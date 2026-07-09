@@ -4,10 +4,12 @@ import { Briefcase, ClipboardList, PlusCircle } from "lucide-react";
 import { useDepartment, useCreateDepartment, useUpdateDepartment } from "../../features/departments";
 import { useHospitals } from "../../features/hospitals";
 import { useBranches } from "../../features/branches";
+import { useAuth } from "../../context/AuthContext";
 import { FormSection } from "../../components/ui/FormSection";
 import { InputField, SelectField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 import { DEPARTMENT_CATEGORIES } from "../../config/departmentTheme";
+import { ROLE_HOME_PATH } from "../../types/auth";
 
 const PRESET_SERVICES = ["Outpatient Care", "Emergency Services", "Diagnostic Imaging", "Intensive Care (ICU)", "Pediatric Wing"];
 
@@ -15,8 +17,11 @@ export function DepartmentFormPage() {
   const { id } = useParams();
   const isEdit = !!id;
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "super_admin";
+  const basePath = ROLE_HOME_PATH[user!.role];
   const { data: department } = useDepartment(id);
-  const { data: hospitalsData } = useHospitals({ page: 1 });
+  const { data: hospitalsData } = useHospitals({ page: 1 }, { enabled: isSuperAdmin });
   const createDepartment = useCreateDepartment();
   const updateDepartment = useUpdateDepartment(id ?? "");
 
@@ -27,7 +32,9 @@ export function DepartmentFormPage() {
     category: DEPARTMENT_CATEGORIES[0],
     description: "",
     headName: "",
+    location: "",
     totalBeds: 0,
+    occupiedBeds: 0,
     doctors: 0,
     nurses: 0,
     support: 0,
@@ -36,7 +43,7 @@ export function DepartmentFormPage() {
   const [customService, setCustomService] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const { data: branchesData } = useBranches({ hospitalId: form.hospital || undefined });
+  const { data: branchesData } = useBranches({ hospitalId: form.hospital || undefined }, { enabled: isSuperAdmin });
 
   useEffect(() => {
     if (department) {
@@ -47,7 +54,9 @@ export function DepartmentFormPage() {
         category: department.category,
         description: department.description,
         headName: department.headName,
+        location: department.location,
         totalBeds: department.totalBeds,
+        occupiedBeds: department.occupiedBeds,
         doctors: department.doctors,
         nurses: department.nurses,
         support: department.support,
@@ -80,7 +89,7 @@ export function DepartmentFormPage() {
       } else {
         await createDepartment.mutateAsync(payload);
       }
-      navigate("/super-admin/departments");
+      navigate(`${basePath}/departments`);
     } catch {
       setError("Could not save department. Check the form and try again.");
     }
@@ -93,7 +102,7 @@ export function DepartmentFormPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
         <div className="text-sm text-slate-400">
-          <Link to="/super-admin/departments" className="hover:text-navy-700">
+          <Link to={`${basePath}/departments`} className="hover:text-navy-700">
             Departments
           </Link>{" "}
           &gt; {isEdit ? "Edit Department" : "Add New Department"}
@@ -112,32 +121,38 @@ export function DepartmentFormPage() {
               </option>
             ))}
           </SelectField>
-          <SelectField label="Parent Hospital" required value={form.hospital} onChange={(e) => setForm({ ...form, hospital: e.target.value })}>
-            <option value="">Select Hospital</option>
-            {hospitalsData?.data.map((h) => (
-              <option key={h._id} value={h._id}>
-                {h.name}
-              </option>
-            ))}
-          </SelectField>
-          <SelectField
-            label="Branch Location"
-            value={form.branch}
-            onChange={(e) => setForm({ ...form, branch: e.target.value })}
-            disabled={!branchesData?.data.length}
-          >
-            <option value="">{branchesData?.data.length ? "Select Branch (optional)" : "No branches for this hospital"}</option>
-            {branchesData?.data.map((b) => (
-              <option key={b._id} value={b._id}>
-                {b.name}
-              </option>
-            ))}
-          </SelectField>
+          {isSuperAdmin && (
+            <>
+              <SelectField label="Parent Hospital" required value={form.hospital} onChange={(e) => setForm({ ...form, hospital: e.target.value })}>
+                <option value="">Select Hospital</option>
+                {hospitalsData?.data.map((h) => (
+                  <option key={h._id} value={h._id}>
+                    {h.name}
+                  </option>
+                ))}
+              </SelectField>
+              <SelectField
+                label="Branch Location"
+                value={form.branch}
+                onChange={(e) => setForm({ ...form, branch: e.target.value })}
+                disabled={!branchesData?.data.length}
+              >
+                <option value="">{branchesData?.data.length ? "Select Branch (optional)" : "No branches for this hospital"}</option>
+                {branchesData?.data.map((b) => (
+                  <option key={b._id} value={b._id}>
+                    {b.name}
+                  </option>
+                ))}
+              </SelectField>
+            </>
+          )}
+          <InputField label="Location (Wing/Floor)" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="e.g. Wing B, Floor 4" />
         </FormSection>
 
         <FormSection icon={ClipboardList} title="Operational Details">
           <InputField label="Department Head" value={form.headName} onChange={(e) => setForm({ ...form, headName: e.target.value })} placeholder="Search by name" />
           <InputField label="Total Beds" type="number" min={0} value={form.totalBeds} onChange={(e) => setForm({ ...form, totalBeds: Number(e.target.value) })} />
+          <InputField label="Occupied Beds" type="number" min={0} value={form.occupiedBeds} onChange={(e) => setForm({ ...form, occupiedBeds: Number(e.target.value) })} />
           <InputField label="Doctors" type="number" min={0} value={form.doctors} onChange={(e) => setForm({ ...form, doctors: Number(e.target.value) })} />
           <InputField label="Nurses" type="number" min={0} value={form.nurses} onChange={(e) => setForm({ ...form, nurses: Number(e.target.value) })} />
           <InputField label="Support Staff" type="number" min={0} value={form.support} onChange={(e) => setForm({ ...form, support: Number(e.target.value) })} />
@@ -175,7 +190,7 @@ export function DepartmentFormPage() {
         {error && <p className="text-sm text-red-600">{error}</p>}
 
         <div className="flex justify-end gap-3">
-          <Button type="button" variant="secondary" onClick={() => navigate("/super-admin/departments")}>
+          <Button type="button" variant="secondary" onClick={() => navigate(`${basePath}/departments`)}>
             Cancel
           </Button>
           <Button type="submit" variant="primary" disabled={isSaving}>

@@ -31,20 +31,23 @@ static, read-only display of this table, not a dynamic custom-role engine.
 ## Repo layout
 ```
 server/src/
-  config/        env.ts, db.ts (connects to MONGO_URI)
-  models/        Mongoose schemas — User, Hospital, Branch, Department, Report (grows per module)
-  middleware/    auth.ts (protect/restrictTo), scopeToHospital.ts, errorHandler.ts
+  config/        env.ts, db.ts (connects to MONGO_URI), cloudinary.ts
+  models/        Mongoose schemas — User, Hospital, Branch, Department, Report,
+                 Doctor, Staff, Patient, Appointment, InventoryItem, Invoice
+  middleware/    auth.ts (protect/restrictTo), scopeToHospital.ts, upload.ts, errorHandler.ts
   controllers/ routes/   one pair per resource (auth, hospitals, branches, departments, admins,
-                 roles, analytics, reports)
+                 roles, analytics, reports, uploads, doctors, staff, patients, appointments,
+                 inventory, invoices)
   utils/         AppError, catchAsync, pagination, csv, idGenerator, rolePermissions, ensureSuperAdmin
   seed/seed.ts   demo data for local dev
 client/src/
   pages/{public,auth,super-admin,hospital-admin,accountant}/
   layouts/       PublicLayout, DashboardLayout (Sidebar + Topbar)
   components/ui/ Button, Card, KpiCard, ChartCard, DataTable, Badge, Modal, Sidebar, Topbar,
-                 Field (InputField/SelectField/TextareaField), FormSection, Pagination
+                 Field (InputField/SelectField/TextareaField), FormSection, Pagination, FileUpload
   features/      TanStack Query hooks per resource (hospitals.ts, branches.ts, departments.ts,
-                 admins.ts, roles.ts, analytics.ts, reports.ts) — same pattern in every file:
+                 admins.ts, roles.ts, analytics.ts, reports.ts, doctors.ts, staff.ts, patients.ts,
+                 appointments.ts, inventory.ts, invoices.ts) — same pattern in every file:
                  useX/useXs query hooks + useCreateX/useUpdateX/useDeleteX mutations
   config/nav.ts  per-role sidebar navigation definitions
   config/departmentTheme.ts   icon/color per department category, for the Departments grid
@@ -52,17 +55,36 @@ client/src/
   router.tsx     role-guarded route tree
 ```
 
+### Shared pages between roles
+`pages/super-admin/DepartmentsPage.tsx` / `DepartmentFormPage.tsx` / `DepartmentMetricsPage.tsx`
+and `ManageRolesPage.tsx` are used by **both** `/super-admin/*` and `/admin/*` routes (imported
+into both branches of `router.tsx`) rather than duplicated — they compute their base path via
+`ROLE_HOME_PATH[user.role]` and conditionally hide super_admin-only fields (Parent Hospital/Branch
+selects) when the logged-in user is a `hospital_admin`. The underlying `departments`/`roles`
+backend routes are shared the same way, via `scopeToHospital` + `restrictTo('super_admin',
+'hospital_admin')`.
+
 ## Auth flow
 1. `POST /api/v1/auth/login` — email+password, bcrypt-compares against `User.passwordHash`,
-   signs a JWT (`{ id, role }`), sets it as an httpOnly `secure` (in prod) cookie.
-2. Every protected request: `protect` middleware reads the cookie, verifies the JWT, loads
+   signs a JWT (`{ id, role }`) and returns it in the response body as `data.token`.
+2. The frontend stores that token in **`sessionStorage`** (`client/src/lib/tokenStorage.ts`), not a
+   cookie — `sessionStorage` is scoped per browser tab/window, so logging into a different account
+   in a different tab doesn't clobber other open sessions. An axios request interceptor
+   (`client/src/lib/api.ts`) attaches it as `Authorization: Bearer <token>` on every request.
+3. Every protected request: `protect` middleware reads that header, verifies the JWT, loads
    `req.user` from Mongo.
-3. `restrictTo(...roles)` middleware gates routes by role.
-4. `scopeToHospital` middleware (must run after `protect`) auto-filters tenant-scoped queries:
+4. `restrictTo(...roles)` middleware gates routes by role.
+5. `scopeToHospital` middleware (must run after `protect`) auto-filters tenant-scoped queries:
    - `hospital_admin` / `accountant` → forced to `req.user.hospital`.
    - `super_admin` → sees everything, or narrows via `?hospitalId=`.
-5. Frontend never stores the token — `AuthContext` just tracks the logged-in user object from
-   `/auth/me` / the login response. Logout calls `POST /auth/logout` which clears the cookie.
+6. Auth is fully stateless — logout just clears `sessionStorage` client-side (`POST /auth/logout`
+   is a no-op kept for API symmetry, since there's no server-side session to invalidate).
+
+Trade-off: this replaced an earlier httpOnly-cookie design (immune to XSS token theft) specifically
+to support multiple simultaneous logins in different windows, which cookies can't do since they're
+shared across every tab of the same origin. `sessionStorage` is readable by JS, so it's more exposed
+to XSS than an httpOnly cookie would be — acceptable here since there's no XSS-introducing
+third-party script/CDN content in this app.
 
 ## File uploads (Cloudinary)
 `server/src/config/cloudinary.ts` parses `CLOUDINARY_URL` from `.env`
@@ -102,9 +124,9 @@ the collection has zero documents, so it never runs again (or duplicates) once a
 hospital_admin/accountant accounts) — it wipes `Users`/`Hospitals` first and uses the same
 `SUPER_ADMIN_*` env values for the super_admin it creates.
 
-Vite proxies `/api/*` to `localhost:5000` in dev (`client/vite.config.ts`), so the browser sees the
-cookie as same-origin — no CORS/cross-site-cookie complications locally, even though the two apps
-run as fully separate processes with their own dependency trees.
+Vite proxies `/api/*` to `localhost:5000` in dev (`client/vite.config.ts`), so requests appear
+same-origin to the browser — avoids CORS complications locally even though the two apps run as
+fully separate processes with their own dependency trees.
 
 ### Demo accounts
 | Email | Role | Password | Source |
@@ -113,9 +135,13 @@ run as fully separate processes with their own dependency trees.
 | `admin@hms.test` | hospital_admin (Sunrise General Hospital) | `Password123!` | `npm run seed` only |
 | `accountant@hms.test` | accountant (Sunrise General Hospital) | `Password123!` | `npm run seed` only |
 
-`npm run seed` wipes and recreates `User`/`Hospital`/`Branch`/`Department`/`Report`, then seeds one
-sample branch and department under "Sunrise General Hospital" so the Super Admin screens have real
-data to show immediately.
+**⚠️ `npm run seed` wipes every collection it touches with an unconditional `deleteMany({})` —
+`User`, `Hospital`, `Branch`, `Department`, `Report`, `Doctor`, `Staff`, `Patient`, `Appointment`,
+`InventoryItem`, `Invoice` — including any accounts/records created by hand through the running
+app, not just prior seed output. Check `db.users.find()` before running it if the database has
+real (non-demo) accounts you want to keep.** It (re)creates "Sunrise General Hospital" with one
+sample doctor, staff member, patient (with a medical history entry), appointment, inventory item,
+and invoice, so every dashboard has real data to show immediately after seeding.
 
 ## Build roadmap (see `C:\Users\HP\.claude\plans\compressed-scribbling-dove.md` for the full plan)
 1. ✅ Foundation — monorepo→separate apps, auth, shared UI kit, layouts, seed script.
@@ -123,22 +149,35 @@ data to show immediately.
 3. ✅ Super Admin module — Hospital/Branch/Department/Admin/Report models + full CRUD APIs + all 14
    screens (Dashboard, Hospitals list/add/edit/details, Branches list/add/edit, Departments grid/
    add/edit/metrics, Admins list/add/edit, Manage Roles, Analytics, Reports).
-4. ⬜ Hospital Admin module — Doctor/Staff/Patient/Appointment/Inventory models + CRUD + 18 screens.
-5. ⬜ Accountant module — Invoice/Payment/InsuranceClaim/Expense/Payroll/AuditLog models + CRUD + 20 screens.
+4. ✅ Hospital Admin module — Doctor/Staff/Patient/Appointment/InventoryItem/Invoice models + full
+   CRUD APIs + all 19 screens (Dashboard, Doctors list/add/profile/performance, Patients
+   list/add/details incl. medical history, Appointments list/add/workflow-details, Staff
+   list/add, Departments grid/add/metrics (shared with Super Admin), Finance + invoice
+   create/detail, Inventory list/add/item-details, Roles (shared)). Every hospital_admin request
+   is hard-scoped to `req.user.hospital` via `scopeToHospital` — verified two hospital_admins
+   from different hospitals cannot see/edit/delete each other's data.
+5. ⬜ Accountant module — Payment/InsuranceClaim/Expense/Payroll/AuditLog models + CRUD + 20 screens
+   (the `Invoice` model from phase 4 is reused, not rebuilt).
 6. ⬜ Cross-cutting polish — global search, notifications, audit-log hooks, final seed pass.
 
-Hospital Admin / Accountant dashboards still show static KPI shells (see `pages/{role}/Dashboard.tsx`)
-— wired to real data when phases 4–5 land.
+Accountant dashboard still shows a static KPI shell (see `pages/accountant/Dashboard.tsx`) — wired
+to real data when phase 5 lands.
 
-### Honest-empty data policy (Super Admin module)
-Every number on every Super Admin screen comes from a real Mongo query. Hospitals/Branches/
-Departments/Admins counts are fully real. Metrics that depend on modules not built yet — Revenue,
-Active Patients, Appointments, Doctor/staff performance, bed occupancy — render explicit "no data
-yet" states instead of fabricated numbers (see `analyticsController.ts`'s `pending` flags and the
-empty-state cards in `AnalyticsPage.tsx`/`HospitalDetailsPage.tsx`/`DepartmentMetricsPage.tsx`).
+### Honest-empty data policy
+Every number on every Super Admin and Hospital Admin screen comes from a real Mongo query.
+Hospitals/Branches/Departments/Admins/Doctors/Staff/Patients/Appointments/Inventory/Invoice counts
+are fully real — including bed occupancy (`Department.occupiedBeds`/`totalBeds`, editable per
+department) and revenue (summed from real `Invoice` documents). Metrics that still depend on
+modules not built yet — hospital-wide patient satisfaction trend charts, doctor consultation-time
+telemetry, supplier/purchase-order tracking — render explicit "no data yet" states instead of
+fabricated numbers (see `analyticsController.ts`'s `pending` flags and the empty-state cards in
+`AnalyticsPage.tsx`/`HospitalDetailsPage.tsx`/`DepartmentMetricsPage.tsx`/`DoctorPerformancePage.tsx`).
 Reports Hub was similarly re-scoped from Figma's fictional PDF/XLSX financial reports to a real CSV
-export of the 4 registries we do have, logged to the `Report` collection. "Manage Roles" shows our
-3 real fixed roles with live assigned-user counts, not Figma's 14 fictional roles.
+export of the 4 registries we do have, logged to the `Report` collection. "Manage Roles"/"Role
+Permission Matrix" shows our 3 (or 2, hospital-scoped) real fixed roles with live assigned-user
+counts, not Figma's 14 fictional roles. Inventory's Purchase-Order/Supplier-Performance panels and
+Appointment's live vitals-tracking widgets were dropped as separate subsystems out of scope here —
+see the full list of adaptations in the Hospital Admin module plan file.
 
 ### Gotchas
 - `components/ui/Card.tsx` only adds its default `bg-white` when the caller's `className` doesn't
@@ -149,8 +188,8 @@ export of the 4 registries we do have, logged to the `Report` collection. "Manag
 
 ## Design reference
 Figma file: `ifQiK3X0WSWTVzfflLHMhQ`, one page, three labeled sections each containing many
-individual screen frames: **Super Admin Dashboard** (13 screens, starts at node `0:326`),
+individual screen frames: **Super Admin Dashboard** (14 screens, starts at node `0:326`),
 **Accountant Dashboard** (20 screens, starts at node `0:4825`), **Hospital Admin Dashboard**
-(18 screens, starts at node `0:10923`). No login/landing frames exist there; those were designed
+(19 screens, starts at node `0:10923`). No login/landing frames exist there; those were designed
 fresh in this codebase to match the navy/white SaaS visual language (sidebar + topbar, KPI cards
 with icon-in-tinted-box, chart cards, status-pill tables).

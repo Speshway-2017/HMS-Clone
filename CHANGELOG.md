@@ -5,6 +5,39 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 ### Added
+- **Hospital Admin module, all 19 Figma screens implemented end-to-end:**
+  - New `Doctor`, `Staff`, `Patient` (with embedded `medicalHistory`), `Appointment`,
+    `InventoryItem`, `Invoice` models; `Department` gained `location`/`occupiedBeds` (now used for
+    real bed-occupancy % everywhere, replacing the earlier honest-empty placeholder).
+  - Full CRUD REST APIs for doctors (+ performance endpoint), staff (+ top-3 leaderboard),
+    patients (+ medical-history entries), appointments (+ status workflow), inventory
+    (+ computed critical/low/optimal stock status), invoices (+ computed subtotal/tax/insurance
+    totals), all hard-scoped to `req.user.hospital` via `scopeToHospital` — verified two
+    hospital_admins from different hospitals cannot see, fetch-by-id, or delete each other's data.
+  - New `GET /api/v1/analytics/hospital` (real hospital-scoped counts incl. revenue from paid
+    invoices and bed occupancy from department data).
+  - `departments` and `roles` backend routes/frontend pages extended (not duplicated) to serve
+    both `super_admin` and `hospital_admin` — same components, computed base path, conditionally
+    hidden super_admin-only fields.
+  - Matching frontend pages for every screen: Doctors (list/add/profile/performance), Patients
+    (list/add/details-with-medical-history), Appointments (list/add/workflow-details with a
+    real status-advance control), Staff (list/add), Departments (shared), Finance (dashboard +
+    invoice create/detail with real computed billing totals), Inventory (list/add/item-details),
+    Roles (shared) — plus `features/*.ts` TanStack Query hooks per resource.
+  - Cloudinary upload folders extended for doctor/staff profile photos (reusing the existing
+    `FileUpload` component/endpoint from the Super Admin phase).
+  - Seed script extended with one doctor/staff/patient/appointment/inventory item/invoice under
+    the demo hospital.
+
+### Changed
+- Switched auth from an httpOnly cookie to a JWT returned from login and stored in
+  `sessionStorage`, sent as `Authorization: Bearer <token>` (axios request interceptor). This lets
+  different accounts be logged in simultaneously in different browser tabs/windows, which cookies
+  can't do (they're shared across every tab of the same origin). Removed `cookie-parser` (unused
+  now) and the cookie-setting helpers. Documented the resulting XSS trade-off in
+  `KNOWLEDGE_BASE.md`.
+
+### Added
 - Real file uploads via Cloudinary: `POST /api/v1/uploads` (multer memory storage → Cloudinary,
   no temp files on disk), a reusable `FileUpload` component, and wiring for hospital logo/license
   (`HospitalFormPage`) and admin profile photo (`AdminFormPage`, shown in the Topbar avatar once

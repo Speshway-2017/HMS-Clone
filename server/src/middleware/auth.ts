@@ -4,11 +4,12 @@ import { env } from "../config/env";
 import { User } from "../models/User";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
-import { AUTH_COOKIE_NAME, TokenPayload } from "../utils/token";
+import { TokenPayload } from "../utils/token";
 import { Role } from "../utils/roles";
 
 export const protect = catchAsync(async (req: Request, _res: Response, next: NextFunction) => {
-  const token = req.cookies?.[AUTH_COOKIE_NAME];
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : undefined;
   if (!token) {
     throw new AppError("You are not logged in.", 401);
   }

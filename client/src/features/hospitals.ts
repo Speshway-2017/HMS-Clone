@@ -12,9 +12,10 @@ interface HospitalListResponse extends Paginated<Hospital> {
   counts: { total: number; active: number; inactive: number };
 }
 
-export function useHospitals(params: HospitalListParams) {
+export function useHospitals(params: HospitalListParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["hospitals", params],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<HospitalListResponse>("/hospitals", { params });
       return res.data;

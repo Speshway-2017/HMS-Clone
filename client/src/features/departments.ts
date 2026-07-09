@@ -25,10 +25,9 @@ export function useDepartment(id: string | undefined) {
 
 interface DepartmentMetrics {
   department: Department;
-  bedOccupancy: { pending: boolean; message?: string };
+  bedOccupancy: { percent: number; occupied: number; total: number };
   patientVolumeTrend: { pending: boolean; data: unknown[] };
   staffPerformance: { pending: boolean; data: unknown[] };
-  patientScore: { pending: boolean };
 }
 
 export function useDepartmentMetrics(id: string | undefined) {
@@ -45,7 +44,7 @@ export function useDepartmentMetrics(id: string | undefined) {
 export function useCreateDepartment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: Partial<Department> & { hospital: string }) => {
+    mutationFn: async (payload: Partial<Department> & { hospital?: string }) => {
       const res = await api.post("/departments", payload);
       return res.data.data.department as Department;
     },

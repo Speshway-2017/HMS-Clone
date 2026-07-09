@@ -1,9 +1,11 @@
 import { Link } from "react-router-dom";
 import { Plus, ArrowRight } from "lucide-react";
 import { useDepartments } from "../../features/departments";
+import { useAuth } from "../../context/AuthContext";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { getDepartmentTheme } from "../../config/departmentTheme";
+import { ROLE_HOME_PATH } from "../../types/auth";
 
 const STATUS_LABEL: Record<string, { text: string; tone: "success" | "danger" | "warning" }> = {
   operational: { text: "Operational", tone: "success" },
@@ -14,6 +16,9 @@ const STATUS_LABEL: Record<string, { text: string; tone: "success" | "danger" | 
 
 export function DepartmentsPage() {
   const { data: departments, isLoading } = useDepartments();
+  const { user } = useAuth();
+  const basePath = ROLE_HOME_PATH[user!.role];
+  const isSuperAdmin = user?.role === "super_admin";
 
   return (
     <div className="space-y-6">
@@ -21,10 +26,12 @@ export function DepartmentsPage() {
         <div>
           <h1 className="text-2xl font-bold">Clinical Departments</h1>
           <p className="mt-1 text-sm text-navy-100">
-            Manage medical infrastructure and monitor departments across all registered hospitals.
+            {isSuperAdmin
+              ? "Manage medical infrastructure and monitor departments across all registered hospitals."
+              : "Manage medical infrastructure and monitor departments for your hospital."}
           </p>
         </div>
-        <Link to="/super-admin/departments/new">
+        <Link to={`${basePath}/departments/new`}>
           <Button variant="secondary" className="bg-white">
             <Plus className="h-4 w-4" /> Add Department
           </Button>
@@ -56,7 +63,9 @@ export function DepartmentsPage() {
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-white py-2 text-center">
                   <div className="text-xs text-slate-400">Beds</div>
-                  <div className="text-sm font-semibold text-slate-800">{dept.totalBeds}</div>
+                  <div className="text-sm font-semibold text-slate-800">
+                    {dept.occupiedBeds}/{dept.totalBeds}
+                  </div>
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-white py-2 text-center">
                   <div className="text-xs text-slate-400">Rating</div>
@@ -64,7 +73,7 @@ export function DepartmentsPage() {
                 </div>
               </div>
 
-              <Link to={`/super-admin/departments/${dept._id}/metrics`}>
+              <Link to={`${basePath}/departments/${dept._id}/metrics`}>
                 <Button variant="secondary" className="mt-4 w-full justify-center border-navy-200 text-navy-700">
                   View Full Metrics <ArrowRight className="h-4 w-4" />
                 </Button>

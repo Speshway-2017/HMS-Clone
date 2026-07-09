@@ -2,6 +2,12 @@ import { Request, Response } from "express";
 import { Hospital } from "../models/Hospital";
 import { Branch } from "../models/Branch";
 import { Department } from "../models/Department";
+import { Doctor } from "../models/Doctor";
+import { Staff } from "../models/Staff";
+import { Patient } from "../models/Patient";
+import { Appointment } from "../models/Appointment";
+import { InventoryItem } from "../models/InventoryItem";
+import { Invoice } from "../models/Invoice";
 import { User } from "../models/User";
 import { catchAsync } from "../utils/catchAsync";
 
@@ -56,6 +62,49 @@ export const getGlobalAnalytics = catchAsync(async (_req: Request, res: Response
       charts: {
         branchesPerHospital,
         adminsByRole: adminsByRole.map((a) => ({ role: a._id, count: a.count })),
+      },
+    },
+  });
+});
+
+export const getHospitalAnalytics = catchAsync(async (req: Request, res: Response) => {
+  const hospitalFilter = req.hospitalFilter as Record<string, unknown>;
+  const startOfDay = new Date(new Date().setHours(0, 0, 0, 0));
+  const endOfDay = new Date(new Date().setHours(24, 0, 0, 0));
+
+  const [totalDoctors, totalStaff, totalPatients, todaysAppointments, departments, inventoryItems, paidInvoices] = await Promise.all([
+    Doctor.countDocuments(hospitalFilter),
+    Staff.countDocuments(hospitalFilter),
+    Patient.countDocuments(hospitalFilter),
+    Appointment.countDocuments({ ...hospitalFilter, date: { $gte: startOfDay, $lt: endOfDay } }),
+    Department.find(hospitalFilter),
+    InventoryItem.find(hospitalFilter),
+    Invoice.find({ ...hospitalFilter, status: "paid" }),
+  ]);
+
+  const criticalStockCount = inventoryItems.filter((i) => i.stockQty <= i.reorderLevel).length;
+  const totalBeds = departments.reduce((sum, d) => sum + d.totalBeds, 0);
+  const occupiedBeds = departments.reduce((sum, d) => sum + d.occupiedBeds, 0);
+  const bedOccupancyPercent = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0;
+  const totalRevenue = paidInvoices.reduce(
+    (sum, inv) => sum + inv.items.reduce((s, i) => s + i.quantity * i.amount, 0) * (1 + inv.taxRate / 100) + inv.serviceFee,
+    0,
+  );
+
+  res.json({
+    status: "success",
+    data: {
+      counts: {
+        totalDoctors,
+        totalStaff,
+        totalPatients,
+        todaysAppointments,
+        totalDepartments: departments.length,
+        criticalStockCount,
+        totalBeds,
+        occupiedBeds,
+        bedOccupancyPercent,
+        totalRevenue,
       },
     },
   });

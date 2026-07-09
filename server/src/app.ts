@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
-import cookieParser from "cookie-parser";
 import { env } from "./config/env";
 import { notFound, errorHandler } from "./middleware/errorHandler";
 import authRoutes from "./routes/authRoutes";
@@ -14,14 +13,19 @@ import roleRoutes from "./routes/roleRoutes";
 import analyticsRoutes from "./routes/analyticsRoutes";
 import reportRoutes from "./routes/reportRoutes";
 import uploadRoutes from "./routes/uploadRoutes";
+import doctorRoutes from "./routes/doctorRoutes";
+import staffRoutes from "./routes/staffRoutes";
+import patientRoutes from "./routes/patientRoutes";
+import appointmentRoutes from "./routes/appointmentRoutes";
+import inventoryRoutes from "./routes/inventoryRoutes";
+import invoiceRoutes from "./routes/invoiceRoutes";
 import "./config/cloudinary";
 
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: env.clientUrl, credentials: true }));
+app.use(cors({ origin: env.clientUrl }));
 app.use(express.json());
-app.use(cookieParser());
 if (env.nodeEnv !== "test") {
   app.use(morgan("dev"));
 }
@@ -39,6 +43,12 @@ app.use("/api/v1/roles", roleRoutes);
 app.use("/api/v1/analytics", analyticsRoutes);
 app.use("/api/v1/reports", reportRoutes);
 app.use("/api/v1/uploads", uploadRoutes);
+app.use("/api/v1/doctors", doctorRoutes);
+app.use("/api/v1/staff", staffRoutes);
+app.use("/api/v1/patients", patientRoutes);
+app.use("/api/v1/appointments", appointmentRoutes);
+app.use("/api/v1/inventory", inventoryRoutes);
+app.use("/api/v1/invoices", invoiceRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

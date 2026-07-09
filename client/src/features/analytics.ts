@@ -31,3 +31,28 @@ export function useGlobalAnalytics() {
     },
   });
 }
+
+interface HospitalAnalytics {
+  counts: {
+    totalDoctors: number;
+    totalStaff: number;
+    totalPatients: number;
+    todaysAppointments: number;
+    totalDepartments: number;
+    criticalStockCount: number;
+    totalBeds: number;
+    occupiedBeds: number;
+    bedOccupancyPercent: number;
+    totalRevenue: number;
+  };
+}
+
+export function useHospitalAnalytics() {
+  return useQuery({
+    queryKey: ["analytics", "hospital"],
+    queryFn: async () => {
+      const res = await api.get("/analytics/hospital");
+      return res.data.data as HospitalAnalytics;
+    },
+  });
+}
