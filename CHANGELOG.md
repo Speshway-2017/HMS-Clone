@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Changed
+- Switched auth from an httpOnly cookie to a JWT returned from login and stored in
+  `sessionStorage`, sent as `Authorization: Bearer <token>` (axios request interceptor). This lets
+  different accounts be logged in simultaneously in different browser tabs/windows, which cookies
+  can't do (they're shared across every tab of the same origin). Removed `cookie-parser` (unused
+  now) and the cookie-setting helpers. Documented the resulting XSS trade-off in
+  `KNOWLEDGE_BASE.md`.
+
 ### Added
 - Real file uploads via Cloudinary: `POST /api/v1/uploads` (multer memory storage → Cloudinary,
   no temp files on disk), a reusable `FileUpload` component, and wiring for hospital logo/license

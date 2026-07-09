@@ -54,15 +54,25 @@ client/src/
 
 ## Auth flow
 1. `POST /api/v1/auth/login` — email+password, bcrypt-compares against `User.passwordHash`,
-   signs a JWT (`{ id, role }`), sets it as an httpOnly `secure` (in prod) cookie.
-2. Every protected request: `protect` middleware reads the cookie, verifies the JWT, loads
+   signs a JWT (`{ id, role }`) and returns it in the response body as `data.token`.
+2. The frontend stores that token in **`sessionStorage`** (`client/src/lib/tokenStorage.ts`), not a
+   cookie — `sessionStorage` is scoped per browser tab/window, so logging into a different account
+   in a different tab doesn't clobber other open sessions. An axios request interceptor
+   (`client/src/lib/api.ts`) attaches it as `Authorization: Bearer <token>` on every request.
+3. Every protected request: `protect` middleware reads that header, verifies the JWT, loads
    `req.user` from Mongo.
-3. `restrictTo(...roles)` middleware gates routes by role.
-4. `scopeToHospital` middleware (must run after `protect`) auto-filters tenant-scoped queries:
+4. `restrictTo(...roles)` middleware gates routes by role.
+5. `scopeToHospital` middleware (must run after `protect`) auto-filters tenant-scoped queries:
    - `hospital_admin` / `accountant` → forced to `req.user.hospital`.
    - `super_admin` → sees everything, or narrows via `?hospitalId=`.
-5. Frontend never stores the token — `AuthContext` just tracks the logged-in user object from
-   `/auth/me` / the login response. Logout calls `POST /auth/logout` which clears the cookie.
+6. Auth is fully stateless — logout just clears `sessionStorage` client-side (`POST /auth/logout`
+   is a no-op kept for API symmetry, since there's no server-side session to invalidate).
+
+Trade-off: this replaced an earlier httpOnly-cookie design (immune to XSS token theft) specifically
+to support multiple simultaneous logins in different windows, which cookies can't do since they're
+shared across every tab of the same origin. `sessionStorage` is readable by JS, so it's more exposed
+to XSS than an httpOnly cookie would be — acceptable here since there's no XSS-introducing
+third-party script/CDN content in this app.
 
 ## File uploads (Cloudinary)
 `server/src/config/cloudinary.ts` parses `CLOUDINARY_URL` from `.env`

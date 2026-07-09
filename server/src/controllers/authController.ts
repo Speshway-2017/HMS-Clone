@@ -3,7 +3,7 @@ import { z } from "zod";
 import { User, UserDocument } from "../models/User";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
-import { signToken, setAuthCookie, clearAuthCookie } from "../utils/token";
+import { signToken } from "../utils/token";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -38,13 +38,12 @@ export const login = catchAsync(async (req: Request, res: Response) => {
   await user.save();
 
   const token = signToken({ id: user._id.toString(), role: user.role });
-  setAuthCookie(res, token);
 
-  res.status(200).json({ status: "success", data: { user: sanitizeUser(user) } });
+  res.status(200).json({ status: "success", data: { user: sanitizeUser(user), token } });
 });
 
 export const logout = catchAsync(async (_req: Request, res: Response) => {
-  clearAuthCookie(res);
+  // Stateless JWT — the client discards its token. Nothing to invalidate server-side.
   res.status(200).json({ status: "success", data: null });
 });
 
