@@ -4,6 +4,11 @@ All notable changes to this project are documented in this file.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Changed
+- Split `client` and `server` into fully independent apps: removed the root `package.json`,
+  root lockfile, and root `node_modules` (npm workspaces + `concurrently`). Each app now has its
+  own dependencies and is started with its own `npm install` / `npm run dev` in a separate
+  terminal — no shared tooling at the repo root.
 
 ## [0.1.0] - 2026-07-08
 ### Added

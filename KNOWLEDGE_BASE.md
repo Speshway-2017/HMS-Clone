@@ -23,8 +23,9 @@ static, read-only display of this table, not a dynamic custom-role engine.
 - **Frontend**: React 18 + Vite + TypeScript, React Router v6, Tailwind CSS (theme tokens in
   `client/tailwind.config.ts` — `navy` palette pulled from the Figma screenshots), TanStack Query
   for server state, Recharts for charts, lucide-react for icons.
-- **Monorepo**: npm workspaces (`server`, `client`), root `npm run dev` runs both concurrently via
-  `concurrently`.
+- **Two independent apps**: `server` and `client` are separate Node projects, each with its own
+  `package.json` / lockfile / `node_modules` — no root package.json or shared workspace tooling.
+  Run each with its own `npm install` and `npm run dev`, in two terminals.
 
 ## Repo layout
 ```
@@ -57,15 +58,24 @@ client/src/
 
 ## Local development
 Requires MongoDB running locally on the default port (`mongod` / MongoDB Community Server / Compass).
+`server` and `client` are installed and run independently, in separate terminals.
 
 ```bash
-npm install          # installs both workspaces
-npm run seed          # wipes Users/Hospitals, creates demo accounts (see below)
-npm run dev            # runs server (:5000) + client (:5173) together
+# Terminal 1 — backend
+cd server
+npm install
+npm run seed     # wipes Users/Hospitals, creates demo accounts (see below)
+npm run dev        # http://localhost:5000
+
+# Terminal 2 — frontend
+cd client
+npm install
+npm run dev        # http://localhost:5173
 ```
 
 Vite proxies `/api/*` to `localhost:5000` in dev (`client/vite.config.ts`), so the browser sees the
-cookie as same-origin — no CORS/cross-site-cookie complications locally.
+cookie as same-origin — no CORS/cross-site-cookie complications locally, even though the two apps
+run as fully separate processes with their own dependency trees.
 
 ### Seeded demo accounts (password for all: `Password123!`)
 | Email | Role |
