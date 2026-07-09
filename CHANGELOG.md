@@ -9,12 +9,35 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   is empty, using `SUPER_ADMIN_NAME` / `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` from
   `server/.env` (`server/src/utils/ensureSuperAdmin.ts`). The demo seed script now reuses the same
   env values for its super_admin instead of a hardcoded one.
+- **Super Admin module, all 14 Figma screens implemented end-to-end:**
+  - New `Branch`, `Department`, `Report` models; `Hospital` gained `bedCapacity`, `User` gained
+    `title`/`phone`/`employeeId`.
+  - Full CRUD REST APIs for hospitals, branches, departments, admins, plus read-only `roles` (3
+    real roles with live assigned-user counts), `analytics/global` (real structural counts with
+    honest `pending` flags for revenue/patient/appointment metrics we don't have data for yet), and
+    `reports` (real CSV export of each registry, logged to the `Report` collection).
+  - Matching frontend pages for every screen — Hospitals (list/add/edit/details), Branches
+    (list/add/edit), Departments (grid/add/edit/full-metrics), Admins (list/add/edit, with a
+    one-time temp-password reveal on creation), Manage Roles, Analytics (Recharts on real data),
+    Reports — plus new shared UI primitives (`Field`, `FormSection`, `Pagination`) and
+    `features/*.ts` TanStack Query hooks per resource.
+  - Fixed a `Card` component bug (found via Playwright walkthrough of every new screen) where an
+    emphasized navy KPI card rendered invisible white-on-white text because the component's default
+    `bg-white` could win over a caller-supplied `bg-navy-700` depending on Tailwind's generated CSS
+    order; `Card` now omits its default background whenever the caller passes one.
+- Redesigned the public landing page with current SaaS design patterns (sticky blurred nav,
+  gradient-mesh hero with a dashboard-preview mockup, bento-grid features, elevated role cards, CTA
+  band, multi-column footer) and verified it fully responsive with no horizontal scroll from 375px
+  phones through 1920px+ screens (new `xs: 400px` Tailwind breakpoint, `max-w-[1600px]` content cap
+  for ultra-wide/TV).
 
 ### Changed
 - Split `client` and `server` into fully independent apps: removed the root `package.json`,
   root lockfile, and root `node_modules` (npm workspaces + `concurrently`). Each app now has its
   own dependencies and is started with its own `npm install` / `npm run dev` in a separate
   terminal — no shared tooling at the repo root.
+- `npm run seed` now also wipes `Branch`/`Department`/`Report` and seeds one sample branch and
+  department, so the Super Admin screens have real data immediately after seeding.
 
 ## [0.1.0] - 2026-07-08
 ### Added

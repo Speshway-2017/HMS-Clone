@@ -8,6 +8,7 @@ const hospitalSchema = new Schema(
     contactEmail: { type: String, default: "" },
     contactPhone: { type: String, default: "" },
     logoUrl: { type: String, default: "" },
+    bedCapacity: { type: Number, default: 0 },
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },
   },

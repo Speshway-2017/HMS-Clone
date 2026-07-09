@@ -6,6 +6,13 @@ import cookieParser from "cookie-parser";
 import { env } from "./config/env";
 import { notFound, errorHandler } from "./middleware/errorHandler";
 import authRoutes from "./routes/authRoutes";
+import hospitalRoutes from "./routes/hospitalRoutes";
+import branchRoutes from "./routes/branchRoutes";
+import departmentRoutes from "./routes/departmentRoutes";
+import adminRoutes from "./routes/adminRoutes";
+import roleRoutes from "./routes/roleRoutes";
+import analyticsRoutes from "./routes/analyticsRoutes";
+import reportRoutes from "./routes/reportRoutes";
 
 const app = express();
 
@@ -22,6 +29,13 @@ app.get("/api/v1/health", (_req, res) => {
 });
 
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/hospitals", hospitalRoutes);
+app.use("/api/v1/branches", branchRoutes);
+app.use("/api/v1/departments", departmentRoutes);
+app.use("/api/v1/admins", adminRoutes);
+app.use("/api/v1/roles", roleRoutes);
+app.use("/api/v1/analytics", analyticsRoutes);
+app.use("/api/v1/reports", reportRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

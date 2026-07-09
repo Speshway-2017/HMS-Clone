@@ -31,16 +31,23 @@ static, read-only display of this table, not a dynamic custom-role engine.
 ```
 server/src/
   config/        env.ts, db.ts (connects to MONGO_URI)
-  models/        Mongoose schemas (User, Hospital, ... grows per module)
+  models/        Mongoose schemas — User, Hospital, Branch, Department, Report (grows per module)
   middleware/    auth.ts (protect/restrictTo), scopeToHospital.ts, errorHandler.ts
-  controllers/ routes/   one pair per resource
+  controllers/ routes/   one pair per resource (auth, hospitals, branches, departments, admins,
+                 roles, analytics, reports)
+  utils/         AppError, catchAsync, pagination, csv, idGenerator, rolePermissions, ensureSuperAdmin
   seed/seed.ts   demo data for local dev
 client/src/
   pages/{public,auth,super-admin,hospital-admin,accountant}/
   layouts/       PublicLayout, DashboardLayout (Sidebar + Topbar)
-  components/ui/ Button, Card, KpiCard, ChartCard, DataTable, Badge, Modal, Sidebar, Topbar
-  context/AuthContext.tsx   current user/session (calls GET /auth/me on load)
+  components/ui/ Button, Card, KpiCard, ChartCard, DataTable, Badge, Modal, Sidebar, Topbar,
+                 Field (InputField/SelectField/TextareaField), FormSection, Pagination
+  features/      TanStack Query hooks per resource (hospitals.ts, branches.ts, departments.ts,
+                 admins.ts, roles.ts, analytics.ts, reports.ts) — same pattern in every file:
+                 useX/useXs query hooks + useCreateX/useUpdateX/useDeleteX mutations
   config/nav.ts  per-role sidebar navigation definitions
+  config/departmentTheme.ts   icon/color per department category, for the Departments grid
+  context/AuthContext.tsx   current user/session (calls GET /auth/me on load)
   router.tsx     role-guarded route tree
 ```
 
@@ -90,20 +97,43 @@ run as fully separate processes with their own dependency trees.
 ### Demo accounts
 | Email | Role | Password | Source |
 |---|---|---|---|
-| `superadmin@hms.test` | super_admin | `SUPER_ADMIN_PASSWORD` in `.env` | auto-bootstrap or `npm run seed` |
+| value of `SUPER_ADMIN_EMAIL` in `.env` | super_admin | `SUPER_ADMIN_PASSWORD` in `.env` | auto-bootstrap or `npm run seed` |
 | `admin@hms.test` | hospital_admin (Sunrise General Hospital) | `Password123!` | `npm run seed` only |
 | `accountant@hms.test` | accountant (Sunrise General Hospital) | `Password123!` | `npm run seed` only |
 
+`npm run seed` wipes and recreates `User`/`Hospital`/`Branch`/`Department`/`Report`, then seeds one
+sample branch and department under "Sunrise General Hospital" so the Super Admin screens have real
+data to show immediately.
+
 ## Build roadmap (see `C:\Users\HP\.claude\plans\compressed-scribbling-dove.md` for the full plan)
-1. ✅ Foundation — monorepo, auth, shared UI kit, layouts, seed script.
-2. ✅ Public site + Login — landing page + login wired to real auth API.
-3. ⬜ Super Admin module — Hospital/Branch/Department/Admin models + CRUD + 13 screens.
+1. ✅ Foundation — monorepo→separate apps, auth, shared UI kit, layouts, seed script.
+2. ✅ Public site + Login — modern responsive landing page + login wired to real auth API.
+3. ✅ Super Admin module — Hospital/Branch/Department/Admin/Report models + full CRUD APIs + all 14
+   screens (Dashboard, Hospitals list/add/edit/details, Branches list/add/edit, Departments grid/
+   add/edit/metrics, Admins list/add/edit, Manage Roles, Analytics, Reports).
 4. ⬜ Hospital Admin module — Doctor/Staff/Patient/Appointment/Inventory models + CRUD + 18 screens.
 5. ⬜ Accountant module — Invoice/Payment/InsuranceClaim/Expense/Payroll/AuditLog models + CRUD + 20 screens.
 6. ⬜ Cross-cutting polish — global search, notifications, audit-log hooks, final seed pass.
 
-Phases 1–2 are done; dashboards currently show static KPI shells (see `pages/{role}/Dashboard.tsx`) —
-these get wired to real data as each module's backend lands in phases 3–5.
+Hospital Admin / Accountant dashboards still show static KPI shells (see `pages/{role}/Dashboard.tsx`)
+— wired to real data when phases 4–5 land.
+
+### Honest-empty data policy (Super Admin module)
+Every number on every Super Admin screen comes from a real Mongo query. Hospitals/Branches/
+Departments/Admins counts are fully real. Metrics that depend on modules not built yet — Revenue,
+Active Patients, Appointments, Doctor/staff performance, bed occupancy — render explicit "no data
+yet" states instead of fabricated numbers (see `analyticsController.ts`'s `pending` flags and the
+empty-state cards in `AnalyticsPage.tsx`/`HospitalDetailsPage.tsx`/`DepartmentMetricsPage.tsx`).
+Reports Hub was similarly re-scoped from Figma's fictional PDF/XLSX financial reports to a real CSV
+export of the 4 registries we do have, logged to the `Report` collection. "Manage Roles" shows our
+3 real fixed roles with live assigned-user counts, not Figma's 14 fictional roles.
+
+### Gotchas
+- `components/ui/Card.tsx` only adds its default `bg-white` when the caller's `className` doesn't
+  already contain a `bg-` utility (checked via regex) — otherwise two conflicting `bg-*` classes on
+  one element race on Tailwind's generated stylesheet order, not JSX string order, and the wrong one
+  can win. This is why `<Card className="bg-navy-700 text-white">` (used for emphasized KPI cards)
+  reliably shows the navy background instead of silently rendering white-on-white text.
 
 ## Design reference
 Figma file: `ifQiK3X0WSWTVzfflLHMhQ`, one page, three labeled sections each containing many

@@ -9,6 +9,9 @@ export interface UserDocument extends Document {
   passwordHash: string;
   role: Role;
   hospital: Types.ObjectId | null;
+  title: string;
+  phone: string;
+  employeeId: string;
   status: "active" | "inactive";
   lastLogin: Date | null;
   createdAt: Date;
@@ -23,6 +26,9 @@ const userSchema = new Schema<UserDocument>(
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, enum: ROLES, required: true },
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", default: null },
+    title: { type: String, default: "" },
+    phone: { type: String, default: "" },
+    employeeId: { type: String, default: "" },
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     lastLogin: { type: Date, default: null },
   },
