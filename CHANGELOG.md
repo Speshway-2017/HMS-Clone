@@ -5,6 +5,32 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 ### Added
+- **Settings page** (`pages/shared/SettingsPage.tsx`) — shared across all three roles, accessible
+  from the sidebar "Settings" item and by clicking the avatar/name in the Topbar. Contains a
+  read-only profile card (name, email, role) and a Change Password form (new password + confirm,
+  show/hide toggles, match indicator, loading state, success/error toast).
+- **Change Password API** — `PATCH /api/v1/auth/change-password` (protected, all roles): validates
+  that new and confirm passwords match, then bcrypt-hashes (cost 12) and persists the new hash.
+  No current-password requirement, no strength restrictions — any non-empty password is accepted.
+- **Notification overlay** (`components/ui/NotificationPanel.tsx`) — functional bell icon in the
+  Topbar for `hospital_admin` only. Clicking opens a slide-in dropdown panel with real
+  notifications sourced from live Mongo queries:
+    - 🗓 **Appointments** scheduled today or tomorrow (status `scheduled`)
+    - ⚠️ **Low/out-of-stock inventory** items where `stockQty ≤ reorderLevel`
+    - 💳 **Overdue or past-due-pending invoices** (status `overdue` or `pending` with `dueDate`
+      in the past)
+    - 🧑‍⚕️ **New patients** registered in the last 24 hours
+  Critical items sort to the top. Clicking any item navigates to that record's detail page and
+  marks it read. Panel includes unread count badge, "Mark all as read", loading skeleton, empty
+  state, Escape/outside-click dismissal, and auto-refreshes every 60 seconds via TanStack Query.
+- **Notification API** — `GET /api/v1/notifications` (protected + `scopeToHospital`): runs 4
+  parallel queries and returns a unified sorted array of `{ id, type, title, message, link,
+  severity, createdAt }` objects.
+- **Settings nav item** added to all three role sidebar nav arrays in `config/nav.ts`.
+- **Topbar avatar/name** is now a clickable `<Link>` to the role-specific settings page
+  (e.g. `/admin/settings`), with a small Settings icon beside the name.
+
+
 - **Hospital Admin module, all 19 Figma screens implemented end-to-end:**
   - New `Doctor`, `Staff`, `Patient` (with embedded `medicalHistory`), `Appointment`,
     `InventoryItem`, `Invoice` models; `Department` gained `location`/`occupiedBeds` (now used for

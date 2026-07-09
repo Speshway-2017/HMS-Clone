@@ -20,6 +20,7 @@ import {
   TrendingUp,
   ClipboardList,
   History,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 import { Role } from "../types/auth";
@@ -40,6 +41,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "Manage Roles", path: "/super-admin/roles", icon: ShieldCheck },
     { label: "Analytics", path: "/super-admin/analytics", icon: BarChart3 },
     { label: "Reports", path: "/super-admin/reports", icon: FileText },
+    { label: "Settings", path: "/super-admin/settings", icon: Settings },
   ],
   hospital_admin: [
     { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
@@ -51,6 +53,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "Finance", path: "/admin/finance", icon: Wallet },
     { label: "Inventory", path: "/admin/inventory", icon: Boxes },
     { label: "Roles", path: "/admin/roles", icon: ShieldCheck },
+    { label: "Settings", path: "/admin/settings", icon: Settings },
   ],
   accountant: [
     { label: "Dashboard", path: "/accountant", icon: LayoutDashboard },
@@ -61,5 +64,6 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "Expenses", path: "/accountant/expenses", icon: ClipboardList },
     { label: "Financial Analytics", path: "/accountant/analytics", icon: TrendingUp },
     { label: "Audit Logs", path: "/accountant/audit-logs", icon: History },
+    { label: "Settings", path: "/accountant/settings", icon: Settings },
   ],
 };
