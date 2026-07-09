@@ -17,6 +17,11 @@ export const env = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "8h",
   clientUrl: process.env.CLIENT_URL ?? "http://localhost:5173",
   nodeEnv: process.env.NODE_ENV ?? "development",
+  superAdmin: {
+    name: required("SUPER_ADMIN_NAME"),
+    email: required("SUPER_ADMIN_EMAIL"),
+    password: required("SUPER_ADMIN_PASSWORD"),
+  },
 };
 
 export const isProduction = env.nodeEnv === "production";

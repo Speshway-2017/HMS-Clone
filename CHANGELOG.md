@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
+### Added
+- Auto-bootstrap of the first `super_admin` account on server startup when the `User` collection
+  is empty, using `SUPER_ADMIN_NAME` / `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` from
+  `server/.env` (`server/src/utils/ensureSuperAdmin.ts`). The demo seed script now reuses the same
+  env values for its super_admin instead of a hardcoded one.
+
 ### Changed
 - Split `client` and `server` into fully independent apps: removed the root `package.json`,
   root lockfile, and root `node_modules` (npm workspaces + `concurrently`). Each app now has its

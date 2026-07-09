@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import mongoose from "mongoose";
 import { connectDB } from "../config/db";
+import { env } from "../config/env";
 import { Hospital } from "../models/Hospital";
 import { User } from "../models/User";
 
@@ -12,11 +13,12 @@ async function run() {
   await Promise.all([User.deleteMany({}), Hospital.deleteMany({})]);
 
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
+  const superAdminPasswordHash = await bcrypt.hash(env.superAdmin.password, 10);
 
   const superAdmin = await User.create({
-    name: "Alex Morgan",
-    email: "superadmin@hms.test",
-    passwordHash,
+    name: env.superAdmin.name,
+    email: env.superAdmin.email,
+    passwordHash: superAdminPasswordHash,
     role: "super_admin",
     hospital: null,
   });
@@ -46,11 +48,11 @@ async function run() {
     hospital: hospital._id,
   });
 
-  console.log("Seed complete. Demo accounts (password for all: %s):", DEMO_PASSWORD);
+  console.log("Seed complete. Demo accounts:");
   console.table([
-    { role: superAdmin.role, email: superAdmin.email },
-    { role: hospitalAdmin.role, email: hospitalAdmin.email },
-    { role: accountant.role, email: accountant.email },
+    { role: superAdmin.role, email: superAdmin.email, password: env.superAdmin.password },
+    { role: hospitalAdmin.role, email: hospitalAdmin.email, password: DEMO_PASSWORD },
+    { role: accountant.role, email: accountant.email, password: DEMO_PASSWORD },
   ]);
 
   await mongoose.disconnect();

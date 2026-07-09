@@ -64,8 +64,7 @@ Requires MongoDB running locally on the default port (`mongod` / MongoDB Communi
 # Terminal 1 — backend
 cd server
 npm install
-npm run seed     # wipes Users/Hospitals, creates demo accounts (see below)
-npm run dev        # http://localhost:5000
+npm run dev        # http://localhost:5000 — auto-creates the super_admin below if the DB is empty
 
 # Terminal 2 — frontend
 cd client
@@ -73,16 +72,27 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
+### Super admin bootstrap
+On every startup, `server/src/utils/ensureSuperAdmin.ts` checks if the `User` collection is empty;
+if so it creates one `super_admin` account from `SUPER_ADMIN_NAME` / `SUPER_ADMIN_EMAIL` /
+`SUPER_ADMIN_PASSWORD` in `server/.env` (see `.env.example`). This means a brand-new local MongoDB
+gets a working login the moment the server starts, with no manual seeding step. It only fires when
+the collection has zero documents, so it never runs again (or duplicates) once any user exists.
+
+`npm run seed` is still available separately for full demo data (a sample hospital plus
+hospital_admin/accountant accounts) — it wipes `Users`/`Hospitals` first and uses the same
+`SUPER_ADMIN_*` env values for the super_admin it creates.
+
 Vite proxies `/api/*` to `localhost:5000` in dev (`client/vite.config.ts`), so the browser sees the
 cookie as same-origin — no CORS/cross-site-cookie complications locally, even though the two apps
 run as fully separate processes with their own dependency trees.
 
-### Seeded demo accounts (password for all: `Password123!`)
-| Email | Role |
-|---|---|
-| `superadmin@hms.test` | super_admin |
-| `admin@hms.test` | hospital_admin (Sunrise General Hospital) |
-| `accountant@hms.test` | accountant (Sunrise General Hospital) |
+### Demo accounts
+| Email | Role | Password | Source |
+|---|---|---|---|
+| `superadmin@hms.test` | super_admin | `SUPER_ADMIN_PASSWORD` in `.env` | auto-bootstrap or `npm run seed` |
+| `admin@hms.test` | hospital_admin (Sunrise General Hospital) | `Password123!` | `npm run seed` only |
+| `accountant@hms.test` | accountant (Sunrise General Hospital) | `Password123!` | `npm run seed` only |
 
 ## Build roadmap (see `C:\Users\HP\.claude\plans\compressed-scribbling-dove.md` for the full plan)
 1. ✅ Foundation — monorepo, auth, shared UI kit, layouts, seed script.
