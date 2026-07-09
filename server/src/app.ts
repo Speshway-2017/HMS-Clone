@@ -19,6 +19,7 @@ import patientRoutes from "./routes/patientRoutes";
 import appointmentRoutes from "./routes/appointmentRoutes";
 import inventoryRoutes from "./routes/inventoryRoutes";
 import invoiceRoutes from "./routes/invoiceRoutes";
+import notificationRoutes from "./routes/notificationRoutes";
 import "./config/cloudinary";
 
 const app = express();
@@ -49,6 +50,7 @@ app.use("/api/v1/patients", patientRoutes);
 app.use("/api/v1/appointments", appointmentRoutes);
 app.use("/api/v1/inventory", inventoryRoutes);
 app.use("/api/v1/invoices", invoiceRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

@@ -38,6 +38,7 @@ import { InventoryPage } from "./pages/hospital-admin/InventoryPage";
 import { InventoryFormPage } from "./pages/hospital-admin/InventoryFormPage";
 import { InventoryItemDetailsPage } from "./pages/hospital-admin/InventoryItemDetailsPage";
 import { AccountantDashboard } from "./pages/accountant/Dashboard";
+import { SettingsPage } from "./pages/shared/SettingsPage";
 
 export const router = createBrowserRouter([
   {
@@ -72,6 +73,7 @@ export const router = createBrowserRouter([
           { path: "roles", element: <ManageRolesPage /> },
           { path: "analytics", element: <AnalyticsPage /> },
           { path: "reports", element: <ReportsPage /> },
+          { path: "settings", element: <SettingsPage /> },
         ],
       },
     ],
@@ -111,6 +113,7 @@ export const router = createBrowserRouter([
           { path: "inventory/:id", element: <InventoryItemDetailsPage /> },
           { path: "inventory/:id/edit", element: <InventoryFormPage /> },
           { path: "roles", element: <ManageRolesPage /> },
+          { path: "settings", element: <SettingsPage /> },
         ],
       },
     ],
@@ -121,7 +124,10 @@ export const router = createBrowserRouter([
       {
         path: "/accountant",
         element: <DashboardLayout />,
-        children: [{ index: true, element: <AccountantDashboard /> }],
+        children: [
+          { index: true, element: <AccountantDashboard /> },
+          { path: "settings", element: <SettingsPage /> },
+        ],
       },
     ],
   },

@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import bcrypt from "bcrypt";
 import { z } from "zod";
 import { User, UserDocument } from "../models/User";
 import { AppError } from "../utils/AppError";
@@ -49,4 +50,25 @@ export const logout = catchAsync(async (_req: Request, res: Response) => {
 
 export const getMe = catchAsync(async (req: Request, res: Response) => {
   res.status(200).json({ status: "success", data: { user: sanitizeUser(req.user!) } });
+});
+
+const changePasswordSchema = z.object({
+  newPassword: z.string().min(1, "New password is required."),
+  confirmPassword: z.string().min(1, "Please confirm your new password."),
+});
+
+export const changePassword = catchAsync(async (req: Request, res: Response) => {
+  const { newPassword, confirmPassword } = changePasswordSchema.parse(req.body);
+
+  if (newPassword !== confirmPassword) {
+    throw new AppError("New password and confirmation do not match.", 400);
+  }
+
+  const user = await User.findById(req.user!._id).select("+passwordHash");
+  if (!user) throw new AppError("User not found.", 404);
+
+  user.passwordHash = await bcrypt.hash(newPassword, 12);
+  await user.save();
+
+  res.status(200).json({ status: "success", data: { message: "Password changed successfully." } });
 });
