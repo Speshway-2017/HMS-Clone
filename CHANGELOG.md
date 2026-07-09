@@ -5,6 +5,11 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 ### Added
+- Real file uploads via Cloudinary: `POST /api/v1/uploads` (multer memory storage → Cloudinary,
+  no temp files on disk), a reusable `FileUpload` component, and wiring for hospital logo/license
+  (`HospitalFormPage`) and admin profile photo (`AdminFormPage`, shown in the Topbar avatar once
+  set). `Hospital` gained `licenseUrl`, `User` gained `avatarUrl`. Verified with a real upload to
+  the configured Cloudinary account end-to-end through the actual form.
 - Auto-bootstrap of the first `super_admin` account on server startup when the `User` collection
   is empty, using `SUPER_ADMIN_NAME` / `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` from
   `server/.env` (`server/src/utils/ensureSuperAdmin.ts`). The demo seed script now reuses the same

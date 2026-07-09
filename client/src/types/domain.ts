@@ -6,6 +6,7 @@ export interface Hospital {
   contactEmail: string;
   contactPhone: string;
   logoUrl: string;
+  licenseUrl: string;
   bedCapacity: number;
   status: "active" | "inactive";
   createdAt: string;
@@ -54,6 +55,7 @@ export interface Admin {
   title: string;
   phone: string;
   employeeId: string;
+  avatarUrl: string;
   status: "active" | "inactive";
   createdAt: string;
 }

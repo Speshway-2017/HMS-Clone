@@ -17,6 +17,7 @@ function sanitizeUser(user: UserDocument) {
     email: user.email,
     role: user.role,
     hospital: user.hospital,
+    avatarUrl: user.avatarUrl,
     status: user.status,
     lastLogin: user.lastLogin,
   };

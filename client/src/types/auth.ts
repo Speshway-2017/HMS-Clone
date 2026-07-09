@@ -6,6 +6,7 @@ export interface AuthUser {
   email: string;
   role: Role;
   hospital: string | null;
+  avatarUrl?: string;
   status: "active" | "inactive";
   lastLogin: string | null;
 }

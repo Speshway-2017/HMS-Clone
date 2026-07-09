@@ -12,6 +12,7 @@ export interface UserDocument extends Document {
   title: string;
   phone: string;
   employeeId: string;
+  avatarUrl: string;
   status: "active" | "inactive";
   lastLogin: Date | null;
   createdAt: Date;
@@ -29,6 +30,7 @@ const userSchema = new Schema<UserDocument>(
     title: { type: String, default: "" },
     phone: { type: String, default: "" },
     employeeId: { type: String, default: "" },
+    avatarUrl: { type: String, default: "" },
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     lastLogin: { type: Date, default: null },
   },

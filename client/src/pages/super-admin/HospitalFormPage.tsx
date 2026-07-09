@@ -1,9 +1,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { Building2, Phone, UserCog } from "lucide-react";
+import { Building2, Phone, UserCog, FileBadge } from "lucide-react";
 import { useHospital, useCreateHospital, useUpdateHospital, useUnassignedHospitalAdmins } from "../../features/hospitals";
 import { FormSection } from "../../components/ui/FormSection";
 import { InputField, SelectField } from "../../components/ui/Field";
+import { FileUpload } from "../../components/ui/FileUpload";
 import { Button } from "../../components/ui/Button";
 
 export function HospitalFormPage() {
@@ -22,6 +23,8 @@ export function HospitalFormPage() {
     address: "",
     contactEmail: "",
     contactPhone: "",
+    logoUrl: "",
+    licenseUrl: "",
     primaryAdminId: "",
   });
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +39,8 @@ export function HospitalFormPage() {
         address: data.hospital.address,
         contactEmail: data.hospital.contactEmail,
         contactPhone: data.hospital.contactPhone,
+        logoUrl: data.hospital.logoUrl ?? "",
+        licenseUrl: data.hospital.licenseUrl ?? "",
       }));
     }
   }, [data]);
@@ -131,6 +136,18 @@ export function HospitalFormPage() {
               </option>
             ))}
           </SelectField>
+        </FormSection>
+
+        <FormSection icon={FileBadge} title="Documents">
+          <FileUpload label="Hospital Logo" folder="hospital-logos" value={form.logoUrl} onChange={(url) => setForm({ ...form, logoUrl: url })} />
+          <FileUpload
+            label="License Credentials"
+            folder="hospital-licenses"
+            accept="application/pdf"
+            value={form.licenseUrl}
+            onChange={(url) => setForm({ ...form, licenseUrl: url })}
+            hint="PDF only"
+          />
         </FormSection>
 
         {error && <p className="text-sm text-red-600">{error}</p>}

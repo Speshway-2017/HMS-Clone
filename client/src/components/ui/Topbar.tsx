@@ -20,7 +20,11 @@ export function Topbar() {
           <Bell className="h-5 w-5" />
         </button>
         <div className="flex items-center gap-2">
-          <div className="h-9 w-9 rounded-full bg-navy-100" />
+          {user?.avatarUrl ? (
+            <img src={user.avatarUrl} alt={user.name} className="h-9 w-9 rounded-full object-cover" />
+          ) : (
+            <div className="h-9 w-9 rounded-full bg-navy-100" />
+          )}
           <span className="text-sm font-medium text-slate-700">{user?.name}</span>
         </div>
       </div>

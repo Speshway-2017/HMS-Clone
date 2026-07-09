@@ -5,6 +5,7 @@ import { useAdmin, useCreateAdmin, useUpdateAdmin } from "../../features/admins"
 import { useHospitals } from "../../features/hospitals";
 import { FormSection } from "../../components/ui/FormSection";
 import { InputField, SelectField } from "../../components/ui/Field";
+import { FileUpload } from "../../components/ui/FileUpload";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 
@@ -25,6 +26,7 @@ export function AdminFormPage() {
     title: "",
     phone: "",
     employeeId: "",
+    avatarUrl: "",
   });
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ email: string; tempPassword: string } | null>(null);
@@ -39,6 +41,7 @@ export function AdminFormPage() {
         title: admin.title,
         phone: admin.phone,
         employeeId: admin.employeeId,
+        avatarUrl: admin.avatarUrl ?? "",
       });
     }
   }, [admin]);
@@ -124,6 +127,9 @@ export function AdminFormPage() {
           />
           <InputField label="Contact Number" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+1 (555) 000-0000" />
           <InputField label="Employee ID (optional)" value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} placeholder="HMS-2024-000" />
+          <div className="sm:col-span-2">
+            <FileUpload label="Profile Photo" folder="admin-avatars" value={form.avatarUrl} onChange={(url) => setForm({ ...form, avatarUrl: url })} />
+          </div>
         </FormSection>
 
         <FormSection icon={ShieldCheck} title="Role & Scope of Access">

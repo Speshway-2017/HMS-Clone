@@ -13,6 +13,8 @@ import adminRoutes from "./routes/adminRoutes";
 import roleRoutes from "./routes/roleRoutes";
 import analyticsRoutes from "./routes/analyticsRoutes";
 import reportRoutes from "./routes/reportRoutes";
+import uploadRoutes from "./routes/uploadRoutes";
+import "./config/cloudinary";
 
 const app = express();
 
@@ -36,6 +38,7 @@ app.use("/api/v1/admins", adminRoutes);
 app.use("/api/v1/roles", roleRoutes);
 app.use("/api/v1/analytics", analyticsRoutes);
 app.use("/api/v1/reports", reportRoutes);
+app.use("/api/v1/uploads", uploadRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

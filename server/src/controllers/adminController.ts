@@ -17,6 +17,7 @@ const createAdminSchema = z.object({
   title: z.string().optional().default(""),
   phone: z.string().optional().default(""),
   employeeId: z.string().optional().default(""),
+  avatarUrl: z.string().optional().default(""),
 });
 
 const updateAdminSchema = z.object({
@@ -26,6 +27,7 @@ const updateAdminSchema = z.object({
   title: z.string().optional(),
   phone: z.string().optional(),
   employeeId: z.string().optional(),
+  avatarUrl: z.string().optional(),
   status: z.enum(["active", "inactive"]).optional(),
 });
 

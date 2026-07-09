@@ -13,6 +13,8 @@ const hospitalSchema = z.object({
   address: z.string().optional().default(""),
   contactEmail: z.string().email().optional().or(z.literal("")).default(""),
   contactPhone: z.string().optional().default(""),
+  logoUrl: z.string().optional().default(""),
+  licenseUrl: z.string().optional().default(""),
   bedCapacity: z.coerce.number().min(0).optional().default(0),
   primaryAdminId: z.string().optional(),
 });

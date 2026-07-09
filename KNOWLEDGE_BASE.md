@@ -19,7 +19,8 @@ static, read-only display of this table, not a dynamic custom-role engine.
 
 ## Tech stack
 - **Backend**: Node + Express 4 + TypeScript, Mongoose, JWT auth via **httpOnly cookie**
-  (`hms_token`, see `server/src/utils/token.ts`), bcrypt password hashing, zod request validation.
+  (`hms_token`, see `server/src/utils/token.ts`), bcrypt password hashing, zod request validation,
+  Cloudinary for file storage (hospital logos/licenses, admin profile photos).
 - **Frontend**: React 18 + Vite + TypeScript, React Router v6, Tailwind CSS (theme tokens in
   `client/tailwind.config.ts` — `navy` palette pulled from the Figma screenshots), TanStack Query
   for server state, Recharts for charts, lucide-react for icons.
@@ -62,6 +63,17 @@ client/src/
    - `super_admin` → sees everything, or narrows via `?hospitalId=`.
 5. Frontend never stores the token — `AuthContext` just tracks the logged-in user object from
    `/auth/me` / the login response. Logout calls `POST /auth/logout` which clears the cookie.
+
+## File uploads (Cloudinary)
+`server/src/config/cloudinary.ts` parses `CLOUDINARY_URL` from `.env`
+(`cloudinary://<api_key>:<api_secret>@<cloud_name>`) and configures the SDK at startup — fails fast
+if the var is missing or malformed. `POST /api/v1/uploads` (multipart, field name `file`, plus a
+`folder` field restricted to `hospital-logos`/`hospital-licenses`/`admin-avatars`) streams the file
+straight to Cloudinary via `multer` memory storage (no temp files on disk) and returns
+`{ url, publicId, resourceType }`. `client/src/components/ui/FileUpload.tsx` is the reusable
+frontend piece — used for hospital logo/license in `HospitalFormPage` and admin profile photo in
+`AdminFormPage`; the returned Cloudinary URL is stored directly on `Hospital.logoUrl`/`licenseUrl`
+and `User.avatarUrl`.
 
 ## Local development
 Requires MongoDB running locally on the default port (`mongod` / MongoDB Community Server / Compass).
