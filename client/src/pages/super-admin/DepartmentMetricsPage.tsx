@@ -1,31 +1,47 @@
 import { Link, useParams } from "react-router-dom";
+import { Pencil, Star } from "lucide-react";
 import { useDepartmentMetrics } from "../../features/departments";
+import { useDoctors } from "../../features/doctors";
+import { useAuth } from "../../context/AuthContext";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
+import { Button } from "../../components/ui/Button";
+import { ROLE_HOME_PATH } from "../../types/auth";
 
 export function DepartmentMetricsPage() {
   const { id } = useParams();
   const { data, isLoading } = useDepartmentMetrics(id);
+  const { user } = useAuth();
+  const basePath = ROLE_HOME_PATH[user!.role];
+  const isHospitalAdmin = user?.role === "hospital_admin";
+  const { data: doctorsInDept } = useDoctors({ department: id }, { enabled: isHospitalAdmin });
 
   if (isLoading || !data) {
     return <p className="text-slate-400">Loading...</p>;
   }
 
-  const { department } = data;
+  const { department, bedOccupancy } = data;
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm text-slate-400">
-          <Link to="/super-admin/departments" className="hover:text-navy-700">
-            Departments
-          </Link>{" "}
-          / {department.name} / Metrics
-        </p>
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-slate-900">{department.name} Unit Overview</h1>
-          <Badge tone="success">Live</Badge>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm text-slate-400">
+            <Link to={`${basePath}/departments`} className="hover:text-navy-700">
+              Departments
+            </Link>{" "}
+            / {department.name} / Metrics
+          </p>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-slate-900">{department.name} Unit Overview</h1>
+            <Badge tone="success">Live</Badge>
+          </div>
         </div>
+        <Link to={`${basePath}/departments/${id}/edit`}>
+          <Button variant="secondary">
+            <Pencil className="h-4 w-4" /> Edit Dept
+          </Button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -41,10 +57,12 @@ export function DepartmentMetricsPage() {
           <h3 className="text-base font-semibold text-slate-800">Bed Occupancy</h3>
           <p className="text-sm text-slate-500">Current availability</p>
           <div className="mt-6 flex flex-col items-center justify-center gap-2">
-            <div className="flex h-32 w-32 items-center justify-center rounded-full border-8 border-slate-100 text-2xl font-bold text-slate-300">
-              N/A
+            <div className="flex h-32 w-32 items-center justify-center rounded-full border-8 border-navy-600 text-2xl font-bold text-navy-700">
+              {bedOccupancy.percent}%
             </div>
-            <p className="text-xs text-slate-400">{department.totalBeds} beds configured</p>
+            <p className="text-xs text-slate-400">
+              {bedOccupancy.occupied} / {bedOccupancy.total} beds occupied
+            </p>
           </div>
         </Card>
 
@@ -69,10 +87,30 @@ export function DepartmentMetricsPage() {
       </div>
 
       <Card>
-        <h3 className="text-base font-semibold text-slate-800">Department Staff Performance</h3>
-        <div className="mt-6 flex h-32 items-center justify-center rounded-lg bg-slate-50 text-sm text-slate-400">
-          No doctor performance data yet — available once the Doctor module is live.
-        </div>
+        <h3 className="mb-4 text-base font-semibold text-slate-800">Department Staff Performance</h3>
+        {!isHospitalAdmin ? (
+          <div className="flex h-32 items-center justify-center rounded-lg bg-slate-50 text-sm text-slate-400">
+            Doctor performance is managed from the Hospital Admin console.
+          </div>
+        ) : doctorsInDept && doctorsInDept.data.length > 0 ? (
+          <div className="divide-y divide-slate-100">
+            {doctorsInDept.data.map((doc) => (
+              <Link key={doc._id} to={`/admin/doctors/${doc._id}`} className="flex items-center justify-between py-2 hover:bg-slate-50">
+                <div>
+                  <div className="text-sm font-medium text-slate-800">{doc.name}</div>
+                  <div className="text-xs text-slate-400">{doc.specialization || "General"}</div>
+                </div>
+                <span className="flex items-center gap-1 text-amber-500">
+                  <Star className="h-4 w-4 fill-amber-500" /> {doc.rating}
+                </span>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="flex h-32 items-center justify-center rounded-lg bg-slate-50 text-sm text-slate-400">
+            No doctors assigned to this department yet.
+          </div>
+        )}
       </Card>
 
       <Card>

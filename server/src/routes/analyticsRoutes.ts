@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { protect, restrictTo } from "../middleware/auth";
-import { getGlobalAnalytics } from "../controllers/analyticsController";
+import { scopeToHospital } from "../middleware/scopeToHospital";
+import { getGlobalAnalytics, getHospitalAnalytics } from "../controllers/analyticsController";
 
 const router = Router();
 
-router.use(protect, restrictTo("super_admin"));
-router.get("/global", getGlobalAnalytics);
+router.get("/global", protect, restrictTo("super_admin"), getGlobalAnalytics);
+router.get("/hospital", protect, restrictTo("hospital_admin"), scopeToHospital, getHospitalAnalytics);
 
 export default router;

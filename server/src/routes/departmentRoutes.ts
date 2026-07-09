@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { protect, restrictTo } from "../middleware/auth";
+import { scopeToHospital } from "../middleware/scopeToHospital";
 import {
   listDepartments,
   createDepartment,
@@ -11,7 +12,7 @@ import {
 
 const router = Router();
 
-router.use(protect, restrictTo("super_admin"));
+router.use(protect, restrictTo("super_admin", "hospital_admin"), scopeToHospital);
 
 router.route("/").get(listDepartments).post(createDepartment);
 router.get("/:id/metrics", getDepartmentMetrics);

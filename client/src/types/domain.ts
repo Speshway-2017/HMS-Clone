@@ -37,7 +37,9 @@ export interface Department {
   description: string;
   category: string;
   headName: string;
+  location: string;
   totalBeds: number;
+  occupiedBeds: number;
   doctors: number;
   nurses: number;
   support: number;
@@ -71,4 +73,122 @@ export interface RoleInfo {
 export interface Paginated<T> {
   data: T[];
   pagination: { page: number; limit: number; total: number; totalPages: number };
+}
+
+export interface Doctor {
+  _id: string;
+  department: { _id: string; name: string } | string | null;
+  name: string;
+  email: string;
+  phone: string;
+  photoUrl: string;
+  specialization: string;
+  qualification: string;
+  licenseNo: string;
+  bio: string;
+  status: "on_duty" | "on_leave" | "off_duty";
+  rating: number;
+}
+
+export interface Staff {
+  _id: string;
+  department: { _id: string; name: string } | string | null;
+  name: string;
+  email: string;
+  phone: string;
+  photoUrl: string;
+  role: string;
+  employeeId: string;
+  qualifications: string;
+  dateOfJoining: string | null;
+  dutyStatus: "on_duty" | "late" | "off_duty" | "on_leave";
+  checkInTime: string;
+  taskLoad: number;
+  rating: number;
+}
+
+export interface MedicalHistoryEntry {
+  _id: string;
+  date: string;
+  visitType: string;
+  doctorName: string;
+  department: string;
+  diagnosis: string;
+  notes: string;
+  status: string;
+}
+
+export interface Patient {
+  _id: string;
+  name: string;
+  email: string;
+  phone: string;
+  age: number | null;
+  gender: string;
+  bloodGroup: string;
+  address: string;
+  assignedDoctor: { _id: string; name: string } | string | null;
+  status: "admitted" | "opd" | "discharged";
+  allergies: string;
+  insuranceProvider: string;
+  insurancePolicyNumber: string;
+  medicalHistory: MedicalHistoryEntry[];
+  createdAt: string;
+}
+
+export interface Appointment {
+  _id: string;
+  referenceId: string;
+  patient: { _id: string; name: string } | string;
+  doctor: { _id: string; name: string; specialization?: string } | string;
+  department: { _id: string; name: string } | string | null;
+  date: string;
+  time: string;
+  type: string;
+  status: "scheduled" | "checked_in" | "in_consultation" | "completed" | "cancelled" | "no_show";
+  notes: string;
+}
+
+export interface InventoryItem {
+  _id: string;
+  name: string;
+  sku: string;
+  category: "medicines" | "equipment" | "consumables";
+  description: string;
+  unit: string;
+  stockQty: number;
+  reorderLevel: number;
+  maxLevel: number;
+  unitCost: number;
+  supplier: string;
+  storageCondition: string;
+  stockStatus: "critical" | "low" | "optimal";
+}
+
+export interface InvoiceItem {
+  description: string;
+  category: string;
+  quantity: number;
+  amount: number;
+}
+
+export interface InvoiceTotals {
+  subtotal: number;
+  taxAmount: number;
+  total: number;
+  insuranceCovered: number;
+  patientBalance: number;
+}
+
+export interface Invoice {
+  _id: string;
+  patient: { _id: string; name: string } | string;
+  items: InvoiceItem[];
+  taxRate: number;
+  serviceFee: number;
+  insuranceCoveragePercent: number;
+  status: "pending" | "partially_paid" | "paid" | "overdue";
+  issuedAt: string;
+  dueDate: string | null;
+  totals: InvoiceTotals;
 }

@@ -5,7 +5,7 @@ import { uploadFile } from "../controllers/uploadController";
 
 const router = Router();
 
-router.use(protect, restrictTo("super_admin"));
+router.use(protect, restrictTo("super_admin", "hospital_admin"));
 router.post("/", upload.single("file"), uploadFile);
 
 export default router;

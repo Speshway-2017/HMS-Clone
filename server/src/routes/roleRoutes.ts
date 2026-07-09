@@ -4,7 +4,7 @@ import { listRoles } from "../controllers/roleController";
 
 const router = Router();
 
-router.use(protect, restrictTo("super_admin"));
+router.use(protect, restrictTo("super_admin", "hospital_admin"));
 router.get("/", listRoles);
 
 export default router;
