@@ -11,13 +11,13 @@ export function Sidebar() {
   const items = NAV_BY_ROLE[user.role];
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
-      <div className="px-6 py-6">
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
+      <div className="shrink-0 px-6 py-6">
         <div className="text-lg font-bold text-navy-700">HMS Enterprise</div>
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{ROLE_LABEL[user.role]}</div>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3">
         {items.map((item) => (
           <NavLink
             key={item.path}
@@ -35,7 +35,7 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="border-t border-slate-200 p-4">
+      <div className="shrink-0 border-t border-slate-200 p-4">
         <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
           <div>
             <div className="text-sm font-semibold text-slate-800">{user.name}</div>
