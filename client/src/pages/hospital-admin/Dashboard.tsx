@@ -18,7 +18,7 @@ export function HospitalAdminDashboard() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Today's Appointments" value={counts?.todaysAppointments ?? 0} icon={<CalendarClock className="h-5 w-5" />} emphasis />
         <KpiCard label="Bed Occupancy" value={`${counts?.bedOccupancyPercent ?? 0}%`} icon={<BedDouble className="h-5 w-5" />} trend={{ direction: "up", text: `${counts?.occupiedBeds ?? 0}/${counts?.totalBeds ?? 0} beds` }} />
-        <KpiCard label="Total Revenue (Paid)" value={`$${(counts?.totalRevenue ?? 0).toFixed(2)}`} icon={<Wallet className="h-5 w-5" />} />
+        <KpiCard label="Total Revenue (Paid)" value={`₹${(counts?.totalRevenue ?? 0).toFixed(2)}`} icon={<Wallet className="h-5 w-5" />} />
         <KpiCard label="Critical Stock Alerts" value={counts?.criticalStockCount ?? 0} icon={<AlertTriangle className="h-5 w-5" />} />
       </div>
 

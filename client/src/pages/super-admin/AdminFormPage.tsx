@@ -21,7 +21,7 @@ export function AdminFormPage() {
   const [form, setForm] = useState({
     name: "",
     email: "",
-    role: "hospital_admin" as "hospital_admin" | "accountant",
+    role: "hospital_admin" as const,
     hospital: "",
     title: "",
     phone: "",
@@ -36,7 +36,7 @@ export function AdminFormPage() {
       setForm({
         name: admin.name,
         email: admin.email,
-        role: admin.role,
+        role: "hospital_admin",
         hospital: typeof admin.hospital === "object" && admin.hospital ? admin.hospital._id : "",
         title: admin.title,
         phone: admin.phone,
@@ -133,10 +133,16 @@ export function AdminFormPage() {
         </FormSection>
 
         <FormSection icon={ShieldCheck} title="Role & Scope of Access">
-          <SelectField label="System Role" required value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as "hospital_admin" | "accountant" })}>
-            <option value="hospital_admin">Hospital Admin</option>
-            <option value="accountant">Accountant</option>
-          </SelectField>
+          {/* Role is fixed to Hospital Admin — Super Admin can only create Hospital Admins */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-slate-700">System Role</label>
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5">
+              <ShieldCheck className="h-4 w-4 text-navy-700" />
+              <span className="text-sm font-semibold text-navy-700">Hospital Admin</span>
+              <span className="ml-auto rounded-full bg-navy-100 px-2 py-0.5 text-xs text-navy-600">Fixed</span>
+            </div>
+            <p className="text-xs text-slate-400">Super Admins can only create Hospital Administrator accounts.</p>
+          </div>
           <SelectField label="Assigned Hospital" required value={form.hospital} onChange={(e) => setForm({ ...form, hospital: e.target.value })}>
             <option value="">Select Hospital</option>
             {hospitalsData?.data.map((h) => (

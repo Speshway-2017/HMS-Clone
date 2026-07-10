@@ -12,10 +12,17 @@ import {
 
 const router = Router();
 
-router.use(protect, restrictTo("hospital_admin", "receptionist"), scopeToHospital);
+router.use(protect, restrictTo("hospital_admin", "doctor", "receptionist", "accountant"), scopeToHospital);
 
-router.route("/").get(listPatients).post(createPatient);
-router.post("/:id/medical-history", addMedicalHistoryEntry);
-router.route("/:id").get(getPatient).patch(updatePatient).delete(deletePatient);
+router.route("/")
+  .get(listPatients)
+  .post(restrictTo("hospital_admin", "receptionist"), createPatient);
+
+router.post("/:id/medical-history", restrictTo("hospital_admin", "doctor"), addMedicalHistoryEntry);
+
+router.route("/:id")
+  .get(getPatient)
+  .patch(restrictTo("hospital_admin", "doctor", "receptionist"), updatePatient)
+  .delete(restrictTo("hospital_admin"), deletePatient);
 
 export default router;

@@ -29,6 +29,7 @@ const DEMO_PASSWORD = "Password123!";
 async function run() {
   await connectDB();
 
+  // ── Wipe everything ────────────────────────────────────────────────────────
   await Promise.all([
     User.deleteMany({}),
     Hospital.deleteMany({}),
@@ -51,7 +52,7 @@ async function run() {
     DbNotification.deleteMany({}),
   ]);
 
-  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
+  // ── Super Admin (credentials from .env) ────────────────────────────────────
   const superAdminPasswordHash = await bcrypt.hash(env.superAdmin.password, 10);
 
   const superAdmin = await User.create({

@@ -48,11 +48,12 @@ export function useCreateStaff() {
   return useMutation({
     mutationFn: async (payload: Partial<Staff>) => {
       const res = await api.post("/staff", payload);
-      return res.data.data.staff as Staff;
+      return res.data.data as { staff: Staff; tempPassword: string | null };
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["staff"] }),
   });
 }
+
 
 export function useUpdateStaff(id: string) {
   const queryClient = useQueryClient();

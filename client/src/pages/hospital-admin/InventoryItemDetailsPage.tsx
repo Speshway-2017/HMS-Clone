@@ -71,7 +71,7 @@ export function InventoryItemDetailsPage() {
             </div>
             <div>
               <div className="text-slate-400">Unit Cost</div>
-              <div className="font-semibold text-slate-800">${item.unitCost.toFixed(2)}</div>
+              <div className="font-semibold text-slate-800">₹{item.unitCost.toFixed(2)}</div>
             </div>
           </div>
         </Card>
