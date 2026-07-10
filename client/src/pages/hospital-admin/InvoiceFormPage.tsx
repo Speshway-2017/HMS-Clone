@@ -72,7 +72,7 @@ export function InvoiceFormPage() {
             ))}
           </SelectField>
           <InputField label="Tax Rate (%)" type="number" min={0} value={taxRate} onChange={(e) => setTaxRate(Number(e.target.value))} />
-          <InputField label="Service Fee ($)" type="number" min={0} value={serviceFee} onChange={(e) => setServiceFee(Number(e.target.value))} />
+          <InputField label="Service Fee (₹)" type="number" min={0} value={serviceFee} onChange={(e) => setServiceFee(Number(e.target.value))} />
           <InputField
             label="Insurance Coverage (%)"
             type="number"

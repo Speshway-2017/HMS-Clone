@@ -51,11 +51,12 @@ export function useCreateDoctor() {
   return useMutation({
     mutationFn: async (payload: Partial<Doctor>) => {
       const res = await api.post("/doctors", payload);
-      return res.data.data.doctor as Doctor;
+      return res.data.data as { doctor: Doctor; tempPassword: string | null };
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["doctors"] }),
   });
 }
+
 
 export function useUpdateDoctor(id: string) {
   const queryClient = useQueryClient();
@@ -77,3 +78,14 @@ export function useDeleteDoctor() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["doctors"] }),
   });
 }
+
+export function useDoctorProfileMe() {
+  return useQuery({
+    queryKey: ["doctors", "me"],
+    queryFn: async () => {
+      const res = await api.get("/doctors/me");
+      return res.data.data.doctor as Doctor;
+    },
+  });
+}
+

@@ -4,9 +4,20 @@ import { Appointment } from "../models/Appointment";
 import { InventoryItem } from "../models/InventoryItem";
 import { Invoice } from "../models/Invoice";
 import { Patient } from "../models/Patient";
+import { Doctor } from "../models/Doctor";
 
 export const getNotifications = catchAsync(async (req: Request, res: Response) => {
   const hospitalFilter = req.hospitalFilter as Record<string, unknown>;
+  const isDoctor = req.user!.role === "doctor";
+
+  // Find the doctor ID for this user if they are a doctor
+  let doctorId: string | null = null;
+  if (isDoctor) {
+    const docProfile = await Doctor.findOne({ email: req.user!.email });
+    if (docProfile) {
+      doctorId = docProfile._id.toString();
+    }
+  }
 
   const now = new Date();
   const startOfToday = new Date(now);
@@ -18,37 +29,47 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
 
   const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
+  const apptFilter: Record<string, any> = {
+    ...hospitalFilter,
+    status: "scheduled",
+    date: { $gte: startOfToday, $lt: endOfTomorrow },
+  };
+
+  if (isDoctor && doctorId) {
+    apptFilter.doctor = doctorId;
+  }
+
   const [upcomingAppointments, lowStockItems, actionableInvoices, newPatients] = await Promise.all([
     // Appointments scheduled today or tomorrow
-    Appointment.find({
-      ...hospitalFilter,
-      status: "scheduled",
-      date: { $gte: startOfToday, $lt: endOfTomorrow },
-    })
+    Appointment.find(apptFilter)
       .populate("patient", "name")
       .populate("doctor", "name")
       .sort({ date: 1 })
       .limit(10)
       .lean(),
 
-    // Inventory at or below reorder level
-    InventoryItem.find({ ...hospitalFilter, $expr: { $lte: ["$stockQty", "$reorderLevel"] } })
-      .sort({ stockQty: 1 })
-      .limit(10)
-      .lean(),
+    // Inventory at or below reorder level (only fetch for admins)
+    !isDoctor
+      ? InventoryItem.find({ ...hospitalFilter, $expr: { $lte: ["$stockQty", "$reorderLevel"] } })
+          .sort({ stockQty: 1 })
+          .limit(10)
+          .lean()
+      : Promise.resolve([]),
 
-    // Overdue invoices or pending invoices with a passed due date
-    Invoice.find({
-      ...hospitalFilter,
-      $or: [
-        { status: "overdue" },
-        { status: "pending", dueDate: { $lt: now } },
-      ],
-    })
-      .populate("patient", "name")
-      .sort({ dueDate: 1 })
-      .limit(10)
-      .lean(),
+    // Overdue invoices or pending invoices with a passed due date (only fetch for admins)
+    !isDoctor
+      ? Invoice.find({
+          ...hospitalFilter,
+          $or: [
+            { status: "overdue" },
+            { status: "pending", dueDate: { $lt: now } },
+          ],
+        })
+          .populate("patient", "name")
+          .sort({ dueDate: 1 })
+          .limit(10)
+          .lean()
+      : Promise.resolve([]),
 
     // Patients registered in the last 24 hours
     Patient.find({ ...hospitalFilter, createdAt: { $gte: last24h } })
@@ -82,7 +103,7 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
       type: "appointment",
       title: "Upcoming Appointment",
       message: `${patientName} with Dr. ${doctorName} at ${appt.time} ${dayLabel}`,
-      link: `/admin/appointments/${appt._id}`,
+      link: isDoctor ? `/doctor/op-management` : `/admin/appointments/${appt._id}`,
       severity: "info",
       createdAt: appt.date,
     });
@@ -123,7 +144,7 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
       type: "patient",
       title: "New Patient Registered",
       message: `${patient.name} was added to the system`,
-      link: `/admin/patients/${patient._id}`,
+      link: isDoctor ? `/doctor/patient-records` : `/admin/patients/${patient._id}`,
       severity: "info",
       createdAt: patient.createdAt as Date,
     });

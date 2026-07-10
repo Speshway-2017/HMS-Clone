@@ -21,7 +21,7 @@ export function FinancePage() {
     { header: "Invoice", render: (inv) => <span className="font-mono text-xs text-slate-500">{inv._id.slice(-8).toUpperCase()}</span> },
     { header: "Patient", render: (inv) => <span className="font-medium text-slate-700">{typeof inv.patient === "object" ? inv.patient.name : ""}</span> },
     { header: "Date Issued", render: (inv) => <span className="text-slate-600">{new Date(inv.issuedAt).toLocaleDateString()}</span> },
-    { header: "Amount", render: (inv) => <span className="font-semibold text-slate-800">${inv.totals.total.toFixed(2)}</span> },
+    { header: "Amount", render: (inv) => <span className="font-semibold text-slate-800">₹{inv.totals.total.toFixed(2)}</span> },
     { header: "Status", render: (inv) => <Badge tone={STATUS_TONE[inv.status]}>{inv.status.replace("_", " ")}</Badge> },
     {
       header: "Actions",
@@ -48,8 +48,8 @@ export function FinancePage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <KpiCard label="Total Billing" value={`$${(data?.counts.totalBilling ?? 0).toFixed(2)}`} icon={<Receipt className="h-5 w-5" />} emphasis />
-        <KpiCard label="Net Revenue (Paid)" value={`$${(data?.counts.netRevenue ?? 0).toFixed(2)}`} icon={<TrendingUp className="h-5 w-5" />} />
+        <KpiCard label="Total Billing" value={`₹${(data?.counts.totalBilling ?? 0).toFixed(2)}`} icon={<Receipt className="h-5 w-5" />} emphasis />
+        <KpiCard label="Net Revenue (Paid)" value={`₹${(data?.counts.netRevenue ?? 0).toFixed(2)}`} icon={<TrendingUp className="h-5 w-5" />} />
         <KpiCard label="Pending / Overdue" value={data?.counts.pendingCount ?? 0} icon={<AlertCircle className="h-5 w-5" />} />
       </div>
 

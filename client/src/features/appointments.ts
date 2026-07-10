@@ -14,9 +14,10 @@ interface AppointmentListResponse extends Paginated<Appointment> {
   counts: { total: number; today: number };
 }
 
-export function useAppointments(params: AppointmentListParams) {
+export function useAppointments(params: AppointmentListParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["appointments", params],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<AppointmentListResponse>("/appointments", { params });
       return res.data;

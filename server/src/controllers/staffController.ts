@@ -1,8 +1,11 @@
 import { Request, Response } from "express";
+import bcrypt from "bcrypt";
 import { z } from "zod";
 import { Staff, STAFF_DUTY_STATUSES } from "../models/Staff";
+import { User } from "../models/User";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
+import { generateTempPassword } from "../utils/idGenerator";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 
 const staffSchema = z.object({
@@ -58,8 +61,32 @@ export const getTopStaff = catchAsync(async (req: Request, res: Response) => {
 
 export const createStaff = catchAsync(async (req: Request, res: Response) => {
   const body = staffSchema.parse(req.body);
-  const staff = await Staff.create({ ...body, hospital: req.hospitalFilter!.hospital });
-  res.status(201).json({ status: "success", data: { staff } });
+  const hospitalId = req.hospitalFilter!.hospital;
+
+  const staff = await Staff.create({ ...body, hospital: hospitalId });
+
+  // Auto-create a login User account for staff members with an email
+  let tempPassword: string | undefined;
+  if (body.email) {
+    tempPassword = generateTempPassword();
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+    
+    const userRole = body.role || "receptionist";
+
+    await User.create({
+      name: body.name,
+      email: body.email,
+      passwordHash,
+      role: userRole,
+      hospital: hospitalId,
+    });
+  }
+
+
+  res.status(201).json({
+    status: "success",
+    data: { staff, tempPassword: tempPassword ?? null },
+  });
 });
 
 export const getStaffMember = catchAsync(async (req: Request, res: Response) => {

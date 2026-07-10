@@ -31,11 +31,18 @@ export const listDepartments = catchAsync(async (req: Request, res: Response) =>
 
 export const createDepartment = catchAsync(async (req: Request, res: Response) => {
   const body = departmentSchema.parse(req.body);
-  const hospital = body.hospital ?? (req.hospitalFilter?.hospital as string | undefined);
+  const hospital = (body.hospital && body.hospital.trim()) || (req.hospitalFilter?.hospital as string | undefined);
   if (!hospital) {
     throw new AppError("A hospital must be specified.", 400);
   }
-  const department = await Department.create({ ...body, hospital });
+
+  const cleanBody = {
+    ...body,
+    hospital,
+    branch: (body.branch && body.branch.trim()) || null,
+  };
+
+  const department = await Department.create(cleanBody);
   res.status(201).json({ status: "success", data: { department } });
 });
 
@@ -49,7 +56,16 @@ export const getDepartment = catchAsync(async (req: Request, res: Response) => {
 
 export const updateDepartment = catchAsync(async (req: Request, res: Response) => {
   const body = departmentSchema.partial().parse(req.body);
-  const department = await Department.findOneAndUpdate({ _id: req.params.id, ...req.hospitalFilter }, body, {
+  
+  const cleanBody: Record<string, any> = { ...body };
+  if (body.hospital === "") {
+    cleanBody.hospital = undefined;
+  }
+  if (body.branch === "") {
+    cleanBody.branch = null;
+  }
+
+  const department = await Department.findOneAndUpdate({ _id: req.params.id, ...req.hospitalFilter }, cleanBody, {
     new: true,
     runValidators: true,
   });
