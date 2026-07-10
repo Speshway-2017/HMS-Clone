@@ -18,6 +18,10 @@ const medicalHistoryEntrySchema = new Schema(
 const patientSchema = new Schema(
   {
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
+    uhid: { type: String, unique: true, sparse: true },
+    patientCode: { type: String, unique: true, sparse: true },
+    qrCode: { type: String, default: "" },
+    photoUrl: { type: String, default: "" },
     name: { type: String, required: true, trim: true },
     email: { type: String, default: "" },
     phone: { type: String, default: "" },
@@ -30,10 +34,16 @@ const patientSchema = new Schema(
     allergies: { type: String, default: "" },
     insuranceProvider: { type: String, default: "" },
     insurancePolicyNumber: { type: String, default: "" },
+    emergencyContact: {
+      name: { type: String, default: "" },
+      phone: { type: String, default: "" },
+      relation: { type: String, default: "" },
+    },
     medicalHistory: { type: [medicalHistoryEntrySchema], default: [] },
   },
   { timestamps: true },
 );
+
 
 export type Patient = InferSchemaType<typeof patientSchema> & { _id: Types.ObjectId };
 export const Patient = model("Patient", patientSchema);

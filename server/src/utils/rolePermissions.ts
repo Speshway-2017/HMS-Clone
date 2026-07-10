@@ -24,7 +24,7 @@ export const ROLE_PERMISSIONS: Record<Role, { label: string; description: string
   receptionist: {
     label: "Receptionist",
     description: "Manages patient onboarding, schedules appointments, and handles clinic front desk operations.",
-    permissions: ["Patient Registration", "Appointment Scheduling", "Visitor Log", "Billing Intake"],
+    permissions: ["Patient Registration", "Appointment Scheduling", "Visitor Log", "Billing Intake", "Patient Management", "Appointment Booking", "Billing Operations", "Queue Management"],
   },
 };
 

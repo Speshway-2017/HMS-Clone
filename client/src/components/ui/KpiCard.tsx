@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { Card } from "./Card";
 
 interface KpiCardProps {
@@ -7,11 +8,20 @@ interface KpiCardProps {
   icon?: ReactNode;
   trend?: { direction: "up" | "down"; text: string };
   emphasis?: boolean;
+  to?: string;
 }
 
-export function KpiCard({ label, value, icon, trend, emphasis = false }: KpiCardProps) {
-  return (
-    <Card className={emphasis ? "bg-navy-700 text-white" : ""}>
+export function KpiCard({ label, value, icon, trend, emphasis = false, to }: KpiCardProps) {
+  const cardContent = (
+    <Card
+      role={to ? "button" : undefined}
+      tabIndex={to ? 0 : undefined}
+      className={`h-full transition-all duration-300 ${
+        emphasis
+          ? "bg-navy-700 text-white hover:bg-navy-800"
+          : "hover:bg-slate-50 hover:border-slate-350 focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+      } ${to ? "cursor-pointer" : ""}`}
+    >
       <div className="flex items-start justify-between">
         <span className={`text-xs font-semibold uppercase tracking-wide ${emphasis ? "text-navy-100" : "text-slate-500"}`}>
           {label}
@@ -28,4 +38,14 @@ export function KpiCard({ label, value, icon, trend, emphasis = false }: KpiCard
       )}
     </Card>
   );
+
+  if (to) {
+    return (
+      <Link to={to} className="no-underline text-inherit block h-full focus:outline-none">
+        {cardContent}
+      </Link>
+    );
+  }
+
+  return cardContent;
 }

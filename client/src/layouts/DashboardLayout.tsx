@@ -1,8 +1,34 @@
+import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Sidebar } from "../components/ui/Sidebar";
 import { Topbar } from "../components/ui/Topbar";
+import { useAuth } from "../context/AuthContext";
+import { socket } from "../lib/socket";
 
 export function DashboardLayout() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (user?.hospital) {
+      socket.emit("join_hospital", user.hospital);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const handleUpdate = (data: any) => {
+      console.log("Real-time update received via Socket.IO:", data);
+      // Invalidate all query keys to trigger real-time auto-updates
+      queryClient.invalidateQueries();
+    };
+
+    socket.on("dashboard_update", handleUpdate);
+    return () => {
+      socket.off("dashboard_update", handleUpdate);
+    };
+  }, [queryClient]);
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
       <Sidebar />
