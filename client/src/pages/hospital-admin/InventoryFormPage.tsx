@@ -89,7 +89,7 @@ export function InventoryFormPage() {
           <InputField label="Stock Quantity" type="number" min={0} value={form.stockQty} onChange={(e) => setForm({ ...form, stockQty: Number(e.target.value) })} />
           <InputField label="Reorder Level" type="number" min={0} value={form.reorderLevel} onChange={(e) => setForm({ ...form, reorderLevel: Number(e.target.value) })} />
           <InputField label="Max Level" type="number" min={0} value={form.maxLevel} onChange={(e) => setForm({ ...form, maxLevel: Number(e.target.value) })} />
-          <InputField label="Unit Cost ($)" type="number" min={0} value={form.unitCost} onChange={(e) => setForm({ ...form, unitCost: Number(e.target.value) })} />
+          <InputField label="Unit Cost (₹)" type="number" min={0} value={form.unitCost} onChange={(e) => setForm({ ...form, unitCost: Number(e.target.value) })} />
           <InputField label="Supplier" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} placeholder="e.g. Global Pharma Co." />
           <InputField label="Storage Condition" value={form.storageCondition} onChange={(e) => setForm({ ...form, storageCondition: e.target.value })} placeholder="e.g. Cold Chain (2-8°C)" />
           <div className="sm:col-span-2">

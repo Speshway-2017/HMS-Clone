@@ -16,6 +16,7 @@ import { DepartmentMetricsPage } from "./pages/super-admin/DepartmentMetricsPage
 import { AdminsPage } from "./pages/super-admin/AdminsPage";
 import { AdminFormPage } from "./pages/super-admin/AdminFormPage";
 import { ManageRolesPage } from "./pages/super-admin/ManageRolesPage";
+import { RoleFormPage } from "./pages/super-admin/RoleFormPage";
 import { AnalyticsPage } from "./pages/super-admin/AnalyticsPage";
 import { ReportsPage } from "./pages/super-admin/ReportsPage";
 import { HospitalAdminDashboard } from "./pages/hospital-admin/Dashboard";
@@ -39,6 +40,17 @@ import { InventoryFormPage } from "./pages/hospital-admin/InventoryFormPage";
 import { InventoryItemDetailsPage } from "./pages/hospital-admin/InventoryItemDetailsPage";
 import { AccountantDashboard } from "./pages/accountant/Dashboard";
 import { SettingsPage } from "./pages/shared/SettingsPage";
+// Doctor module
+import { DoctorDashboard } from "./pages/doctor/Dashboard";
+import { OPManagementPage } from "./pages/doctor/OPManagementPage";
+import { IPManagementPage } from "./pages/doctor/IPManagementPage";
+import { PatientRecordsPage } from "./pages/doctor/PatientRecordsPage";
+import { LaboratoryPage } from "./pages/doctor/LaboratoryPage";
+import { RadiologyPage } from "./pages/doctor/RadiologyPage";
+import { OperationTheatrePage } from "./pages/doctor/OperationTheatrePage";
+import { TelemedicinePage } from "./pages/doctor/TelemedicinePage";
+import { PerformancePage } from "./pages/doctor/PerformancePage";
+import { DoctorSettingsPage } from "./pages/doctor/SettingsPage";
 
 export const router = createBrowserRouter([
   {
@@ -71,6 +83,8 @@ export const router = createBrowserRouter([
           { path: "admins/new", element: <AdminFormPage /> },
           { path: "admins/:id/edit", element: <AdminFormPage /> },
           { path: "roles", element: <ManageRolesPage /> },
+          { path: "roles/new", element: <RoleFormPage /> },
+          { path: "roles/:id/edit", element: <RoleFormPage /> },
           { path: "analytics", element: <AnalyticsPage /> },
           { path: "reports", element: <ReportsPage /> },
           { path: "settings", element: <SettingsPage /> },
@@ -113,6 +127,8 @@ export const router = createBrowserRouter([
           { path: "inventory/:id", element: <InventoryItemDetailsPage /> },
           { path: "inventory/:id/edit", element: <InventoryFormPage /> },
           { path: "roles", element: <ManageRolesPage /> },
+          { path: "roles/new", element: <RoleFormPage /> },
+          { path: "roles/:id/edit", element: <RoleFormPage /> },
           { path: "settings", element: <SettingsPage /> },
         ],
       },
@@ -131,4 +147,27 @@ export const router = createBrowserRouter([
       },
     ],
   },
+  {
+    element: <ProtectedRoute allow={["doctor"]} />,
+    children: [
+      {
+        path: "/doctor",
+        element: <DashboardLayout />,
+        children: [
+          { index: true, element: <DoctorDashboard /> },
+          { path: "op-management", element: <OPManagementPage /> },
+          { path: "ip-management", element: <IPManagementPage /> },
+          { path: "patient-records", element: <PatientRecordsPage /> },
+          { path: "laboratory", element: <LaboratoryPage /> },
+          { path: "radiology", element: <RadiologyPage /> },
+          { path: "ot", element: <OperationTheatrePage /> },
+          { path: "telemedicine", element: <TelemedicinePage /> },
+          { path: "performance", element: <PerformancePage /> },
+          { path: "settings", element: <DoctorSettingsPage /> },
+        ],
+      },
+    ],
+  },
 ]);
+
+

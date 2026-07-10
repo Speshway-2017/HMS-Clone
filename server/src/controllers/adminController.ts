@@ -12,13 +12,14 @@ const ADMIN_ROLES = ["hospital_admin", "accountant"] as const;
 const createAdminSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
-  role: z.enum(ADMIN_ROLES),
+  role: z.literal("hospital_admin"),   // Super Admin can only create Hospital Admins
   hospital: z.string().min(1),
   title: z.string().optional().default(""),
   phone: z.string().optional().default(""),
   employeeId: z.string().optional().default(""),
   avatarUrl: z.string().optional().default(""),
 });
+
 
 const updateAdminSchema = z.object({
   name: z.string().min(1).optional(),

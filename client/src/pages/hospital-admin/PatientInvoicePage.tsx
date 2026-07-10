@@ -88,7 +88,7 @@ export function PatientInvoicePage() {
                       <Badge tone="neutral">{item.category || "—"}</Badge>
                     </td>
                     <td className="py-2 text-slate-600">{item.quantity}</td>
-                    <td className="py-2 text-right font-medium text-slate-700">${(item.quantity * item.amount).toFixed(2)}</td>
+                    <td className="py-2 text-right font-medium text-slate-700">₹{(item.quantity * item.amount).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -97,27 +97,27 @@ export function PatientInvoicePage() {
             <div className="mt-6 ml-auto max-w-xs space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-slate-500">Subtotal</span>
-                <span className="font-medium text-slate-800">${invoice.totals.subtotal.toFixed(2)}</span>
+                <span className="font-medium text-slate-800">₹{invoice.totals.subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Tax ({invoice.taxRate}%)</span>
-                <span className="font-medium text-slate-800">${invoice.totals.taxAmount.toFixed(2)}</span>
+                <span className="font-medium text-slate-800">₹{invoice.totals.taxAmount.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Service Fees</span>
-                <span className="font-medium text-slate-800">${invoice.serviceFee.toFixed(2)}</span>
+                <span className="font-medium text-slate-800">₹{invoice.serviceFee.toFixed(2)}</span>
               </div>
               <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold text-slate-900">
                 <span>Total Amount</span>
-                <span>${invoice.totals.total.toFixed(2)}</span>
+                <span>₹{invoice.totals.total.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-emerald-600">
                 <span>Insurance Coverage</span>
-                <span>-${invoice.totals.insuranceCovered.toFixed(2)}</span>
+                <span>-₹{invoice.totals.insuranceCovered.toFixed(2)}</span>
               </div>
               <div className="flex justify-between font-semibold text-red-600">
                 <span>Patient Balance Due</span>
-                <span>${invoice.totals.patientBalance.toFixed(2)}</span>
+                <span>₹{invoice.totals.patientBalance.toFixed(2)}</span>
               </div>
             </div>
           </Card>

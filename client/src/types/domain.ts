@@ -63,11 +63,13 @@ export interface Admin {
 }
 
 export interface RoleInfo {
+  _id?: string;
   role: string;
   label: string;
   description: string;
   permissions: string[];
   assignedUsers: number;
+  isCustom?: boolean;
 }
 
 export interface Paginated<T> {

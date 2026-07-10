@@ -1,9 +1,12 @@
 import { Request, Response } from "express";
+import bcrypt from "bcrypt";
 import { z } from "zod";
 import { Doctor, DOCTOR_STATUSES } from "../models/Doctor";
+import { User } from "../models/User";
 import { Appointment } from "../models/Appointment";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
+import { generateTempPassword } from "../utils/idGenerator";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 
 const doctorSchema = z.object({
@@ -48,8 +51,29 @@ export const listDoctors = catchAsync(async (req: Request, res: Response) => {
 
 export const createDoctor = catchAsync(async (req: Request, res: Response) => {
   const body = doctorSchema.parse(req.body);
-  const doctor = await Doctor.create({ ...body, hospital: req.hospitalFilter!.hospital });
-  res.status(201).json({ status: "success", data: { doctor } });
+  const hospitalId = req.hospitalFilter!.hospital;
+
+  // Create the Doctor profile record
+  const doctor = await Doctor.create({ ...body, hospital: hospitalId });
+
+  // Auto-create a login User account if an email is provided
+  let tempPassword: string | undefined;
+  if (body.email) {
+    tempPassword = generateTempPassword();
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+    await User.create({
+      name: body.name,
+      email: body.email,
+      passwordHash,
+      role: "doctor",
+      hospital: hospitalId,
+    });
+  }
+
+  res.status(201).json({
+    status: "success",
+    data: { doctor, tempPassword: tempPassword ?? null },
+  });
 });
 
 export const getDoctor = catchAsync(async (req: Request, res: Response) => {
@@ -105,3 +129,12 @@ export const getDoctorPerformance = catchAsync(async (req: Request, res: Respons
     },
   });
 });
+
+export const getDoctorProfileMe = catchAsync(async (req: Request, res: Response) => {
+  const doctor = await Doctor.findOne({ email: req.user!.email }).populate("department", "name");
+  if (!doctor) {
+    throw new AppError("Doctor profile not found for the logged-in user.", 404);
+  }
+  res.json({ status: "success", data: { doctor } });
+});
+

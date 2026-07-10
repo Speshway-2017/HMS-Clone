@@ -25,7 +25,7 @@ const userSchema = new Schema<UserDocument>(
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true, select: false },
-    role: { type: String, enum: ROLES, required: true },
+    role: { type: String, required: true },
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", default: null },
     title: { type: String, default: "" },
     phone: { type: String, default: "" },

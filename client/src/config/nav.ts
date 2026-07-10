@@ -21,6 +21,12 @@ import {
   ClipboardList,
   History,
   Settings,
+  FlaskConical,
+  ScanLine,
+  Scissors,
+  Video,
+  BedDouble,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 import { Role } from "../types/auth";
@@ -66,4 +72,17 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "Audit Logs", path: "/accountant/audit-logs", icon: History },
     { label: "Settings", path: "/accountant/settings", icon: Settings },
   ],
+  doctor: [
+    { label: "Dashboard", path: "/doctor", icon: LayoutDashboard },
+    { label: "OP Management", path: "/doctor/op-management", icon: Activity },
+    { label: "IP Management", path: "/doctor/ip-management", icon: BedDouble },
+    { label: "Patient Records", path: "/doctor/patient-records", icon: Users },
+    { label: "Laboratory", path: "/doctor/laboratory", icon: FlaskConical },
+    { label: "Radiology", path: "/doctor/radiology", icon: ScanLine },
+    { label: "Operation Theatre", path: "/doctor/ot", icon: Scissors },
+    { label: "Telemedicine", path: "/doctor/telemedicine", icon: Video },
+    { label: "Performance", path: "/doctor/performance", icon: BarChart3 },
+    { label: "Settings", path: "/doctor/settings", icon: Settings },
+  ],
 };
+
