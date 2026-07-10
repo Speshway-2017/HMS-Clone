@@ -5,7 +5,7 @@ import { listStaff, getTopStaff, createStaff, getStaffMember, updateStaff, delet
 
 const router = Router();
 
-router.use(protect, restrictTo("hospital_admin"), scopeToHospital);
+router.use(protect, restrictTo("hospital_admin", "receptionist"), scopeToHospital);
 
 router.get("/top", getTopStaff);
 router.route("/").get(listStaff).post(createStaff);

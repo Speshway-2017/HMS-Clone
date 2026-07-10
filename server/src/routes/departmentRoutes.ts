@@ -12,7 +12,7 @@ import {
 
 const router = Router();
 
-router.use(protect, restrictTo("super_admin", "hospital_admin"), scopeToHospital);
+router.use(protect, restrictTo("super_admin", "hospital_admin", "receptionist"), scopeToHospital);
 
 router.route("/").get(listDepartments).post(createDepartment);
 router.get("/:id/metrics", getDepartmentMetrics);

@@ -11,7 +11,7 @@ import {
 
 const router = Router();
 
-router.use(protect, restrictTo("hospital_admin"), scopeToHospital);
+router.use(protect, restrictTo("hospital_admin", "receptionist"), scopeToHospital);
 
 router.route("/").get(listAppointments).post(createAppointment);
 router.route("/:id").get(getAppointment).patch(updateAppointment).delete(deleteAppointment);

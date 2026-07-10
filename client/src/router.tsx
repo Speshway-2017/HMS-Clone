@@ -39,6 +39,18 @@ import { InventoryFormPage } from "./pages/hospital-admin/InventoryFormPage";
 import { InventoryItemDetailsPage } from "./pages/hospital-admin/InventoryItemDetailsPage";
 import { AccountantDashboard } from "./pages/accountant/Dashboard";
 import { SettingsPage } from "./pages/shared/SettingsPage";
+import { ReceptionistDashboard } from "./pages/receptionist/Dashboard";
+import { PatientManagementPage } from "./pages/receptionist/PatientManagement";
+import { AppointmentsPage as ReceptionAppointmentsPage } from "./pages/receptionist/Appointments";
+import { OPManagementPage } from "./pages/receptionist/OPManagement";
+import { IPManagementPage } from "./pages/receptionist/IPManagement";
+import { BillingPage as ReceptionBillingPage } from "./pages/receptionist/Billing";
+import { QueuePage } from "./pages/receptionist/Queue";
+import { DisplayQueuePage } from "./pages/receptionist/DisplayQueue";
+import { DoctorsPage as ReceptionDoctorsPage } from "./pages/receptionist/Doctors";
+import { NotificationsPage as ReceptionNotificationsPage } from "./pages/receptionist/Notifications";
+import { ReportsPage as ReceptionReportsPage } from "./pages/receptionist/Reports";
+
 
 export const router = createBrowserRouter([
   {
@@ -129,6 +141,61 @@ export const router = createBrowserRouter([
           { path: "settings", element: <SettingsPage /> },
         ],
       },
+    ],
+  },
+  {
+    element: <ProtectedRoute allow={["receptionist"]} />,
+    children: [
+      {
+        path: "/receptionist",
+        element: <DashboardLayout />,
+        children: [
+          { index: true, element: <ReceptionistDashboard /> },
+          { path: "patients", element: <PatientManagementPage /> },
+          { path: "patients/new", element: <PatientManagementPage activeTab="new" /> },
+          { path: "patients/search", element: <PatientManagementPage activeTab="search" /> },
+          { path: "patients/:id", element: <PatientManagementPage /> },
+          { path: "appointments", element: <ReceptionAppointmentsPage /> },
+          { path: "appointments/new", element: <ReceptionAppointmentsPage activeTab="new" /> },
+          { path: "appointments/today", element: <ReceptionAppointmentsPage activeTab="today" /> },
+          { path: "appointments/calendar", element: <ReceptionAppointmentsPage activeTab="calendar" /> },
+          { path: "op", element: <OPManagementPage /> },
+          { path: "op/new", element: <OPManagementPage activeTab="new" /> },
+          { path: "op/queue", element: <OPManagementPage activeTab="queue" /> },
+          { path: "op/history", element: <OPManagementPage activeTab="history" /> },
+          { path: "ip", element: <IPManagementPage /> },
+          { path: "ip/new", element: <IPManagementPage activeTab="new" /> },
+          { path: "ip/admissions", element: <IPManagementPage activeTab="admissions" /> },
+          { path: "ip/rooms", element: <IPManagementPage activeTab="rooms" /> },
+          { path: "ip/beds", element: <IPManagementPage activeTab="rooms" /> },
+          { path: "ip/transfer", element: <IPManagementPage activeTab="transfer" /> },
+          { path: "ip/discharges", element: <IPManagementPage activeTab="discharges" /> },
+          { path: "billing", element: <ReceptionBillingPage /> },
+          { path: "billing/consultation", element: <ReceptionBillingPage activeTab="consultation" /> },
+          { path: "billing/new", element: <ReceptionBillingPage activeTab="consultation" /> },
+          { path: "billing/payments", element: <ReceptionBillingPage activeTab="pending" /> },
+          { path: "billing/pending", element: <ReceptionBillingPage activeTab="pending" /> },
+          { path: "billing/completed", element: <ReceptionBillingPage activeTab="completed" /> },
+          { path: "billing/receipts", element: <ReceptionBillingPage activeTab="completed" /> },
+          { path: "billing/collections", element: <ReceptionBillingPage activeTab="collections" /> },
+          { path: "queue", element: <QueuePage /> },
+          { path: "queue/tokens", element: <QueuePage /> },
+          { path: "doctors", element: <ReceptionDoctorsPage /> },
+          { path: "doctors/availability", element: <ReceptionDoctorsPage activeTab="availability" /> },
+          { path: "doctors/timings", element: <ReceptionDoctorsPage activeTab="timings" /> },
+          { path: "notifications", element: <ReceptionNotificationsPage /> },
+          { path: "reports", element: <ReceptionReportsPage /> },
+          { path: "settings", element: <SettingsPage /> },
+        ],
+      },
+      {
+        path: "/receptionist/queue/display",
+        element: <DisplayQueuePage />
+      },
+      {
+        path: "/display-board",
+        element: <DisplayQueuePage />
+      }
     ],
   },
 ]);

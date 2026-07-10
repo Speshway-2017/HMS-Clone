@@ -16,4 +16,10 @@ export const ROLE_PERMISSIONS: Record<Role, { label: string; description: string
     description: "Handles billing, payroll, claims, and financial reporting for an assigned hospital.",
     permissions: ["Billing Operations", "Payroll Processing", "Insurance Claims", "Financial Reports"],
   },
+  receptionist: {
+    label: "Receptionist",
+    description: "Handles patient registration, queue management, bookings, and payments.",
+    permissions: ["Patient Management", "Appointment Booking", "Billing Operations", "Queue Management"],
+  },
 };
+

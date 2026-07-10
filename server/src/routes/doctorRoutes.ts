@@ -12,7 +12,7 @@ import {
 
 const router = Router();
 
-router.use(protect, restrictTo("hospital_admin"), scopeToHospital);
+router.use(protect, restrictTo("hospital_admin", "receptionist"), scopeToHospital);
 
 router.route("/").get(listDoctors).post(createDoctor);
 router.get("/:id/performance", getDoctorPerformance);

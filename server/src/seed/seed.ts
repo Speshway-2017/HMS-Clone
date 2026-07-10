@@ -13,7 +13,16 @@ import { Patient } from "../models/Patient";
 import { Appointment } from "../models/Appointment";
 import { InventoryItem } from "../models/InventoryItem";
 import { Invoice } from "../models/Invoice";
+import { Room } from "../models/Room";
+import { Bed } from "../models/Bed";
+import { OPVisit } from "../models/OPVisit";
+import { Admission } from "../models/Admission";
+import { Payment } from "../models/Payment";
+import { Queue } from "../models/Queue";
+import { AuditLog } from "../models/AuditLog";
+import { DbNotification } from "../models/DbNotification";
 import { generateBranchId } from "../utils/idGenerator";
+
 
 const DEMO_PASSWORD = "Password123!";
 
@@ -32,6 +41,14 @@ async function run() {
     Appointment.deleteMany({}),
     InventoryItem.deleteMany({}),
     Invoice.deleteMany({}),
+    Room.deleteMany({}),
+    Bed.deleteMany({}),
+    OPVisit.deleteMany({}),
+    Admission.deleteMany({}),
+    Payment.deleteMany({}),
+    Queue.deleteMany({}),
+    AuditLog.deleteMany({}),
+    DbNotification.deleteMany({}),
   ]);
 
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
@@ -69,6 +86,16 @@ async function run() {
     role: "accountant",
     hospital: hospital._id,
   });
+
+  const receptionist = await User.create({
+    name: "Sarah Connor",
+    email: "receptionist@hms.test",
+    passwordHash,
+    role: "receptionist",
+    hospital: hospital._id,
+    employeeId: "EMP-2024-0002"
+  });
+
 
   await Branch.create({
     hospital: hospital._id,
@@ -190,14 +217,38 @@ async function run() {
     status: "partially_paid",
   });
 
+  const wards = ["General Ward", "Semi-Private Ward", "Private Ward", "ICU"];
+  const roomTypes: ("General" | "Semi-Private" | "Private" | "ICU")[] = ["General", "Semi-Private", "Private", "ICU"];
+  
+  for (let i = 0; i < wards.length; i++) {
+    const room = await Room.create({
+      hospital: hospital._id,
+      roomNumber: `R-10${i+1}`,
+      roomType: roomTypes[i],
+      wardName: wards[i],
+      status: "active"
+    });
+    
+    for (let j = 1; j <= 4; j++) {
+      await Bed.create({
+        hospital: hospital._id,
+        room: room._id,
+        bedNumber: `${room.roomNumber}-B${j}`,
+        isOccupied: false
+      });
+    }
+  }
+
   console.log("Seed complete. Demo accounts:");
   console.table([
     { role: superAdmin.role, email: superAdmin.email, password: env.superAdmin.password },
     { role: hospitalAdmin.role, email: hospitalAdmin.email, password: DEMO_PASSWORD },
     { role: accountant.role, email: accountant.email, password: DEMO_PASSWORD },
+    { role: "receptionist", email: "receptionist@hms.test", password: DEMO_PASSWORD },
   ]);
 
   await mongoose.disconnect();
+
 }
 
 run().catch((err) => {

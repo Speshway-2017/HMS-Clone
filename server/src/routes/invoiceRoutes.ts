@@ -5,7 +5,7 @@ import { listInvoices, createInvoice, getInvoice, updateInvoice, deleteInvoice }
 
 const router = Router();
 
-router.use(protect, restrictTo("hospital_admin"), scopeToHospital);
+router.use(protect, restrictTo("hospital_admin", "receptionist"), scopeToHospital);
 
 router.route("/").get(listInvoices).post(createInvoice);
 router.route("/:id").get(getInvoice).patch(updateInvoice).delete(deleteInvoice);

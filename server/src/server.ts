@@ -1,12 +1,18 @@
+import { createServer } from "http";
 import app from "./app";
 import { connectDB } from "./config/db";
 import { env } from "./config/env";
 import { ensureSuperAdmin } from "./utils/ensureSuperAdmin";
+import { initSocket } from "./config/socket";
 
 async function main() {
   await connectDB();
   await ensureSuperAdmin();
-  app.listen(env.port, () => {
+
+  const httpServer = createServer(app);
+  initSocket(httpServer, env.clientUrl);
+
+  httpServer.listen(env.port, () => {
     console.log(`Server listening on http://localhost:${env.port}`);
   });
 }
