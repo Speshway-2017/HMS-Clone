@@ -4,6 +4,8 @@ import { DashboardLayout } from "./layouts/DashboardLayout";
 import { LandingPage } from "./pages/public/LandingPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+
+// Super Admin module
 import { SuperAdminDashboard } from "./pages/super-admin/Dashboard";
 import { HospitalsPage } from "./pages/super-admin/HospitalsPage";
 import { HospitalFormPage } from "./pages/super-admin/HospitalFormPage";
@@ -19,6 +21,8 @@ import { ManageRolesPage } from "./pages/super-admin/ManageRolesPage";
 import { RoleFormPage } from "./pages/super-admin/RoleFormPage";
 import { AnalyticsPage } from "./pages/super-admin/AnalyticsPage";
 import { ReportsPage } from "./pages/super-admin/ReportsPage";
+
+// Hospital Admin module
 import { HospitalAdminDashboard } from "./pages/hospital-admin/Dashboard";
 import { DoctorsPage } from "./pages/hospital-admin/DoctorsPage";
 import { DoctorFormPage } from "./pages/hospital-admin/DoctorFormPage";
@@ -38,13 +42,19 @@ import { PatientInvoicePage } from "./pages/hospital-admin/PatientInvoicePage";
 import { InventoryPage } from "./pages/hospital-admin/InventoryPage";
 import { InventoryFormPage } from "./pages/hospital-admin/InventoryFormPage";
 import { InventoryItemDetailsPage } from "./pages/hospital-admin/InventoryItemDetailsPage";
+
+// Accountant module
 import { AccountantDashboard } from "./pages/accountant/Dashboard";
+
+// Shared/Profile settings
 import { SettingsPage } from "./pages/shared/SettingsPage";
+
+// Receptionist module
 import { ReceptionistDashboard } from "./pages/receptionist/Dashboard";
 import { PatientManagementPage } from "./pages/receptionist/PatientManagement";
 import { AppointmentsPage as ReceptionAppointmentsPage } from "./pages/receptionist/Appointments";
-import { OPManagementPage } from "./pages/receptionist/OPManagement";
-import { IPManagementPage } from "./pages/receptionist/IPManagement";
+import { OPManagementPage as ReceptionistOPManagementPage } from "./pages/receptionist/OPManagement";
+import { IPManagementPage as ReceptionistIPManagementPage } from "./pages/receptionist/IPManagement";
 import { BillingPage as ReceptionBillingPage } from "./pages/receptionist/Billing";
 import { QueuePage } from "./pages/receptionist/Queue";
 import { DisplayQueuePage } from "./pages/receptionist/DisplayQueue";
@@ -54,8 +64,8 @@ import { ReportsPage as ReceptionReportsPage } from "./pages/receptionist/Report
 
 // Doctor module
 import { DoctorDashboard } from "./pages/doctor/Dashboard";
-import { OPManagementPage } from "./pages/doctor/OPManagementPage";
-import { IPManagementPage } from "./pages/doctor/IPManagementPage";
+import { OPManagementPage as DoctorOPManagementPage } from "./pages/doctor/OPManagementPage";
+import { IPManagementPage as DoctorIPManagementPage } from "./pages/doctor/IPManagementPage";
 import { PatientRecordsPage } from "./pages/doctor/PatientRecordsPage";
 import { LaboratoryPage } from "./pages/doctor/LaboratoryPage";
 import { RadiologyPage } from "./pages/doctor/RadiologyPage";
@@ -175,17 +185,17 @@ export const router = createBrowserRouter([
           { path: "appointments/new", element: <ReceptionAppointmentsPage activeTab="new" /> },
           { path: "appointments/today", element: <ReceptionAppointmentsPage activeTab="today" /> },
           { path: "appointments/calendar", element: <ReceptionAppointmentsPage activeTab="calendar" /> },
-          { path: "op", element: <OPManagementPage /> },
-          { path: "op/new", element: <OPManagementPage activeTab="new" /> },
-          { path: "op/queue", element: <OPManagementPage activeTab="queue" /> },
-          { path: "op/history", element: <OPManagementPage activeTab="history" /> },
-          { path: "ip", element: <IPManagementPage /> },
-          { path: "ip/new", element: <IPManagementPage activeTab="new" /> },
-          { path: "ip/admissions", element: <IPManagementPage activeTab="admissions" /> },
-          { path: "ip/rooms", element: <IPManagementPage activeTab="rooms" /> },
-          { path: "ip/beds", element: <IPManagementPage activeTab="rooms" /> },
-          { path: "ip/transfer", element: <IPManagementPage activeTab="transfer" /> },
-          { path: "ip/discharges", element: <IPManagementPage activeTab="discharges" /> },
+          { path: "op", element: <ReceptionistOPManagementPage /> },
+          { path: "op/new", element: <ReceptionistOPManagementPage activeTab="new" /> },
+          { path: "op/queue", element: <ReceptionistOPManagementPage activeTab="queue" /> },
+          { path: "op/history", element: <ReceptionistOPManagementPage activeTab="history" /> },
+          { path: "ip", element: <ReceptionistIPManagementPage /> },
+          { path: "ip/new", element: <ReceptionistIPManagementPage activeTab="new" /> },
+          { path: "ip/admissions", element: <ReceptionistIPManagementPage activeTab="admissions" /> },
+          { path: "ip/rooms", element: <ReceptionistIPManagementPage activeTab="rooms" /> },
+          { path: "ip/beds", element: <ReceptionistIPManagementPage activeTab="rooms" /> },
+          { path: "ip/transfer", element: <ReceptionistIPManagementPage activeTab="transfer" /> },
+          { path: "ip/discharges", element: <ReceptionistIPManagementPage activeTab="discharges" /> },
           { path: "billing", element: <ReceptionBillingPage /> },
           { path: "billing/consultation", element: <ReceptionBillingPage activeTab="consultation" /> },
           { path: "billing/new", element: <ReceptionBillingPage activeTab="consultation" /> },
@@ -206,12 +216,15 @@ export const router = createBrowserRouter([
       },
       {
         path: "/receptionist/queue/display",
-        element: <DisplayQueuePage />
+        element: <DisplayQueuePage />,
       },
       {
         path: "/display-board",
-        element: <DisplayQueuePage />
-      }
+        element: <DisplayQueuePage />,
+      },
+    ],
+  },
+  {
     element: <ProtectedRoute allow={["doctor"]} />,
     children: [
       {
@@ -219,8 +232,8 @@ export const router = createBrowserRouter([
         element: <DashboardLayout />,
         children: [
           { index: true, element: <DoctorDashboard /> },
-          { path: "op-management", element: <OPManagementPage /> },
-          { path: "ip-management", element: <IPManagementPage /> },
+          { path: "op-management", element: <DoctorOPManagementPage /> },
+          { path: "ip-management", element: <DoctorIPManagementPage /> },
           { path: "patient-records", element: <PatientRecordsPage /> },
           { path: "laboratory", element: <LaboratoryPage /> },
           { path: "radiology", element: <RadiologyPage /> },
@@ -233,5 +246,3 @@ export const router = createBrowserRouter([
     ],
   },
 ]);
-
-

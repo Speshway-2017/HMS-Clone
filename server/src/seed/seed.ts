@@ -54,6 +54,7 @@ async function run() {
 
   // ── Super Admin (credentials from .env) ────────────────────────────────────
   const superAdminPasswordHash = await bcrypt.hash(env.superAdmin.password, 10);
+  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
 
   const superAdmin = await User.create({
     name: env.superAdmin.name,
