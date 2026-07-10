@@ -5,6 +5,21 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 ### Added
+- **Accountant Dashboard module, all 20 screens/views implemented end-to-end:**
+  - Added new pages: `Dashboard.tsx`, `BillingPage.tsx`, `PaymentsPage.tsx`, `ClaimsPage.tsx`, `PayrollPage.tsx`, `ExpensesPage.tsx`, `AnalyticsPage.tsx`, `AuditLogsPage.tsx`, and a custom `SettingsPage.tsx` under `client/src/pages/accountant/`.
+  - Expanded frontend routes under `/accountant` inside `client/src/router.tsx` to mount all 9 pages.
+  - Authorized `"accountant"` role on backend endpoints in `invoiceRoutes.ts`, `receptionRoutes.ts`, `doctorRoutes.ts`, and `staffRoutes.ts` to enable correct data loading (fixing stuck loading state for payroll employee list).
+  - Integrated local persistence (LocalStorage) for payroll, expenses, insurance claims, tax rates, and active payment channel preferences to maintain a fully interactive state.
+  - Fixed alignment and table header background clipping on scroll by shifting table backgrounds from row elements to header tags (`thead`), specifying minimum table widths, and adding `whitespace-nowrap` classes to prevent header text from wrapping onto two lines.
+  - Aligned dashboard layout structure and replaced custom metrics cards with the reusable `KpiCard` component for unified, clean aesthetics.
+  - Normalized uppercase styling in billing categories ("Pharmacy Billing", "Laboratory Billing").
+  - Simplified table views in Billing, Payments, and Claims pages by removing less critical columns (e.g. Insurance Covered, Patient Balance, Transaction ID, Policy Number, Invoice Ref) to keep tables clean, and relocated them into their respective modal detail views.
+  - Standardized status badge sizes (`w-36` / width: 9rem) across all Accountant tables and dashboards for unified, clean grid structures.
+  - Redesigned Badge component styling to use rounded rectangle corners (`rounded-lg`) instead of full rounded pills, adding border outline accents and uppercase text format for a clean, premium, and neat appearance.
+  - Arranged Claims and Expenses tables for cleaner responsive structures, resolving data multi-line wrapping by converting double-line fields (e.g. patient name/phone, recipient/description) into single-line formats, and implemented a detail view modal for expenses.
+  - Removed unnecessary columns (Approved Amount from Claims list, Payment Method from Expenses list) to prevent horizontal scrolling on typical screen layouts, with full details accessible inside the detailed modals.
+  - Added a `size="sm"` layout variant to the `KpiCard` component and applied it to the Accountant Dashboard KPI metrics to reduce padding, icon sizes, and typography sizes for a cleaner look.
+  - Added Notification Panel integration into the Accountant dashboard topbar, sharing the admin's notification dropdown styles with real-time sync, and re-mapped internal links (billing, appointments, inventory) to relevant accountant paths.
 - **Settings page** (`pages/shared/SettingsPage.tsx`) — shared across all three roles, accessible
   from the sidebar "Settings" item and by clicking the avatar/name in the Topbar. Contains a
   read-only profile card (name, email, role) and a Change Password form (new password + confirm,

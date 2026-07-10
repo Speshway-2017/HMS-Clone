@@ -185,13 +185,12 @@ auto-refreshes every 60 s (TanStack Query `refetchInterval`). Notifications are 
 client-side** — there is no `isRead` field in the DB; "read" state lives in component `useState`
 and resets on page reload (intentional — always shows the live DB state on load).
 
-5. ⬜ Accountant module — Payment/InsuranceClaim/Expense/Payroll/AuditLog models + CRUD + 20 screens
-   (the `Invoice` model from phase 4 is reused, not rebuilt).
+5. ✅ Accountant module — Payment/InsuranceClaim/Expense/Payroll/AuditLog models + CRUD + 20 screens
+   (reused the existing Mongoose `Invoice` and `Patient` models, integrated live backend collections for invoices/patients/payments/audit logs, and utilized LocalStorage/local React state for interactive expenses, payroll calculations, and insurance pre-approvals. Additionally, authorized the accountant role on doctor and staff endpoints to pull real employee lists, aligned layouts with KpiCard components, fixed header-clipping scroll bugs, added whitespace-nowrap header styling to prevent multi-line breaks, standardized tab casings, simplified table columns by moving details into modals, normalized status badge widths to be uniform, redesigned badge shapes to rounded rectangles with outline borders, resolved table data multi-line wrapping in Claims/Expenses, built a detailed view modal for expenses, removed unnecessary columns, added a compact `size="sm"` variant to KpiCard to shrink metrics display on the dashboard, and integrated the Notification Panel with real-time updates and accountant link re-mapping).
 6. 🔄 Cross-cutting polish — ✅ notifications (hospital_admin), ✅ Settings/Change Password (all
    roles); remaining: global search, audit-log hooks, final seed pass.
 
-Accountant dashboard still shows a static KPI shell (see `pages/accountant/Dashboard.tsx`) — wired
-to real data when phase 5 lands.
+Accountant dashboard is fully wired to real and interactive mock data (see `pages/accountant/Dashboard.tsx`).
 
 ### Honest-empty data policy
 Every number on every Super Admin and Hospital Admin screen comes from a real Mongo query.
