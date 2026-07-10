@@ -12,6 +12,7 @@ import {
   BellOff,
 } from "lucide-react";
 import { useNotifications, AppNotification, NotificationType, NotificationSeverity } from "../../features/notifications";
+import { useAuth } from "../../context/AuthContext";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -116,6 +117,7 @@ export function NotificationPanel() {
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const panelRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const { data, isLoading } = useNotifications();
   const notifications = data?.data?.notifications ?? [];
@@ -147,7 +149,19 @@ export function NotificationPanel() {
   }
 
   function handleNavigate(link: string) {
-    navigate(link);
+    let targetLink = link;
+    if (user?.role === "accountant") {
+      if (link.startsWith("/admin/finance")) {
+        targetLink = "/accountant/billing";
+      } else if (link.startsWith("/admin/appointments")) {
+        targetLink = "/accountant/dashboard";
+      } else if (link.startsWith("/admin/patients")) {
+        targetLink = "/accountant/billing";
+      } else if (link.startsWith("/admin/inventory")) {
+        targetLink = "/accountant/expenses";
+      }
+    }
+    navigate(targetLink);
     setOpen(false);
     setReadIds((prev) => {
       const next = new Set(prev);

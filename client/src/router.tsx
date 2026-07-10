@@ -45,6 +45,14 @@ import { InventoryItemDetailsPage } from "./pages/hospital-admin/InventoryItemDe
 
 // Accountant module
 import { AccountantDashboard } from "./pages/accountant/Dashboard";
+import { AccountantBillingPage } from "./pages/accountant/BillingPage";
+import { AccountantPaymentsPage } from "./pages/accountant/PaymentsPage";
+import { AccountantClaimsPage } from "./pages/accountant/ClaimsPage";
+import { AccountantPayrollPage } from "./pages/accountant/PayrollPage";
+import { AccountantExpensesPage } from "./pages/accountant/ExpensesPage";
+import { AccountantAnalyticsPage } from "./pages/accountant/AnalyticsPage";
+import { AccountantAuditLogsPage } from "./pages/accountant/AuditLogsPage";
+import { AccountantSettingsPage } from "./pages/accountant/SettingsPage";
 
 // Shared/Profile settings
 import { SettingsPage } from "./pages/shared/SettingsPage";
@@ -164,7 +172,14 @@ export const router = createBrowserRouter([
         element: <DashboardLayout />,
         children: [
           { index: true, element: <AccountantDashboard /> },
-          { path: "settings", element: <SettingsPage /> },
+          { path: "billing", element: <AccountantBillingPage /> },
+          { path: "payments", element: <AccountantPaymentsPage /> },
+          { path: "claims", element: <AccountantClaimsPage /> },
+          { path: "payroll", element: <AccountantPayrollPage /> },
+          { path: "expenses", element: <AccountantExpensesPage /> },
+          { path: "analytics", element: <AccountantAnalyticsPage /> },
+          { path: "audit-logs", element: <AccountantAuditLogsPage /> },
+          { path: "settings", element: <AccountantSettingsPage /> },
         ],
       },
     ],
