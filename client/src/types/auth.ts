@@ -1,4 +1,4 @@
-export type Role = "super_admin" | "hospital_admin" | "accountant" | "receptionist" | "doctor" | "pharmacist" | "manage_pharmacy";
+export type Role = "super_admin" | "hospital_admin" | "accountant" | "receptionist" | "doctor" | "pharmacist" | "laboratory";
 
 export interface AuthUser {
   id: string;
@@ -18,7 +18,7 @@ export const ROLE_HOME_PATH: Record<Role, string> = {
   receptionist: "/receptionist",
   doctor: "/doctor",
   pharmacist: "/pharmacy",
-  manage_pharmacy: "/pharmacy",
+  laboratory: "/laboratory",
 };
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -28,6 +28,6 @@ export const ROLE_LABEL: Record<Role, string> = {
   receptionist: "Receptionist",
   doctor: "Doctor",
   pharmacist: "Pharmacist",
-  manage_pharmacy: "Pharmacy",
+  laboratory: "Laboratory",
 };
 

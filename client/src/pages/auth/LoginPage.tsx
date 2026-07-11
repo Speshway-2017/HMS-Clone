@@ -14,7 +14,7 @@ export function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (user) {
-    const redirectTo = (location.state as { from?: string })?.from ?? ROLE_HOME_PATH[user.role];
+    const redirectTo = (location.state as { from?: string })?.from ?? ROLE_HOME_PATH[user.role] ?? "/";
     return <Navigate to={redirectTo} replace />;
   }
 
@@ -24,7 +24,7 @@ export function LoginPage() {
     setIsSubmitting(true);
     try {
       const loggedInUser = await login(email, password);
-      navigate(ROLE_HOME_PATH[loggedInUser.role], { replace: true });
+      navigate(ROLE_HOME_PATH[loggedInUser.role] ?? "/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");
     } finally {

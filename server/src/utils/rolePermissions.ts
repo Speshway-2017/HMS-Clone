@@ -31,10 +31,10 @@ export const ROLE_PERMISSIONS: Record<Role, { label: string; description: string
     description: "Verifies prescriptions, dispenses medicines, manages inventory, and handles pharmacy billing.",
     permissions: ["Verify Prescriptions", "Dispense Medicines", "Inventory Management", "Pharmacy Billing"],
   },
-  manage_pharmacy: {
-    label: "Pharmacy",
-    description: "The Pharmacy role manages medicine dispensing, prescription verification, inventory, supplier management, billing.",
-    permissions: ["Verify Prescriptions", "Dispense Medicines", "Inventory Management", "Pharmacy Billing"],
+  laboratory: {
+    label: "Laboratory",
+    description: "The Laboratory role manages lab test requests, sample collections, test processing, quality control, laboratory inventory, and report delivery.",
+    permissions: ["Manage Test Requests", "Collect Samples", "Process Tests", "Quality Control", "Lab Inventory", "Report Delivery"],
   },
 };
 
