@@ -11,7 +11,7 @@ import {
 
 const router = Router();
 
-router.use(protect, restrictTo("hospital_admin", "doctor", "receptionist", "accountant", "pharmacist", "manage_pharmacy"), scopeToHospital);
+router.use(protect, restrictTo("hospital_admin", "doctor", "receptionist", "accountant", "pharmacist", "laboratory"), scopeToHospital);
 
 router.route("/")
   .get(listAppointments)

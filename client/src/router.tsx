@@ -92,6 +92,16 @@ import { PharmacyBilling } from "./pages/pharmacy/Billing";
 import { PharmacySalesAnalytics } from "./pages/pharmacy/SalesAnalytics";
 import { PharmacySettings } from "./pages/pharmacy/Settings";
 
+// Laboratory module
+import { LaboratoryDashboard } from "./pages/laboratory/Dashboard";
+import { LaboratoryTestRequestManagement } from "./pages/laboratory/TestRequestManagement";
+import { LaboratorySampleCollection } from "./pages/laboratory/SampleCollection";
+import { LaboratoryTestProcessing } from "./pages/laboratory/TestProcessing";
+import { LaboratoryQualityControl } from "./pages/laboratory/QualityControl";
+import { LaboratoryInventory } from "./pages/laboratory/LabInventory";
+import { LaboratoryReportDelivery } from "./pages/laboratory/ReportDelivery";
+import { LaboratorySettings } from "./pages/laboratory/Settings";
+
 export const router = createBrowserRouter([
   {
     element: <PublicLayout />,
@@ -271,7 +281,7 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    element: <ProtectedRoute allow={["pharmacist", "manage_pharmacy"]} />,
+    element: <ProtectedRoute allow={["pharmacist"]} />,
     children: [
       {
         path: "/pharmacy",
@@ -285,6 +295,25 @@ export const router = createBrowserRouter([
           { path: "billing", element: <PharmacyBilling /> },
           { path: "analytics", element: <PharmacySalesAnalytics /> },
           { path: "settings", element: <PharmacySettings /> },
+        ],
+      },
+    ],
+  },
+  {
+    element: <ProtectedRoute allow={["laboratory"]} />,
+    children: [
+      {
+        path: "/laboratory",
+        element: <DashboardLayout />,
+        children: [
+          { index: true, element: <LaboratoryDashboard /> },
+          { path: "requests", element: <LaboratoryTestRequestManagement /> },
+          { path: "samples", element: <LaboratorySampleCollection /> },
+          { path: "processing", element: <LaboratoryTestProcessing /> },
+          { path: "qc", element: <LaboratoryQualityControl /> },
+          { path: "inventory", element: <LaboratoryInventory /> },
+          { path: "reports", element: <LaboratoryReportDelivery /> },
+          { path: "settings", element: <LaboratorySettings /> },
         ],
       },
     ],

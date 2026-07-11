@@ -47,6 +47,18 @@ export const listRoles = catchAsync(async (req: Request, res: Response) => {
           description: "Manages patient onboarding, schedules appointments, and handles clinic front desk operations.",
           permissions: ["Patient Registration", "Appointment Scheduling", "Visitor Log", "Billing Intake"],
         },
+        {
+          role: "pharmacist",
+          label: "Pharmacist",
+          description: "Verifies prescriptions, dispenses medicines, manages inventory, and handles pharmacy billing.",
+          permissions: ["Verify Prescriptions", "Dispense Medicines", "Inventory Management", "Pharmacy Billing"],
+        },
+        {
+          role: "laboratory",
+          label: "Laboratory",
+          description: "The Laboratory role manages lab test requests, sample collections, test processing, quality control, laboratory inventory, and report delivery.",
+          permissions: ["Manage Test Requests", "Collect Samples", "Process Tests", "Quality Control", "Lab Inventory", "Report Delivery"],
+        },
       ];
 
       await CustomRole.insertMany(
@@ -149,7 +161,7 @@ export const createRole = catchAsync(async (req: Request, res: Response) => {
   }
 
   // Ensure role does not collide with static roles
-  if (ROLES.includes(body.role as any)) {
+  if (["super_admin", "hospital_admin"].includes(body.role)) {
     throw new AppError("A system role with this name already exists.", 400);
   }
 

@@ -11,7 +11,7 @@ import {
 
 const router = Router();
 
-router.use(protect, restrictTo("hospital_admin", "pharmacist", "manage_pharmacy"), scopeToHospital);
+router.use(protect, restrictTo("hospital_admin", "pharmacist", "laboratory"), scopeToHospital);
 
 router.route("/").get(listInventory).post(createInventoryItem);
 router.route("/:id").get(getInventoryItem).patch(updateInventoryItem).delete(deleteInventoryItem);

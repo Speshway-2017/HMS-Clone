@@ -7,8 +7,8 @@ const SETTINGS_PATH: Record<string, string> = {
   super_admin: "/super-admin/settings",
   hospital_admin: "/admin/settings",
   accountant: "/accountant/settings",
-  manage_pharmacy: "/pharmacy/settings",
   pharmacist: "/pharmacy/settings",
+  laboratory: "/laboratory/settings",
 };
 
 export function Topbar() {
@@ -27,12 +27,12 @@ export function Topbar() {
       </div>
 
       <div className="flex items-center gap-3">
-        {/* Notification bell — for hospital_admin, doctor, accountant, and pharmacy roles */}
+        {/* Notification bell — for hospital_admin, doctor, accountant, pharmacist, and laboratory roles */}
         {(user?.role === "hospital_admin" || 
           user?.role === "doctor" || 
           user?.role === "accountant" || 
-          user?.role === "manage_pharmacy" || 
-          user?.role === "pharmacist") && <NotificationPanel />}
+          user?.role === "pharmacist" ||
+          user?.role === "laboratory") && <NotificationPanel />}
 
         {/* Avatar + name → Settings */}
         <Link
