@@ -82,6 +82,16 @@ import { TelemedicinePage } from "./pages/doctor/TelemedicinePage";
 import { PerformancePage } from "./pages/doctor/PerformancePage";
 import { DoctorSettingsPage } from "./pages/doctor/SettingsPage";
 
+// Pharmacy module
+import { PharmacyDashboard } from "./pages/pharmacy/Dashboard";
+import { PharmacyPrescriptionVerification } from "./pages/pharmacy/PrescriptionVerification";
+import { PharmacyMedicineDispensing } from "./pages/pharmacy/MedicineDispensing";
+import { PharmacyInventoryManagement } from "./pages/pharmacy/InventoryManagement";
+import { PharmacySupplierManagement } from "./pages/pharmacy/SupplierManagement";
+import { PharmacyBilling } from "./pages/pharmacy/Billing";
+import { PharmacySalesAnalytics } from "./pages/pharmacy/SalesAnalytics";
+import { PharmacySettings } from "./pages/pharmacy/Settings";
+
 export const router = createBrowserRouter([
   {
     element: <PublicLayout />,
@@ -256,6 +266,25 @@ export const router = createBrowserRouter([
           { path: "telemedicine", element: <TelemedicinePage /> },
           { path: "performance", element: <PerformancePage /> },
           { path: "settings", element: <DoctorSettingsPage /> },
+        ],
+      },
+    ],
+  },
+  {
+    element: <ProtectedRoute allow={["pharmacist", "manage_pharmacy"]} />,
+    children: [
+      {
+        path: "/pharmacy",
+        element: <DashboardLayout />,
+        children: [
+          { index: true, element: <PharmacyDashboard /> },
+          { path: "prescriptions", element: <PharmacyPrescriptionVerification /> },
+          { path: "dispensing", element: <PharmacyMedicineDispensing /> },
+          { path: "inventory", element: <PharmacyInventoryManagement /> },
+          { path: "suppliers", element: <PharmacySupplierManagement /> },
+          { path: "billing", element: <PharmacyBilling /> },
+          { path: "analytics", element: <PharmacySalesAnalytics /> },
+          { path: "settings", element: <PharmacySettings /> },
         ],
       },
     ],

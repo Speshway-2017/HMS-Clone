@@ -150,7 +150,17 @@ export function NotificationPanel() {
 
   function handleNavigate(link: string) {
     let targetLink = link;
-    if (user?.role === "accountant") {
+    if (user?.role === "manage_pharmacy" || user?.role === "pharmacist") {
+      if (link.startsWith("/admin/inventory")) {
+        targetLink = "/pharmacy/inventory";
+      } else if (link.startsWith("/admin/finance") || link.startsWith("/admin/invoices")) {
+        targetLink = "/pharmacy/billing";
+      } else if (link.startsWith("/admin/patients")) {
+        targetLink = "/pharmacy/prescriptions";
+      } else if (link.startsWith("/admin/dashboard")) {
+        targetLink = "/pharmacy";
+      }
+    } else if (user?.role === "accountant") {
       if (link.startsWith("/admin/finance")) {
         targetLink = "/accountant/billing";
       } else if (link.startsWith("/admin/appointments")) {

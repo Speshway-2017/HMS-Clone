@@ -27,6 +27,9 @@ import {
   Video,
   BedDouble,
   Activity,
+  Pill,
+  ClipboardCheck,
+  Truck,
   type LucideIcon,
 } from "lucide-react";
 import { Role } from "../types/auth";
@@ -162,6 +165,26 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "Telemedicine", path: "/doctor/telemedicine", icon: Video },
     { label: "Performance", path: "/doctor/performance", icon: BarChart3 },
     { label: "Settings", path: "/doctor/settings", icon: Settings },
+  ],
+  pharmacist: [
+    { label: "Dashboard", path: "/pharmacy", icon: LayoutDashboard },
+    { label: "Prescription Verification", path: "/pharmacy/prescriptions", icon: ClipboardCheck },
+    { label: "Medicine Dispensing", path: "/pharmacy/dispensing", icon: Pill },
+    { label: "Inventory Management", path: "/pharmacy/inventory", icon: Boxes },
+    { label: "Supplier Management", path: "/pharmacy/suppliers", icon: Truck },
+    { label: "Billing", path: "/pharmacy/billing", icon: Receipt },
+    { label: "Sales Analytics", path: "/pharmacy/analytics", icon: BarChart3 },
+    { label: "Settings", path: "/pharmacy/settings", icon: Settings },
+  ],
+  manage_pharmacy: [
+    { label: "Dashboard", path: "/pharmacy", icon: LayoutDashboard },
+    { label: "Prescription Verification", path: "/pharmacy/prescriptions", icon: ClipboardCheck },
+    { label: "Medicine Dispensing", path: "/pharmacy/dispensing", icon: Pill },
+    { label: "Inventory Management", path: "/pharmacy/inventory", icon: Boxes },
+    { label: "Supplier Management", path: "/pharmacy/suppliers", icon: Truck },
+    { label: "Billing", path: "/pharmacy/billing", icon: Receipt },
+    { label: "Sales Analytics", path: "/pharmacy/analytics", icon: BarChart3 },
+    { label: "Settings", path: "/pharmacy/settings", icon: Settings },
   ],
 };
 

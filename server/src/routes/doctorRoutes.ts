@@ -16,7 +16,7 @@ const router = Router();
 // Allow logged in doctors to retrieve their own doctor profile
 router.get("/me", protect, restrictTo("doctor"), getDoctorProfileMe);
 
-router.use(protect, restrictTo("hospital_admin", "receptionist", "accountant"), scopeToHospital);
+router.use(protect, restrictTo("hospital_admin", "receptionist", "accountant", "pharmacist", "manage_pharmacy"), scopeToHospital);
 
 router.route("/").get(listDoctors).post(createDoctor);
 router.get("/:id/performance", getDoctorPerformance);

@@ -26,5 +26,15 @@ export const ROLE_PERMISSIONS: Record<Role, { label: string; description: string
     description: "Manages patient onboarding, schedules appointments, and handles clinic front desk operations.",
     permissions: ["Patient Registration", "Appointment Scheduling", "Visitor Log", "Billing Intake", "Patient Management", "Appointment Booking", "Billing Operations", "Queue Management"],
   },
+  pharmacist: {
+    label: "Pharmacist",
+    description: "Verifies prescriptions, dispenses medicines, manages inventory, and handles pharmacy billing.",
+    permissions: ["Verify Prescriptions", "Dispense Medicines", "Inventory Management", "Pharmacy Billing"],
+  },
+  manage_pharmacy: {
+    label: "Pharmacy",
+    description: "The Pharmacy role manages medicine dispensing, prescription verification, inventory, supplier management, billing.",
+    permissions: ["Verify Prescriptions", "Dispense Medicines", "Inventory Management", "Pharmacy Billing"],
+  },
 };
 
