@@ -33,3 +33,4 @@ const admissionSchema = new Schema(
 
 export type Admission = InferSchemaType<typeof admissionSchema> & { _id: Types.ObjectId };
 export const Admission = model("Admission", admissionSchema);
+

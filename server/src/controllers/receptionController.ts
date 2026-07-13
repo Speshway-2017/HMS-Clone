@@ -39,7 +39,11 @@ const appointmentBookingSchema = z.object({
   date: z.string().min(1, "Date is required"),
   time: z.string().min(1, "Time is required"),
   type: z.enum(["Consultation", "Walk-in", "Emergency"]).default("Consultation"),
-  notes: z.string().optional().default("")
+  notes: z.string().optional().default(""),
+  // Follow-up booking fields
+  followUp: z.boolean().optional().default(false),
+  parentAppointmentId: z.string().optional().nullable(),
+  followUpReason: z.string().optional().default(""),
 });
 
 const paymentSchema = z.object({
@@ -151,6 +155,20 @@ export const bookAppointment = catchAsync(async (req: Request, res: Response) =>
     req.user!._id
   );
   res.status(201).json({ status: "success", data: result });
+});
+
+export const checkDuplicateAppointment = catchAsync(async (req: Request, res: Response) => {
+  const { patientId, doctorId, date } = req.query as Record<string, string>;
+  if (!patientId || !doctorId || !date) {
+    throw new AppError("patientId, doctorId and date are required query parameters.", 400);
+  }
+  const result = await ReceptionService.checkDuplicateAppointment(
+    req.hospitalFilter!.hospital as any,
+    patientId,
+    doctorId,
+    date
+  );
+  res.json({ status: "success", data: result });
 });
 
 export const processBillingPayment = catchAsync(async (req: Request, res: Response) => {
@@ -347,3 +365,41 @@ export const getTodayRegistrations = catchAsync(async (req: Request, res: Respon
 
   res.json({ status: "success", data: { patients, total: patients.length } });
 });
+
+const cancelAppointmentSchema = z.object({
+  reason: z.enum(["Patient Requested", "Doctor Unavailable", "Duplicate Booking", "Wrong Booking", "Emergency", "Other"]),
+  remarks: z.string().optional().default(""),
+  refundRequired: z.union([z.boolean(), z.enum(["Yes", "No"])]).default("No"),
+});
+
+export const cancelAppointment = catchAsync(async (req: Request, res: Response) => {
+  const cancelData = cancelAppointmentSchema.parse(req.body);
+  const result = await ReceptionService.cancelAppointment(
+    req.hospitalFilter!.hospital as any,
+    req.params.id,
+    cancelData,
+    req.user!._id
+  );
+  res.json({ status: "success", data: result });
+});
+
+const rescheduleAppointmentSchema = z.object({
+  newDate: z.string().min(1, "New appointment date is required"),
+  newTime: z.string().min(1, "New appointment time is required"),
+  doctorId: z.string().min(1, "Doctor is required"),
+  departmentId: z.string().min(1, "Department is required"),
+  reason: z.enum(["Patient Requested", "Doctor Requested", "Doctor Unavailable", "Equipment Issue", "Emergency", "Other"]),
+  remarks: z.string().optional().default(""),
+});
+
+export const rescheduleAppointment = catchAsync(async (req: Request, res: Response) => {
+  const rescheduleData = rescheduleAppointmentSchema.parse(req.body);
+  const result = await ReceptionService.rescheduleAppointment(
+    req.hospitalFilter!.hospital as any,
+    req.params.id,
+    rescheduleData,
+    req.user!._id
+  );
+  res.json({ status: "success", data: result });
+});
+

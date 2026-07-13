@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import { Patient, PATIENT_STATUSES } from "../models/Patient";
+import { Doctor } from "../models/Doctor";
+import { Types } from "mongoose";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
@@ -38,11 +40,32 @@ export const listPatients = catchAsync(async (req: Request, res: Response) => {
   if (status) filter.status = status;
   if (search) filter.name = new RegExp(search, "i");
 
+  if (req.user?.role === "doctor") {
+    const doctor = await Doctor.findOne({ email: req.user.email, isActive: { $ne: false } });
+    if (doctor) {
+      filter.assignedDoctor = doctor._id;
+    } else {
+      filter.assignedDoctor = new Types.ObjectId();
+    }
+  }
+
   const [patients, total, statusCounts, admissionsToday] = await Promise.all([
     Patient.find(filter).populate("assignedDoctor", "name").sort({ createdAt: -1 }).skip(skip).limit(limit),
     Patient.countDocuments(filter),
-    Patient.aggregate([{ $match: req.hospitalFilter as Record<string, unknown> }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
-    Patient.countDocuments({ ...req.hospitalFilter, createdAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) } }),
+    Patient.aggregate([
+      { 
+        $match: { 
+          ...req.hospitalFilter as Record<string, unknown>,
+          ...(req.user?.role === "doctor" && filter.assignedDoctor ? { assignedDoctor: filter.assignedDoctor } : {})
+        } 
+      }, 
+      { $group: { _id: "$status", count: { $sum: 1 } } }
+    ]),
+    Patient.countDocuments({ 
+      ...req.hospitalFilter, 
+      createdAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) },
+      ...(req.user?.role === "doctor" && filter.assignedDoctor ? { assignedDoctor: filter.assignedDoctor } : {})
+    }),
   ]);
 
   res.json({

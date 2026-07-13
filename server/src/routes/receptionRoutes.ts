@@ -26,7 +26,10 @@ import {
   getPendingInvoices,
   getPaymentHistory,
   getCompletedInvoices,
-  getTodayRegistrations
+  getTodayRegistrations,
+  cancelAppointment,
+  rescheduleAppointment,
+  checkDuplicateAppointment
 } from "../controllers/receptionController";
 
 const router = Router();
@@ -44,7 +47,10 @@ router.get("/patients/list", listPatients);
 router.route("/patients").post(registerPatient);
 
 // Appointments
+router.get("/appointments/check-duplicate", checkDuplicateAppointment);
 router.post("/appointments", bookAppointment);
+router.post("/appointments/:id/cancel", cancelAppointment);
+router.post("/appointments/:id/reschedule", rescheduleAppointment);
 
 // Billing — data-consistent endpoints (SAME query as dashboard stats)
 router.post("/billing/pay", processBillingPayment);

@@ -1,6 +1,6 @@
 import { Schema, model, InferSchemaType, Types } from "mongoose";
 
-export const DOCTOR_STATUSES = ["on_duty", "on_leave", "off_duty"] as const;
+export const DOCTOR_STATUSES = ["on_duty", "on_leave", "off_duty", "ACTIVE", "INACTIVE", "RETIRED", "TRANSFERRED"] as const;
 
 const doctorSchema = new Schema(
   {
@@ -14,8 +14,11 @@ const doctorSchema = new Schema(
     qualification: { type: String, default: "" },
     licenseNo: { type: String, default: "" },
     bio: { type: String, default: "" },
-    status: { type: String, enum: DOCTOR_STATUSES, default: "on_duty" },
+    status: { type: String, enum: DOCTOR_STATUSES, default: "ACTIVE" },
     rating: { type: Number, default: 0, min: 0, max: 100 },
+    isActive: { type: Boolean, default: true },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
   },
   { timestamps: true },
 );

@@ -155,6 +155,20 @@ export interface Appointment {
   clinicalNotes?: string;
   treatmentPlan?: string;
   advice?: string;
+  cancellationReason?: string;
+  cancellationRemarks?: string;
+  refundRequired?: boolean;
+  rescheduleHistory?: Array<{
+    oldDate: string;
+    oldTime: string;
+    newDate: string;
+    newTime: string;
+    oldToken: string;
+    newToken: string;
+    rescheduledBy: string;
+    reason: string;
+    timestamp: string;
+  }>;
   vitals?: {
     temperature?: string;
     bloodPressure?: string;

@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { ReceptionRepository } from "../repositories/receptionRepository";
 import { AppError } from "../utils/AppError";
 import { Doctor } from "../models/Doctor";
@@ -13,6 +13,7 @@ import { Queue } from "../models/Queue";
 import { Appointment } from "../models/Appointment";
 import { OPVisit } from "../models/OPVisit";
 import { Hospital } from "../models/Hospital";
+import { DbNotification } from "../models/DbNotification";
 import { emitToHospital } from "../config/socket";
 
 
@@ -149,14 +150,74 @@ export class ReceptionService {
   }
 
   // ── Appointment Booking ──
+
+  /**
+   * Pre-booking duplicate check.
+   * Returns { isDuplicate, existingAppointment } without throwing — controller decides HTTP response.
+   * Active statuses = everything except cancelled / no_show / completed.
+   */
+  static async checkDuplicateAppointment(
+    hospitalId: Types.ObjectId,
+    patientId: string,
+    doctorId: string,
+    date: string
+  ) {
+    const bookingDate = new Date(date);
+    const startOfDay = new Date(bookingDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(bookingDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const [doctor, existing] = await Promise.all([
+      Doctor.findOne({ _id: doctorId, hospital: hospitalId, isActive: { $ne: false } }, "name"),
+      Appointment.findOne({
+        hospital: hospitalId,
+        patient: patientId,
+        doctor: doctorId,
+        date: { $gte: startOfDay, $lte: endOfDay },
+        status: { $nin: ["cancelled", "no_show", "completed"] },
+      }).populate("doctor", "name"),
+    ]);
+
+    if (!existing) {
+      return { isDuplicate: false };
+    }
+
+    const apptDate = new Date(existing.date).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+
+    const doctorName = doctor?.name || "the selected doctor";
+
+    return {
+      isDuplicate: true,
+      message: `This patient already has an appointment with Dr. ${doctorName} on ${apptDate}. Please complete, cancel or reschedule the existing appointment before creating another appointment.`,
+      existingAppointment: {
+        _id: existing._id,
+        referenceId: existing.referenceId,
+        date: existing.date,
+        time: existing.time,
+        status: existing.status,
+      },
+    };
+  }
+
   static async bookAppointment(hospitalId: Types.ObjectId, appointmentData: any, userId: Types.ObjectId) {
-    const { patientId, doctorId, departmentId, date, time, type, notes } = appointmentData;
+
+    const { patientId, doctorId, departmentId, date, time, type, notes, followUp, parentAppointmentId, followUpReason } = appointmentData;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const bookingDate = new Date(date);
     bookingDate.setHours(0, 0, 0, 0);
+
+    const dupStartOfDay = new Date(bookingDate);
+    dupStartOfDay.setHours(0, 0, 0, 0);
+    const dupEndOfDay = new Date(bookingDate);
+    dupEndOfDay.setHours(23, 59, 59, 999);
 
     // 1. Date validation (minimum selectable date is today)
     if (bookingDate < today) {
@@ -168,46 +229,70 @@ export class ReceptionService {
     const bookingDateStr = bookingDate.toISOString().split("T")[0];
     if (bookingDateStr === todayStr) {
       const now = new Date();
-      const currentHour = now.getHours();
-      const currentMin = now.getMinutes();
-
       const [slotHourStr, slotMinStr] = time.split(":");
       const slotHour = parseInt(slotHourStr, 10);
       const slotMin = parseInt(slotMinStr, 10);
-
-      if (slotHour < currentHour || (slotHour === currentHour && slotMin <= currentMin)) {
+      if (slotHour < now.getHours() || (slotHour === now.getHours() && slotMin <= now.getMinutes())) {
         throw new AppError("Cannot book past time slots for today.", 400);
       }
     }
 
-    // 3. Duplicate appointment prevention (Patient, Doctor, Date, Time Slot)
-    const existingAppointment = await Appointment.findOne({
-      hospital: hospitalId,
-      patient: patientId,
-      doctor: doctorId,
-      date: bookingDate,
-      time,
-      status: { $in: ["scheduled", "checked_in", "in_consultation", "completed"] }
-    });
-    if (existingAppointment) {
-      throw new AppError("Appointment already exists for this patient.", 409);
-    }
-
-    // Verify doctor availability (ensure no overlapping appointment in slot)
-    const doctor = await Doctor.findOne({ _id: doctorId, hospital: hospitalId });
+    // 3. Doctor active & leave check
+    const doctor = await Doctor.findOne({ _id: doctorId, hospital: hospitalId, isActive: { $ne: false } });
     if (!doctor) {
-      throw new AppError("Doctor not found.", 404);
+      throw new AppError("Doctor not found or is currently inactive.", 404);
     }
     if (doctor.status === "on_leave") {
       throw new AppError("Doctor is currently on leave.", 400);
     }
 
-    const overlap = await ReceptionRepository.checkDoctorSlotOverlap(hospitalId, doctorId, bookingDate, time);
-    if (overlap) {
-      throw new AppError("Doctor is already booked for this slot.", 400);
+    // 4. Duplicate appointment validation:
+    //    Patient + Doctor + Date (regardless of time slot) → BLOCKED
+    //    Exception: followUp === true with a valid parentAppointmentId
+    if (!followUp) {
+      const existingAppointment = await Appointment.findOne({
+        hospital: hospitalId,
+        patient: patientId,
+        doctor: doctorId,
+        date: { $gte: dupStartOfDay, $lte: dupEndOfDay },
+        status: { $nin: ["cancelled", "no_show", "completed"] },
+      }).populate("doctor", "name");
+
+      if (existingAppointment) {
+        const apptDate = new Date(existingAppointment.date).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+        throw new AppError(
+          `This patient already has an appointment with Dr. ${doctor.name} on ${apptDate}. Please complete, cancel or reschedule the existing appointment before creating another appointment.`,
+          409
+        );
+      }
+    } else {
+      // Follow-up: validate that parentAppointmentId exists and belongs to this patient+doctor+hospital
+      if (!parentAppointmentId) {
+        throw new AppError("Parent appointment ID is required for follow-up bookings.", 400);
+      }
+      const parentAppt = await Appointment.findOne({
+        _id: parentAppointmentId,
+        hospital: hospitalId,
+        patient: patientId,
+        doctor: doctorId,
+        status: { $in: ["completed"] },
+      });
+      if (!parentAppt) {
+        throw new AppError("Valid completed parent appointment not found for this follow-up booking.", 404);
+      }
     }
 
-    // Generate unique auto-incremented appointment number formatted as APT2026000001
+    // 5. Doctor slot occupancy check (other patients in same time slot)
+    const overlap = await ReceptionRepository.checkDoctorSlotOverlap(hospitalId, doctorId, bookingDate, time);
+    if (overlap) {
+      throw new AppError("Doctor is already booked for this time slot. Please choose a different slot.", 400);
+    }
+
+    // 6. Generate unique auto-incremented appointment reference ID: APT<year><6-digit serial>
     const year = bookingDate.getFullYear();
     const aptPrefix = `APT${year}`;
     const latestAppt = await Appointment.findOne({
@@ -225,7 +310,7 @@ export class ReceptionService {
     }
     const referenceId = `${aptPrefix}${String(nextSerial).padStart(6, "0")}`;
 
-    const newAppointment = await ReceptionRepository.createAppointment({
+    const appointmentPayload: Record<string, unknown> = {
       hospital: hospitalId,
       referenceId,
       patient: patientId,
@@ -235,13 +320,23 @@ export class ReceptionService {
       time,
       type: type || "Consultation",
       status: "scheduled",
-      notes: notes || ""
-    });
+      notes: notes || "",
+    };
 
-    // Automatically create a consultation billing Invoice
+    // Attach follow-up metadata if applicable
+    if (followUp) {
+      appointmentPayload.followUp = true;
+      appointmentPayload.parentAppointmentId = parentAppointmentId;
+      appointmentPayload.followUpDate = bookingDate;
+      appointmentPayload.followUpReason = followUpReason || "";
+    }
+
+    const newAppointment = await ReceptionRepository.createAppointment(appointmentPayload);
+
+    // 7. Automatically create a consultation billing Invoice
     const registrationFee = type === "Emergency" ? 200 : 100;
     const consultationFee = type === "Emergency" ? 500 : 300;
-    const gst = 0; // GST exempt for hospital OPD consultations
+    const gst = 0;
     const discount = 0;
 
     const items = [
@@ -279,7 +374,7 @@ export class ReceptionService {
       hospital: hospitalId,
       user: userId,
       action: "APPOINTMENT_BOOK",
-      details: `Booked appointment ${referenceId} for patient ID ${patientId}. Created Invoice ID ${newInvoice._id}`
+      details: `Booked ${followUp ? "follow-up " : ""}appointment ${referenceId} for patient ID ${patientId} with Dr. ${doctor.name}${followUp ? ` (Parent: ${parentAppointmentId})` : ""}. Invoice ID ${newInvoice._id}`
     });
 
     return {
@@ -294,6 +389,7 @@ export class ReceptionService {
       }
     };
   }
+
 
   // ── Billing Payments ──
   static async processPayment(hospitalId: Types.ObjectId, paymentData: any, userId: Types.ObjectId) {
@@ -923,4 +1019,321 @@ export class ReceptionService {
 
     return admission;
   }
+
+  static async cancelAppointment(hospitalId: Types.ObjectId, appointmentId: string, data: any, userId: Types.ObjectId) {
+    const { reason, remarks, refundRequired } = data;
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId }).session(session);
+      if (!appointment) {
+        throw new AppError("Appointment not found.", 404);
+      }
+
+      if (["in_consultation", "completed"].includes(appointment.status)) {
+        throw new AppError("Cannot cancel appointment. Consultation has already started or is completed.", 400);
+      }
+
+      // Check queue state if any
+      const queueItem = await Queue.findOne({ appointment: appointmentId, hospital: hospitalId }).session(session);
+      if (queueItem && ["called", "completed"].includes(queueItem.status)) {
+        throw new AppError("Cannot cancel appointment. Consultation has already started or is completed.", 400);
+      }
+
+      // Update appointment status to Cancelled and store details
+      appointment.status = "cancelled";
+      appointment.cancellationReason = reason;
+      appointment.cancellationRemarks = remarks || "";
+      appointment.refundRequired = refundRequired === "Yes" || refundRequired === true;
+      await appointment.save({ session });
+
+      // Update token status in Queue to Cancelled (skipped/cancelled)
+      await Queue.findOneAndUpdate(
+        { appointment: appointmentId, hospital: hospitalId },
+        { status: "skipped" },
+        { session }
+      );
+
+      // Verify if payment completed by finding invoice
+      const invoice = await Invoice.findOne({ hospital: hospitalId, appointment: appointmentId }).session(session);
+      if (invoice && invoice.status === "paid") {
+        await DbNotification.create([{
+          hospital: hospitalId,
+          title: "Appointment Refund Request Pending",
+          message: `Refund of ${invoice.totals.total} requested for cancelled appointment ${appointment.referenceId}. Reason: ${reason}`,
+          type: "invoice",
+          recipientRole: "accountant",
+          severity: "warning",
+          data: {
+            appointmentId,
+            invoiceId: invoice._id.toString(),
+            amount: invoice.totals.total,
+            reason,
+          }
+        }], { session });
+      }
+
+      // Create notification for receptionist
+      await DbNotification.create([{
+        hospital: hospitalId,
+        title: "Appointment Cancelled",
+        message: `Appointment ${appointment.referenceId} has been cancelled by receptionist.`,
+        type: "appointment",
+        recipientRole: "receptionist",
+        severity: "info",
+      }], { session });
+
+      // Write audit log
+      await ReceptionRepository.createAuditLog({
+        hospital: hospitalId,
+        user: userId,
+        action: "APPOINTMENT_CANCELLED",
+        details: `Cancelled appointment ${appointment.referenceId}. Reason: ${reason}. Refund required: ${refundRequired}`
+      });
+
+      await session.commitTransaction();
+
+      // Emit socket.io event for real-time dashboard updates
+      emitToHospital(hospitalId.toString(), "dashboard_update", {
+        type: "APPOINTMENT_CANCELLED",
+        appointmentId,
+        timestamp: new Date()
+      });
+
+      return appointment;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
+  static async rescheduleAppointment(hospitalId: Types.ObjectId, appointmentId: string, data: any, userId: Types.ObjectId) {
+    const { newDate, newTime, doctorId, departmentId, reason, remarks } = data;
+
+    // ── 1. Date / time guards ──────────────────────────────────────────────────
+    const parsedDate = new Date(newDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (parsedDate < today) {
+      throw new AppError("New appointment date cannot be before today.", 400);
+    }
+
+    const todayStr = new Date().toISOString().split("T")[0];
+    if (newDate === todayStr) {
+      const now = new Date();
+      const [slotHour, slotMin] = newTime.split(":").map(Number);
+      if (slotHour < now.getHours() || (slotHour === now.getHours() && slotMin <= now.getMinutes())) {
+        throw new AppError("New appointment time cannot be in the past.", 400);
+      }
+    }
+
+    // ── 2. Doctor active & leave check ────────────────────────────────────────
+    const doctor = await Doctor.findOne({ _id: doctorId, hospital: hospitalId, isActive: { $ne: false } });
+    if (!doctor) {
+      throw new AppError("The selected doctor is inactive, retired, or does not exist.", 404);
+    }
+    if (doctor.status === "on_leave") {
+      throw new AppError("The doctor is currently on leave and cannot accept appointments.", 400);
+    }
+
+    // ── 3. Slot occupancy check (doctor already booked for this slot) ──────────
+    const slotOverlap = await ReceptionRepository.checkDoctorSlotOverlap(hospitalId, doctorId, parsedDate, newTime);
+    if (slotOverlap && slotOverlap._id.toString() !== appointmentId) {
+      throw new AppError("The doctor is already booked for this date and time slot. Please choose a different slot.", 400);
+    }
+
+    // ── 4. Open transaction ────────────────────────────────────────────────────
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId })
+        .populate("patient")
+        .populate("department")
+        .session(session);
+
+      if (!appointment) {
+        throw new AppError("Appointment not found.", 404);
+      }
+
+      // ── 5. Status guard ────────────────────────────────────────────────────
+      if (["in_consultation", "completed", "cancelled"].includes(appointment.status)) {
+        throw new AppError("Cannot reschedule. Appointment is already in consultation, completed, or cancelled.", 400);
+      }
+
+      // ── 6. ONE-RESCHEDULE LIMIT ────────────────────────────────────────────
+      const currentRescheduleCount = (appointment as any).rescheduleCount ?? appointment.rescheduleHistory?.length ?? 0;
+      if (currentRescheduleCount >= 1) {
+        throw new AppError(
+          "This appointment has already been rescheduled once. Further rescheduling requires administrator approval.",
+          400
+        );
+      }
+
+      // ── 7. Full duplicate booking validation ──────────────────────────────
+      //  Block any ACTIVE appointment for same Patient + Doctor + Date + Time
+      const startOfDay = new Date(parsedDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(parsedDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const duplicateAppt = await Appointment.findOne({
+        hospital: hospitalId,
+        patient: (appointment.patient as any)._id,
+        doctor: doctorId,
+        date: { $gte: startOfDay, $lte: endOfDay },
+        time: newTime,
+        status: { $nin: ["cancelled", "no_show"] },
+      }).session(session);
+
+      if (duplicateAppt && duplicateAppt._id.toString() !== appointmentId) {
+        throw new AppError(
+          "Duplicate appointment detected. This patient already has an appointment for the selected doctor, date and time.",
+          400
+        );
+      }
+
+      // ── 8. Queue: mark old token skipped, generate new ────────────────────
+      const oldQueueRecord = await Queue.findOne({ appointment: appointmentId, hospital: hospitalId }).session(session);
+
+      let newTokenNumber = "N/A";
+
+      if (oldQueueRecord) {
+        oldQueueRecord.status = "skipped";
+        await oldQueueRecord.save({ session });
+
+        // Generate new token for the new appointment date
+        const tokenCount = await Queue.countDocuments({
+          hospital: hospitalId,
+          date: { $gte: startOfDay, $lte: endOfDay },
+        }).session(session);
+        newTokenNumber = `T${String(tokenCount + 1).padStart(3, "0")}`;
+
+        await Queue.create(
+          [
+            {
+              hospital: hospitalId,
+              tokenNumber: newTokenNumber,
+              type: oldQueueRecord.type || "regular",
+              status: "waiting",
+              patient: (appointment.patient as any)._id,
+              doctor: doctorId,
+              department: departmentId,
+              date: parsedDate,
+              appointment: appointmentId,
+            },
+          ],
+          { session }
+        );
+      }
+
+      // ── 9. Update billing description if invoice exists ────────────────────
+      const invoice = await Invoice.findOne({ hospital: hospitalId, appointment: appointmentId }).session(session);
+      if (invoice) {
+        invoice.items = invoice.items.map((item) => {
+          if (item.category === "consultation") {
+            return {
+              description: `${appointment.type || "General"} Doctor Consultation - Dr. ${doctor.name}`,
+              category: "consultation",
+              quantity: 1,
+              amount: item.amount,
+            };
+          }
+          return item;
+        });
+        await invoice.save({ session });
+      }
+
+      // ── 10. Capture old values before mutating ────────────────────────────
+      const oldDate = appointment.date;
+      const oldTime = appointment.time;
+      const oldToken = oldQueueRecord ? oldQueueRecord.tokenNumber : "N/A";
+
+      // ── 11. Push to reschedule history ────────────────────────────────────
+      appointment.rescheduleHistory.push({
+        oldDate,
+        oldTime,
+        newDate: parsedDate,
+        newTime,
+        oldToken,
+        newToken: newTokenNumber,
+        rescheduledBy: userId,
+        reason,
+        timestamp: new Date(),
+      });
+
+      // ── 12. Update appointment record ──────────────────────────────────────
+      appointment.date = parsedDate;
+      appointment.time = newTime;
+      appointment.doctor = doctorId as any;
+      appointment.department = departmentId as any;
+      appointment.notes = remarks || appointment.notes;
+
+      // New tracking fields
+      (appointment as any).isRescheduled = true;
+      (appointment as any).rescheduleCount = currentRescheduleCount + 1;
+      (appointment as any).previousAppointmentDate = oldDate;
+      (appointment as any).previousAppointmentTime = oldTime;
+      (appointment as any).newAppointmentDate = parsedDate;
+      (appointment as any).newAppointmentTime = newTime;
+
+      await appointment.save({ session });
+
+      // ── 13. Notifications ─────────────────────────────────────────────────
+      const departmentName = (appointment.department as any)?.name || "N/A";
+      await DbNotification.create(
+        [
+          {
+            hospital: hospitalId,
+            title: "Appointment Rescheduled",
+            message: `Appointment ${appointment.referenceId} rescheduled. New Date: ${parsedDate.toLocaleDateString()}, Time: ${newTime}, Token: ${newTokenNumber}, Doctor: Dr. ${doctor.name}.`,
+            type: "appointment",
+            recipientRole: "receptionist",
+            severity: "info",
+            data: {
+              appointmentId,
+              newDate,
+              newTime,
+              newToken: newTokenNumber,
+              doctorName: doctor.name,
+              departmentName,
+            },
+          },
+        ],
+        { session }
+      );
+
+      // ── 14. Audit log ─────────────────────────────────────────────────────
+      await ReceptionRepository.createAuditLog({
+        hospital: hospitalId,
+        user: userId,
+        action: "APPOINTMENT_RESCHEDULE",
+        details: `Rescheduled appointment ${appointment.referenceId} | Old: ${new Date(oldDate).toLocaleDateString()} ${oldTime} (Token: ${oldToken}) → New: ${parsedDate.toLocaleDateString()} ${newTime} (Token: ${newTokenNumber}) | Reason: ${reason} | RescheduleCount: ${currentRescheduleCount + 1}`,
+      });
+
+      await session.commitTransaction();
+
+      // ── 15. Real-time socket update ────────────────────────────────────────
+      emitToHospital(hospitalId.toString(), "dashboard_update", {
+        type: "APPOINTMENT_RESCHEDULED",
+        appointmentId,
+        newDate,
+        newTime,
+        newToken: newTokenNumber,
+        timestamp: new Date(),
+      });
+
+      return appointment;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
 }
+

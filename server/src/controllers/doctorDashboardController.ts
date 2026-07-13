@@ -16,7 +16,7 @@ import { Types } from "mongoose";
 
 // Helper helper to resolve the logged-in doctor profile
 async function getLoggedDoctor(req: Request) {
-  const doctor = await Doctor.findOne({ email: req.user!.email });
+  const doctor = await Doctor.findOne({ email: req.user!.email, isActive: { $ne: false } });
   if (!doctor) {
     throw new AppError("Doctor profile not found for the logged-in user.", 404);
   }
@@ -89,20 +89,21 @@ export const getQueue = catchAsync(async (req: Request, res: Response) => {
 export const callPatient = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const queueId = req.params.id;
+  const doctor = await getLoggedDoctor(req);
   
   const queueItem = await Queue.findOneAndUpdate(
-    { _id: queueId, hospital: hospitalId },
+    { _id: queueId, hospital: hospitalId, doctor: doctor._id },
     { status: "called" },
     { new: true }
   ).populate("patient");
 
   if (!queueItem) {
-    throw new AppError("Queue item not found.", 404);
+    throw new AppError("Queue item not found or unauthorized.", 404);
   }
 
   if (queueItem.appointment) {
     await Appointment.findOneAndUpdate(
-      { _id: queueItem.appointment, hospital: hospitalId },
+      { _id: queueItem.appointment, hospital: hospitalId, doctor: doctor._id },
       { status: "in_consultation" }
     );
   }
@@ -113,15 +114,16 @@ export const callPatient = catchAsync(async (req: Request, res: Response) => {
 export const skipPatient = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const queueId = req.params.id;
+  const doctor = await getLoggedDoctor(req);
 
   const queueItem = await Queue.findOneAndUpdate(
-    { _id: queueId, hospital: hospitalId },
+    { _id: queueId, hospital: hospitalId, doctor: doctor._id },
     { status: "skipped" },
     { new: true }
   );
 
   if (!queueItem) {
-    throw new AppError("Queue item not found.", 404);
+    throw new AppError("Queue item not found or unauthorized.", 404);
   }
 
   res.json({ status: "success", data: queueItem });
@@ -130,20 +132,21 @@ export const skipPatient = catchAsync(async (req: Request, res: Response) => {
 export const markNoShow = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const queueId = req.params.id;
+  const doctor = await getLoggedDoctor(req);
 
   const queueItem = await Queue.findOneAndUpdate(
-    { _id: queueId, hospital: hospitalId },
+    { _id: queueId, hospital: hospitalId, doctor: doctor._id },
     { status: "skipped" },
     { new: true }
   );
 
   if (!queueItem) {
-    throw new AppError("Queue item not found.", 404);
+    throw new AppError("Queue item not found or unauthorized.", 404);
   }
 
   if (queueItem.appointment) {
     await Appointment.findOneAndUpdate(
-      { _id: queueItem.appointment, hospital: hospitalId },
+      { _id: queueItem.appointment, hospital: hospitalId, doctor: doctor._id },
       { status: "no_show" }
     );
   }
@@ -396,9 +399,10 @@ export const createCertificate = catchAsync(async (req: Request, res: Response) 
 export const startConsultation = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const appointmentId = req.params.id;
+  const doctor = await getLoggedDoctor(req);
 
   const appointment = await Appointment.findOneAndUpdate(
-    { _id: appointmentId, hospital: hospitalId },
+    { _id: appointmentId, hospital: hospitalId, doctor: doctor._id },
     { status: "in_consultation" },
     { new: true }
   );
@@ -409,7 +413,7 @@ export const startConsultation = catchAsync(async (req: Request, res: Response) 
 
   // Update the queue status to 'called' if token exists
   await Queue.findOneAndUpdate(
-    { appointment: appointmentId, hospital: hospitalId },
+    { appointment: appointmentId, hospital: hospitalId, doctor: doctor._id },
     { status: "called" }
   );
 
@@ -419,8 +423,9 @@ export const startConsultation = catchAsync(async (req: Request, res: Response) 
 export const getWorkspace = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const appointmentId = req.params.id;
+  const doctor = await getLoggedDoctor(req);
 
-  const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId })
+  const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: doctor._id })
     .populate("patient")
     .populate("doctor")
     .populate("department");
@@ -433,7 +438,7 @@ export const getWorkspace = catchAsync(async (req: Request, res: Response) => {
   const doctorId = appointment.doctor._id;
 
   const [queueItem, prescriptions, labOrders, radiologyOrders, admissions] = await Promise.all([
-    Queue.findOne({ appointment: appointmentId, hospital: hospitalId }),
+    Queue.findOne({ appointment: appointmentId, hospital: hospitalId, doctor: doctorId }),
     Prescription.find({ patient: patientId, doctor: doctorId, hospital: hospitalId }),
     LabOrder.find({ patient: patientId, doctor: doctorId, hospital: hospitalId }),
     RadiologyOrder.find({ patient: patientId, doctor: doctorId, hospital: hospitalId }),
@@ -457,9 +462,10 @@ export const saveVitals = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const appointmentId = req.params.id;
   const { vitals, chiefComplaint } = req.body;
+  const doctor = await getLoggedDoctor(req);
 
   const appointment = await Appointment.findOneAndUpdate(
-    { _id: appointmentId, hospital: hospitalId },
+    { _id: appointmentId, hospital: hospitalId, doctor: doctor._id },
     { vitals, chiefComplaint },
     { new: true }
   );
@@ -475,9 +481,10 @@ export const saveClinicalNotes = catchAsync(async (req: Request, res: Response) 
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const appointmentId = req.params.id;
   const { diagnosis, symptoms, clinicalNotes, treatmentPlan, advice } = req.body;
+  const doctor = await getLoggedDoctor(req);
 
   const appointment = await Appointment.findOneAndUpdate(
-    { _id: appointmentId, hospital: hospitalId },
+    { _id: appointmentId, hospital: hospitalId, doctor: doctor._id },
     { diagnosis, symptoms, clinicalNotes, treatmentPlan, advice },
     { new: true }
   );
@@ -493,8 +500,9 @@ export const recommendAdmission = catchAsync(async (req: Request, res: Response)
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const appointmentId = req.params.id;
   const { suggestedWard, diagnosis, notes } = req.body;
+  const doctor = await getLoggedDoctor(req);
 
-  const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId })
+  const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: doctor._id })
     .populate("patient")
     .populate("doctor");
 
@@ -503,13 +511,13 @@ export const recommendAdmission = catchAsync(async (req: Request, res: Response)
   }
 
   const patient = appointment.patient as any;
-  const doctor = appointment.doctor as any;
+  const docProfile = appointment.doctor as any;
 
   // Create notification for receptionist
   const notification = await DbNotification.create({
     hospital: hospitalId,
     title: "Inpatient Admission Recommended",
-    message: `Patient ${patient.name} recommended for IP admission by Dr. ${doctor.name}.`,
+    message: `Patient ${patient.name} recommended for IP admission by Dr. ${docProfile.name}.`,
     type: "admission_request",
     recipientRole: "receptionist",
     severity: "warning",
@@ -568,8 +576,9 @@ export const createRadiologyOrder = catchAsync(async (req: Request, res: Respons
 export const completeConsultation = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const appointmentId = req.params.id;
+  const doctor = await getLoggedDoctor(req);
 
-  const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId })
+  const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: doctor._id })
     .populate("patient")
     .populate("doctor")
     .populate("department");
@@ -584,7 +593,7 @@ export const completeConsultation = catchAsync(async (req: Request, res: Respons
 
   // Update queue item status to completed if exists
   await Queue.findOneAndUpdate(
-    { appointment: appointmentId, hospital: hospitalId },
+    { appointment: appointmentId, hospital: hospitalId, doctor: doctor._id },
     { status: "completed" }
   );
 
@@ -620,7 +629,8 @@ export const completeConsultation = catchAsync(async (req: Request, res: Respons
 
 export const getRadiologyOrders = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
-  const orders = await RadiologyOrder.find({ hospital: hospitalId })
+  const doctor = await getLoggedDoctor(req);
+  const orders = await RadiologyOrder.find({ hospital: hospitalId, doctor: doctor._id })
     .populate("patient")
     .populate("doctor")
     .sort({ createdAt: -1 });
