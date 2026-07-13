@@ -14,6 +14,7 @@ import { Appointment } from "../models/Appointment";
 import { OPVisit } from "../models/OPVisit";
 import { Hospital } from "../models/Hospital";
 import { DbNotification } from "../models/DbNotification";
+import { Ward } from "../models/Ward";
 import { emitToHospital } from "../config/socket";
 
 
@@ -143,6 +144,62 @@ export class ReceptionService {
   // ── Patient Search ──
   static async searchPatients(hospitalId: Types.ObjectId, query: string) {
     return await ReceptionRepository.searchPatients(hospitalId, query);
+  }
+
+  static async getPatientDetail(hospitalId: Types.ObjectId, patientId: string) {
+    const patient = await Patient.findOne({ _id: patientId, hospital: hospitalId }).populate("assignedDoctor", "name");
+    if (!patient) {
+      throw new AppError("Patient not found", 404);
+    }
+    
+    // Get last active consultation today or most recent one
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const lastAppointment = await Appointment.findOne({
+      hospital: hospitalId,
+      patient: patientId,
+      status: { $nin: ["cancelled", "no_show"] }
+    }).sort({ createdAt: -1 }).populate("doctor department");
+
+    const activeAdmission = await Admission.findOne({
+      hospital: hospitalId,
+      patient: patientId,
+      status: {
+        $in: [
+          "admitted",
+          "Admitted",
+          "Bed Allocated",
+          "Under Observation",
+          "Waiting for Bed",
+          "In Ward",
+          "ICU",
+          "Operation Scheduled",
+          "Under Treatment",
+          "Transferred"
+        ]
+      }
+    });
+
+    return {
+      patient,
+      activeAdmission: activeAdmission ? {
+        _id: activeAdmission._id,
+        admissionNumber: activeAdmission.admissionNumber,
+        status: activeAdmission.status,
+        admissionDate: activeAdmission.admissionDate
+      } : null,
+      currentConsultation: lastAppointment ? {
+        appointmentId: lastAppointment._id,
+        referenceId: lastAppointment.referenceId,
+        doctor: (lastAppointment.doctor as any)?.name || "N/A",
+        department: (lastAppointment.department as any)?.name || "N/A",
+        diagnosis: lastAppointment.diagnosis || lastAppointment.chiefComplaint || "N/A",
+        notes: lastAppointment.notes || ""
+      } : null
+    };
   }
 
   static async listPatients(hospitalId: Types.ObjectId, page: number, limit: number, search?: string) {
@@ -659,13 +716,50 @@ export class ReceptionService {
 
   // ── Inpatient (IP) Admissions ──
   static async getAdmissionRequests(hospitalId: Types.ObjectId) {
-    return await ReceptionRepository.getNotificationsByRole(hospitalId, "receptionist")
-      .then(notifs => notifs.filter(n => n.type === "admission_request" && !n.isRead));
+    return await AdmissionRequest.find({ hospital: hospitalId, status: "Admission Requested" })
+      .populate("patient")
+      .populate("doctor")
+      .populate("department")
+      .sort({ createdAt: -1 });
+  }
+
+  static async rejectAdmissionRequest(hospitalId: Types.ObjectId, requestId: string, userId: Types.ObjectId) {
+    const admissionReq = await AdmissionRequest.findOne({ _id: requestId, hospital: hospitalId });
+    if (!admissionReq) {
+      throw new AppError("Admission request not found.", 404);
+    }
+    
+    admissionReq.status = "Rejected";
+    await admissionReq.save();
+
+    // Mark corresponding notification as read if any
+    await DbNotification.updateMany(
+      { hospital: hospitalId, "data.requestId": requestId },
+      { isRead: true }
+    );
+
+    // Emit real-time Socket.IO notification to doctor and dashboards
+    emitToHospital(hospitalId.toString(), "admission_request_update", {
+      requestId: admissionReq._id,
+      requestNumber: admissionReq.requestNumber,
+      status: "Rejected",
+      timestamp: new Date()
+    });
+
+    await ReceptionRepository.createAuditLog({
+      hospital: hospitalId,
+      user: userId,
+      action: "IP_ADMIT_REJECT",
+      details: `Rejected Admission Request ${admissionReq.requestNumber} for Patient ID: ${admissionReq.patient}`
+    });
+
+    return admissionReq;
   }
 
   static async admitPatient(hospitalId: Types.ObjectId, admissionData: any, userId: Types.ObjectId) {
     const {
       notificationId,
+      requestId,
       patientId,
       opVisitId,
       admissionDate,
@@ -686,7 +780,13 @@ export class ReceptionService {
       admittingDoctor,
       priority = "Routine",
       admissionReason,
-      verbalApproval
+      verbalApproval,
+
+      // Manual Admission specifics
+      departmentId,
+      admissionType = "Direct Admission",
+      expectedStay = "",
+      primaryDiagnosis = ""
     } = admissionData;
 
     // ── RECEPTIONIST INITIATED ADMISSION VALIDATIONS ──
@@ -702,66 +802,123 @@ export class ReceptionService {
       }
     }
 
-    // 1. Validate bed availability
-    const bed = await Bed.findOne({ _id: bedId, hospital: hospitalId });
-    if (!bed) {
-      throw new AppError("Selected bed not found.", 404);
-    }
-    if (bed.isOccupied) {
-      throw new AppError("Selected bed is already occupied.", 400);
-    }
-
-    // 2. Validate room & ward match
-    const room = await Room.findOne({ _id: roomId, hospital: hospitalId });
-    if (!room) {
-      throw new AppError("Selected room not found.", 404);
-    }
-
-    // 3. Verify no existing active admission for this patient
-    const activeAdm = await Admission.findOne({ hospital: hospitalId, patient: patientId, status: "admitted" });
-    if (activeAdm) {
-      throw new AppError("Patient is already admitted.", 400);
-    }
-
-    // 4. Verify patient exists
-    const patient = await Patient.findOne({ _id: patientId, hospital: hospitalId });
-    if (!patient) {
-      throw new AppError("Patient record not found.", 404);
-    }
-
-    // 5. Generate Admission Number: IPYYYY000000 format (e.g. IP2026000125)
-    const currentYear = new Date().getFullYear();
-    const prefix = `IP${currentYear}`;
-    const latestAdmission = await Admission.findOne({
-      hospital: hospitalId,
-      admissionNumber: new RegExp(`^${prefix}`)
-    }).sort({ createdAt: -1 });
-
-    let nextSerial = 1;
-    if (latestAdmission) {
-      const serialPart = latestAdmission.admissionNumber.replace(prefix, "");
-      const lastSerial = parseInt(serialPart, 10);
-      if (!isNaN(lastSerial)) {
-        nextSerial = lastSerial + 1;
-      }
-    }
-    const admissionNumber = `${prefix}${String(nextSerial).padStart(6, "0")}`;
-
-    // Rollback context objects
-    let createdAdmission: any = null;
-    let createdInvoice: any = null;
-    let createdPayment: any = null;
-    let bedMarkedOccupied = false;
-    let patientMarkedAdmitted = false;
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
     try {
-      // 6. Allocate Bed / Mark as Occupied
-      bed.isOccupied = true;
-      await bed.save();
-      bedMarkedOccupied = true;
+      // 1. Validate bed availability & status
+      const bed = await Bed.findOne({ _id: bedId, hospital: hospitalId }).session(session);
+      if (!bed) {
+        throw new AppError("Selected bed not found.", 404);
+      }
+      if (bed.status !== "Available" || bed.isOccupied) {
+        throw new AppError("Selected bed is already occupied or not available.", 400);
+      }
 
-      // 7. Create admission record
-      createdAdmission = await Admission.create({
+      // 2. Validate room status & ward match
+      const room = await Room.findOne({ _id: roomId, hospital: hospitalId }).session(session);
+      if (!room) {
+        throw new AppError("Selected room not found.", 404);
+      }
+      if (room.status !== "Active" && room.status !== "active") {
+        throw new AppError("Selected room is currently inactive.", 400);
+      }
+      if (room.wardName !== ward) {
+        throw new AppError("Selected room does not belong to the selected ward.", 400);
+      }
+
+      // 2b. Validate ward status
+      const wardRecord = await Ward.findOne({ _id: room.ward, hospital: hospitalId }).session(session);
+      if (!wardRecord) {
+        throw new AppError("Associated ward not found.", 404);
+      }
+      if (wardRecord.status !== "Active" && wardRecord.status !== "active") {
+        throw new AppError("Selected ward is currently inactive.", 400);
+      }
+
+      // 3. Verify doctor belongs to selected department
+      if (admittingDoctor) {
+        const doc = await Doctor.findOne({ _id: admittingDoctor, hospital: hospitalId }).session(session);
+        if (!doc) {
+          throw new AppError("Selected admitting doctor not found.", 404);
+        }
+        if (departmentId && doc.department && doc.department.toString() !== departmentId.toString()) {
+          throw new AppError("Selected doctor does not belong to the selected department.", 400);
+        }
+      }
+
+      // 4. Verify no existing active admission for this patient
+      const activeAdm = await Admission.findOne({
+        hospital: hospitalId,
+        patient: patientId,
+        status: {
+          $in: [
+            "admitted",
+            "Admitted",
+            "Bed Allocated",
+            "Under Observation",
+            "Waiting for Bed",
+            "In Ward",
+            "ICU",
+            "Operation Scheduled",
+            "Under Treatment",
+            "Transferred"
+          ]
+        }
+      }).session(session);
+      if (activeAdm) {
+        throw new AppError(`This patient already has an active inpatient admission (IP No: ${activeAdm.admissionNumber}). Please discharge the patient before creating a new admission.`, 409);
+      }
+
+      // 4b. OP to IP Validation
+      if (admissionMode === "Doctor Requested") {
+        if (notificationId) {
+          const notif = await DbNotification.findOne({ _id: notificationId, hospital: hospitalId }).session(session);
+          if (!notif || notif.type !== "admission_request") {
+            throw new AppError("Invalid or missing Doctor Admission Request notification.", 400);
+          }
+        }
+        if (opVisitId) {
+          const opVisit = await OPVisit.findOne({ _id: opVisitId, hospital: hospitalId }).session(session);
+          if (!opVisit) {
+            throw new AppError("OP Visit record not found.", 404);
+          }
+          if (opVisit.status !== "referred_ip") {
+            throw new AppError("OP consultation did not recommend admission or is not completed.", 400);
+          }
+        }
+      }
+
+      // 5. Verify patient exists
+      const patient = await Patient.findOne({ _id: patientId, hospital: hospitalId }).session(session);
+      if (!patient) {
+        throw new AppError("Patient record not found.", 404);
+      }
+
+      // 6. Generate Admission Number: IPYYYY000000 format (e.g. IP2026000125)
+      const currentYear = new Date().getFullYear();
+      const prefix = `IP${currentYear}`;
+      const latestAdmission = await Admission.findOne({
+        hospital: hospitalId,
+        admissionNumber: new RegExp(`^${prefix}`)
+      }).sort({ createdAt: -1 }).session(session);
+
+      let nextSerial = 1;
+      if (latestAdmission) {
+        const serialPart = latestAdmission.admissionNumber.replace(prefix, "");
+        const lastSerial = parseInt(serialPart, 10);
+        if (!isNaN(lastSerial)) {
+          nextSerial = lastSerial + 1;
+        }
+      }
+      const admissionNumber = `${prefix}${String(nextSerial).padStart(6, "0")}`;
+
+      // Allocate Bed / Mark as Occupied
+      bed.isOccupied = true;
+      await bed.save({ session });
+
+      // Create admission record
+      const [createdAdmission] = await Admission.create([{
         hospital: hospitalId,
         patient: patientId,
         opVisit: opVisitId || null,
@@ -783,17 +940,24 @@ export class ReceptionService {
         priority,
         admissionMode,
         approvalType: admissionMode === "Receptionist Initiated" ? "Doctor Verbal Order" : "Doctor Request System",
-        admissionReason: admissionReason || ""
-      });
+        admissionReason: admissionReason || "",
+        
+        department: departmentId || null,
+        admissionType,
+        expectedStay,
+        primaryDiagnosis
+      }], { session });
 
-      // 8. If advance amount is provided, generate invoice and payment receipt
+      let createdInvoice: any = null;
+      let createdPayment: any = null;
+
+      // If advance amount is provided, generate invoice and payment receipt
       if (Number(advanceAmount) > 0) {
-        // Create auto-incremented receipt format RCPYYYY00000
         const rcpPrefix = `RCP${currentYear}`;
         const latestPaymentWithRcp = await Payment.findOne({
           hospital: hospitalId,
           transactionId: new RegExp(`^${rcpPrefix}`)
-        }).sort({ createdAt: -1 });
+        }).sort({ createdAt: -1 }).session(session);
         let nextRcpSerial = 1;
         if (latestPaymentWithRcp) {
           const serialPart = latestPaymentWithRcp.transactionId?.replace(rcpPrefix, "") || "0";
@@ -802,7 +966,7 @@ export class ReceptionService {
         }
         const receiptNumber = `${rcpPrefix}${String(nextRcpSerial).padStart(5, "0")}`;
 
-        createdInvoice = await Invoice.create({
+        const [invoice] = await Invoice.create([{
           hospital: hospitalId,
           patient: patientId,
           status: "paid",
@@ -825,9 +989,10 @@ export class ReceptionService {
             total: Number(advanceAmount),
             patientBalance: 0
           }
-        });
+        }], { session });
+        createdInvoice = invoice;
 
-        createdPayment = await Payment.create({
+        const [payment] = await Payment.create([{
           hospital: hospitalId,
           invoice: createdInvoice._id,
           patient: patientId,
@@ -835,126 +1000,157 @@ export class ReceptionService {
           paymentMethod,
           transactionId: receiptNumber,
           paidAt: new Date()
-        });
+        }], { session });
+        createdPayment = payment;
       }
 
-      // 9. Update patient status to admitted
+      // Update patient status to admitted
       patient.status = "admitted";
-      await patient.save();
-      patientMarkedAdmitted = true;
+      await patient.save({ session });
 
-      // 10. Mark the notification as read if provided
+      // Update Admission Request status if applicable
+      let resolvedReqId = requestId;
+      if (!resolvedReqId && notificationId) {
+        const notif = await DbNotification.findOne({ _id: notificationId, hospital: hospitalId }).session(session);
+        if (notif && notif.data?.requestId) {
+          resolvedReqId = notif.data.requestId;
+        }
+      }
+
+      if (resolvedReqId) {
+        const admissionReq = await AdmissionRequest.findOne({ _id: resolvedReqId, hospital: hospitalId }).session(session);
+        if (admissionReq) {
+          admissionReq.status = "Approved";
+          await admissionReq.save({ session });
+
+          // Mark corresponding notifications as read
+          await DbNotification.updateMany(
+            { hospital: hospitalId, "data.requestId": resolvedReqId },
+            { isRead: true }
+          ).session(session);
+
+          // Emit Socket update
+          emitToHospital(hospitalId.toString(), "admission_request_update", {
+            requestId: resolvedReqId,
+            status: "Approved",
+            timestamp: new Date()
+          });
+        }
+      }
+
+      // Update OP Visit status to ConvertedToIP if applicable
+      let resolvedOpVisitId = opVisitId;
+      if (!resolvedOpVisitId && resolvedReqId) {
+        const admissionReq = await AdmissionRequest.findOne({ _id: resolvedReqId, hospital: hospitalId }).session(session);
+        if (admissionReq && admissionReq.consultation) {
+          resolvedOpVisitId = admissionReq.consultation as any;
+        }
+      }
+      if (resolvedOpVisitId) {
+        const opV = await OPVisit.findOne({ _id: resolvedOpVisitId, hospital: hospitalId }).session(session);
+        if (opV) {
+          opV.status = "ConvertedToIP";
+          await opV.save({ session });
+        }
+      }
+
+      // Mark the notification as read if provided
       if (notificationId) {
         await ReceptionRepository.markNotificationRead(hospitalId, notificationId);
       }
 
-      // 11. Create audit log
-      const docRecord = admittingDoctor ? await Doctor.findById(admittingDoctor) : null;
-      const approvalType = admissionMode === "Receptionist Initiated" ? "Doctor Verbal Order" : "Doctor Request System";
+      // Create audit log
+      const docRecord = admittingDoctor ? await Doctor.findById(admittingDoctor).session(session) : null;
+      const approvalTypeStr = admissionMode === "Receptionist Initiated" ? "Doctor Verbal Order" : "Doctor Request System";
       await ReceptionRepository.createAuditLog({
         hospital: hospitalId,
         user: userId,
         action: "IP_ADMIT",
-        details: `Created By: Receptionist | Admission Mode: ${admissionMode} | Approval Type: ${approvalType} | Admitting Doctor: ${docRecord ? docRecord.name : "N/A"} | Timestamp: ${new Date().toISOString()} | Remarks: ${admissionNotes || ""}`
+        details: `Created By: Receptionist | Admission Mode: ${admissionMode} | Approval Type: ${approvalTypeStr} | Admitting Doctor: ${docRecord ? docRecord.name : "N/A"} | Timestamp: ${new Date().toISOString()} | Remarks: ${admissionNotes || ""}`
       });
 
+      await session.commitTransaction();
+      session.endSession();
+
+      // Retrieve patient's last OP visit for slip auto-fills
+      const lastOpVisit = await OPVisit.findOne({ hospital: hospitalId, patient: patientId })
+        .sort({ createdAt: -1 })
+        .populate("doctor department");
+
+      const hospital = await Hospital.findById(hospitalId);
+      const hospitalName = hospital ? hospital.name : "HMS General Hospital";
+
+      // Construct Wrist Band and Admission Slip Details
+      const wristBand = {
+        patientName: patient.name,
+        uhid: patient.uhid,
+        age: patient.age,
+        gender: patient.gender,
+        admissionNumber,
+        ward,
+        roomNumber: room.roomNumber,
+        bedNumber: bed.bedNumber,
+        allergies: patient.allergies || "No Known Allergies",
+        barcode: admissionNumber
+      };
+
+      const slipDoctor = admittingDoctor 
+        ? docRecord?.name
+        : (lastOpVisit?.doctor as any)?.name || "N/A";
+
+      const admissionSlip = {
+        hospitalName,
+        admissionNumber,
+        admissionDate: new Date(admissionDate).toLocaleDateString("en-IN"),
+        admissionTime: admissionTime || "--:--",
+        patientName: patient.name,
+        uhid: patient.uhid,
+        age: patient.age,
+        gender: patient.gender,
+        ward,
+        roomNumber: room.roomNumber,
+        bedNumber: bed.bedNumber,
+        attenderName,
+        attenderPhone,
+        insuranceProvider: insuranceProvider || "N/A",
+        advancePaid: Number(advanceAmount) || 0,
+        receiptNumber: createdPayment ? createdPayment.transactionId : "N/A",
+        admissionNotes: admissionNotes || "",
+        
+        // Auto-fills from previous OP Consultation
+        lastOpVisitDate: lastOpVisit ? new Date(lastOpVisit.createdAt).toLocaleDateString("en-IN") : "N/A",
+        lastConsultingDoctor: (lastOpVisit?.doctor as any)?.name || "N/A",
+        lastConsultingDepartment: (lastOpVisit?.department as any)?.name || "N/A",
+        diagnosis: lastOpVisit?.clinicalNotes || "N/A",
+        admittingDoctorName: slipDoctor
+      };
+
+      // Real-time updates via Socket.IO
+      emitToHospital(hospitalId.toString(), "dashboard_update", {
+        type: "IP_ADMISSION",
+        admissionNumber,
+        patientName: patient.name,
+        uhid: patient.uhid,
+        ward,
+        roomNumber: room.roomNumber,
+        bedNumber: bed.bedNumber,
+        timestamp: new Date()
+      });
+
+      return {
+        success: true,
+        admission: createdAdmission,
+        invoice: createdInvoice,
+        payment: createdPayment,
+        wristBand,
+        admissionSlip
+      };
+
     } catch (error) {
-      // ── ROLLBACK MECHANISM IF FAILURE OCCURS ──
-      console.error("Admission failed, rolling back changes...", error);
-
-      if (bedMarkedOccupied) {
-        await Bed.updateOne({ _id: bedId }, { isOccupied: false, status: "Available" });
-      }
-      if (createdAdmission) {
-        await Admission.deleteOne({ _id: createdAdmission._id });
-      }
-      if (createdInvoice) {
-        await Invoice.deleteOne({ _id: createdInvoice._id });
-      }
-      if (createdPayment) {
-        await Payment.deleteOne({ _id: createdPayment._id });
-      }
-      if (patientMarkedAdmitted) {
-        await Patient.updateOne({ _id: patientId }, { status: "outpatient" });
-      }
-
+      await session.abortTransaction();
+      session.endSession();
       throw error;
     }
-
-    // 12. Fetch hospital details for slip
-    const hospital = await Hospital.findById(hospitalId);
-    const hospitalName = hospital ? hospital.name : "HMS General Hospital";
-
-    // 12b. Retrieve patient's last OP visit for slip auto-fills
-    const lastOpVisit = await OPVisit.findOne({ hospital: hospitalId, patient: patientId })
-      .sort({ createdAt: -1 })
-      .populate("doctor department");
-
-    // 13. Construct Wrist Band and Admission Slip Details
-    const wristBand = {
-      patientName: patient.name,
-      uhid: patient.uhid,
-      age: patient.age,
-      gender: patient.gender,
-      admissionNumber,
-      ward,
-      roomNumber: room.roomNumber,
-      bedNumber: bed.bedNumber,
-      allergies: patient.allergies || "No Known Allergies",
-      barcode: admissionNumber
-    };
-
-    const slipDoctor = admittingDoctor 
-      ? (await Doctor.findById(admittingDoctor))?.name
-      : (lastOpVisit?.doctor as any)?.name || "N/A";
-
-    const admissionSlip = {
-      hospitalName,
-      admissionNumber,
-      admissionDate: new Date(admissionDate).toLocaleDateString("en-IN"),
-      admissionTime: admissionTime || "--:--",
-      patientName: patient.name,
-      uhid: patient.uhid,
-      age: patient.age,
-      gender: patient.gender,
-      ward,
-      roomNumber: room.roomNumber,
-      bedNumber: bed.bedNumber,
-      attenderName,
-      attenderPhone,
-      insuranceProvider: insuranceProvider || "N/A",
-      advancePaid: Number(advanceAmount) || 0,
-      receiptNumber: createdPayment ? createdPayment.transactionId : "N/A",
-      admissionNotes: admissionNotes || "",
-      
-      // Auto-fills from previous OP Consultation
-      lastOpVisitDate: lastOpVisit ? new Date(lastOpVisit.createdAt).toLocaleDateString("en-IN") : "N/A",
-      lastConsultingDoctor: (lastOpVisit?.doctor as any)?.name || "N/A",
-      lastConsultingDepartment: (lastOpVisit?.department as any)?.name || "N/A",
-      diagnosis: lastOpVisit?.clinicalNotes || "N/A",
-      admittingDoctorName: slipDoctor
-    };
-
-    // 14. Real-time updates via Socket.IO
-    emitToHospital(hospitalId.toString(), "dashboard_update", {
-      type: "IP_ADMISSION",
-      admissionNumber,
-      patientName: patient.name,
-      uhid: patient.uhid,
-      ward,
-      roomNumber: room.roomNumber,
-      bedNumber: bed.bedNumber,
-      timestamp: new Date()
-    });
-
-    return {
-      success: true,
-      admission: createdAdmission,
-      invoice: createdInvoice,
-      payment: createdPayment,
-      wristBand,
-      admissionSlip
-    };
   }
 
   static async transferPatient(hospitalId: Types.ObjectId, transferData: any, userId: Types.ObjectId) {

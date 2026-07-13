@@ -10,9 +10,11 @@ import { Patient } from "../models/Patient";
 import { RadiologyOrder } from "../models/RadiologyOrder";
 import { DbNotification } from "../models/DbNotification";
 import { Admission } from "../models/Admission";
+import { AdmissionRequest } from "../models/AdmissionRequest";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { Types } from "mongoose";
+import { emitToHospital } from "../config/socket";
 
 // Helper helper to resolve the logged-in doctor profile
 async function getLoggedDoctor(req: Request) {
@@ -437,12 +439,13 @@ export const getWorkspace = catchAsync(async (req: Request, res: Response) => {
   const patientId = appointment.patient._id;
   const doctorId = appointment.doctor._id;
 
-  const [queueItem, prescriptions, labOrders, radiologyOrders, admissions] = await Promise.all([
+  const [queueItem, prescriptions, labOrders, radiologyOrders, admissions, admissionRequests] = await Promise.all([
     Queue.findOne({ appointment: appointmentId, hospital: hospitalId, doctor: doctorId }),
     Prescription.find({ patient: patientId, doctor: doctorId, hospital: hospitalId }),
     LabOrder.find({ patient: patientId, doctor: doctorId, hospital: hospitalId }),
     RadiologyOrder.find({ patient: patientId, doctor: doctorId, hospital: hospitalId }),
     Admission.find({ patient: patientId, hospital: hospitalId }),
+    AdmissionRequest.find({ patient: patientId, hospital: hospitalId }).sort({ createdAt: -1 }),
   ]);
 
   res.json({
@@ -454,6 +457,7 @@ export const getWorkspace = catchAsync(async (req: Request, res: Response) => {
       labOrders,
       radiologyOrders,
       admissions,
+      admissionRequests,
     },
   });
 });
@@ -499,38 +503,146 @@ export const saveClinicalNotes = catchAsync(async (req: Request, res: Response) 
 export const recommendAdmission = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const appointmentId = req.params.id;
-  const { suggestedWard, diagnosis, notes } = req.body;
+  const {
+    priority = "Routine",
+    preferredWard = "General",
+    preferredBedType = "General",
+    expectedStay = "",
+    primaryDiagnosis,
+    clinicalNotes = "",
+    admissionReason = "",
+    specialInstructions = ""
+  } = req.body;
+
+  if (!primaryDiagnosis || !primaryDiagnosis.trim()) {
+    throw new AppError("Diagnosis is mandatory for admission recommendation.", 400);
+  }
+
   const doctor = await getLoggedDoctor(req);
 
   const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: doctor._id })
     .populate("patient")
-    .populate("doctor");
+    .populate("doctor")
+    .populate("department");
 
   if (!appointment) {
     throw new AppError("Appointment not found.", 404);
   }
 
+  // 1. Verify consultation is completed or in consultation
+  if (appointment.status !== "completed" && appointment.status !== "in_consultation") {
+    throw new AppError("Patient consultation must be active or completed to recommend admission.", 400);
+  }
+
   const patient = appointment.patient as any;
   const docProfile = appointment.doctor as any;
+  const department = appointment.department as any;
 
-  // Create notification for receptionist
-  const notification = await DbNotification.create({
+  // 2. Patient should not already have an ACTIVE IP Admission.
+  const activeAdm = await Admission.findOne({
     hospital: hospitalId,
-    title: "Inpatient Admission Recommended",
-    message: `Patient ${patient.name} recommended for IP admission by Dr. ${docProfile.name}.`,
+    patient: patient._id,
+    status: {
+      $in: [
+        "admitted",
+        "Admitted",
+        "Bed Allocated",
+        "Under Observation",
+        "Waiting for Bed",
+        "In Ward",
+        "ICU",
+        "Operation Scheduled",
+        "Under Treatment",
+        "Transferred"
+      ]
+    }
+  });
+
+  if (activeAdm) {
+    throw new AppError(`This patient already has an active inpatient admission (IP No: ${activeAdm.admissionNumber}). Request blocked.`, 400);
+  }
+
+  // 3. Do not allow duplicate pending Admission Requests
+  const existingRequest = await AdmissionRequest.findOne({
+    hospital: hospitalId,
+    patient: patient._id,
+    status: "Admission Requested"
+  });
+
+  if (existingRequest) {
+    throw new AppError(`A pending admission request (Request No: ${existingRequest.requestNumber}) already exists for this patient.`, 400);
+  }
+
+  // 4. Generate Unique Admission Request Number: ARYYYY000001
+  const currentYear = new Date().getFullYear();
+  const prefix = `AR${currentYear}`;
+  
+  const latestReq = await AdmissionRequest.findOne({
+    hospital: hospitalId,
+    requestNumber: new RegExp(`^${prefix}`)
+  }).sort({ createdAt: -1 });
+
+  let nextSerial = 1;
+  if (latestReq) {
+    const serialPart = latestReq.requestNumber.replace(prefix, "");
+    const lastSerial = parseInt(serialPart, 10);
+    if (!isNaN(lastSerial)) {
+      nextSerial = lastSerial + 1;
+    }
+  }
+  const requestNumber = `${prefix}${String(nextSerial).padStart(6, "0")}`;
+
+  // 5. Create AdmissionRequest
+  const admissionReq = await AdmissionRequest.create({
+    hospital: hospitalId,
+    requestNumber,
+    patient: patient._id,
+    doctor: doctor._id,
+    department: department._id,
+    priority,
+    preferredWard,
+    preferredBedType,
+    expectedStay,
+    primaryDiagnosis,
+    clinicalNotes,
+    admissionReason: admissionReason || primaryDiagnosis,
+    specialInstructions,
+    status: "Admission Requested"
+  });
+
+  // 6. Create Notification for receptionist (to support existing notification flows in IPManagement page)
+  await DbNotification.create({
+    hospital: hospitalId,
+    title: "New Admission Request",
+    message: `Dr. ${docProfile.name} requested IP admission for ${patient.name} (${patient.uhid}) due to: ${primaryDiagnosis}`,
     type: "admission_request",
     recipientRole: "receptionist",
-    severity: "warning",
+    severity: priority === "Emergency" ? "critical" : "warning",
+    link: `/receptionist/ip/new`,
     data: {
       patientId: patient._id.toString(),
       opVisitId: appointmentId,
-      diagnosis: diagnosis || appointment.diagnosis || "OP Consultation",
-      suggestedWard: suggestedWard || "General Ward",
-      notes: notes || appointment.clinicalNotes || "",
-    },
+      diagnosis: primaryDiagnosis,
+      suggestedWard: preferredWard || "General Ward",
+      notes: clinicalNotes || "",
+      requestId: admissionReq._id.toString(),
+      requestNumber
+    }
   });
 
-  res.status(201).json({ status: "success", data: notification });
+  // 7. Emit real-time Socket.IO notification to receptionist
+  emitToHospital(hospitalId.toString(), "new_admission_request", {
+    requestNumber,
+    patientName: patient.name,
+    uhid: patient.uhid,
+    doctorName: docProfile.name,
+    departmentName: department?.name || "N/A",
+    priority,
+    requestedTime: new Date(),
+    requestId: admissionReq._id
+  });
+
+  res.status(201).json({ status: "success", data: admissionReq });
 });
 
 export const createRadiologyOrder = catchAsync(async (req: Request, res: Response) => {

@@ -74,16 +74,31 @@ export interface RoomAvailability {
 
 export interface AdmissionRequest {
   _id: string;
-  title: string;
-  message: string;
-  type: string;
-  isRead: boolean;
-  data: {
+  requestNumber?: string;
+  patient?: any;
+  doctor?: any;
+  department?: any;
+  priority?: "Routine" | "Urgent" | "Emergency";
+  preferredWard?: string;
+  preferredBedType?: string;
+  expectedStay?: string;
+  primaryDiagnosis?: string;
+  clinicalNotes?: string;
+  admissionReason?: string;
+  specialInstructions?: string;
+  status?: "Admission Requested" | "Approved" | "Admitted" | "Rejected";
+  title?: string;
+  message?: string;
+  type?: string;
+  isRead?: boolean;
+  data?: {
     patientId: string;
     opVisitId: string;
     diagnosis: string;
     suggestedWard?: string;
     suggestedRoomType?: string;
+    requestId?: string;
+    requestNumber?: string;
   };
   createdAt: string;
 }
@@ -262,7 +277,9 @@ export function useAdmissionRequests() {
   return useQuery({
     queryKey: ["reception", "admissions", "requests"],
     queryFn: async () => {
-      const res = await api.get<{ data: { requests: AdmissionRequest[] } }>("/reception/admissions/requests");
+      const res = await api.get<{ data: { requests: AdmissionRequest[] } }>("/admission-requests", {
+        params: { status: "Pending" }
+      });
       return res.data.data.requests;
     },
     refetchInterval: 10000 // Poll for new admission alerts
@@ -277,6 +294,19 @@ export function useAdmissions(status: "admitted" | "discharged" = "admitted") {
         params: { status }
       });
       return res.data.data.admissions;
+    }
+  });
+}
+
+export function useRejectAdmissionRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.post(`/admission-requests/${id}/reject`);
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reception", "admissions", "requests"] });
     }
   });
 }
@@ -550,6 +580,17 @@ export function useRescheduleAppointment() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reception"] });
     }
+  });
+}
+
+export function usePatientDetail(patientId: string) {
+  return useQuery({
+    queryKey: ["reception", "patient-detail", patientId],
+    queryFn: async () => {
+      const res = await api.get<{ data: { patient: any, currentConsultation: any } }>(`/reception/patients/${patientId}`);
+      return res.data.data;
+    },
+    enabled: !!patientId
   });
 }
 

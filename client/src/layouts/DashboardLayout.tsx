@@ -24,8 +24,12 @@ export function DashboardLayout() {
     };
 
     socket.on("dashboard_update", handleUpdate);
+    socket.on("admission:request:created", handleUpdate);
+    socket.on("admission_request_update", handleUpdate);
     return () => {
       socket.off("dashboard_update", handleUpdate);
+      socket.off("admission:request:created", handleUpdate);
+      socket.off("admission_request_update", handleUpdate);
     };
   }, [queryClient]);
 

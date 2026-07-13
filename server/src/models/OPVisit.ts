@@ -11,7 +11,7 @@ const opVisitSchema = new Schema(
     tokenNumber: { type: String, required: true },
     reasonForVisit: { type: String, default: "" },
     clinicalNotes: { type: String, default: "" },
-    status: { type: String, enum: ["active", "completed", "referred_ip"], default: "active" },
+    status: { type: String, enum: ["active", "completed", "referred_ip", "ConvertedToIP"], default: "active" },
     billingStatus: { type: String, enum: ["pending", "paid"], default: "pending" },
   },
   { timestamps: true }
