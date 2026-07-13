@@ -6,6 +6,8 @@ import { Types } from "mongoose";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
+import { Admission } from "../models/Admission";
+import { Bed } from "../models/Bed";
 
 const medicalHistoryEntrySchema = z.object({
   date: z.coerce.date(),
@@ -108,7 +110,19 @@ export const updatePatient = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const deletePatient = catchAsync(async (req: Request, res: Response) => {
-  const patient = await Patient.findOneAndDelete({ _id: req.params.id, ...req.hospitalFilter });
+  const patientId = req.params.id;
+  const hospitalId = req.hospitalFilter!.hospital;
+
+  // Release any occupied beds before deleting the patient
+  const activeAdmissions = await Admission.find({ hospital: hospitalId, patient: patientId, status: "admitted" });
+  for (const adm of activeAdmissions) {
+    await Bed.updateOne({ _id: adm.bed, hospital: hospitalId }, { isOccupied: false, status: "Available" });
+  }
+
+  // Delete admissions for this patient
+  await Admission.deleteMany({ hospital: hospitalId, patient: patientId });
+
+  const patient = await Patient.findOneAndDelete({ _id: patientId, ...req.hospitalFilter });
   if (!patient) {
     throw new AppError("Patient not found.", 404);
   }

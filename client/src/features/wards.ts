@@ -64,10 +64,10 @@ export interface UpdateWardPayload {
   status?: string;
 }
 
-export function useUpdateWard(id: string) {
+export function useUpdateWard() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: UpdateWardPayload) => {
+    mutationFn: async ({ id, ...payload }: UpdateWardPayload & { id: string }) => {
       const res = await api.patch(`/wards/${id}`, payload);
       return res.data.data.ward;
     },

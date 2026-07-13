@@ -73,10 +73,10 @@ export interface UpdateRoomPayload {
   status?: string;
 }
 
-export function useUpdateRoom(id: string) {
+export function useUpdateRoom() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: UpdateRoomPayload) => {
+    mutationFn: async ({ id, ...payload }: UpdateRoomPayload & { id: string }) => {
       const res = await api.patch(`/rooms/${id}`, payload);
       return res.data.data.room;
     },
