@@ -100,10 +100,25 @@ export const updateDoctor = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const deleteDoctor = catchAsync(async (req: Request, res: Response) => {
-  const doctor = await Doctor.findOneAndDelete({ _id: req.params.id, ...req.hospitalFilter });
+  const doctor = await Doctor.findOneAndUpdate(
+    { _id: req.params.id, ...req.hospitalFilter },
+    {
+      isActive: false,
+      deletedAt: new Date(),
+      deletedBy: req.user!._id,
+      status: "INACTIVE"
+    },
+    { new: true }
+  );
   if (!doctor) {
     throw new AppError("Doctor not found.", 404);
   }
+
+  // Deactivate associated login account if exists
+  if (doctor.email) {
+    await User.findOneAndUpdate({ email: doctor.email.toLowerCase() }, { status: "inactive" });
+  }
+
   res.status(204).send();
 });
 

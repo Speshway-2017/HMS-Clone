@@ -184,6 +184,28 @@ export function useBookAppointment() {
   });
 }
 
+export function useCheckDuplicateAppointment(
+  patientId: string,
+  doctorId: string,
+  date: string,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: ["reception", "duplicate-check", patientId, doctorId, date],
+    queryFn: async () => {
+      const res = await api.get<{ data: { isDuplicate: boolean; message?: string; existingAppointment?: any } }>(
+        "/reception/appointments/check-duplicate",
+        { params: { patientId, doctorId, date } }
+      );
+      return res.data.data;
+    },
+    enabled: enabled && !!patientId && !!doctorId && !!date,
+    staleTime: 0,           // Always fresh — booking-critical data
+    gcTime: 0,
+    retry: false,
+  });
+}
+
 // ── Billing Hooks ──
 export function usePayBilling() {
   const queryClient = useQueryClient();
@@ -477,3 +499,57 @@ export function useTodayRegistrations() {
     refetchInterval: 30000
   });
 }
+
+export function useCancelAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ appointmentId, reason, remarks, refundRequired }: { appointmentId: string; reason: string; remarks: string; refundRequired: string }) => {
+      const res = await api.post(`/reception/appointments/${appointmentId}/cancel`, {
+        reason,
+        remarks,
+        refundRequired
+      });
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reception"] });
+    }
+  });
+}
+
+export function useRescheduleAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      appointmentId,
+      newDate,
+      newTime,
+      doctorId,
+      departmentId,
+      reason,
+      remarks
+    }: {
+      appointmentId: string;
+      newDate: string;
+      newTime: string;
+      doctorId: string;
+      departmentId: string;
+      reason: string;
+      remarks: string;
+    }) => {
+      const res = await api.post(`/reception/appointments/${appointmentId}/reschedule`, {
+        newDate,
+        newTime,
+        doctorId,
+        departmentId,
+        reason,
+        remarks
+      });
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reception"] });
+    }
+  });
+}
+

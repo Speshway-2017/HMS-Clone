@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import { Appointment, APPOINTMENT_STATUSES } from "../models/Appointment";
+import { Doctor } from "../models/Doctor";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
@@ -57,6 +58,35 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
 
 export const createAppointment = catchAsync(async (req: Request, res: Response) => {
   const body = appointmentSchema.parse(req.body);
+  const doctor = await Doctor.findOne({ _id: body.doctor, hospital: req.hospitalFilter!.hospital, isActive: { $ne: false } });
+  if (!doctor) {
+    throw new AppError("The selected doctor is inactive, retired, or does not exist.", 400);
+  }
+
+  // Duplicate appointment guard: Patient + Doctor + Date (any status except cancelled/no_show/completed)
+  if (body.patient && body.doctor && body.date) {
+    const startOfDay = new Date(body.date as unknown as Date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(body.date as unknown as Date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const existing = await Appointment.findOne({
+      hospital: req.hospitalFilter!.hospital,
+      patient: body.patient,
+      doctor: body.doctor,
+      date: { $gte: startOfDay, $lte: endOfDay },
+      status: { $nin: ["cancelled", "no_show", "completed"] },
+    });
+
+    if (existing) {
+      const apptDate = new Date(existing.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+      throw new AppError(
+        `This patient already has an appointment with Dr. ${doctor.name} on ${apptDate}. Please complete, cancel or reschedule the existing appointment before creating another appointment.`,
+        409
+      );
+    }
+  }
+
   const appointment = await Appointment.create({
     ...body,
     hospital: req.hospitalFilter!.hospital,
@@ -64,6 +94,7 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
   });
   res.status(201).json({ status: "success", data: { appointment } });
 });
+
 
 export const getAppointment = catchAsync(async (req: Request, res: Response) => {
   const appointment = await Appointment.findOne({ _id: req.params.id, ...req.hospitalFilter })

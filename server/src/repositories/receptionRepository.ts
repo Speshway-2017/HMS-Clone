@@ -244,6 +244,7 @@ export class ReceptionRepository {
       .populate("patient", "name uhid phone age gender")
       .populate("doctor", "name specialization")
       .populate("department", "name")
+      .populate("appointment", "rescheduleCount isRescheduled rescheduleHistory referenceId status")
       .sort({ createdAt: 1 });
   }
 

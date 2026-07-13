@@ -27,6 +27,37 @@ const appointmentSchema = new Schema(
     clinicalNotes: { type: String, default: "" },
     treatmentPlan: { type: String, default: "" },
     advice: { type: String, default: "" },
+    cancellationReason: { type: String, default: "" },
+    cancellationRemarks: { type: String, default: "" },
+    refundRequired: { type: Boolean, default: false },
+    rescheduleHistory: [
+      {
+        oldDate: { type: Date, required: true },
+        oldTime: { type: String, required: true },
+        newDate: { type: Date, required: true },
+        newTime: { type: String, required: true },
+        oldToken: { type: String, required: true },
+        newToken: { type: String, required: true },
+        rescheduledBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+        reason: { type: String, required: true },
+        timestamp: { type: Date, default: Date.now }
+      }
+    ],
+    // Reschedule tracking fields
+    isRescheduled: { type: Boolean, default: false },
+    rescheduleCount: { type: Number, default: 0 },
+    previousAppointmentDate: { type: Date, default: null },
+    previousAppointmentTime: { type: String, default: "" },
+    newAppointmentDate: { type: Date, default: null },
+    newAppointmentTime: { type: String, default: "" },
+
+    // Follow-up visit fields
+    followUp: { type: Boolean, default: false },
+    parentAppointmentId: { type: Schema.Types.ObjectId, ref: "Appointment", default: null },
+    followUpDate: { type: Date, default: null },
+    followUpReason: { type: String, default: "" },
+
+
     vitals: {
       temperature: { type: String, default: "" },
       bloodPressure: { type: String, default: "" },
