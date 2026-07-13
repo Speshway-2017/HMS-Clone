@@ -69,7 +69,7 @@ const admissionSchema = z.object({
   advanceAmount: z.coerce.number().min(0).default(0),
   admissionNotes: z.string().optional().default(""),
   paymentMethod: z.string().optional().default("Cash"),
-  
+
   // Receptionist Initiated Specifics
   admissionMode: z.enum(["Doctor Requested", "Receptionist Initiated"]).optional().default("Doctor Requested"),
   admittingDoctor: z.string().optional().nullable(),

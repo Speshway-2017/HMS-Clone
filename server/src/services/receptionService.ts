@@ -64,7 +64,7 @@ export class ReceptionService {
       // Doctors Status
       Doctor.find({ hospital: hospitalId }),
       // Active rooms
-      Room.find({ hospital: hospitalId, status: "active" }),
+      Room.find({ hospital: hospitalId, status: { $in: ["active", "Active"] } }),
       // Bed counts
       Bed.find({ hospital: hospitalId })
     ]);
@@ -767,7 +767,7 @@ export class ReceptionService {
       console.error("Admission failed, rolling back changes...", error);
 
       if (bedMarkedOccupied) {
-        await Bed.updateOne({ _id: bedId }, { isOccupied: false });
+        await Bed.updateOne({ _id: bedId }, { isOccupied: false, status: "Available" });
       }
       if (createdAdmission) {
         await Admission.deleteOne({ _id: createdAdmission._id });

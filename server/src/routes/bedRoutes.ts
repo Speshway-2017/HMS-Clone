@@ -1,0 +1,24 @@
+import { Router } from "express";
+import { protect, restrictTo } from "../middleware/auth";
+import { scopeToHospital } from "../middleware/scopeToHospital";
+import {
+  listBeds,
+  createBed,
+  updateBed,
+  deleteBed
+} from "../controllers/bedController";
+
+const router = Router();
+
+// Secure all routes
+router.use(protect, restrictTo("hospital_admin", "receptionist"), scopeToHospital);
+
+router.route("/")
+  .get(listBeds)
+  .post(restrictTo("hospital_admin"), createBed);
+
+router.route("/:id")
+  .patch(restrictTo("hospital_admin"), updateBed)
+  .delete(restrictTo("hospital_admin"), deleteBed);
+
+export default router;
