@@ -689,32 +689,35 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                   </div>
                   {patientSearchQuery && searchPatients && searchPatients.length > 0 && (
                     <div className="rounded-lg border border-slate-150 divide-y divide-slate-100 max-h-40 overflow-y-auto">
-                      {searchPatients.map((p) => (
-                        <button
-                          key={p._id}
-                          type="button"
-                          onClick={() => {
-                            if (p.status === "admitted") {
-                              alert("This patient is already admitted to the hospital.");
-                              return;
-                            }
-                            setSelectedPatientId(p._id);
-                            setPatientSearchQuery(`${p.name} (${p.uhid})`);
-                            // Auto-populate some attender fields if same as emergency contact
-                            setAttenderName(p.emergencyContact?.name || "");
-                            setAttenderPhone(p.emergencyContact?.phone || "");
-                          }}
-                          className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-slate-50 ${
-                            selectedPatientId === p._id ? "bg-indigo-50 font-semibold" : ""
-                          }`}
-                        >
-                          <div>
-                            <div className="font-semibold text-slate-800">{p.name}</div>
-                            <div className="text-slate-450 font-mono text-[10px]">{p.uhid} — {p.phone} {p.status === "admitted" ? "— ADMITTED" : ""}</div>
-                          </div>
-                          {selectedPatientId === p._id && <span className="text-[10px] bg-indigo-600 text-white rounded px-1.5 py-0.5">Selected</span>}
-                        </button>
-                      ))}
+                      {searchPatients.map((p) => {
+                        const anyP = p as any;
+                        return (
+                          <button
+                            key={p._id}
+                            type="button"
+                            onClick={() => {
+                              if (anyP.status === "admitted") {
+                                alert("This patient is already admitted to the hospital.");
+                                return;
+                              }
+                              setSelectedPatientId(p._id);
+                              setPatientSearchQuery(`${p.name} (${p.uhid})`);
+                              // Auto-populate some attender fields if same as emergency contact
+                              setAttenderName(anyP.emergencyContact?.name || "");
+                              setAttenderPhone(anyP.emergencyContact?.phone || "");
+                            }}
+                            className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-slate-50 ${
+                              selectedPatientId === p._id ? "bg-indigo-50 font-semibold" : ""
+                            }`}
+                          >
+                            <div>
+                              <div className="font-semibold text-slate-800">{p.name}</div>
+                              <div className="text-slate-450 font-mono text-[10px]">{p.uhid} — {p.phone} {anyP.status === "admitted" ? "— ADMITTED" : ""}</div>
+                            </div>
+                            {selectedPatientId === p._id && <span className="text-[10px] bg-indigo-600 text-white rounded px-1.5 py-0.5">Selected</span>}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </Card>
@@ -800,14 +803,14 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
               )}
 
               {((subTab === "requests" && selectedReq) || (subTab === "manual" && selectedPatientId)) && (
-                patientDetail?.activeAdmission ? (
+                (patientDetail as any)?.activeAdmission ? (
                   <Card className="border border-red-200 bg-red-50/50 p-6 space-y-4">
                     <div className="flex items-start gap-3">
                       <ShieldAlert className="h-6 w-6 text-red-650 shrink-0 mt-0.5" />
                       <div className="space-y-1">
                         <h4 className="text-sm font-bold text-red-800">Duplicate IP Admission Blocked</h4>
                         <p className="text-xs text-red-750 leading-relaxed">
-                          This patient already has an active inpatient admission (IP No: {patientDetail.activeAdmission.admissionNumber}). Please discharge the patient before creating a new admission.
+                          This patient already has an active inpatient admission (IP No: {(patientDetail as any).activeAdmission.admissionNumber}). Please discharge the patient before creating a new admission.
                         </p>
                       </div>
                     </div>

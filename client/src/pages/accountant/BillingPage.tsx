@@ -37,8 +37,16 @@ export function AccountantBillingPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
+  const tabToBillingType: Record<string, string | undefined> = {
+    all: undefined,
+    op: "OP",
+    ip: "IP",
+    pharmacy: "PHARMACY",
+    laboratory: "LAB"
+  };
+
   // Invoices & Patients Queries
-  const { data: invoicesData, refetch } = useInvoices({ page });
+  const { data: invoicesData, refetch } = useInvoices({ page, billingType: tabToBillingType[activeTab] });
   const { data: patientsData } = usePatients({ limit: 100 } as any);
   const createInvoiceMutation = useCreateInvoice();
 
@@ -86,6 +94,16 @@ export function AccountantBillingPage() {
     e.preventDefault();
     if (!patientId || items.length === 0) return;
 
+    const firstItemCategory = items[0]?.category;
+    let bType = "OP";
+    if (firstItemCategory === "ip") {
+      bType = "IP";
+    } else if (firstItemCategory === "pharmacy") {
+      bType = "PHARMACY";
+    } else if (firstItemCategory === "laboratory") {
+      bType = "LAB";
+    }
+
     createInvoiceMutation.mutate(
       {
         patient: patientId,
@@ -93,9 +111,10 @@ export function AccountantBillingPage() {
         taxRate,
         serviceFee,
         insuranceCoveragePercent: insuranceCoverPercent,
+        billingType: bType,
         status: "pending",
-        dueDate: dueDate ? new Date(dueDate) as any : undefined
-      },
+        dueDate: dueDate ? new Date(dueDate) : undefined
+      } as any,
       {
         onSuccess: () => {
           setIsNewInvoiceOpen(false);
@@ -109,15 +128,11 @@ export function AccountantBillingPage() {
     );
   };
 
-  // Filter invoices client-side for immediate feedback
+  // Filter invoices client-side for search query matching
   const filteredInvoices = (invoicesData?.data ?? []).filter((inv) => {
     const pName = typeof inv.patient === "object" ? (inv.patient as any).name : "";
-    const matchesSearch = pName.toLowerCase().includes(search.toLowerCase()) || 
-                          inv._id.toLowerCase().includes(search.toLowerCase());
-    
-    if (activeTab === "all") return matchesSearch;
-    // Map tab categories to items categories
-    return matchesSearch && inv.items.some((item) => item.category === activeTab);
+    return pName.toLowerCase().includes(search.toLowerCase()) || 
+           inv._id.toLowerCase().includes(search.toLowerCase());
   });
 
   const handlePrint = () => {
@@ -152,10 +167,10 @@ export function AccountantBillingPage() {
             }`}
           >
             {tab === "all" 
-              ? "All Bills" 
+              ? `All Bills (${invoicesData?.counts?.all ?? 0})` 
               : tab === "op" || tab === "ip" 
-                ? `${tab.toUpperCase()} Billing` 
-                : `${tab.charAt(0).toUpperCase()}${tab.slice(1)} Billing`}
+                ? `${tab.toUpperCase()} Billing (${invoicesData?.counts?.[tab] ?? 0})` 
+                : `${tab.charAt(0).toUpperCase()}${tab.slice(1)} Billing (${invoicesData?.counts?.[tab] ?? 0})`}
           </button>
         ))}
       </div>

@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Pill, Search, Clipboard, History, Eye, CheckCircle2, AlertCircle, Printer } from "lucide-react";
 import { usePatients } from "../../features/patients";
 import { useInventory } from "../../features/inventory";
+import { usePrescriptions, useDispensePrescription } from "../../features/doctorDashboard";
+import toast from "react-hot-toast";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
 import { Badge } from "../../components/ui/Badge";
@@ -65,6 +67,9 @@ export function PharmacyMedicineDispensing() {
     };
   });
 
+  const { data: realPrescriptions } = usePrescriptions();
+  const dispenseMutation = useDispensePrescription();
+
   useEffect(() => {
     // Load local dispensing logs
     const saved = localStorage.getItem("hms_pharmacy_dispensing");
@@ -75,6 +80,30 @@ export function PharmacyMedicineDispensing() {
       setDispensedList([]);
     }
   }, []);
+
+  // Auto-populate medications from real prescription when ID is entered
+  useEffect(() => {
+    if (!prescriptionId || !realPrescriptions) return;
+    const foundRx = realPrescriptions.find((rx: any) => rx._id === prescriptionId || rx._id.slice(-4) === prescriptionId);
+    if (foundRx) {
+      if (foundRx.patient?._id) {
+        setSelectedPatientId(foundRx.patient._id);
+        setSelectedPatientName(foundRx.patient.name);
+      }
+      const mappedItems = (foundRx.medications || []).map((m: any) => {
+        const matched = availableMeds.find((av: any) => av.name.toLowerCase().includes(m.name.toLowerCase()));
+        return {
+          name: m.name,
+          batchNo: matched ? matched.batchNo : m.strength || "BATCH-001",
+          quantity: 1,
+          price: matched ? matched.price : 100
+        };
+      });
+      if (mappedItems.length > 0) {
+        setItemsToDispense(mappedItems);
+      }
+    }
+  }, [prescriptionId, realPrescriptions]);
 
   const handlePatientSelect = (patientId: string) => {
     setSelectedPatientId(patientId);
@@ -146,6 +175,18 @@ export function PharmacyMedicineDispensing() {
     const updated = [newRecord, ...dispensedList];
     setDispensedList(updated);
     localStorage.setItem("hms_pharmacy_dispensing", JSON.stringify(updated));
+
+    // If it's a real prescription, mark as Dispensed on the backend
+    if (prescriptionId && prescriptionId !== "Walk-in") {
+      const foundRx = realPrescriptions?.find((rx: any) => rx._id === prescriptionId || rx._id.slice(-4) === prescriptionId);
+      if (foundRx) {
+        dispenseMutation.mutate(foundRx._id, {
+          onSuccess: () => {
+            toast.success("Prescription status updated to Dispensed on backend!");
+          }
+        });
+      }
+    }
 
     // Reset Form
     setSelectedPatientId("");

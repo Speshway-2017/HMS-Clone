@@ -13,8 +13,9 @@ import { Admission } from "../models/Admission";
 import { AdmissionRequest } from "../models/AdmissionRequest";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { emitToHospital } from "../config/socket";
+import { createOrUpdatePrescriptionCore } from "./prescriptionController";
 
 // Helper helper to resolve the logged-in doctor profile
 async function getLoggedDoctor(req: Request) {
@@ -217,41 +218,98 @@ export const getPrescriptions = catchAsync(async (req: Request, res: Response) =
 export const createPrescription = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
-  const { patientId, diagnosis, medicines, notes } = req.body;
+  const { patientId, diagnosis, medicines, notes, advice, followUpDate } = req.body;
 
-  const prescription = await Prescription.create({
-    hospital: hospitalId,
-    patient: patientId,
-    doctor: doctor._id,
-    diagnosis,
-    medicines,
-    notes: notes || "",
-    status: "pending",
-  });
+  // Find active or recent appointment for context
+  let finalApptId = req.body.appointmentId;
+  if (!finalApptId) {
+    const activeAppt = await Appointment.findOne({
+      patient: patientId,
+      doctor: doctor._id,
+      hospital: hospitalId,
+      status: "in_consultation"
+    });
+    if (activeAppt) {
+      finalApptId = activeAppt._id.toString();
+    } else {
+      const lastAppt = await Appointment.findOne({
+        patient: patientId,
+        doctor: doctor._id,
+        hospital: hospitalId
+      }).sort({ createdAt: -1 });
+      if (lastAppt) {
+        finalApptId = lastAppt._id.toString();
+      } else {
+        throw new AppError("No active consultation appointment found for this patient.", 400);
+      }
+    }
+  }
 
-  // Also push to medical history
-  await Patient.findOneAndUpdate(
-    { _id: patientId, hospital: hospitalId },
-    {
-      $push: {
-        medicalHistory: {
-          $each: [
-            {
-              date: new Date(),
-              visitType: "Prescription Issued",
-              doctorName: doctor.name,
-              diagnosis,
-              notes: medicines.map((m: any) => `${m.name} (${m.dosage}, ${m.frequency}, ${m.duration})`).join("; "),
-              status: "Completed",
-            },
-          ],
-          $position: 0,
+  // Format medications from old medicines format or new medications format
+  const rawMeds = medicines || req.body.medications || [];
+  const medications = rawMeds.map((m: any) => ({
+    name: m.name,
+    strength: m.strength || "",
+    dosage: m.dosage || "",
+    frequency: m.frequency || "",
+    duration: m.duration || "",
+    instructions: m.instructions || "",
+  }));
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const reqHostUrl = `${req.protocol}://${req.get("host")}`;
+    const prescription = await createOrUpdatePrescriptionCore(
+      session,
+      hospitalId,
+      doctor,
+      finalApptId,
+      {
+        medications,
+        labOrders: req.body.labOrders || [],
+        radiologyOrders: req.body.radiologyOrders || [],
+        diagnosis: diagnosis || "Consultation visit",
+        clinicalNotes: notes || "",
+        advice: advice || "",
+        followUpDate
+      },
+      reqHostUrl
+    );
+
+    // Also push to patient's medical history
+    const medsNotes = medications.map((m: any) => `${m.name} (${m.dosage}, ${m.frequency}, ${m.duration})`).join("; ");
+    await Patient.findOneAndUpdate(
+      { _id: patientId, hospital: hospitalId },
+      {
+        $push: {
+          medicalHistory: {
+            $each: [
+              {
+                date: new Date(),
+                visitType: "Prescription Issued",
+                doctorName: doctor.name,
+                diagnosis: diagnosis || "Prescription",
+                notes: medsNotes || "Prescription updated",
+                status: "Completed",
+              },
+            ],
+            $position: 0,
+          },
         },
       },
-    }
-  );
+      { session }
+    );
 
-  res.status(201).json({ status: "success", data: prescription });
+    await session.commitTransaction();
+    res.status(201).json({ status: "success", data: prescription });
+  } catch (err) {
+    await session.abortTransaction();
+    throw err;
+  } finally {
+    session.endSession();
+  }
 });
 
 export const completePrescription = catchAsync(async (req: Request, res: Response) => {
@@ -690,53 +748,85 @@ export const completeConsultation = catchAsync(async (req: Request, res: Respons
   const appointmentId = req.params.id;
   const doctor = await getLoggedDoctor(req);
 
-  const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: doctor._id })
-    .populate("patient")
-    .populate("doctor")
-    .populate("department");
+  const { medications, labOrders, radiologyOrders, diagnosis, chiefComplaint, clinicalNotes, advice, followUpDate } = req.body;
 
-  if (!appointment) {
-    throw new AppError("Appointment not found.", 404);
-  }
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  // Update appointment status to completed
-  appointment.status = "completed";
-  await appointment.save();
+  try {
+    const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: doctor._id })
+      .populate("patient")
+      .populate("doctor")
+      .populate("department")
+      .session(session);
 
-  // Update queue item status to completed if exists
-  await Queue.findOneAndUpdate(
-    { appointment: appointmentId, hospital: hospitalId, doctor: doctor._id },
-    { status: "completed" }
-  );
+    if (!appointment) {
+      throw new AppError("Appointment not found.", 404);
+    }
 
-  // Push to patient's medicalHistory array
-  const departmentName = (appointment.department as any)?.name || "General OPD";
-  const diagnosis = appointment.diagnosis || "Consultation";
-  const notes = `Chief Complaint: ${appointment.chiefComplaint || "None"}. Vitals: BP: ${appointment.vitals?.bloodPressure || "—"}, Temp: ${appointment.vitals?.temperature || "—"}. Notes: ${appointment.clinicalNotes || "None"}. Plan: ${appointment.treatmentPlan || "None"}.`;
+    // Update appointment status to completed
+    appointment.status = "completed";
+    if (diagnosis) appointment.diagnosis = diagnosis;
+    if (chiefComplaint) appointment.chiefComplaint = chiefComplaint;
+    if (clinicalNotes) appointment.clinicalNotes = clinicalNotes;
+    if (advice) appointment.advice = advice;
+    if (followUpDate) appointment.followUpDate = followUpDate;
+    await appointment.save({ session });
 
-  await Patient.findOneAndUpdate(
-    { _id: appointment.patient._id, hospital: hospitalId },
-    {
-      $push: {
-        medicalHistory: {
-          $each: [
-            {
-              date: new Date(),
-              visitType: "OPD Consultation",
-              doctorName: (appointment.doctor as any).name,
-              department: departmentName,
-              diagnosis,
-              notes,
-              status: "Completed",
-            },
-          ],
-          $position: 0,
+    // Update queue item status to completed if exists
+    await Queue.findOneAndUpdate(
+      { appointment: appointmentId, hospital: hospitalId, doctor: doctor._id },
+      { status: "completed" },
+      { session }
+    );
+
+    // Save prescription automatically using transaction
+    const reqHostUrl = `${req.protocol}://${req.get("host")}`;
+    const prescription = await createOrUpdatePrescriptionCore(
+      session,
+      hospitalId,
+      doctor,
+      appointmentId,
+      { medications, labOrders, radiologyOrders, diagnosis, chiefComplaint, clinicalNotes, advice, followUpDate },
+      reqHostUrl
+    );
+
+    // Push to patient's medicalHistory array
+    const departmentName = (appointment.department as any)?.name || "General OPD";
+    const diagnosisVal = diagnosis || appointment.diagnosis || "Consultation";
+    const notesVal = `Chief Complaint: ${chiefComplaint || appointment.chiefComplaint || "None"}. Vitals: BP: ${appointment.vitals?.bloodPressure || "—"}, Temp: ${appointment.vitals?.temperature || "—"}. Notes: ${clinicalNotes || appointment.clinicalNotes || "None"}. Plan: ${appointment.treatmentPlan || "None"}.`;
+
+    await Patient.findOneAndUpdate(
+      { _id: appointment.patient._id, hospital: hospitalId },
+      {
+        $push: {
+          medicalHistory: {
+            $each: [
+              {
+                date: new Date(),
+                visitType: "OPD Consultation",
+                doctorName: (appointment.doctor as any).name,
+                department: departmentName,
+                diagnosis: diagnosisVal,
+                notes: notesVal,
+                status: "Completed",
+              },
+            ],
+            $position: 0,
+          },
         },
       },
-    }
-  );
+      { session }
+    );
 
-  res.json({ status: "success", data: appointment });
+    await session.commitTransaction();
+    res.json({ status: "success", data: appointment, prescription });
+  } catch (err) {
+    await session.abortTransaction();
+    throw err;
+  } finally {
+    session.endSession();
+  }
 });
 
 export const getRadiologyOrders = catchAsync(async (req: Request, res: Response) => {

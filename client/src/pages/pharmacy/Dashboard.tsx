@@ -20,6 +20,7 @@ import { Button } from "../../components/ui/Button";
 import { useInventory } from "../../features/inventory";
 import { useInvoices } from "../../features/invoices";
 import { usePatients } from "../../features/patients";
+import { usePrescriptions } from "../../features/doctorDashboard";
 
 interface Medicine {
   _id: string;
@@ -53,8 +54,9 @@ export function PharmacyDashboard() {
   const { data: inventoryData, isLoading: isInventoryLoading } = useInventory({ category: "medicines" });
   const { data: invoiceData, isLoading: isInvoicesLoading } = useInvoices({});
   const { data: patientData, isLoading: isPatientsLoading } = usePatients({});
+  const { data: realPrescriptions, isLoading: isPrescriptionsLoading } = usePrescriptions();
 
-  if (isInventoryLoading || isInvoicesLoading || isPatientsLoading) {
+  if (isInventoryLoading || isInvoicesLoading || isPatientsLoading || isPrescriptionsLoading) {
     return (
       <div className="flex h-[400px] items-center justify-center">
         <div className="text-slate-500 font-medium">Loading dashboard data...</div>
@@ -107,25 +109,14 @@ export function PharmacyDashboard() {
   });
 
   // 4. Prescriptions mapping
-  const savedStatuses = JSON.parse(localStorage.getItem("hms_pharmacy_prescription_statuses") || "{}");
-  const prescriptions: Prescription[] = [];
-  const patients = patientData?.data || [];
-  patients.forEach((patient: any) => {
-    patient.medicalHistory?.forEach((history: any, idx: number) => {
-      if (history.notes && (history.notes.toLowerCase().includes("mg") || history.notes.toLowerCase().includes("tab") || history.notes.toLowerCase().includes("rx") || history.notes.toLowerCase().includes("dose"))) {
-        const rxId = `RX-${patient._id.slice(-4)}-${idx}`;
-        const status = savedStatuses[rxId] || "Pending";
-        prescriptions.push({
-          _id: rxId,
-          patientName: patient.name,
-          doctorName: history.doctorName || "Attending Physician",
-          medicines: [history.notes],
-          date: new Date(history.date).toISOString().split("T")[0],
-          status,
-        });
-      }
-    });
-  });
+  const prescriptions: Prescription[] = (realPrescriptions || []).map((rx: any) => ({
+    _id: rx._id,
+    patientName: rx.patient?.name || "Unknown Patient",
+    doctorName: rx.doctor?.name || "Attending Physician",
+    medicines: (rx.medications || []).map((m: any) => `${m.name}${m.strength ? ` (${m.strength})` : ""}`),
+    date: new Date(rx.createdAt).toISOString().split("T")[0],
+    status: rx.status as any,
+  }));
 
   // Compute stats
   const lowStockCount = medicines.filter(med => med.stockQty <= med.reorderLevel).length;

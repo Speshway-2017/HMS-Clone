@@ -8,6 +8,7 @@ import { Department } from "../models/Department";
 import { Patient } from "../models/Patient";
 import { Invoice } from "../models/Invoice";
 import { Admission } from "../models/Admission";
+import { AdmissionRequest } from "../models/AdmissionRequest";
 import { Payment } from "../models/Payment";
 import { Queue } from "../models/Queue";
 import { Appointment } from "../models/Appointment";
@@ -408,6 +409,7 @@ export class ReceptionService {
       hospital: hospitalId,
       patient: patientId,
       appointment: newAppointment._id,
+      billingType: "OP",
       items,
       taxRate: 0,
       serviceFee: 0,
@@ -820,7 +822,7 @@ export class ReceptionService {
       if (!room) {
         throw new AppError("Selected room not found.", 404);
       }
-      if (room.status !== "Active" && room.status !== "active") {
+      if (room.status !== "Active") {
         throw new AppError("Selected room is currently inactive.", 400);
       }
       if (room.wardName !== ward) {
@@ -832,7 +834,7 @@ export class ReceptionService {
       if (!wardRecord) {
         throw new AppError("Associated ward not found.", 404);
       }
-      if (wardRecord.status !== "Active" && wardRecord.status !== "active") {
+      if (wardRecord.status !== "Active") {
         throw new AppError("Selected ward is currently inactive.", 400);
       }
 
@@ -969,6 +971,7 @@ export class ReceptionService {
         const [invoice] = await Invoice.create([{
           hospital: hospitalId,
           patient: patientId,
+          billingType: "IP",
           status: "paid",
           issuedAt: new Date(),
           dueDate: new Date(),

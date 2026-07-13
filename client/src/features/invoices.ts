@@ -6,15 +6,26 @@ interface InvoiceListParams {
   page?: number;
   status?: string;
   patient?: string;
+  billingType?: string;
 }
 
 interface InvoiceListResponse extends Paginated<Invoice> {
-  counts: { totalBilling: number; netRevenue: number; pendingCount: number };
+  counts: {
+    totalBilling: number;
+    netRevenue: number;
+    pendingCount: number;
+    all?: number;
+    op?: number;
+    ip?: number;
+    pharmacy?: number;
+    laboratory?: number;
+  };
 }
 
 export function useInvoices(params: InvoiceListParams) {
+  const qKey = params.billingType ? params.billingType.toUpperCase() : "ALL";
   return useQuery({
-    queryKey: ["invoices", params],
+    queryKey: ["invoices", qKey, params],
     queryFn: async () => {
       const res = await api.get<InvoiceListResponse>("/invoices", { params });
       return res.data;

@@ -4,19 +4,47 @@ const prescriptionSchema = new Schema(
   {
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
     patient: { type: Schema.Types.ObjectId, ref: "Patient", required: true },
+    appointment: { type: Schema.Types.ObjectId, ref: "Appointment", required: true },
+    consultation: { type: Schema.Types.ObjectId, ref: "Appointment", required: true },
     doctor: { type: Schema.Types.ObjectId, ref: "Doctor", required: true },
-    diagnosis: { type: String, required: true },
-    medicines: [
+    department: { type: Schema.Types.ObjectId, ref: "Department", default: null },
+    diagnosis: { type: String, default: "" },
+    chiefComplaint: { type: String, default: "" },
+    clinicalNotes: { type: String, default: "" },
+    medications: [
       {
         name: { type: String, required: true },
-        dosage: { type: String, required: true },
-        frequency: { type: String, required: true },
-        duration: { type: String, required: true },
+        strength: { type: String, default: "" },
+        dosage: { type: String, default: "" },
+        frequency: { type: String, default: "" },
+        duration: { type: String, default: "" },
+        instructions: { type: String, default: "" },
       },
     ],
-    status: { type: String, enum: ["pending", "completed"], default: "pending" },
-    notes: { type: String, default: "" },
-    date: { type: Date, default: Date.now },
+    labOrders: [{ type: String }],
+    radiologyOrders: [{ type: String }],
+    advice: { type: String, default: "" },
+    followUpDate: { type: Date, default: null },
+    status: {
+      type: String,
+      enum: ["Pending", "Dispensed", "Completed", "Cancelled"],
+      default: "Pending",
+    },
+    deliveryStatus: {
+      mobile: {
+        type: String,
+        enum: ["pending", "delivered", "failed"],
+        default: "pending",
+      },
+      pharmacy: {
+        type: String,
+        enum: ["pending", "delivered", "failed"],
+        default: "pending",
+      },
+    },
+    prescriptionNumber: { type: String, unique: true, sparse: true },
+    pdfUrl: { type: String, default: "" },
+    downloadUrl: { type: String, default: "" },
   },
   { timestamps: true }
 );

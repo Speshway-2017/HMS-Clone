@@ -14,6 +14,7 @@ import {
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+import { Modal } from "../../components/ui/Modal";
 import { InputField, TextareaField, SelectField } from "../../components/ui/Field";
 import {
   User,
@@ -80,8 +81,16 @@ export function ConsultationWorkspacePage() {
 
   // Prescription form state
   const [prescriptionMeds, setPrescriptionMeds] = useState<any[]>([
-    { name: "", dosage: "", frequency: "", duration: "", instructions: "" },
+    { name: "", strength: "", dosage: "", frequency: "", duration: "", instructions: "" },
   ]);
+
+  // Success delivery tracking states
+  const [successInfo, setSuccessInfo] = useState<{
+    show: boolean;
+    isCompleted: boolean;
+    pdfUrl: string;
+    downloadUrl: string;
+  } | null>(null);
 
   // Lab form state
   const [selectedLabTests, setSelectedLabTests] = useState<string[]>([]);
@@ -192,16 +201,33 @@ export function ConsultationWorkspacePage() {
       return;
     }
     try {
-      await completeMutation.mutateAsync(appointment._id);
+      const res = await completeMutation.mutateAsync({
+        appointmentId: appointment._id,
+        medications: prescriptionMeds,
+        labOrders: selectedLabTests,
+        radiologyOrders: radioNotes ? [radioType] : [],
+        diagnosis,
+        chiefComplaint,
+        clinicalNotes,
+        advice,
+        followUpDate: (appointment as any).followUpDate || null,
+      });
+
+      const rx = res.prescription as any;
+      setSuccessInfo({
+        show: true,
+        isCompleted: true,
+        pdfUrl: rx?.pdfUrl || "",
+        downloadUrl: rx?.downloadUrl || "",
+      });
       toast.success("Consultation completed successfully!");
-      navigate("/doctor");
-    } catch {
-      toast.error("Failed to complete consultation");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to complete consultation");
     }
   };
 
   const handleAddMed = () => {
-    setPrescriptionMeds([...prescriptionMeds, { name: "", dosage: "", frequency: "", duration: "", instructions: "" }]);
+    setPrescriptionMeds([...prescriptionMeds, { name: "", strength: "", dosage: "", frequency: "", duration: "", instructions: "" }]);
   };
 
   const handleRemoveMed = (index: number) => {
@@ -220,16 +246,28 @@ export function ConsultationWorkspacePage() {
       return;
     }
     try {
-      await prescriptionMutation.mutateAsync({
+      const rx = (await prescriptionMutation.mutateAsync({
+        appointmentId: appointment._id,
         patientId: patient._id,
         diagnosis: diagnosis || "Consultation visit",
         medicines: prescriptionMeds,
-        notes: advice,
+        notes: clinicalNotes || "",
+        advice: advice || "",
+        followUpDate: (appointment as any).followUpDate || null,
+        labOrders: selectedLabTests,
+        radiologyOrders: radioNotes ? [radioType] : [],
+      })) as any;
+      
+      setSuccessInfo({
+        show: true,
+        isCompleted: false,
+        pdfUrl: rx?.pdfUrl || "",
+        downloadUrl: rx?.downloadUrl || "",
       });
-      toast.success("Prescription generated!");
+      toast.success("Prescription generated successfully!");
       refetch();
-    } catch {
-      toast.error("Failed to generate prescription");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to generate prescription");
     }
   };
 
@@ -520,19 +558,22 @@ export function ConsultationWorkspacePage() {
                   <div className="space-y-3">
                     {prescriptionMeds.map((med, index) => (
                       <div key={index} className="flex flex-wrap gap-2 items-end border-b border-slate-100 pb-3">
-                        <div className="flex-1 min-w-[200px]">
-                          <InputField label={index === 0 ? "Medicine Name" : ""} value={med.name} onChange={(e) => handleMedChange(index, "name", e.target.value)} placeholder="e.g. Amoxicillin 500mg" required />
+                        <div className="flex-1 min-w-[150px]">
+                          <InputField label={index === 0 ? "Medicine Name" : ""} value={med.name} onChange={(e) => handleMedChange(index, "name", e.target.value)} placeholder="e.g. Amoxicillin" required />
+                        </div>
+                        <div className="w-24">
+                          <InputField label={index === 0 ? "Strength" : ""} value={med.strength || ""} onChange={(e) => handleMedChange(index, "strength", e.target.value)} placeholder="e.g. 500mg" />
                         </div>
                         <div className="w-24">
                           <InputField label={index === 0 ? "Dosage" : ""} value={med.dosage} onChange={(e) => handleMedChange(index, "dosage", e.target.value)} placeholder="e.g. 1 tab" />
                         </div>
-                        <div className="w-32">
+                        <div className="w-28">
                           <InputField label={index === 0 ? "Frequency" : ""} value={med.frequency} onChange={(e) => handleMedChange(index, "frequency", e.target.value)} placeholder="e.g. Once daily" />
                         </div>
                         <div className="w-24">
                           <InputField label={index === 0 ? "Duration" : ""} value={med.duration} onChange={(e) => handleMedChange(index, "duration", e.target.value)} placeholder="e.g. 5 days" />
                         </div>
-                        <div className="flex-1 min-w-[150px]">
+                        <div className="flex-1 min-w-[120px]">
                           <InputField label={index === 0 ? "Instructions" : ""} value={med.instructions} onChange={(e) => handleMedChange(index, "instructions", e.target.value)} placeholder="e.g. After meals" />
                         </div>
                         {prescriptionMeds.length > 1 && (
@@ -738,19 +779,19 @@ export function ConsultationWorkspacePage() {
                     <div className="grid grid-cols-2 gap-2 text-slate-650">
                       <div>
                         <span className="block font-medium text-slate-400">Patient Name:</span>
-                        <span className="font-semibold text-slate-800">{appointment.patient?.name}</span>
+                        <span className="font-semibold text-slate-800">{(appointment.patient as any)?.name}</span>
                       </div>
                       <div>
                         <span className="block font-medium text-slate-400">UHID:</span>
-                        <span className="font-semibold text-slate-800 font-mono">{appointment.patient?.uhid}</span>
+                        <span className="font-semibold text-slate-800 font-mono">{(appointment.patient as any)?.uhid}</span>
                       </div>
                       <div>
                         <span className="block font-medium text-slate-400">Age / Gender:</span>
-                        <span className="font-semibold text-slate-800">{appointment.patient?.age} yrs / {appointment.patient?.gender}</span>
+                        <span className="font-semibold text-slate-800">{(appointment.patient as any)?.age} yrs / {(appointment.patient as any)?.gender}</span>
                       </div>
                       <div>
                         <span className="block font-medium text-slate-400">Phone:</span>
-                        <span className="font-semibold text-slate-800">{appointment.patient?.phone || "N/A"}</span>
+                        <span className="font-semibold text-slate-800">{(appointment.patient as any)?.phone || "N/A"}</span>
                       </div>
                       <div>
                         <span className="block font-medium text-slate-400">OP Code:</span>
@@ -946,6 +987,100 @@ export function ConsultationWorkspacePage() {
           )}
         </div>
       </div>
+
+      {successInfo && (
+        <Modal
+          title={successInfo.isCompleted ? "Consultation Completed Successfully" : "Prescription Generated"}
+          isOpen={successInfo.show}
+          onClose={() => {
+            setSuccessInfo(null);
+            if (successInfo.isCompleted) {
+              navigate("/doctor");
+            }
+          }}
+        >
+          <div className="p-4 space-y-6 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600">
+              <CheckCircle className="h-6 w-6" />
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold text-slate-900">
+                {successInfo.isCompleted ? "Workflow Completed!" : "Prescription Saved!"}
+              </h3>
+              <p className="text-sm text-slate-500">
+                The digital workflow has processed all delivery pipelines successfully.
+              </p>
+            </div>
+
+            {/* Checklist */}
+            <div className="mx-auto max-w-xs text-left bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2.5">
+              {successInfo.isCompleted && (
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                  <span className="text-green-600 font-bold">✓</span> Consultation Completed
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                <span className="text-green-600 font-bold">✓</span> Prescription Generated
+              </div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                <span className="text-green-600 font-bold">✓</span> Pharmacy Notified
+              </div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                <span className="text-green-600 font-bold">✓</span> Patient Notified
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-2 pt-2 justify-center">
+              <Button
+                variant="primary"
+                onClick={() => window.open(successInfo.pdfUrl || successInfo.downloadUrl, "_blank")}
+                className="flex items-center gap-1 text-xs"
+              >
+                View Prescription
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => window.open(successInfo.downloadUrl, "_self")}
+                className="flex items-center gap-1 text-xs"
+              >
+                Download PDF
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  const printWin = window.open(successInfo.pdfUrl || successInfo.downloadUrl, "_blank");
+                  if (printWin) {
+                    printWin.focus();
+                    setTimeout(() => {
+                      printWin.print();
+                    }, 500);
+                  }
+                }}
+                className="flex items-center gap-1 text-xs"
+              >
+                Print
+              </Button>
+            </div>
+            
+            <div className="border-t border-slate-100 pt-4">
+              <Button
+                variant={successInfo.isCompleted ? "primary" : "secondary"}
+                onClick={() => {
+                  setSuccessInfo(null);
+                  if (successInfo.isCompleted) {
+                    navigate("/doctor");
+                  }
+                }}
+                className="w-full text-xs"
+              >
+                {successInfo.isCompleted ? "Back to Doctor Dashboard" : "Close"}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

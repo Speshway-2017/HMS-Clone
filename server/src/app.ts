@@ -26,6 +26,9 @@ import wardRoutes from "./routes/wardRoutes";
 import roomRoutes from "./routes/roomRoutes";
 import bedRoutes from "./routes/bedRoutes";
 import admissionRequestRoutes from "./routes/admissionRequestRoutes";
+import prescriptionRoutes from "./routes/prescriptionRoutes";
+import { getPatientPrescriptions } from "./controllers/prescriptionController";
+import { protect } from "./middleware/auth";
 import "./config/cloudinary";
 
 const app = express();
@@ -66,6 +69,10 @@ app.use("/api/v1/wards", wardRoutes);
 app.use("/api/v1/rooms", roomRoutes);
 app.use("/api/v1/beds", bedRoutes);
 app.use("/api/v1/admission-requests", admissionRequestRoutes);
+
+// Register Prescription Delivery endpoints
+app.use("/api/v1/prescriptions", prescriptionRoutes);
+app.use("/api/patient/prescriptions", protect, getPatientPrescriptions);
 
 app.use(notFound);
 app.use(errorHandler);
