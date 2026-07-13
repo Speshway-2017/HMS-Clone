@@ -149,6 +149,20 @@ export interface Appointment {
   type: string;
   status: "scheduled" | "checked_in" | "in_consultation" | "completed" | "cancelled" | "no_show";
   notes: string;
+  chiefComplaint?: string;
+  symptoms?: string;
+  diagnosis?: string;
+  clinicalNotes?: string;
+  treatmentPlan?: string;
+  advice?: string;
+  vitals?: {
+    temperature?: string;
+    bloodPressure?: string;
+    pulseRate?: string;
+    respiratoryRate?: string;
+    oxygenSaturation?: string;
+    weight?: string;
+  };
 }
 
 export interface InventoryItem {

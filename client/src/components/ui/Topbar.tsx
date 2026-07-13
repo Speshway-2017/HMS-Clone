@@ -9,6 +9,7 @@ const SETTINGS_PATH: Record<string, string> = {
   accountant: "/accountant/settings",
   pharmacist: "/pharmacy/settings",
   laboratory: "/laboratory/settings",
+  doctor: "/doctor/settings",
 };
 
 export function Topbar() {

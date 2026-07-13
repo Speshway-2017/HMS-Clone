@@ -4,6 +4,7 @@ import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { usePatients } from "../../features/patients";
+import { useRadiologyOrders } from "../../features/doctorDashboard";
 
 const MODALITIES = ["All", "X-Ray", "MRI", "CT Scan", "Ultrasound", "ECG", "Echocardiography"];
 
@@ -22,36 +23,30 @@ const MODALITY_COLOR: Record<string, string> = {
 
 export function RadiologyPage() {
   const [activeModality, setActiveModality] = useState("All");
-  const { data: patientsData, isLoading } = usePatients({ page: 1 });
+  const { isLoading: patientsLoading } = usePatients({ page: 1 });
+  const { data: dbOrders, isLoading: ordersLoading } = useRadiologyOrders();
 
-  const patients = patientsData?.data || [];
+  const isLoading = patientsLoading || ordersLoading;
+  const orders = dbOrders || [];
 
-  // Construct dynamic radiology reports from database patients
-  const radiologyReports = patients.map((p, index) => {
-    const isEven = index % 2 === 0;
-    const isThird = index % 3 === 0;
-
-    const type = isEven ? "X-Ray" : isThird ? "MRI" : "CT Scan";
-    const region = isEven ? "Chest (PA View)" : isThird ? "Right Knee" : "Brain (Plain)";
-    const status = isThird ? "pending" : isEven ? "normal" : "abnormal";
-    const priority = isThird ? "stat" : isEven ? "routine" : "urgent";
-    const radiologist = isThird ? "—" : "Dr. K. Nair";
-    const finding = isThird ? "Pending radiologist review." : isEven ? "No cardiomegaly. Lung fields clear. Costophrenic angles sharp." : "High density focus seen in the right temporal lobe, suggestive of bleed.";
-    const impression = isThird ? "Pending." : isEven ? "Normal chest radiograph." : "Findings suggestive of acute hemorrhage. Correlate clinically.";
+  // Construct dynamic radiology reports from database patient orders
+  const radiologyReports = orders.map((o: any) => {
+    const isCompleted = o.status === "completed";
+    const type = o.type === "CT" ? "CT Scan" : o.type === "X-ray" ? "X-Ray" : o.type;
 
     return {
-      id: p._id,
+      id: o._id,
       type,
-      patient: p.name,
-      age: p.age || 35,
-      date: new Date(p.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
-      region,
-      status,
-      priority,
-      finding,
-      impression,
-      radiologist,
-      approved: isEven,
+      patient: o.patient?.name || "Patient",
+      age: o.patient?.age || 35,
+      date: new Date(o.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
+      region: o.notes || "Standard view",
+      status: isCompleted ? "normal" : "pending",
+      priority: o.priority?.toLowerCase() || "routine",
+      finding: o.findings || "Pending review by radiologist.",
+      impression: isCompleted ? "Normal imaging studies." : "Pending.",
+      radiologist: "Dr. K. Nair",
+      approved: isCompleted,
     };
   });
 
@@ -85,7 +80,7 @@ export function RadiologyPage() {
         <p className="text-sm text-slate-500">View and manage imaging reports: X-Ray, MRI, CT Scan, Ultrasound, ECG.</p>
       </div>
 
-      {patients.length === 0 ? (
+      {orders.length === 0 ? (
         <Card className="flex h-64 flex-col items-center justify-center p-6 text-center border-dashed border-slate-200 bg-slate-50">
           <ScanLine className="mb-2 h-10 w-10 text-slate-400" />
           <h3 className="text-sm font-semibold text-slate-600">No Radiology Studies</h3>

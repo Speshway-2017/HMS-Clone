@@ -13,14 +13,14 @@ import {
   Stethoscope,
   CheckCircle2,
   XCircle,
+  Bell,
+  FileText,
 } from "lucide-react";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { useAuth } from "../../context/AuthContext";
-import { useDoctorProfileMe } from "../../features/doctors";
-import { useAppointments } from "../../features/appointments";
-import { usePatients } from "../../features/patients";
+import { useDoctorDashboardMetrics, useDoctorTodayAppointments } from "../../features/doctorDashboard";
 
 const STATUS_BADGE: Record<string, { tone: "success" | "warning" | "info" | "neutral" | "danger"; label: string }> = {
   completed:       { tone: "success",  label: "Completed"       },
@@ -35,83 +35,60 @@ export function DoctorDashboard() {
   const { user } = useAuth();
   const today = new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   
-  // Format today's date as YYYY-MM-DD for fetching appointments
-  const todayStr = new Date().toISOString().split("T")[0];
+  // Fetch metrics counts from real MongoDB
+  const { data: metrics, isLoading: isMetricsLoading, isError: isMetricsError } = useDoctorDashboardMetrics();
 
-  // Fetch logged-in doctor profile
-  const { data: doctorProfile, isLoading: isDoctorLoading } = useDoctorProfileMe();
+  // Fetch today's schedule for list display
+  const { data: appointments, isLoading: isApptsLoading } = useDoctorTodayAppointments();
 
-  // Fetch today's appointments for this doctor
-  const { data: appointmentsData, isLoading: isApptsLoading } = useAppointments(
-    {
-      doctor: doctorProfile?._id,
-      from: todayStr,
-      to: todayStr,
-    },
-    { enabled: !!doctorProfile?._id }
-  );
-
-  // Fetch patients info to get admitted patients count
-  const { data: patientsData, isLoading: isPatientsLoading } = usePatients({ page: 1 });
-
-  const appointments = appointmentsData?.data || [];
-  const isLoading = isDoctorLoading || isApptsLoading || isPatientsLoading;
-
-  // KPI Calculations
-  const opPatientsCount = appointments.length;
-  const ipPatientsCount = patientsData?.counts.admitted ?? 0;
-  const totalAppointments = appointments.length;
-  const remainingAppts = appointments.filter((a) => ["scheduled", "checked_in", "in_consultation"].includes(a.status)).length;
-  
-  const emergencyCases = appointments.filter((a) => a.type?.toLowerCase() === "emergency").length;
-  const surgeriesCount = appointments.filter((a) => a.type?.toLowerCase() === "surgery").length;
-
-  // Status Summary Calculations
-  const completedCount = appointments.filter((a) => a.status === "completed").length;
-  const inProgressCount = appointments.filter((a) => a.status === "in_consultation").length;
-  const waitingCount = appointments.filter((a) => ["checked_in", "scheduled"].includes(a.status)).length;
-  const cancelledCount = appointments.filter((a) => ["cancelled", "no_show"].includes(a.status)).length;
-
-  // Get unique recent patients from today's appointments
-  const recentPatients = Array.from(
-    new Map(
-      appointments
-        .filter((appt) => typeof appt.patient === "object" && appt.patient)
-        .map((appt) => {
-          const p = appt.patient as any;
-          return [
-            p._id,
-            {
-              id: p._id,
-              name: p.name,
-              age: p.age || 35,
-              diagnosis: appt.notes || "Consultation",
-              lastVisit: "Today",
-            },
-          ];
-        })
-    ).values()
-  ).slice(0, 3);
+  const isLoading = isMetricsLoading || isApptsLoading;
 
   // Filter surgeries today
   const upcomingSurgeries = appointments
-    .filter((a) => a.type?.toLowerCase() === "surgery")
-    .map((a) => {
-      const p = a.patient as any;
-      return {
-        id: a._id,
-        patient: p?.name || "Unknown Patient",
-        procedure: a.notes || "Surgical Procedure",
-        date: `Today, ${a.time}`,
-        ot: "OT-1",
-        team: "Medical Team",
-      };
-    });
+    ? appointments
+        .filter((a) => a.type?.toLowerCase() === "surgery")
+        .map((a) => {
+          const p = a.patient as any;
+          return {
+            id: a._id,
+            patient: p?.name || "Unknown Patient",
+            procedure: a.notes || "Surgical Procedure",
+            date: `Today, ${a.time}`,
+            ot: "OT-1",
+            team: "Medical Team",
+          };
+        })
+    : [];
+
+  // Filter unique recent patients
+  const recentPatients = appointments
+    ? Array.from(
+        new Map(
+          appointments
+            .filter((appt) => typeof appt.patient === "object" && appt.patient)
+            .map((appt) => {
+              const p = appt.patient as any;
+              return [
+                p._id,
+                {
+                  id: p._id,
+                  name: p.name,
+                  age: p.age || 35,
+                  diagnosis: appt.notes || "Consultation",
+                  lastVisit: "Today",
+                },
+              ];
+            })
+        ).values()
+      ).slice(0, 3)
+    : [];
 
   if (isLoading) {
     return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-navy-700 border-t-transparent"></div>
+      <div className="space-y-6">
+        <div className="flex h-[60vh] items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-navy-700 border-t-transparent"></div>
+        </div>
       </div>
     );
   }
@@ -138,30 +115,58 @@ export function DoctorDashboard() {
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards (Widgets 1, 2, 3, 8, 10) */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <KpiCard label="OP Patients Today" value={opPatientsCount} icon={<Activity className="h-5 w-5" />} emphasis />
-        <KpiCard label="IP Patients" value={ipPatientsCount} icon={<BedDouble className="h-5 w-5" />} />
-        <KpiCard label="Appointments" value={totalAppointments} icon={<CalendarClock className="h-5 w-5" />} trend={{ direction: "up", text: `${remainingAppts} remaining` }} />
-        <KpiCard label="Emergency Cases" value={emergencyCases} icon={<AlertTriangle className="h-5 w-5" />} />
-        <KpiCard label="Surgeries Today" value={surgeriesCount} icon={<Scissors className="h-5 w-5" />} />
+        <KpiCard
+          label="Today's Appointments"
+          value={metrics?.todayAppointments ?? 0}
+          icon={<Activity className="h-5 w-5" />}
+          emphasis
+          to="/doctor/appointments/today"
+        />
+        <KpiCard
+          label="Waiting Patients"
+          value={metrics?.waitingPatients ?? 0}
+          icon={<User className="h-5 w-5" />}
+          to="/doctor/queue"
+        />
+        <KpiCard
+          label="Current Inpatients"
+          value={metrics?.currentInpatients ?? 0}
+          icon={<BedDouble className="h-5 w-5" />}
+          to="/doctor/inpatients"
+        />
+        <KpiCard
+          label="Today's Surgeries"
+          value={metrics?.todaySurgeries ?? 0}
+          icon={<Scissors className="h-5 w-5" />}
+          to="/doctor/surgeries"
+        />
+        <KpiCard
+          label="Calendar Schedule"
+          value={metrics?.calendar ?? 0}
+          icon={<CalendarClock className="h-5 w-5" />}
+          to="/doctor/calendar"
+        />
       </div>
 
-      {/* Consultation Summary Row */}
+      {/* Consultation Summary Row (Widgets 4, 5, 6, 7) */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { label: "Completed", value: completedCount, icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" />, color: "text-emerald-600" },
-          { label: "In Progress", value: inProgressCount, icon: <Clock className="h-4 w-4 text-amber-500" />, color: "text-amber-600" },
-          { label: "Waiting", value: waitingCount, icon: <User className="h-4 w-4 text-blue-500" />, color: "text-blue-600" },
-          { label: "Cancelled", value: cancelledCount, icon: <XCircle className="h-4 w-4 text-red-400" />, color: "text-red-500" },
+          { label: "Completed Consultations", value: metrics?.completedConsultations ?? 0, icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" />, color: "text-emerald-600", to: "/doctor/consultations/completed" },
+          { label: "Pending Prescriptions", value: metrics?.pendingPrescriptions ?? 0, icon: <Clock className="h-4 w-4 text-amber-500" />, color: "text-amber-600", to: "/doctor/prescriptions/pending" },
+          { label: "Pending Lab Orders", value: metrics?.pendingLabOrders ?? 0, icon: <Stethoscope className="h-4 w-4 text-blue-500" />, color: "text-blue-600", to: "/doctor/laboratory/pending" },
+          { label: "Follow-up Patients", value: metrics?.followupPatients ?? 0, icon: <ChevronRight className="h-4 w-4 text-purple-500" />, color: "text-purple-600", to: "/doctor/followups" },
         ].map((s) => (
-          <Card key={s.label} className="flex items-center gap-4 p-4">
-            <div className="rounded-full bg-slate-100 p-2">{s.icon}</div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{s.label}</p>
-              <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-            </div>
-          </Card>
+          <Link key={s.label} to={s.to} className="block no-underline text-inherit focus:outline-none h-full">
+            <Card className="flex items-center gap-4 p-4 cursor-pointer hover:bg-slate-50 hover:border-slate-350 transition-all duration-300 h-full">
+              <div className="rounded-full bg-slate-100 p-2">{s.icon}</div>
+              <div>
+                <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate-500">{s.label}</p>
+                <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+              </div>
+            </Card>
+          </Link>
         ))}
       </div>
 
@@ -171,11 +176,11 @@ export function DoctorDashboard() {
         <Card className="lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-base font-semibold text-slate-800">Today's Schedule</h3>
-            <Link to="/doctor/op-management" className="flex items-center gap-1 text-xs font-medium text-navy-700 hover:underline">
+            <Link to="/doctor/appointments/today" className="flex items-center gap-1 text-xs font-medium text-navy-700 hover:underline">
               View all <ChevronRight className="h-3 w-3" />
             </Link>
           </div>
-          {appointments.length === 0 ? (
+          {!appointments || appointments.length === 0 ? (
             <div className="flex h-48 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
               <CalendarClock className="mb-2 h-8 w-8 text-slate-400" />
               <p className="text-sm font-semibold text-slate-600">No Appointments Scheduled</p>
@@ -211,8 +216,8 @@ export function DoctorDashboard() {
                     <Badge tone={STATUS_BADGE[appt.status]?.tone || "neutral"}>
                       {STATUS_BADGE[appt.status]?.label || appt.status}
                     </Badge>
-                    {appt.status === "in_consultation" && (
-                      <Link to="/doctor/op-management">
+                    {["scheduled", "checked_in", "in_consultation"].includes(appt.status) && (
+                      <Link to={`/doctor/consultation/${appt._id}`}>
                         <button className="rounded-lg bg-navy-700 px-3 py-1 text-xs font-medium text-white hover:bg-navy-800">
                           Open
                         </button>
@@ -232,11 +237,10 @@ export function DoctorDashboard() {
             <h3 className="mb-3 text-base font-semibold text-slate-800">Quick Actions</h3>
             <div className="space-y-2">
               {[
-                { label: "OP Patient Queue",     to: "/doctor/op-management",   icon: <Activity className="h-4 w-4 text-navy-700" /> },
-                { label: "IP Rounds",            to: "/doctor/ip-management",   icon: <BedDouble className="h-4 w-4 text-navy-700" /> },
-                { label: "Order Lab Test",       to: "/doctor/laboratory",      icon: <Stethoscope className="h-4 w-4 text-navy-700" /> },
-                { label: "View Radiology",       to: "/doctor/radiology",       icon: <CalendarClock className="h-4 w-4 text-navy-700" /> },
-                { label: "Start Telemedicine",   to: "/doctor/telemedicine",    icon: <Video className="h-4 w-4 text-navy-700" /> },
+                { label: "New Prescription",     to: "/doctor/prescriptions/new",   icon: <Plus className="h-4 w-4 text-navy-700" /> },
+                { label: "Patient History",      to: "/doctor/patients",            icon: <User className="h-4 w-4 text-navy-700" /> },
+                { label: "Create Lab Order",     to: "/doctor/laboratory/new",      icon: <Stethoscope className="h-4 w-4 text-navy-700" /> },
+                { label: "Medical Certificate",  to: "/doctor/certificates/new",    icon: <FileText className="h-4 w-4 text-navy-700" /> },
               ].map((action) => (
                 <Link
                   key={action.to}
@@ -250,11 +254,32 @@ export function DoctorDashboard() {
             </div>
           </Card>
 
+          {/* Notifications Card (Widget 9) */}
+          <Card>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-slate-800">Clinical Alerts</h3>
+              <Link to="/doctor/notifications" className="text-xs font-medium text-navy-700 hover:underline">
+                View All ({metrics?.notifications ?? 0})
+              </Link>
+            </div>
+            <Link to="/doctor/notifications" className="block text-slate-700 hover:bg-slate-50 transition-colors border border-slate-100 rounded-lg p-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-blue-50 text-blue-600">
+                  <Bell className="h-4 w-4 animate-bounce" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-800">You have {metrics?.notifications ?? 0} alerts</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Click to view critical lab reports or requests.</p>
+                </div>
+              </div>
+            </Link>
+          </Card>
+
           {/* Upcoming Surgeries */}
           <Card>
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-base font-semibold text-slate-800">Upcoming Surgeries</h3>
-              <Link to="/doctor/ot" className="text-xs font-medium text-navy-700 hover:underline">View OT</Link>
+              <Link to="/doctor/surgeries" className="text-xs font-medium text-navy-700 hover:underline">View Surgeries</Link>
             </div>
             {upcomingSurgeries.length === 0 ? (
               <p className="py-2 text-center text-xs text-slate-400">No surgeries scheduled for today.</p>
@@ -279,7 +304,7 @@ export function DoctorDashboard() {
           <Card>
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-base font-semibold text-slate-800">Recent Patients</h3>
-              <Link to="/doctor/patient-records" className="text-xs font-medium text-navy-700 hover:underline">All Records</Link>
+              <Link to="/doctor/patients" className="text-xs font-medium text-navy-700 hover:underline">All Records</Link>
             </div>
             {recentPatients.length === 0 ? (
               <p className="py-2 text-center text-xs text-slate-400">No patients recorded today.</p>

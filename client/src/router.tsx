@@ -78,6 +78,21 @@ import { OperationTheatrePage } from "./pages/doctor/OperationTheatrePage";
 import { TelemedicinePage } from "./pages/doctor/TelemedicinePage";
 import { PerformancePage } from "./pages/doctor/PerformancePage";
 import { DoctorSettingsPage } from "./pages/doctor/SettingsPage";
+import { TodayAppointmentsPage } from "./pages/doctor/TodayAppointmentsPage";
+import { QueuePage as DoctorQueuePage } from "./pages/doctor/QueuePage";
+import { InpatientsPage as DoctorInpatientsPage } from "./pages/doctor/InpatientsPage";
+import { CompletedConsultationsPage } from "./pages/doctor/CompletedConsultationsPage";
+import { PendingPrescriptionsPage } from "./pages/doctor/PendingPrescriptionsPage";
+import { NewPrescriptionPage } from "./pages/doctor/NewPrescriptionPage";
+import { PendingLabOrdersPage } from "./pages/doctor/PendingLabOrdersPage";
+import { NewLabOrderPage } from "./pages/doctor/NewLabOrderPage";
+import { FollowupsPage } from "./pages/doctor/FollowupsPage";
+import { SurgeriesPage } from "./pages/doctor/SurgeriesPage";
+import { NotificationsPage as DoctorNotificationsPage } from "./pages/doctor/NotificationsPage";
+import { CalendarPage as DoctorCalendarPage } from "./pages/doctor/CalendarPage";
+import { PatientsPage as DoctorPatientsPage } from "./pages/doctor/PatientsPage";
+import { NewCertificatePage } from "./pages/doctor/NewCertificatePage";
+import { ConsultationWorkspacePage } from "./pages/doctor/ConsultationWorkspacePage";
 
 // Pharmacy module
 import { PharmacyDashboard } from "./pages/pharmacy/Dashboard";
@@ -269,6 +284,21 @@ export const router = createBrowserRouter([
           { path: "telemedicine", element: <TelemedicinePage /> },
           { path: "performance", element: <PerformancePage /> },
           { path: "settings", element: <DoctorSettingsPage /> },
+          { path: "appointments/today", element: <TodayAppointmentsPage /> },
+          { path: "queue", element: <DoctorQueuePage /> },
+          { path: "inpatients", element: <DoctorInpatientsPage /> },
+          { path: "consultations/completed", element: <CompletedConsultationsPage /> },
+          { path: "prescriptions/pending", element: <PendingPrescriptionsPage /> },
+          { path: "prescriptions/new", element: <NewPrescriptionPage /> },
+          { path: "laboratory/pending", element: <PendingLabOrdersPage /> },
+          { path: "laboratory/new", element: <NewLabOrderPage /> },
+          { path: "followups", element: <FollowupsPage /> },
+          { path: "surgeries", element: <SurgeriesPage /> },
+          { path: "notifications", element: <DoctorNotificationsPage /> },
+          { path: "calendar", element: <DoctorCalendarPage /> },
+          { path: "patients", element: <DoctorPatientsPage /> },
+          { path: "certificates/new", element: <NewCertificatePage /> },
+          { path: "consultation/:id", element: <ConsultationWorkspacePage /> },
         ],
       },
     ],
