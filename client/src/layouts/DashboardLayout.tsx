@@ -26,10 +26,16 @@ export function DashboardLayout() {
     socket.on("dashboard_update", handleUpdate);
     socket.on("admission:request:created", handleUpdate);
     socket.on("admission_request_update", handleUpdate);
+    socket.on("prescription:new", handleUpdate);
+    socket.on("prescription:updated", handleUpdate);
+    socket.on("prescription:dispensed", handleUpdate);
     return () => {
       socket.off("dashboard_update", handleUpdate);
       socket.off("admission:request:created", handleUpdate);
       socket.off("admission_request_update", handleUpdate);
+      socket.off("prescription:new", handleUpdate);
+      socket.off("prescription:updated", handleUpdate);
+      socket.off("prescription:dispensed", handleUpdate);
     };
   }, [queryClient]);
 

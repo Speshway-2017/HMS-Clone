@@ -5,7 +5,8 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
 import { TextareaField } from "../../components/ui/Field";
-import { usePatients } from "../../features/patients";
+import { usePrescriptions, useDispensePrescription, useCancelPrescription } from "../../features/doctorDashboard";
+import toast from "react-hot-toast";
 
 interface Prescription {
   _id: string;
@@ -30,65 +31,59 @@ export function PharmacyPrescriptionVerification() {
   const [isRejectOpen, setIsRejectOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
 
-  const { data: patientData, isLoading } = usePatients({});
+  const { data: realPrescriptions, isLoading } = usePrescriptions();
+  const dispenseMutation = useDispensePrescription();
+  const cancelMutation = useCancelPrescription();
 
-  const [prescriptionStatuses, setPrescriptionStatuses] = useState<Record<string, { status: "Approved" | "Rejected"; reason?: string }>>(() => {
-    return JSON.parse(localStorage.getItem("hms_pharmacy_prescription_statuses") || "{}");
-  });
+  const prescriptions: Prescription[] = (realPrescriptions || []).map((rx: any) => {
+    let uiStatus: "Pending" | "Approved" | "Rejected" = "Pending";
+    if (rx.status === "Dispensed" || rx.status === "Completed") {
+      uiStatus = "Approved";
+    } else if (rx.status === "Cancelled") {
+      uiStatus = "Rejected";
+    }
 
-  const saveStatuses = (updated: Record<string, { status: "Approved" | "Rejected"; reason?: string }>) => {
-    setPrescriptionStatuses(updated);
-    localStorage.setItem("hms_pharmacy_prescription_statuses", JSON.stringify(updated));
-  };
-
-  const patients = patientData?.data || [];
-  const prescriptions: Prescription[] = [];
-
-  patients.forEach((patient: any) => {
-    patient.medicalHistory?.forEach((history: any, idx: number) => {
-      if (history.notes && (history.notes.toLowerCase().includes("mg") || history.notes.toLowerCase().includes("tab") || history.notes.toLowerCase().includes("rx") || history.notes.toLowerCase().includes("dose"))) {
-        const rxId = `RX-${patient._id.slice(-4)}-${idx}`;
-        const localState = prescriptionStatuses[rxId];
-        
-        prescriptions.push({
-          _id: rxId,
-          patientName: patient.name,
-          patientAge: patient.age || 30,
-          patientGender: patient.gender || "Male",
-          doctorName: history.doctorName || "Attending Physician",
-          department: history.department || "General Medicine",
-          medicines: [history.notes],
-          allergies: patient.allergies || "None",
-          diagnosis: history.diagnosis || "Observation",
-          date: new Date(history.date).toISOString().split("T")[0],
-          status: localState ? localState.status : "Pending",
-          rejectionReason: localState?.reason
-        });
-      }
-    });
-  });
-
-  const handleApprove = (id: string) => {
-    const updated = {
-      ...prescriptionStatuses,
-      [id]: { status: "Approved" as const }
+    return {
+      _id: rx._id,
+      patientName: rx.patient?.name || "Unknown Patient",
+      patientAge: rx.patient?.age || 30,
+      patientGender: rx.patient?.gender || "Male",
+      doctorName: rx.doctor?.name || "Attending Physician",
+      department: rx.department?.name || "General Medicine",
+      medicines: (rx.medications || []).map(
+        (m: any) => `${m.name}${m.strength ? ` (${m.strength})` : ""} - ${m.dosage}, ${m.frequency}, ${m.duration}`
+      ),
+      allergies: rx.patient?.allergies || "None",
+      diagnosis: rx.diagnosis || "Observation",
+      date: new Date(rx.createdAt).toISOString().split("T")[0],
+      status: uiStatus,
+      rejectionReason: rx.status === "Cancelled" ? "Prescription Cancelled" : ""
     };
-    saveStatuses(updated);
-    setIsDetailsOpen(false);
-    setSelectedPresc(null);
+  });
+
+  const handleApprove = async (id: string) => {
+    try {
+      await dispenseMutation.mutateAsync(id);
+      toast.success("Prescription verified & approved for dispensing!");
+      setIsDetailsOpen(false);
+      setSelectedPresc(null);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to verify prescription");
+    }
   };
 
-  const handleRejectSubmit = () => {
+  const handleRejectSubmit = async () => {
     if (!selectedPresc || !rejectionReason.trim()) return;
-    const updated = {
-      ...prescriptionStatuses,
-      [selectedPresc._id]: { status: "Rejected" as const, reason: rejectionReason }
-    };
-    saveStatuses(updated);
-    setRejectionReason("");
-    setIsRejectOpen(false);
-    setIsDetailsOpen(false);
-    setSelectedPresc(null);
+    try {
+      await cancelMutation.mutateAsync(selectedPresc._id);
+      toast.success("Prescription rejected / cancelled successfully.");
+      setRejectionReason("");
+      setIsRejectOpen(false);
+      setIsDetailsOpen(false);
+      setSelectedPresc(null);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to reject prescription");
+    }
   };
 
   const filtered = prescriptions.filter(p => {

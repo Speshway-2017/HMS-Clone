@@ -1,0 +1,518 @@
+import { Request, Response } from "express";
+import mongoose, { Types } from "mongoose";
+import jwt from "jsonwebtoken";
+import path from "path";
+import fs from "fs";
+import { Prescription } from "../models/Prescription";
+import { PrescriptionAuditLog } from "../models/PrescriptionAuditLog";
+import { NotificationQueue } from "../models/NotificationQueue";
+import { Patient } from "../models/Patient";
+import { Doctor } from "../models/Doctor";
+import { Appointment } from "../models/Appointment";
+import { Hospital } from "../models/Hospital";
+import { Department } from "../models/Department";
+import { generatePrescriptionPDF } from "../services/pdfService";
+import { emitToHospital } from "../config/socket";
+import { catchAsync } from "../utils/catchAsync";
+import { AppError } from "../utils/AppError";
+import { env } from "../config/env";
+
+async function getLoggedDoctor(req: Request) {
+  const doctor = await Doctor.findOne({ email: req.user!.email, isActive: { $ne: false } });
+  if (!doctor) {
+    throw new AppError("Doctor profile not found for the logged-in user.", 404);
+  }
+  return doctor;
+}
+
+/**
+ * Core business function to create or update a prescription.
+ * Runs atomically inside a Mongoose transaction session.
+ */
+export async function createOrUpdatePrescriptionCore(
+  session: mongoose.ClientSession,
+  hospitalId: Types.ObjectId,
+  doctor: any,
+  appointmentId: string,
+  data: {
+    medications: any[];
+    labOrders?: string[];
+    radiologyOrders?: string[];
+    diagnosis?: string;
+    chiefComplaint?: string;
+    clinicalNotes?: string;
+    advice?: string;
+    followUpDate?: Date | null;
+  },
+  reqHostUrl: string
+) {
+  // 1. Validation
+  const hasMed = data.medications && data.medications.length > 0;
+  const hasLab = data.labOrders && data.labOrders.length > 0 && data.labOrders.some(l => l && l.trim());
+  const hasRadio = data.radiologyOrders && data.radiologyOrders.length > 0 && data.radiologyOrders.some(r => r && r.trim());
+
+  if (hasMed) {
+    for (const m of data.medications) {
+      if (!m.name || !m.name.trim()) {
+        throw new AppError("Medicine name is required for all rows.", 400);
+      }
+      if (!m.strength || !m.strength.trim()) {
+        throw new AppError(`Strength is required for ${m.name}.`, 400);
+      }
+      if (!m.frequency || !m.frequency.trim()) {
+        throw new AppError(`Frequency is required for ${m.name}.`, 400);
+      }
+      if (!m.duration || !m.duration.trim()) {
+        throw new AppError(`Duration is required for ${m.name}.`, 400);
+      }
+      if (!m.instructions || !m.instructions.trim()) {
+        throw new AppError(`Instructions are required for ${m.name}.`, 400);
+      }
+    }
+  } else if (!hasLab && !hasRadio) {
+    throw new AppError("Cannot save empty prescription. At least one medicine, lab test, or radiology order must be prescribed.", 400);
+  }
+
+  // 2. Load profiles
+  const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId }).session(session);
+  if (!appointment) {
+    throw new AppError("Associated appointment not found.", 404);
+  }
+
+  const patient = await Patient.findOne({ _id: appointment.patient, hospital: hospitalId }).session(session);
+  if (!patient) {
+    throw new AppError("Patient profile not found.", 404);
+  }
+
+  const hospital = await Hospital.findById(hospitalId).session(session);
+  if (!hospital) {
+    throw new AppError("Hospital profile not found.", 404);
+  }
+
+  const department = appointment.department ? await Department.findById(appointment.department).session(session) : null;
+
+  // 3. Find existing or instantiate new prescription
+  let prescription = await Prescription.findOne({ appointment: appointmentId, hospital: hospitalId }).session(session);
+  const isNew = !prescription;
+
+  const medsFormatted = (data.medications || []).map(m => ({
+    name: m.name,
+    strength: m.strength || "",
+    dosage: m.dosage || "",
+    frequency: m.frequency || "",
+    duration: m.duration || "",
+    instructions: m.instructions || "",
+  }));
+
+  const diagnosisVal = data.diagnosis || appointment.diagnosis || "Consultation visit";
+  const chiefComplaintVal = data.chiefComplaint || appointment.chiefComplaint || "";
+  const clinicalNotesVal = data.clinicalNotes || appointment.clinicalNotes || "";
+  const adviceVal = data.advice || appointment.advice || "";
+  const followUpDateVal = data.followUpDate !== undefined ? data.followUpDate : (appointment.followUpDate || null);
+
+  if (!prescription) {
+    const count = await Prescription.countDocuments({ hospital: hospitalId }).session(session);
+    const sequence = String(count + 1).padStart(6, "0");
+    const currentYear = new Date().getFullYear();
+    const rxNumber = `RX-${currentYear}-${sequence}`;
+
+    const [newRx] = await Prescription.create([{
+      hospital: hospitalId,
+      patient: patient._id,
+      appointment: appointmentId,
+      consultation: appointmentId,
+      doctor: doctor._id,
+      department: department ? department._id : null,
+      prescriptionNumber: rxNumber,
+      diagnosis: diagnosisVal,
+      chiefComplaint: chiefComplaintVal,
+      clinicalNotes: clinicalNotesVal,
+      medications: medsFormatted,
+      labOrders: data.labOrders || [],
+      radiologyOrders: data.radiologyOrders || [],
+      advice: adviceVal,
+      followUpDate: followUpDateVal,
+      status: "Pending",
+      deliveryStatus: {
+        mobile: "pending",
+        pharmacy: "pending"
+      }
+    }], { session });
+    prescription = newRx;
+  } else {
+    if (!prescription.prescriptionNumber) {
+      const count = await Prescription.countDocuments({ hospital: hospitalId }).session(session);
+      const sequence = String(count + 1).padStart(6, "0");
+      const currentYear = new Date().getFullYear();
+      prescription.prescriptionNumber = `RX-${currentYear}-${sequence}`;
+    }
+    prescription.diagnosis = diagnosisVal;
+    prescription.chiefComplaint = chiefComplaintVal;
+    prescription.clinicalNotes = clinicalNotesVal;
+    prescription.medications = medsFormatted as any;
+    prescription.labOrders = data.labOrders || [];
+    prescription.radiologyOrders = data.radiologyOrders || [];
+    prescription.advice = adviceVal;
+    prescription.followUpDate = followUpDateVal;
+    prescription.status = "Pending";
+    prescription.deliveryStatus = {
+      mobile: "pending",
+      pharmacy: "pending"
+    };
+    await prescription.save({ session });
+  }
+
+  // Narrow the prescription type for the compiler
+  if (!prescription) {
+    throw new AppError("Failed to initialize prescription.", 500);
+  }
+
+  // 4. Expiry token 7 days
+  const token = jwt.sign(
+    { prescriptionId: prescription._id, patientId: patient._id },
+    env.jwtSecret,
+    { expiresIn: "7d" }
+  );
+
+  const verificationUrl = `${env.clientUrl}/verify-prescription/${prescription._id}`;
+  const downloadUrl = `${reqHostUrl}/api/v1/prescriptions/${prescription._id}/download?token=${token}`;
+
+  prescription.pdfUrl = `/api/v1/prescriptions/${prescription._id}/download?token=${token}`;
+  prescription.downloadUrl = downloadUrl;
+  await prescription.save({ session });
+
+  // 5. Generate secure PDF file
+  const secureDir = path.join(__dirname, "../../../secure_prescriptions");
+  const pdfPath = path.join(secureDir, `${prescription._id}.pdf`);
+
+  await generatePrescriptionPDF({
+    prescriptionId: prescription._id.toString(),
+    prescriptionNumber: prescription.prescriptionNumber || "",
+    hospitalName: hospital.name,
+    hospitalAddress: hospital.address,
+    hospitalPhone: hospital.contactPhone,
+    hospitalEmail: hospital.contactEmail,
+    patientName: patient.name,
+    patientAge: patient.age ?? null,
+    patientGender: patient.gender,
+    patientUhid: patient.uhid || "",
+    doctorName: doctor.name,
+    doctorLicenseNo: doctor.licenseNo,
+    doctorSpecialization: doctor.specialization,
+    departmentName: department ? department.name : "General OPD",
+    visitDate: prescription.createdAt ? new Date(prescription.createdAt) : new Date(),
+    diagnosis: prescription.diagnosis || "",
+    chiefComplaint: prescription.chiefComplaint || "",
+    clinicalNotes: prescription.clinicalNotes || "",
+    medications: medsFormatted,
+    labOrders: (prescription.labOrders as string[]) || [],
+    radiologyOrders: (prescription.radiologyOrders as string[]) || [],
+    advice: prescription.advice || "",
+    followUpDate: prescription.followUpDate ? new Date(prescription.followUpDate) : null,
+    verificationUrl
+  }, pdfPath);
+
+  const safeRx = prescription;
+
+  // 6. Queue Alerts
+  if (patient.phone) {
+    const notifyBody = `Dear ${patient.name},
+
+Your consultation has been completed.
+Doctor: Dr. ${doctor.name}
+Department: ${department ? department.name : "General OPD"}
+Prescription is ready.
+Download your prescription securely:
+${downloadUrl}
+
+${hospital.name}`;
+
+    await NotificationQueue.create([{
+      prescription: safeRx._id,
+      type: "whatsapp",
+      recipient: patient.phone,
+      content: notifyBody,
+      status: "pending",
+      attempts: 0
+    }], { session });
+  }
+
+  if (patient.email) {
+    const emailBody = `Dear ${patient.name},
+
+Your consultation with Dr. ${doctor.name} has been completed.
+Department: ${department ? department.name : "General OPD"}
+
+Your digital prescription is ready for download. Please find the attached PDF or download it securely from the link below:
+${downloadUrl}
+
+Best regards,
+${hospital.name}`;
+
+    await NotificationQueue.create([{
+      prescription: safeRx._id,
+      type: "email",
+      recipient: patient.email,
+      content: emailBody,
+      emailSubject: `Your digital prescription from ${hospital.name}`,
+      pdfPath,
+      status: "pending",
+      attempts: 0
+    }], { session });
+  }
+
+  // 7. Write Audit Log
+  if (isNew) {
+    await PrescriptionAuditLog.create([{
+      prescription: safeRx._id,
+      doctor: doctor._id,
+      patient: patient._id,
+      createdTime: new Date()
+    }], { session });
+  } else {
+    await PrescriptionAuditLog.findOneAndUpdate(
+      { prescription: safeRx._id },
+      { $set: { createdTime: new Date() } },
+      { session }
+    );
+  }
+
+  // Update deliveryStatus to reflect enqueued jobs
+  if (safeRx.deliveryStatus) {
+    safeRx.deliveryStatus.pharmacy = "delivered";
+  }
+  await safeRx.save({ session });
+
+  // 8. Real-time updates via Socket.IO
+  emitToHospital(hospitalId.toString(), "prescription:new", {
+    _id: safeRx._id,
+    patientName: patient.name,
+    patientAge: patient.age,
+    patientGender: patient.gender,
+    patientUhid: patient.uhid || "",
+    doctorName: doctor.name,
+    departmentName: department ? department.name : "General OPD",
+    medicines: medsFormatted.map(m => `${m.name}${m.strength ? ` (${m.strength})` : ""}`),
+    date: new Date().toISOString().split("T")[0],
+    status: "Pending"
+  });
+
+  emitToHospital(hospitalId.toString(), "prescription:updated", safeRx);
+
+  // Trigger page invalidation and UI updates for Timeline and Consultation Status
+  emitToHospital(hospitalId.toString(), "dashboard_update", {
+    type: "PRESCRIPTION_GENERATED",
+    prescriptionId: safeRx._id,
+    appointmentId: appointmentId
+  });
+
+  return safeRx;
+}
+
+/**
+ * Controller endpoint: Save or Update prescription explicitly (e.g. Save Prescription click)
+ */
+export const savePrescription = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const doctor = await getLoggedDoctor(req);
+  const { appointmentId, medications, labOrders, radiologyOrders, diagnosis, chiefComplaint, clinicalNotes, advice, followUpDate } = req.body;
+
+  if (!appointmentId) {
+    throw new AppError("Appointment ID is required to create a prescription.", 400);
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const reqHostUrl = `${req.protocol}://${req.get("host")}`;
+    const prescription = await createOrUpdatePrescriptionCore(
+      session,
+      hospitalId,
+      doctor,
+      appointmentId,
+      { medications, labOrders, radiologyOrders, diagnosis, chiefComplaint, clinicalNotes, advice, followUpDate },
+      reqHostUrl
+    );
+
+    await session.commitTransaction();
+    res.status(201).json({ status: "success", data: prescription });
+  } catch (err) {
+    await session.abortTransaction();
+    throw err;
+  } finally {
+    session.endSession();
+  }
+});
+
+/**
+ * Controller endpoint: List all prescriptions (scoped to hospital, for doctor/pharmacist)
+ */
+export const listPrescriptions = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const { status } = req.query;
+  
+  const query: any = { hospital: hospitalId };
+  if (status) {
+    query.status = status;
+  }
+
+  const prescriptions = await Prescription.find(query)
+    .populate("patient")
+    .populate("doctor")
+    .populate("department")
+    .sort({ createdAt: -1 });
+
+  res.json({ status: "success", data: prescriptions });
+});
+
+/**
+ * Controller endpoint: Public Verification (returns patient, doctor, meds)
+ */
+export const verifyPrescriptionPublic = catchAsync(async (req: Request, res: Response) => {
+  const prescriptionId = req.params.id;
+
+  const prescription = await Prescription.findById(prescriptionId)
+    .populate("patient")
+    .populate("doctor")
+    .populate("department")
+    .populate("hospital");
+
+  if (!prescription) {
+    throw new AppError("Prescription not found.", 404);
+  }
+
+  // Update audit log for view
+  await PrescriptionAuditLog.findOneAndUpdate(
+    { prescription: prescription._id },
+    { $set: { viewedTime: new Date() } }
+  );
+
+  res.json({
+    status: "success",
+    data: {
+      prescriptionId: prescription._id,
+      hospitalName: (prescription.hospital as any).name,
+      patientName: (prescription.patient as any).name,
+      patientUhid: (prescription.patient as any).uhid,
+      patientAge: (prescription.patient as any).age,
+      patientGender: (prescription.patient as any).gender,
+      doctorName: (prescription.doctor as any).name,
+      doctorLicenseNo: (prescription.doctor as any).licenseNo,
+      departmentName: prescription.department ? (prescription.department as any).name : "General OPD",
+      visitDate: prescription.createdAt,
+      diagnosis: prescription.diagnosis,
+      chiefComplaint: prescription.chiefComplaint,
+      medications: prescription.medications,
+      labOrders: prescription.labOrders,
+      radiologyOrders: prescription.radiologyOrders,
+      advice: prescription.advice,
+      followUpDate: prescription.followUpDate,
+      status: prescription.status,
+    },
+  });
+});
+
+/**
+ * Controller endpoint: Download secure PDF file (verifies signed URL token OR staff JWT auth)
+ */
+export const downloadPrescription = catchAsync(async (req: Request, res: Response) => {
+  const prescriptionId = req.params.id;
+  const token = req.query.token as string;
+
+  let verifiedPayload: any = null;
+
+  // 1. Verify access (either signed URL token or valid user session)
+  if (token) {
+    try {
+      verifiedPayload = jwt.verify(token, env.jwtSecret);
+      if (verifiedPayload.prescriptionId !== prescriptionId) {
+        throw new AppError("Invalid signed token for this prescription.", 403);
+      }
+    } catch (err: any) {
+      throw new AppError("Secure link has expired or is invalid.", 403);
+    }
+  } else {
+    // If no token, request must fall under protect middleware (req.user exists)
+    if (!req.user) {
+      throw new AppError("Unauthorized access. Token or session required.", 401);
+    }
+  }
+
+  const prescription = await Prescription.findById(prescriptionId);
+  if (!prescription) {
+    throw new AppError("Prescription not found.", 404);
+  }
+
+  const pdfPath = path.join(__dirname, "../../../secure_prescriptions", `${prescriptionId}.pdf`);
+  if (!fs.existsSync(pdfPath)) {
+    throw new AppError("Prescription document file not found.", 404);
+  }
+
+  // Determine downloadedBy name for Audit Log
+  const userName = req.user ? req.user.name : "Patient";
+
+  // 2. Update Audit Log
+  await PrescriptionAuditLog.findOneAndUpdate(
+    { prescription: prescription._id },
+    {
+      $set: {
+        downloadedTime: new Date(),
+        downloadedBy: userName,
+      },
+    }
+  );
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.download(pdfPath, `prescription_${prescriptionId}.pdf`);
+});
+
+/**
+ * Controller endpoint: Dispense Medicines (Pharmacist)
+ */
+export const dispensePrescription = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const prescriptionId = req.params.id;
+
+  const prescription = await Prescription.findOneAndUpdate(
+    { _id: prescriptionId, hospital: hospitalId },
+    { status: "Dispensed" },
+    { new: true }
+  );
+
+  if (!prescription) {
+    throw new AppError("Prescription not found.", 404);
+  }
+
+  // Update audit log
+  await PrescriptionAuditLog.findOneAndUpdate(
+    { prescription: prescription._id },
+    { $set: { dispensedTime: new Date() } }
+  );
+
+  // Emit Socket update events
+  emitToHospital(hospitalId.toString(), "prescription:dispensed", prescription);
+  emitToHospital(hospitalId.toString(), "prescription:updated", prescription);
+
+  res.json({ status: "success", data: prescription });
+});
+
+/**
+ * Controller endpoint: Get Patient Prescriptions (Patient Portal API support)
+ */
+export const getPatientPrescriptions = catchAsync(async (req: Request, res: Response) => {
+  // Read patient ID from JWT (if logged as patient) or query param
+  const patientId = req.user?._id || req.query.patientId;
+  
+  if (!patientId) {
+    throw new AppError("Patient identification is required.", 400);
+  }
+
+  const prescriptions = await Prescription.find({ patient: patientId })
+    .populate("doctor")
+    .populate("department")
+    .populate("hospital")
+    .sort({ createdAt: -1 });
+
+  res.json({ status: "success", data: prescriptions });
+});

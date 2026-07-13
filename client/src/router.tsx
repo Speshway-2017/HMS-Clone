@@ -4,6 +4,7 @@ import { DashboardLayout } from "./layouts/DashboardLayout";
 import { LandingPage } from "./pages/public/LandingPage";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { VerifyPrescriptionPage } from "./pages/public/VerifyPrescriptionPage";
 
 // Super Admin module
 import { SuperAdminDashboard } from "./pages/super-admin/Dashboard";
@@ -121,6 +122,7 @@ export const router = createBrowserRouter([
     children: [
       { path: "/", element: <LandingPage /> },
       { path: "/login", element: <LoginPage /> },
+      { path: "/verify-prescription/:id", element: <VerifyPrescriptionPage /> },
     ],
   },
   {

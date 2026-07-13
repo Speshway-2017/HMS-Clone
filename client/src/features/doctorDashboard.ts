@@ -212,7 +212,17 @@ export function useDoctorPendingPrescriptions() {
 export function useCreatePrescription() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { patientId: string; diagnosis: string; medicines: any[]; notes?: string }) => {
+    mutationFn: async (payload: {
+      appointmentId?: string;
+      patientId: string;
+      diagnosis: string;
+      medicines: any[];
+      notes?: string;
+      advice?: string;
+      followUpDate?: Date | null;
+      labOrders?: string[];
+      radiologyOrders?: string[];
+    }) => {
       const res = await api.post("/doctors/dashboard/prescriptions", payload);
       return res.data.data as Prescription;
     },
@@ -439,13 +449,27 @@ export function useSaveClinicalNotes() {
 export function useCompleteConsultation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (appointmentId: string) => {
-      const res = await api.post(`/doctors/dashboard/appointments/${appointmentId}/complete`);
-      return res.data.data;
+    mutationFn: async (payload: {
+      appointmentId: string;
+      medications: any[];
+      labOrders?: string[];
+      radiologyOrders?: string[];
+      diagnosis?: string;
+      chiefComplaint?: string;
+      clinicalNotes?: string;
+      advice?: string;
+      followUpDate?: Date | null;
+    }) => {
+      const { appointmentId, ...body } = payload;
+      const res = await api.post(`/doctors/dashboard/appointments/${appointmentId}/complete`, body);
+      return res.data;
     },
     onSuccess: (data) => {
+      const apptId = data.data?._id;
       queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["doctorDashboard", "workspace", data._id] });
+      if (apptId) {
+        queryClient.invalidateQueries({ queryKey: ["doctorDashboard", "workspace", apptId] });
+      }
     },
   });
 }
@@ -530,6 +554,42 @@ export function useRadiologyOrders() {
     queryFn: async () => {
       const res = await api.get<{ status: string; data: RadiologyOrder[] }>("/doctors/dashboard/radiology/list");
       return res.data.data;
+    },
+  });
+}
+
+export function usePrescriptions(params?: { status?: string }) {
+  return useQuery({
+    queryKey: ["prescriptions", params],
+    queryFn: async () => {
+      const res = await api.get<{ status: string; data: any[] }>("/prescriptions", { params });
+      return res.data.data;
+    },
+  });
+}
+
+export function useDispensePrescription() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.patch<{ status: string; data: any }>(`/prescriptions/${id}/dispense`);
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["prescriptions"] });
+    },
+  });
+}
+
+export function useCancelPrescription() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.patch<{ status: string; data: any }>(`/prescriptions/${id}/cancel`);
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["prescriptions"] });
     },
   });
 }

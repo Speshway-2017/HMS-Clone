@@ -409,6 +409,7 @@ export class ReceptionService {
       hospital: hospitalId,
       patient: patientId,
       appointment: newAppointment._id,
+      billingType: "OP",
       items,
       taxRate: 0,
       serviceFee: 0,
@@ -970,6 +971,7 @@ export class ReceptionService {
         const [invoice] = await Invoice.create([{
           hospital: hospitalId,
           patient: patientId,
+          billingType: "IP",
           status: "paid",
           issuedAt: new Date(),
           dueDate: new Date(),

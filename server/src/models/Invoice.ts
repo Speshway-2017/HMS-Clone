@@ -36,6 +36,11 @@ const invoiceSchema = new Schema(
     discount: { type: Number, default: 0 },
     insuranceCoveragePercent: { type: Number, default: 0 },
     totals: { type: invoiceTotalsSchema, default: () => ({}) },
+    billingType: {
+      type: String,
+      enum: ["OP", "IP", "LAB", "PHARMACY", "RADIOLOGY", "SURGERY", "EMERGENCY", "OTHER"],
+      required: true
+    },
     status: { type: String, enum: INVOICE_STATUSES, default: "pending" },
     issuedAt: { type: Date, default: Date.now },
     dueDate: { type: Date, default: null },
