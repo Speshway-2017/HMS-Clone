@@ -94,15 +94,15 @@ export function BedsPage() {
 
   // Mutations
   const createWardMutation = useCreateWard();
-  const updateWardMutation = useUpdateWard("");
+  const updateWardMutation = useUpdateWard();
   const deleteWardMutation = useDeleteWard();
 
   const createRoomMutation = useCreateRoom();
-  const updateRoomMutation = useUpdateRoom("");
+  const updateRoomMutation = useUpdateRoom();
   const deleteRoomMutation = useDeleteRoom();
 
   const createBedMutation = useCreateBed();
-  const updateBedMutation = useUpdateBed("");
+  const updateBedMutation = useUpdateBed();
   const deleteBedMutation = useDeleteBed();
 
   // Modals Visibility

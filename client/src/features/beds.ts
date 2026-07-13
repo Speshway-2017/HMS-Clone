@@ -64,10 +64,10 @@ export interface UpdateBedPayload {
   status?: string;
 }
 
-export function useUpdateBed(id: string) {
+export function useUpdateBed() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: UpdateBedPayload) => {
+    mutationFn: async ({ id, ...payload }: UpdateBedPayload & { id: string }) => {
       const res = await api.patch(`/beds/${id}`, payload);
       return res.data.data.bed;
     },

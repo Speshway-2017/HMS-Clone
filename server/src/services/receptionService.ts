@@ -1244,7 +1244,7 @@ export class ReceptionService {
             };
           }
           return item;
-        });
+        }) as any;
         await invoice.save({ session });
       }
 
