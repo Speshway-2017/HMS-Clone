@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { List, Plus, Network, BedDouble, UserCheck, ShieldAlert, ArrowRightLeft, DoorOpen, Printer, CheckCircle, FileText } from "lucide-react";
+import toast from "react-hot-toast";
+import { List, Plus, Network, BedDouble, UserCheck, ShieldAlert, ArrowRightLeft, DoorOpen, Printer, CheckCircle, FileText, Search } from "lucide-react";
 import {
   useAdmissionRequests,
   useRoomsAvailability,
@@ -7,12 +8,18 @@ import {
   useAdmitPatient,
   useTransferPatient,
   useRequestDischarge,
-  useMarkNotificationRead
+  useMarkNotificationRead,
+  usePatientsSearch,
+  useDoctorsAvailability,
+  usePatientDetail,
+  useRejectAdmissionRequest
 } from "../../features/receptionist";
+import { useDepartments } from "../../features/departments";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
+import { Badge } from "../../components/ui/Badge";
 import { formatINR } from "../../lib/currency";
 
 interface Props {
@@ -27,6 +34,19 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   }, [activeTab]);
 
   const [selectedReq, setSelectedReq] = useState<any | null>(null);
+
+  // Sub Tab for New Admissions: Doctor Requests vs Manual
+  const [subTab, setSubTab] = useState<"requests" | "manual">("requests");
+
+  // Manual Admission search & details states
+  const [patientSearchQuery, setPatientSearchQuery] = useState("");
+  const [selectedPatientId, setSelectedPatientId] = useState("");
+  const [manualDept, setManualDept] = useState("");
+  const [manualDoctor, setManualDoctor] = useState("");
+  const [manualAdmissionType, setManualAdmissionType] = useState<"Emergency" | "Elective" | "Direct Admission">("Direct Admission");
+  const [manualExpectedStay, setManualExpectedStay] = useState("");
+  const [manualPrimaryDiagnosis, setManualPrimaryDiagnosis] = useState("");
+  const [verbalApproval, setVerbalApproval] = useState(false);
 
   // Form Fields for admission
   const [admissionDate, setAdmissionDate] = useState(new Date().toISOString().split("T")[0]);
@@ -63,6 +83,13 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const { data: dischargedAdmissions } = useAdmissions("discharged");
   const uniqueWards = Array.from(new Set(rooms?.map((r: any) => r.wardName).filter(Boolean)));
 
+  // Additional autocomplete & metadata queries
+  const { data: doctors } = useDoctorsAvailability();
+  const { data: departmentsResponse } = useDepartments();
+  const departments = departmentsResponse || [];
+  const { data: searchPatients } = usePatientsSearch(patientSearchQuery);
+  const { data: patientDetail } = usePatientDetail(selectedPatientId);
+
   // Mutations
   const admitMutation = useAdmitPatient();
   const transferMutation = useTransferPatient();
@@ -71,18 +98,27 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
 
   const handleSelectRequest = (req: any) => {
     setSelectedReq(req);
+    const patientId = req.patient?._id || req.data?.patientId || "";
+    setSelectedPatientId(patientId);
+    setSubTab("requests");
     // Auto-populate patient and insurance details if available
     setInsuranceProvider(req.data?.insuranceProvider || "");
     setInsurancePolicyNumber(req.data?.insurancePolicyNumber || "");
-    setWard(req.data?.suggestedWard || "General Ward");
-    setNotes(`Admission requested for: ${req.data?.diagnosis || ""}`);
+    const suggestedWard = req.preferredWard || req.data?.suggestedWard || "General";
+    setWard(suggestedWard);
+    const diag = req.primaryDiagnosis || req.data?.diagnosis || "";
+    setNotes(`Admission requested for: ${diag}`);
     setTab("new");
   };
 
   const handleAdmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedReq) {
+    if (subTab === "requests" && !selectedReq) {
       alert("Please select a pending admission request first");
+      return;
+    }
+    if (subTab === "manual" && !selectedPatientId) {
+      alert("Please search and select a patient first");
       return;
     }
     if (!ward || !selectedRoomId || !selectedBedId || !attenderName || !attenderPhone) {
@@ -90,11 +126,23 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       return;
     }
 
+    if (subTab === "manual") {
+      if (!manualDoctor) {
+        alert("Admitting doctor selection is mandatory");
+        return;
+      }
+      if (!verbalApproval) {
+        alert("Doctor verbal order checkbox must be verified");
+        return;
+      }
+      if (!manualPrimaryDiagnosis || !manualPrimaryDiagnosis.trim()) {
+        alert("Primary diagnosis / admission reason is required");
+        return;
+      }
+    }
+
     try {
-      const result = await admitMutation.mutateAsync({
-        notificationId: selectedReq._id,
-        patientId: selectedReq.data.patientId,
-        opVisitId: selectedReq.data.opVisitId,
+      const payload: any = {
         admissionDate,
         admissionTime,
         ward,
@@ -107,11 +155,46 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
         advanceAmount: parseFloat(advanceAmount),
         admissionNotes: notes,
         paymentMethod
-      });
+      };
+
+      if (subTab === "requests") {
+        payload.requestId = selectedReq._id;
+        if (selectedReq.type === "admission_request" || selectedReq.message) {
+          payload.notificationId = selectedReq._id;
+        }
+        payload.patientId = selectedReq.patient?._id || selectedReq.data?.patientId;
+        payload.opVisitId = selectedReq.opVisit || selectedReq.data?.opVisitId || null;
+        payload.admissionMode = "Doctor Requested";
+        payload.admittingDoctor = selectedReq.doctor?._id || selectedReq.data?.doctorId || null;
+        payload.departmentId = selectedReq.department?._id || selectedReq.data?.departmentId || null;
+        payload.priority = selectedReq.priority || selectedReq.data?.priority || "Routine";
+        payload.admissionReason = selectedReq.primaryDiagnosis || selectedReq.data?.diagnosis || "";
+      } else {
+        payload.patientId = selectedPatientId;
+        payload.admissionMode = "Receptionist Initiated";
+        payload.admittingDoctor = manualDoctor;
+        payload.departmentId = manualDept || null;
+        payload.priority = "Routine";
+        payload.admissionReason = manualPrimaryDiagnosis;
+        payload.verbalApproval = verbalApproval;
+        payload.admissionType = manualAdmissionType;
+        payload.expectedStay = manualExpectedStay;
+        payload.primaryDiagnosis = manualPrimaryDiagnosis;
+        payload.opVisitId = patientDetail?.currentConsultation?.appointmentId || null;
+      }
+
+      const result = await admitMutation.mutateAsync(payload);
 
       setSuccessData(result);
       // Reset form states
       setSelectedReq(null);
+      setSelectedPatientId("");
+      setPatientSearchQuery("");
+      setManualDept("");
+      setManualDoctor("");
+      setManualExpectedStay("");
+      setManualPrimaryDiagnosis("");
+      setVerbalApproval(false);
       setWard("");
       setSelectedRoomId("");
       setSelectedBedId("");
@@ -126,7 +209,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       refetchRooms();
       refetchAdmissions();
     } catch (err: any) {
-      alert(err.message || "Failed to admit patient");
+      alert(err.response?.data?.message || err.message || "Failed to admit patient");
     }
   };
 
@@ -247,29 +330,83 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
     }
   ];
 
+  const rejectRequestMutation = useRejectAdmissionRequest();
+
+  const handleRejectRequest = async (requestId: string) => {
+    if (!window.confirm("Are you sure you want to reject this admission request?")) return;
+    try {
+      await rejectRequestMutation.mutateAsync(requestId);
+      toast.success("Admission request rejected.");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to reject request");
+    }
+  };
+
   const requestColumns = [
     {
-      header: "Date Requested",
-      render: (row: any) => <span className="text-xs">{new Date(row.createdAt).toLocaleDateString()}</span>
+      header: "Request No",
+      render: (row: any) => <span className="font-mono text-xs font-bold text-indigo-700">{row.requestNumber || "N/A"}</span>
     },
     {
-      header: "Notification Message",
-      render: (row: any) => <span className="text-xs text-slate-700 font-medium">{row.message}</span>
+      header: "Patient",
+      render: (row: any) => <span className="text-xs font-semibold text-slate-800">{row.patient?.name || row.message?.split("requested IP admission for ")[1]?.split(" (")[0] || "N/A"}</span>
     },
     {
-      header: "Suggested Ward",
-      render: (row: any) => <span className="text-xs font-semibold text-indigo-700">{row.data?.suggestedWard || "General"}</span>
+      header: "UHID",
+      render: (row: any) => <span className="font-mono text-xs font-semibold text-slate-650">{row.patient?.uhid || row.data?.uhid || row.message?.split("(")[1]?.split(")")[0] || "N/A"}</span>
     },
     {
-      header: "Action",
+      header: "Doctor",
+      render: (row: any) => <span className="text-xs text-slate-800">Dr. {row.doctor?.name || row.message?.split("Dr. ")[1]?.split(" requested")[0] || "N/A"}</span>
+    },
+    {
+      header: "Department",
+      render: (row: any) => <span className="text-xs text-slate-600">{row.department?.name || row.data?.departmentName || "N/A"}</span>
+    },
+    {
+      header: "Priority",
       render: (row: any) => (
-        <Button
-          type="button"
-          onClick={() => handleSelectRequest(row)}
-          className="text-xs px-3 py-1 flex items-center gap-1"
-        >
-          <UserCheck className="h-3.5 w-3.5" /> Allocate Bed & Admit
-        </Button>
+        <Badge tone={row.priority === "Emergency" ? "danger" : row.priority === "Urgent" ? "warning" : "info"}>
+          {row.priority || "Routine"}
+        </Badge>
+      )
+    },
+    {
+      header: "Diagnosis",
+      render: (row: any) => <span className="text-xs font-medium text-slate-700">{row.primaryDiagnosis || row.data?.diagnosis || "N/A"}</span>
+    },
+    {
+      header: "Requested Time",
+      render: (row: any) => <span className="text-xs text-slate-500">{new Date(row.createdAt).toLocaleString("en-IN")}</span>
+    },
+    {
+      header: "Status",
+      render: (row: any) => (
+        <Badge tone={row.status === "Admission Requested" ? "warning" : row.status === "Approved" ? "success" : "danger"}>
+          {row.status || "Requested"}
+        </Badge>
+      )
+    },
+    {
+      header: "Actions",
+      render: (row: any) => (
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            onClick={() => handleSelectRequest(row)}
+            className="text-xs px-2.5 py-1 flex items-center gap-1 bg-indigo-650 hover:bg-indigo-700"
+          >
+            <UserCheck className="h-3.5 w-3.5" /> Approve
+          </Button>
+          <Button
+            type="button"
+            onClick={() => handleRejectRequest(row._id)}
+            variant="secondary"
+            className="text-xs px-2.5 py-1 text-red-650 hover:text-red-700 border-red-200 hover:bg-red-50 flex items-center gap-1"
+          >
+            Reject
+          </Button>
+        </div>
       )
     }
   ];
@@ -504,28 +641,343 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
             </div>
           ) : (
             <>
-              <Card>
-                <h2 className="mb-4 text-base font-semibold text-slate-800 flex items-center gap-2">
-                  <ShieldAlert className="h-5 w-5 text-red-500 animate-pulse" /> Pending IP Admission Requests
-                </h2>
-                <DataTable columns={requestColumns} rows={requests || []} rowKey={(row) => row._id} emptyMessage="No pending admission requests from doctors." />
-              </Card>
+              {/* Sub-tabs header */}
+              <div className="flex items-center gap-4 border-b border-slate-200 pb-3 mb-6">
+                <button
+                  type="button"
+                  onClick={() => { setSubTab("requests"); setSelectedReq(null); setSelectedPatientId(""); }}
+                  className={`text-sm font-semibold pb-1 border-b-2 transition-all ${
+                    subTab === "requests" ? "border-indigo-650 text-indigo-600 font-bold" : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  Doctor Admission Requests
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setSubTab("manual"); setSelectedReq(null); setSelectedPatientId(""); }}
+                  className={`text-sm font-semibold pb-1 border-b-2 transition-all ${
+                    subTab === "manual" ? "border-indigo-655 text-indigo-600 font-bold" : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  Manual Admission
+                </button>
+              </div>
 
-              {selectedReq && (
-                <form onSubmit={handleAdmit} className="space-y-6">
-                  <Card className="space-y-4 bg-navy-50/20 border-navy-100">
-                    <h3 className="text-sm font-bold text-navy-800">Review Request Details</h3>
-                    <div className="grid grid-cols-2 gap-4 text-xs">
+              {subTab === "requests" && !selectedReq && (
+                <Card>
+                  <h2 className="mb-4 text-base font-semibold text-slate-800 flex items-center gap-2">
+                    <ShieldAlert className="h-5 w-5 text-red-500 animate-pulse" /> Pending Doctor Admission Requests
+                  </h2>
+                  <DataTable columns={requestColumns} rows={requests || []} rowKey={(row) => row._id} emptyMessage="No pending admission requests from doctors." />
+                </Card>
+              )}
+
+              {subTab === "manual" && !selectedPatientId && (
+                <Card className="space-y-4">
+                  <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                    <Search className="h-5 w-5 text-indigo-600" /> Search Patient for Manual Admission
+                  </h2>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search patient by UHID, Patient Name, Phone, Appointment Number, or Token Number..."
+                      value={patientSearchQuery}
+                      onChange={(e) => setPatientSearchQuery(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 pl-10 pr-4 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+                  {patientSearchQuery && searchPatients && searchPatients.length > 0 && (
+                    <div className="rounded-lg border border-slate-150 divide-y divide-slate-100 max-h-40 overflow-y-auto">
+                      {searchPatients.map((p) => (
+                        <button
+                          key={p._id}
+                          type="button"
+                          onClick={() => {
+                            if (p.status === "admitted") {
+                              alert("This patient is already admitted to the hospital.");
+                              return;
+                            }
+                            setSelectedPatientId(p._id);
+                            setPatientSearchQuery(`${p.name} (${p.uhid})`);
+                            // Auto-populate some attender fields if same as emergency contact
+                            setAttenderName(p.emergencyContact?.name || "");
+                            setAttenderPhone(p.emergencyContact?.phone || "");
+                          }}
+                          className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-slate-50 ${
+                            selectedPatientId === p._id ? "bg-indigo-50 font-semibold" : ""
+                          }`}
+                        >
+                          <div>
+                            <div className="font-semibold text-slate-800">{p.name}</div>
+                            <div className="text-slate-450 font-mono text-[10px]">{p.uhid} — {p.phone} {p.status === "admitted" ? "— ADMITTED" : ""}</div>
+                          </div>
+                          {selectedPatientId === p._id && <span className="text-[10px] bg-indigo-600 text-white rounded px-1.5 py-0.5">Selected</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              )}
+
+              {/* Show Demographic Profile details for selected patient */}
+              {selectedPatientId && patientDetail && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                  <Card className="md:col-span-1 space-y-4">
+                    <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500">
+                      Patient Demographics
+                    </h3>
+                    <div className="flex flex-col items-center text-center p-3 space-y-3">
+                      <img
+                        src={patientDetail.patient?.photoUrl || "https://images.unsplash.com/photo-1579684389782-64d84b5e901a?q=80&w=150"}
+                        alt="Patient Photo"
+                        className="w-20 h-20 rounded-full border border-slate-200 object-cover"
+                      />
                       <div>
-                        <span className="text-slate-450 block">Selected Patient:</span>
-                        <span className="font-semibold text-slate-750">{selectedReq.message}</span>
+                        <h4 className="font-bold text-slate-800 text-sm">{patientDetail.patient?.name}</h4>
+                        <span className="font-mono text-xs text-indigo-600 font-bold">{patientDetail.patient?.uhid}</span>
                       </div>
-                      <div>
-                        <span className="text-slate-450 block">Suggested Ward Name:</span>
-                        <span className="font-semibold text-slate-750">{selectedReq.data?.suggestedWard || "General Ward"}</span>
+                    </div>
+                    <div className="space-y-2 text-[11px] border-t pt-3">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-medium">Age / Gender:</span>
+                        <span className="font-semibold text-slate-700">{patientDetail.patient?.age} Yrs / {patientDetail.patient?.gender}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-medium">Blood Group:</span>
+                        <span className="font-semibold text-slate-700">{patientDetail.patient?.bloodGroup || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-medium">Allergies:</span>
+                        <span className="font-bold text-red-650">{patientDetail.patient?.allergies || "No Known Allergies"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-medium">Address:</span>
+                        <span className="font-semibold text-slate-700 text-right">{patientDetail.patient?.address || "N/A"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-medium">Emergency Contact:</span>
+                        <span className="font-semibold text-slate-700">{patientDetail.patient?.emergencyContact?.name || "N/A"} ({patientDetail.patient?.emergencyContact?.phone || "N/A"})</span>
                       </div>
                     </div>
                   </Card>
+
+                  <Card className="md:col-span-2 space-y-4 flex flex-col justify-between">
+                    <div>
+                      <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500">
+                        Active Outpatient (OP) Consultation History
+                      </h3>
+                      {patientDetail.currentConsultation ? (
+                        <div className="rounded-lg bg-indigo-50/30 border border-indigo-100 p-4 mt-2 space-y-3">
+                          <div className="grid grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <span className="text-slate-400 block mb-0.5">Consulting Doctor</span>
+                              <span className="font-semibold text-slate-800">Dr. {patientDetail.currentConsultation.doctor}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block mb-0.5">Department</span>
+                              <span className="font-semibold text-slate-800">{patientDetail.currentConsultation.department}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-slate-400 block mb-0.5">Primary Diagnosis / Chief Complaint</span>
+                              <span className="font-bold text-indigo-700">{patientDetail.currentConsultation.diagnosis}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-450 italic mt-2">No active outpatient consultations recorded today. Admitting directly via Receptionist Order.</p>
+                      )}
+                    </div>
+
+                    <div className="text-xs bg-slate-50 rounded-lg p-3 text-slate-500 border border-slate-100">
+                      <span className="font-bold text-slate-700 block mb-1">Admitting Status Validation:</span>
+                      ✔ Patient exists in registry. <br />
+                      ✔ Patient is currently registered as outpatient. <br />
+                      ✔ Patient is eligible for direct manual admission.
+                    </div>
+                  </Card>
+                </div>
+              )}
+
+              {((subTab === "requests" && selectedReq) || (subTab === "manual" && selectedPatientId)) && (
+                patientDetail?.activeAdmission ? (
+                  <Card className="border border-red-200 bg-red-50/50 p-6 space-y-4">
+                    <div className="flex items-start gap-3">
+                      <ShieldAlert className="h-6 w-6 text-red-650 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-bold text-red-800">Duplicate IP Admission Blocked</h4>
+                        <p className="text-xs text-red-750 leading-relaxed">
+                          This patient already has an active inpatient admission (IP No: {patientDetail.activeAdmission.admissionNumber}). Please discharge the patient before creating a new admission.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-2 border-t border-red-100">
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setTab("admissions");
+                          setSelectedReq(null);
+                          setSelectedPatientId("");
+                          setPatientSearchQuery("");
+                        }}
+                        className="bg-red-700 hover:bg-red-800 text-xs py-1.5 px-3 flex items-center gap-1.5"
+                      >
+                        View Existing Admission
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setSelectedReq(null);
+                          setSelectedPatientId("");
+                          setPatientSearchQuery("");
+                        }}
+                        variant="secondary"
+                        className="text-xs py-1.5 px-3"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </Card>
+                ) : (
+                  <form onSubmit={handleAdmit} className="space-y-6">
+                  {subTab === "requests" && (
+                    <Card className="space-y-4 bg-navy-50/20 border-navy-100">
+                      <h3 className="text-sm font-bold text-navy-800 border-b pb-2 flex items-center justify-between">
+                        <span>Review Doctor Admission Request Details</span>
+                        <Badge tone={selectedReq.priority === "Emergency" ? "danger" : selectedReq.priority === "Urgent" ? "warning" : "info"}>
+                          {selectedReq.priority || "Routine"}
+                        </Badge>
+                      </h3>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-xs">
+                        <div>
+                          <span className="text-slate-400 block font-semibold">Patient Name:</span>
+                          <span className="font-bold text-slate-800">{selectedReq.patient?.name || selectedReq.message?.split("requested IP admission for ")[1]?.split(" (")[0] || "N/A"}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block font-semibold">UHID:</span>
+                          <span className="font-semibold font-mono text-slate-700">{selectedReq.patient?.uhid || selectedReq.data?.uhid || "N/A"}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block font-semibold">Request Number:</span>
+                          <span className="font-bold font-mono text-indigo-700">{selectedReq.requestNumber || "N/A"}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block font-semibold">Recommending Doctor:</span>
+                          <span className="font-semibold text-slate-800">Dr. {selectedReq.doctor?.name || "N/A"}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block font-semibold">Suggested Department:</span>
+                          <span className="font-semibold text-slate-800">{selectedReq.department?.name || "N/A"}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block font-semibold">Suggested Ward & Bed:</span>
+                          <span className="font-semibold text-slate-800">{selectedReq.preferredWard || "General"} ({selectedReq.preferredBedType || "Standard"})</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block font-semibold">Expected Stay duration:</span>
+                          <span className="font-semibold text-slate-800">{selectedReq.expectedStay || "N/A"}</span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-slate-400 block font-semibold">Primary Diagnosis:</span>
+                          <span className="font-bold text-indigo-850">{selectedReq.primaryDiagnosis || selectedReq.data?.diagnosis || "N/A"}</span>
+                        </div>
+                      </div>
+                      {(selectedReq.clinicalNotes || selectedReq.specialInstructions) && (
+                        <div className="border-t border-slate-100 pt-3 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                          {selectedReq.clinicalNotes && (
+                            <div>
+                              <span className="text-slate-400 block font-semibold">Clinical Notes:</span>
+                              <p className="text-slate-700 italic">{selectedReq.clinicalNotes}</p>
+                            </div>
+                          )}
+                          {selectedReq.specialInstructions && (
+                            <div>
+                              <span className="text-slate-400 block font-semibold">Special Instructions:</span>
+                              <p className="text-red-700 font-medium">{selectedReq.specialInstructions}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </Card>
+                  )}
+
+                  {/* Manual Admission Details tab */}
+                  {subTab === "manual" && (
+                    <Card className="space-y-4">
+                      <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500">
+                        Admission Details & Authorizations
+                      </h3>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <SelectField
+                          label="Department *"
+                          required
+                          value={manualDept}
+                          onChange={(e) => {
+                            setManualDept(e.target.value);
+                            setManualDoctor("");
+                          }}
+                        >
+                          <option value="">Select Department</option>
+                          {departments.map((d: any) => (
+                            <option key={d._id} value={d._id}>{d.name}</option>
+                          ))}
+                        </SelectField>
+
+                        <SelectField
+                          label="Admitting Doctor *"
+                          required
+                          value={manualDoctor}
+                          onChange={(e) => setManualDoctor(e.target.value)}
+                        >
+                          <option value="">Select Doctor</option>
+                          {doctors
+                            ?.filter((doc: any) => !manualDept || doc.department?._id === manualDept || doc.department === manualDept)
+                            ?.map((doc: any) => (
+                              <option key={doc._id} value={doc._id}>Dr. {doc.name} ({doc.specialization})</option>
+                            ))}
+                        </SelectField>
+
+                        <SelectField
+                          label="Admission Type *"
+                          required
+                          value={manualAdmissionType}
+                          onChange={(e: any) => setManualAdmissionType(e.target.value)}
+                        >
+                          <option value="Direct Admission">Direct Admission</option>
+                          <option value="Emergency">Emergency</option>
+                          <option value="Elective">Elective</option>
+                        </SelectField>
+
+                        <InputField
+                          label="Expected Stay (Days)"
+                          value={manualExpectedStay}
+                          onChange={(e) => setManualExpectedStay(e.target.value)}
+                          placeholder="e.g. 3"
+                        />
+
+                        <InputField
+                          label="Primary Diagnosis *"
+                          required
+                          value={manualPrimaryDiagnosis}
+                          onChange={(e) => setManualPrimaryDiagnosis(e.target.value)}
+                          placeholder="e.g. Acute Appendicitis"
+                        />
+
+                        <div className="flex items-center gap-2 pt-6">
+                          <input
+                            type="checkbox"
+                            id="verbalApproval"
+                            checked={verbalApproval}
+                            onChange={(e) => setVerbalApproval(e.target.checked)}
+                            className="h-4 w-4 rounded border-slate-350 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <label htmlFor="verbalApproval" className="text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                            Verified Doctor Verbal Order / Consent *
+                          </label>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
 
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <Card className="space-y-4">
@@ -653,14 +1105,23 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                   </Card>
 
                   <div className="flex justify-end gap-3">
-                    <Button type="button" onClick={() => setSelectedReq(null)} variant="secondary">
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setSelectedReq(null);
+                        setSelectedPatientId("");
+                        setPatientSearchQuery("");
+                      }}
+                      variant="secondary"
+                    >
                       Cancel
                     </Button>
-                    <Button type="submit">
-                      Confirm Admission (Status: IP ADMITTED)
+                    <Button type="submit" disabled={admitMutation.isPending}>
+                      {admitMutation.isPending ? "Processing..." : "Confirm Admission (Status: IP ADMITTED)"}
                     </Button>
                   </div>
-                </form>
+                  </form>
+                )
               )}
             </>
           )}

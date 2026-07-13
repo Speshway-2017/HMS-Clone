@@ -93,9 +93,14 @@ export function ConsultationWorkspacePage() {
   const [radioNotes, setRadioNotes] = useState("");
 
   // Admission form state
-  const [admitWard, setAdmitWard] = useState("General Ward");
+  const [admitWard, setAdmitWard] = useState("General");
   const [admitDiagnosis, setAdmitDiagnosis] = useState("");
   const [admitNotes, setAdmitNotes] = useState("");
+  const [admitPriority, setAdmitPriority] = useState("Routine");
+  const [admitBedType, setAdmitBedType] = useState("General");
+  const [admitExpectedStay, setAdmitExpectedStay] = useState("");
+  const [admitReason, setAdmitReason] = useState("");
+  const [admitSpecialInstructions, setAdmitSpecialInstructions] = useState("");
 
   // Populate form states once loaded
   const hasPopulated = useRef(false);
@@ -137,7 +142,7 @@ export function ConsultationWorkspacePage() {
     );
   }
 
-  const { appointment, queueItem, prescriptions, labOrders, radiologyOrders, admissions } = workspaceData;
+  const { appointment, queueItem, prescriptions, labOrders, radiologyOrders, admissions, admissionRequests = [] } = workspaceData;
   const patient = appointment.patient as any;
 
   const handleStartConsultation = async () => {
@@ -279,15 +284,23 @@ export function ConsultationWorkspacePage() {
     try {
       await admitMutation.mutateAsync({
         appointmentId: appointment._id,
-        suggestedWard: admitWard,
-        diagnosis: admitDiagnosis || diagnosis || "Clinical Admission Needed",
-        notes: admitNotes,
+        priority: admitPriority as any,
+        preferredWard: admitWard,
+        preferredBedType: admitBedType,
+        expectedStay: admitExpectedStay,
+        primaryDiagnosis: admitDiagnosis || diagnosis || "",
+        clinicalNotes: admitNotes,
+        admissionReason: admitReason || admitDiagnosis || diagnosis || "",
+        specialInstructions: admitSpecialInstructions
       });
-      toast.success("Admission recommendation sent to receptionist!");
+      toast.success("Admission Request Sent");
       setAdmitNotes("");
+      setAdmitReason("");
+      setAdmitSpecialInstructions("");
       refetch();
-    } catch {
-      toast.error("Failed to recommend admission");
+    } catch (err: any) {
+      const errMsg = err.response?.data?.message || err.message || "Failed to recommend admission";
+      toast.error(errMsg);
     }
   };
 
@@ -718,25 +731,160 @@ export function ConsultationWorkspacePage() {
                   <h3 className="text-sm font-bold text-slate-800 border-b pb-2 flex items-center gap-1">
                     <FileText className="h-4 w-4" /> Recommend IP Admission
                   </h3>
-                  <SelectField label="Suggested Ward Category" value={admitWard} onChange={(e) => setAdmitWard(e.target.value)}>
-                    <option value="General Ward">General Ward</option>
-                    <option value="ICU">ICU</option>
-                    <option value="Semi-Private Room">Semi-Private Room</option>
-                    <option value="Private Suite">Private Deluxe Suite</option>
+
+                  {/* Auto-filled Read-Only Patient Metadata */}
+                  <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2 text-xs">
+                    <h4 className="font-bold text-slate-700">Patient Consultation Info</h4>
+                    <div className="grid grid-cols-2 gap-2 text-slate-650">
+                      <div>
+                        <span className="block font-medium text-slate-400">Patient Name:</span>
+                        <span className="font-semibold text-slate-800">{appointment.patient?.name}</span>
+                      </div>
+                      <div>
+                        <span className="block font-medium text-slate-400">UHID:</span>
+                        <span className="font-semibold text-slate-800 font-mono">{appointment.patient?.uhid}</span>
+                      </div>
+                      <div>
+                        <span className="block font-medium text-slate-400">Age / Gender:</span>
+                        <span className="font-semibold text-slate-800">{appointment.patient?.age} yrs / {appointment.patient?.gender}</span>
+                      </div>
+                      <div>
+                        <span className="block font-medium text-slate-400">Phone:</span>
+                        <span className="font-semibold text-slate-800">{appointment.patient?.phone || "N/A"}</span>
+                      </div>
+                      <div>
+                        <span className="block font-medium text-slate-400">OP Code:</span>
+                        <span className="font-semibold text-slate-800 font-mono">{appointment.referenceId}</span>
+                      </div>
+                      <div>
+                        <span className="block font-medium text-slate-400">Token Number:</span>
+                        <span className="font-semibold text-slate-800 font-mono">{queueItem?.tokenNumber || "N/A"}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <InputField
+                    label="Primary Diagnosis (Mandatory)"
+                    value={admitDiagnosis}
+                    onChange={(e) => setAdmitDiagnosis(e.target.value)}
+                    placeholder="Enter diagnostic confirmation..."
+                    required
+                  />
+
+                  <SelectField
+                    label="Admission Priority"
+                    value={admitPriority}
+                    onChange={(e) => setAdmitPriority(e.target.value)}
+                  >
+                    <option value="Routine">Routine</option>
+                    <option value="Urgent">Urgent</option>
+                    <option value="Emergency">Emergency</option>
                   </SelectField>
 
-                  <InputField label="Admission Diagnosis" value={admitDiagnosis} onChange={(e) => setAdmitDiagnosis(e.target.value)} placeholder="Reason for admission request" />
-                  <TextareaField label="Additional Remarks" value={admitNotes} onChange={(e) => setAdmitNotes(e.target.value)} placeholder="Special instructions for ward management..." rows={3} />
+                  <SelectField
+                    label="Preferred Ward"
+                    value={admitWard}
+                    onChange={(e) => setAdmitWard(e.target.value)}
+                  >
+                    <option value="General">General</option>
+                    <option value="Semi Private">Semi Private</option>
+                    <option value="Private">Private</option>
+                    <option value="ICU">ICU</option>
+                  </SelectField>
 
-                  <Button type="submit" variant="primary" disabled={admitMutation.isPending}>
-                    Recommend Admission
+                  <SelectField
+                    label="Preferred Bed Type"
+                    value={admitBedType}
+                    onChange={(e) => setAdmitBedType(e.target.value)}
+                  >
+                    <option value="General">General</option>
+                    <option value="Semi-Private">Semi-Private</option>
+                    <option value="Private">Private</option>
+                    <option value="ICU">ICU</option>
+                  </SelectField>
+
+                  <InputField
+                    label="Expected Stay Duration"
+                    value={admitExpectedStay}
+                    onChange={(e) => setAdmitExpectedStay(e.target.value)}
+                    placeholder="e.g. 3 Days, 1 Week"
+                  />
+
+                  <InputField
+                    label="Admission Reason"
+                    value={admitReason}
+                    onChange={(e) => setAdmitReason(e.target.value)}
+                    placeholder="Clinical reason for ward admission"
+                  />
+
+                  <TextareaField
+                    label="Clinical Notes / Diagnosis Remarks"
+                    value={admitNotes}
+                    onChange={(e) => setAdmitNotes(e.target.value)}
+                    placeholder="Describe clinical symptoms and observations..."
+                    rows={3}
+                  />
+
+                  <TextareaField
+                    label="Special Instructions"
+                    value={admitSpecialInstructions}
+                    onChange={(e) => setAdmitSpecialInstructions(e.target.value)}
+                    placeholder="Nursing guidance, diet directives..."
+                    rows={2}
+                  />
+
+                  <Button type="submit" variant="primary" className="w-full justify-center" disabled={admitMutation.isPending}>
+                    {admitMutation.isPending ? "Submitting..." : "Send Admission Request"}
                   </Button>
                 </Card>
               </form>
 
-              <div className="md:col-span-2">
+              <div className="md:col-span-2 space-y-6">
+                {/* Admission Request Tracker */}
                 <Card className="p-4 space-y-4">
-                  <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Active Inpatient Status</h3>
+                  <h3 className="text-sm font-bold text-slate-800 border-b pb-2 flex items-center justify-between">
+                    <span>Admission Request Status Tracker</span>
+                    <span className="text-[10px] text-slate-400 font-mono">Current IP workflow</span>
+                  </h3>
+                  {admissionRequests.length === 0 ? (
+                    <div className="p-4 bg-slate-50 border border-dashed rounded-xl text-center text-xs text-slate-400">
+                      No admission requests created for this patient.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {admissionRequests.map((req: any) => (
+                        <div key={req._id} className="border border-slate-200 rounded-xl p-4 space-y-3 text-xs bg-white shadow-sm">
+                          <div className="flex justify-between items-center border-b pb-2">
+                            <span className="font-bold text-indigo-700 font-mono">Req: {req.requestNumber}</span>
+                            <Badge tone={
+                              req.status === "Admitted" ? "success" :
+                              req.status === "Approved" ? "success" :
+                              req.status === "Rejected" ? "danger" :
+                              "warning"
+                            }>
+                              {req.status}
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-slate-600">
+                            <p><span className="font-medium text-slate-800">Priority:</span> {req.priority}</p>
+                            <p><span className="font-medium text-slate-800">Preferred Ward:</span> {req.preferredWard || "General"}</p>
+                            <p><span className="font-medium text-slate-800">Stay Estimate:</span> {req.expectedStay || "N/A"}</p>
+                            <p><span className="font-medium text-slate-800">Diagnosis:</span> {req.primaryDiagnosis}</p>
+                          </div>
+                          {req.clinicalNotes && (
+                            <div className="bg-slate-50 rounded p-2 border border-slate-100 text-slate-650 text-[11px] italic">
+                              Notes: {req.clinicalNotes}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+
+                {/* Admission Registry */}
+                <Card className="p-4 space-y-4">
+                  <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Inpatient Registry Record</h3>
                   {admissions.length === 0 ? (
                     <div className="p-6 bg-slate-50 border border-dashed rounded-xl text-center text-xs text-slate-400">
                       Patient is currently treated as an outpatient (OP). No IP admission records.

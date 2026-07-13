@@ -23,6 +23,7 @@ export class ReceptionRepository {
 
   static async searchPatients(hospitalId: Types.ObjectId, queryStr: string) {
     const filter: any = { hospital: hospitalId };
+    let patientIds: any[] = [];
     if (queryStr) {
       const regex = new RegExp(queryStr, "i");
       filter.$or = [
@@ -31,7 +32,33 @@ export class ReceptionRepository {
         { uhid: regex },
         { patientCode: regex }
       ];
+
+      // Find any appointments matching referenceId
+      const matchedAppts = await Appointment.find({
+        hospital: hospitalId,
+        referenceId: regex
+      }).select("patient");
+      if (matchedAppts.length > 0) {
+        patientIds = patientIds.concat(matchedAppts.map(a => a.patient));
+      }
+
+      // Find any queue tokens matching tokenNumber
+      const matchedTokens = await Queue.find({
+        hospital: hospitalId,
+        tokenNumber: regex
+      }).select("patient");
+      if (matchedTokens.length > 0) {
+        patientIds = patientIds.concat(matchedTokens.map(q => q.patient));
+      }
     }
+    
+    if (patientIds.length > 0) {
+      if (!filter.$or) {
+        filter.$or = [];
+      }
+      filter.$or.push({ _id: { $in: patientIds } });
+    }
+
     return await Patient.find(filter).sort({ name: 1 }).limit(50);
   }
 
@@ -182,11 +209,54 @@ export class ReceptionRepository {
   }
 
   static async findActiveAdmissionByPatient(hospitalId: Types.ObjectId, patientId: string) {
-    return await Admission.findOne({ hospital: hospitalId, patient: patientId, status: "admitted" });
+    return await Admission.findOne({
+      hospital: hospitalId,
+      patient: patientId,
+      status: {
+        $in: [
+          "admitted",
+          "Admitted",
+          "Bed Allocated",
+          "Under Observation",
+          "Waiting for Bed",
+          "In Ward",
+          "ICU",
+          "Operation Scheduled",
+          "Under Treatment",
+          "Transferred"
+        ]
+      }
+    });
   }
 
   static async listAdmissions(hospitalId: Types.ObjectId, status: "admitted" | "discharged") {
-    return await Admission.find({ hospital: hospitalId, status })
+    const statusFilter = status === "admitted"
+      ? {
+          $in: [
+            "admitted",
+            "Admitted",
+            "Bed Allocated",
+            "Under Observation",
+            "Waiting for Bed",
+            "In Ward",
+            "ICU",
+            "Operation Scheduled",
+            "Under Treatment",
+            "Transferred"
+          ]
+        }
+      : {
+          $in: [
+            "discharged",
+            "Discharged",
+            "Cancelled",
+            "Expired",
+            "Against Medical Advice (AMA)",
+            "Transferred Out (Final)"
+          ]
+        };
+
+    return await Admission.find({ hospital: hospitalId, status: statusFilter })
       .populate("patient", "name uhid phone age gender bloodGroup")
       .populate("room")
       .populate("bed")

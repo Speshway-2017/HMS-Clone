@@ -17,7 +17,28 @@ const admissionSchema = new Schema(
     insurancePolicyNumber: { type: String, default: "" },
     advanceAmount: { type: Number, default: 0 },
     admissionNotes: { type: String, default: "" },
-    status: { type: String, enum: ["admitted", "discharged"], default: "admitted" },
+    status: {
+      type: String,
+      enum: [
+        "admitted",
+        "discharged",
+        "Admitted",
+        "Bed Allocated",
+        "Under Observation",
+        "Waiting for Bed",
+        "In Ward",
+        "ICU",
+        "Operation Scheduled",
+        "Under Treatment",
+        "Transferred",
+        "Discharged",
+        "Cancelled",
+        "Expired",
+        "Against Medical Advice (AMA)",
+        "Transferred Out (Final)"
+      ],
+      default: "Admitted"
+    },
     dischargeDate: { type: Date, default: null },
     dischargeNotes: { type: String, default: "" },
     
@@ -26,7 +47,13 @@ const admissionSchema = new Schema(
     priority: { type: String, enum: ["Routine", "Urgent", "Emergency"], default: "Routine" },
     admissionMode: { type: String, enum: ["Doctor Requested", "Receptionist Initiated"], default: "Doctor Requested" },
     approvalType: { type: String, enum: ["Doctor Request System", "Doctor Verbal Order"], default: "Doctor Request System" },
-    admissionReason: { type: String, default: "" }
+    admissionReason: { type: String, default: "" },
+    
+    // Additional fields for Manual Admission
+    department: { type: Schema.Types.ObjectId, ref: "Department", default: null },
+    admissionType: { type: String, enum: ["Emergency", "Elective", "Direct Admission"], default: "Direct Admission" },
+    expectedStay: { type: String, default: "" },
+    primaryDiagnosis: { type: String, default: "" }
   },
   { timestamps: true }
 );

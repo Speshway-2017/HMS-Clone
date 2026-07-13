@@ -29,7 +29,9 @@ import {
   getTodayRegistrations,
   cancelAppointment,
   rescheduleAppointment,
-  checkDuplicateAppointment
+  checkDuplicateAppointment,
+  getPatientDetail,
+  rejectAdmissionRequest
 } from "../controllers/receptionController";
 
 const router = Router();
@@ -44,6 +46,7 @@ router.get("/dashboard/stats", getDashboardStats);
 router.get("/patients/today", getTodayRegistrations);
 router.get("/patients/search", searchPatients);
 router.get("/patients/list", listPatients);
+router.get("/patients/:id", getPatientDetail);
 router.route("/patients").post(registerPatient);
 
 // Appointments
@@ -68,6 +71,7 @@ router.get("/op/history", getOPHistory);
 
 // Admissions (IP)
 router.get("/admissions/requests", getAdmissionRequests);
+router.post("/admissions/requests/:id/reject", rejectAdmissionRequest);
 router.route("/admissions").post(admitPatient).get(getAdmissions);
 router.post("/admissions/transfer", transferPatient);
 router.post("/admissions/:id/discharge", requestDischarge);

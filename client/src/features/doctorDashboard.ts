@@ -350,6 +350,7 @@ export interface ConsultationWorkspaceResponse {
   labOrders: LabOrder[];
   radiologyOrders: RadiologyOrder[];
   admissions: any[];
+  admissionRequests?: any[];
 }
 
 export function useStartConsultation() {
@@ -454,19 +455,35 @@ export function useRecommendAdmission() {
   return useMutation({
     mutationFn: async ({
       appointmentId,
-      suggestedWard,
-      diagnosis,
-      notes,
+      priority,
+      preferredWard,
+      preferredBedType,
+      expectedStay,
+      primaryDiagnosis,
+      clinicalNotes,
+      admissionReason,
+      specialInstructions
     }: {
       appointmentId: string;
-      suggestedWard: string;
-      diagnosis: string;
-      notes: string;
+      priority: "Routine" | "Urgent" | "Emergency";
+      preferredWard: string;
+      preferredBedType: string;
+      expectedStay: string;
+      primaryDiagnosis: string;
+      clinicalNotes: string;
+      admissionReason: string;
+      specialInstructions: string;
     }) => {
-      const res = await api.post(`/doctors/dashboard/appointments/${appointmentId}/admission`, {
-        suggestedWard,
-        diagnosis,
-        notes,
+      const res = await api.post(`/admission-requests`, {
+        appointmentId,
+        priority,
+        preferredWard,
+        preferredBedType,
+        expectedStay,
+        primaryDiagnosis,
+        clinicalNotes,
+        admissionReason,
+        specialInstructions
       });
       return res.data.data;
     },

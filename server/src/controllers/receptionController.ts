@@ -79,7 +79,22 @@ const admissionSchema = z.object({
   admittingDoctor: z.string().optional().nullable(),
   priority: z.enum(["Routine", "Urgent", "Emergency"]).optional().default("Routine"),
   admissionReason: z.string().optional().default(""),
-  verbalApproval: z.boolean().optional().default(false)
+  verbalApproval: z.boolean().optional().default(false),
+
+  // Manual Admission specifics
+  departmentId: z.string().optional().nullable(),
+  admissionType: z.enum(["Emergency", "Elective", "Direct Admission"]).optional().default("Direct Admission"),
+  expectedStay: z.string().optional().default(""),
+  primaryDiagnosis: z.string().optional().default(""),
+  requestId: z.string().optional().nullable()
+});
+
+export const getPatientDetail = catchAsync(async (req: Request, res: Response) => {
+  const result = await ReceptionService.getPatientDetail(
+    req.hospitalFilter!.hospital as any,
+    req.params.id
+  );
+  res.json({ status: "success", data: result });
 });
 
 export const getDashboardStats = catchAsync(async (req: Request, res: Response) => {
@@ -178,7 +193,7 @@ export const processBillingPayment = catchAsync(async (req: Request, res: Respon
     paymentData,
     req.user!._id
   );
-  res.json({ status: "success", data: result });
+  res.status(201).json({ status: "success", data: result });
 });
 
 export const getQueueState = catchAsync(async (req: Request, res: Response) => {
@@ -218,6 +233,15 @@ export const admitPatient = catchAsync(async (req: Request, res: Response) => {
     req.user!._id
   );
   res.status(201).json({ status: "success", data: result });
+});
+
+export const rejectAdmissionRequest = catchAsync(async (req: Request, res: Response) => {
+  const result = await ReceptionService.rejectAdmissionRequest(
+    req.hospitalFilter!.hospital as any,
+    req.params.id,
+    req.user!._id
+  );
+  res.json({ status: "success", data: result });
 });
 
 export const transferPatient = catchAsync(async (req: Request, res: Response) => {

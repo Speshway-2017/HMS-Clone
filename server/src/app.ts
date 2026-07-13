@@ -25,6 +25,7 @@ import doctorDashboardRoutes from "./routes/doctorDashboardRoutes";
 import wardRoutes from "./routes/wardRoutes";
 import roomRoutes from "./routes/roomRoutes";
 import bedRoutes from "./routes/bedRoutes";
+import admissionRequestRoutes from "./routes/admissionRequestRoutes";
 import "./config/cloudinary";
 
 const app = express();
@@ -64,6 +65,7 @@ app.use("/api/v1/reception", receptionRoutes);
 app.use("/api/v1/wards", wardRoutes);
 app.use("/api/v1/rooms", roomRoutes);
 app.use("/api/v1/beds", bedRoutes);
+app.use("/api/v1/admission-requests", admissionRequestRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
