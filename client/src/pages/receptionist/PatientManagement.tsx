@@ -118,6 +118,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
   const { data: rooms } = useRoomsAvailability();
   const { data: doctors } = useDoctorsAvailability();
   const admitMutation = useAdmitPatient();
+  const uniqueWards = Array.from(new Set(rooms?.map((r: any) => r.wardName).filter(Boolean)));
 
   const [isConvertOpen, setIsConvertOpen] = useState(false);
   const [successData, setSuccessData] = useState<any | null>(null);
@@ -897,13 +898,16 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                         label="Ward"
                         required
                         value={ward}
-                        onChange={(e) => setWard(e.target.value)}
+                        onChange={(e) => {
+                          setWard(e.target.value);
+                          setSelectedRoomId("");
+                          setSelectedBedId("");
+                        }}
                       >
                         <option value="">Select Ward</option>
-                        <option value="General Ward">General Ward</option>
-                        <option value="Semi-Private Ward">Semi-Private Ward</option>
-                        <option value="Private Ward">Private Ward</option>
-                        <option value="ICU">ICU</option>
+                        {uniqueWards.map((w: string) => (
+                          <option key={w} value={w}>{w}</option>
+                        ))}
                       </SelectField>
 
                       <SelectField

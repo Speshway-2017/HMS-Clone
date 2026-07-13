@@ -26,13 +26,13 @@ export function AppointmentsPage() {
 
   const columns: Column<Appointment>[] = [
     { header: "Reference", render: (a) => <span className="font-mono text-xs text-slate-500">{a.referenceId}</span> },
-    { header: "Patient", render: (a) => <span className="font-medium text-slate-700">{typeof a.patient === "object" ? a.patient.name : ""}</span> },
+    { header: "Patient", render: (a) => <span className="font-medium text-slate-700">{a.patient && typeof a.patient === "object" ? a.patient.name : ""}</span> },
     {
       header: "Doctor & Department",
       render: (a) => (
         <div>
-          <div className="text-slate-700">{typeof a.doctor === "object" ? a.doctor.name : ""}</div>
-          <div className="text-xs text-slate-400">{typeof a.department === "object" && a.department ? a.department.name : ""}</div>
+          <div className="text-slate-700">{a.doctor && typeof a.doctor === "object" ? a.doctor.name : ""}</div>
+          <div className="text-xs text-slate-400">{a.department && typeof a.department === "object" ? a.department.name : ""}</div>
         </div>
       ),
     },

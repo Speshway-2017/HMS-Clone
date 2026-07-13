@@ -4,9 +4,18 @@ const roomSchema = new Schema(
   {
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
     roomNumber: { type: String, required: true },
-    roomType: { type: String, enum: ["General", "Semi-Private", "Private", "ICU"], required: true },
-    wardName: { type: String, required: true },
-    status: { type: String, enum: ["active", "inactive"], default: "active" },
+    roomName: { type: String, default: "" },
+    ward: { type: Schema.Types.ObjectId, ref: "Ward", required: true },
+    wardName: { type: String, required: true }, // Keep for compatibility with existing code
+    floor: { type: Number, required: true },
+    roomType: {
+      type: String,
+      enum: ["General", "Semi-Private", "Private", "ICU", "NICU", "Emergency"],
+      required: true
+    },
+    capacity: { type: Number, required: true },
+    description: { type: String, default: "" },
+    status: { type: String, enum: ["Active", "Inactive"], default: "Active" }
   },
   { timestamps: true }
 );

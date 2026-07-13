@@ -61,6 +61,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const { data: rooms, refetch: refetchRooms } = useRoomsAvailability();
   const { data: activeAdmissions, refetch: refetchAdmissions } = useAdmissions("admitted");
   const { data: dischargedAdmissions } = useAdmissions("discharged");
+  const uniqueWards = Array.from(new Set(rooms?.map((r: any) => r.wardName).filter(Boolean)));
 
   // Mutations
   const admitMutation = useAdmitPatient();
@@ -550,13 +551,16 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                           label="Select Ward"
                           required
                           value={ward}
-                          onChange={(e) => setWard(e.target.value)}
+                          onChange={(e) => {
+                            setWard(e.target.value);
+                            setSelectedRoomId("");
+                            setSelectedBedId("");
+                          }}
                         >
                           <option value="">Select Ward</option>
-                          <option value="General Ward">General Ward</option>
-                          <option value="Semi-Private Ward">Semi-Private Ward</option>
-                          <option value="Private Ward">Private Ward</option>
-                          <option value="ICU">ICU</option>
+                          {uniqueWards.map((w: string) => (
+                            <option key={w} value={w}>{w}</option>
+                          ))}
                         </SelectField>
                         <SelectField
                           label="Select Room"

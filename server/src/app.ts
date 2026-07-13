@@ -22,6 +22,9 @@ import invoiceRoutes from "./routes/invoiceRoutes";
 import notificationRoutes from "./routes/notificationRoutes";
 import receptionRoutes from "./routes/receptionRoutes";
 import doctorDashboardRoutes from "./routes/doctorDashboardRoutes";
+import wardRoutes from "./routes/wardRoutes";
+import roomRoutes from "./routes/roomRoutes";
+import bedRoutes from "./routes/bedRoutes";
 import "./config/cloudinary";
 
 const app = express();
@@ -58,6 +61,9 @@ app.use("/api/v1/inventory", inventoryRoutes);
 app.use("/api/v1/invoices", invoiceRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/reception", receptionRoutes);
+app.use("/api/v1/wards", wardRoutes);
+app.use("/api/v1/rooms", roomRoutes);
+app.use("/api/v1/beds", bedRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

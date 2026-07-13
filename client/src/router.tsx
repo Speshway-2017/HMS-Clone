@@ -39,6 +39,7 @@ import { PatientInvoicePage } from "./pages/hospital-admin/PatientInvoicePage";
 import { InventoryPage } from "./pages/hospital-admin/InventoryPage";
 import { InventoryFormPage } from "./pages/hospital-admin/InventoryFormPage";
 import { InventoryItemDetailsPage } from "./pages/hospital-admin/InventoryItemDetailsPage";
+import { BedsPage } from "./pages/hospital-admin/BedsPage";
 
 // Accountant module
 import { AccountantDashboard } from "./pages/accountant/Dashboard";
@@ -187,6 +188,7 @@ export const router = createBrowserRouter([
           { path: "roles", element: <ManageRolesPage /> },
           { path: "roles/new", element: <RoleFormPage /> },
           { path: "roles/:id/edit", element: <RoleFormPage /> },
+          { path: "beds", element: <BedsPage /> },
           { path: "settings", element: <SettingsPage /> },
         ],
       },

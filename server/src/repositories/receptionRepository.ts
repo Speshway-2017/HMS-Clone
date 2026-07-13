@@ -133,7 +133,7 @@ export class ReceptionRepository {
 
   // ── Room & Bed Operations ──
   static async listRooms(hospitalId: Types.ObjectId) {
-    return await Room.find({ hospital: hospitalId, status: "active" }).sort({ wardName: 1, roomNumber: 1 });
+    return await Room.find({ hospital: hospitalId, status: { $in: ["active", "Active"] } }).sort({ wardName: 1, roomNumber: 1 });
   }
 
   static async listBedsByRoom(hospitalId: Types.ObjectId, roomId: string) {
@@ -145,7 +145,7 @@ export class ReceptionRepository {
   }
 
   static async getRoomsAvailability(hospitalId: Types.ObjectId) {
-    const rooms = await Room.find({ hospital: hospitalId, status: "active" }).lean();
+    const rooms = await Room.find({ hospital: hospitalId, status: { $in: ["active", "Active"] } }).lean();
     const beds = await Bed.find({ hospital: hospitalId }).lean();
 
     return rooms.map(room => {
@@ -164,7 +164,8 @@ export class ReceptionRepository {
   }
 
   static async updateBedOccupancy(hospitalId: Types.ObjectId, bedId: string, isOccupied: boolean) {
-    return await Bed.findOneAndUpdate({ _id: bedId, hospital: hospitalId }, { isOccupied }, { new: true });
+    const status = isOccupied ? "Occupied" : "Available";
+    return await Bed.findOneAndUpdate({ _id: bedId, hospital: hospitalId }, { isOccupied, status }, { new: true });
   }
 
   // ── Inpatient (Admission) Operations ──
