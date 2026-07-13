@@ -22,10 +22,10 @@ export function TodayAppointmentsPage() {
   const handleStartConsultation = async (apptId: string) => {
     try {
       // Create mutation dynamically since apptId changes
-      const res = await apiUpdateAppointment(apptId, { status: "in_consultation" });
+      const res = await apiStartConsultation(apptId);
       if (res) {
         toast.success("Consultation started");
-        navigate("/doctor/op-management");
+        navigate(`/doctor/consultation/${apptId}`);
       }
     } catch (err) {
       toast.error("Failed to start consultation");
@@ -33,9 +33,9 @@ export function TodayAppointmentsPage() {
   };
 
   // Helper for starting consultation inline
-  const apiUpdateAppointment = async (id: string, body: any) => {
+  const apiStartConsultation = async (id: string) => {
     const { api } = await import("../../lib/api");
-    const res = await api.patch(`/appointments/${id}`, body);
+    const res = await api.post(`/doctors/dashboard/appointments/${id}/start`);
     refetch();
     return res.data;
   };

@@ -738,19 +738,19 @@ export function ConsultationWorkspacePage() {
                     <div className="grid grid-cols-2 gap-2 text-slate-650">
                       <div>
                         <span className="block font-medium text-slate-400">Patient Name:</span>
-                        <span className="font-semibold text-slate-800">{appointment.patient?.name}</span>
+                        <span className="font-semibold text-slate-800">{patient?.name}</span>
                       </div>
                       <div>
                         <span className="block font-medium text-slate-400">UHID:</span>
-                        <span className="font-semibold text-slate-800 font-mono">{appointment.patient?.uhid}</span>
+                        <span className="font-semibold text-slate-800 font-mono">{patient?.uhid}</span>
                       </div>
                       <div>
                         <span className="block font-medium text-slate-400">Age / Gender:</span>
-                        <span className="font-semibold text-slate-800">{appointment.patient?.age} yrs / {appointment.patient?.gender}</span>
+                        <span className="font-semibold text-slate-800">{patient?.age} yrs / {patient?.gender}</span>
                       </div>
                       <div>
                         <span className="block font-medium text-slate-400">Phone:</span>
-                        <span className="font-semibold text-slate-800">{appointment.patient?.phone || "N/A"}</span>
+                        <span className="font-semibold text-slate-800">{patient?.phone || "N/A"}</span>
                       </div>
                       <div>
                         <span className="block font-medium text-slate-400">OP Code:</span>
