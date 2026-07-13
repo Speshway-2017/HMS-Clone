@@ -30,6 +30,12 @@ export interface PatientSearchResult {
   allergies?: string;
   insuranceProvider?: string;
   insurancePolicyNumber?: string;
+  status?: string;
+  emergencyContact?: {
+    name?: string;
+    phone?: string;
+    relation?: string;
+  };
 }
 
 export interface QueueToken {
@@ -587,7 +593,7 @@ export function usePatientDetail(patientId: string) {
   return useQuery({
     queryKey: ["reception", "patient-detail", patientId],
     queryFn: async () => {
-      const res = await api.get<{ data: { patient: any, currentConsultation: any } }>(`/reception/patients/${patientId}`);
+      const res = await api.get<{ data: { patient: any, currentConsultation: any, activeAdmission?: any } }>(`/reception/patients/${patientId}`);
       return res.data.data;
     },
     enabled: !!patientId
