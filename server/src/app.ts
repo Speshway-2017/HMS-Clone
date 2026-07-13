@@ -21,6 +21,7 @@ import inventoryRoutes from "./routes/inventoryRoutes";
 import invoiceRoutes from "./routes/invoiceRoutes";
 import notificationRoutes from "./routes/notificationRoutes";
 import receptionRoutes from "./routes/receptionRoutes";
+import doctorDashboardRoutes from "./routes/doctorDashboardRoutes";
 import "./config/cloudinary";
 
 const app = express();
@@ -45,7 +46,11 @@ app.use("/api/v1/roles", roleRoutes);
 app.use("/api/v1/analytics", analyticsRoutes);
 app.use("/api/v1/reports", reportRoutes);
 app.use("/api/v1/uploads", uploadRoutes);
+
+// Register doctor dashboard first to prevent prefix matching collision on /api/v1/doctors
+app.use("/api/v1/doctors/dashboard", doctorDashboardRoutes);
 app.use("/api/v1/doctors", doctorRoutes);
+
 app.use("/api/v1/staff", staffRoutes);
 app.use("/api/v1/patients", patientRoutes);
 app.use("/api/v1/appointments", appointmentRoutes);
@@ -53,7 +58,6 @@ app.use("/api/v1/inventory", inventoryRoutes);
 app.use("/api/v1/invoices", invoiceRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/reception", receptionRoutes);
-
 
 app.use(notFound);
 app.use(errorHandler);
