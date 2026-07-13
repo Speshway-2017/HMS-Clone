@@ -129,7 +129,7 @@ export function StaffFormPage() {
 
   // ── Main form ─────────────────────────────────────────────────────────────────
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="w-full space-y-6">
       <div>
         <div className="text-sm text-slate-400">
           <Link to="/admin/staff" className="hover:text-navy-700">

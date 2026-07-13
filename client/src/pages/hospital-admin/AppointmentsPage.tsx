@@ -65,11 +65,6 @@ export function AppointmentsPage() {
           <h1 className="text-2xl font-bold text-slate-900">Appointment Management</h1>
           <p className="text-sm text-slate-500">Schedule, monitor, and manage patient flows.</p>
         </div>
-        <Link to="/admin/appointments/new">
-          <Button variant="primary">
-            <Plus className="h-4 w-4" /> Schedule Appointment
-          </Button>
-        </Link>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
