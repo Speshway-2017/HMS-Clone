@@ -102,7 +102,7 @@ export function RoleFormPage() {
   const isSaving = createRole.isPending || updateRole.isPending;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="w-full space-y-6">
       <div>
         <div className="text-sm text-slate-400">
           <Link to={`${basePath}/roles`} className="hover:text-navy-700">

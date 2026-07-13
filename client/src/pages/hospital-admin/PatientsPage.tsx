@@ -57,11 +57,6 @@ export function PatientsPage() {
           <h1 className="text-2xl font-bold text-slate-900">Patient Management</h1>
           <p className="text-sm text-slate-500">Manage and monitor all hospital patient records and admission flows.</p>
         </div>
-        <Link to="/admin/patients/new">
-          <Button variant="primary">
-            <UserPlus className="h-4 w-4" /> Add Patient
-          </Button>
-        </Link>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

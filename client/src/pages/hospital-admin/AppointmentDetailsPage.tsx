@@ -99,35 +99,6 @@ export function AppointmentDetailsPage() {
             </div>
           ))}
         </div>
-
-        <div className="mt-6 flex flex-wrap gap-2">
-          {STATUS_FLOW.map((step) => (
-            <button
-              key={step}
-              onClick={() => updateAppointment.mutate({ status: step })}
-              disabled={updateAppointment.isPending || appointment.status === step}
-              className={`rounded-lg border px-3 py-1.5 text-sm font-medium disabled:cursor-default disabled:opacity-50 ${
-                appointment.status === step ? "border-navy-700 bg-navy-50 text-navy-700" : "border-slate-300 text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              Mark {step.replace("_", " ")}
-            </button>
-          ))}
-          <button
-            onClick={() => updateAppointment.mutate({ status: "cancelled" })}
-            disabled={updateAppointment.isPending}
-            className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => updateAppointment.mutate({ status: "no_show" })}
-            disabled={updateAppointment.isPending}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
-          >
-            No Show
-          </button>
-        </div>
       </Card>
     </div>
   );

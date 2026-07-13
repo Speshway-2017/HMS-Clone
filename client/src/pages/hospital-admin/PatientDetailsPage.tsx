@@ -37,10 +37,7 @@ export function PatientDetailsPage() {
             <Badge tone="info">Patient</Badge>
           </div>
           <p className="text-sm text-slate-500">
-            {patient.gender}, {patient.age} yrs • Blood Type {patient.bloodGroup || "—"} •{" "}
-            <Link to={`/admin/patients/${id}/edit`} className="text-navy-700 hover:underline">
-              Edit
-            </Link>
+            {patient.gender}, {patient.age} yrs • Blood Type {patient.bloodGroup || "—"}
           </p>
         </div>
       </div>
@@ -60,9 +57,6 @@ export function PatientDetailsPage() {
           <Card>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-base font-semibold text-slate-800">Medical History</h3>
-              <Button variant="secondary" onClick={() => setModalOpen(true)}>
-                <Plus className="h-4 w-4" /> Add Entry
-              </Button>
             </div>
             {patient.medicalHistory.length === 0 ? (
               <p className="text-sm text-slate-400">No visit history recorded yet.</p>

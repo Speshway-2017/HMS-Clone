@@ -29,15 +29,12 @@ import { DoctorFormPage } from "./pages/hospital-admin/DoctorFormPage";
 import { DoctorProfilePage } from "./pages/hospital-admin/DoctorProfilePage";
 import { DoctorPerformancePage } from "./pages/hospital-admin/DoctorPerformancePage";
 import { PatientsPage } from "./pages/hospital-admin/PatientsPage";
-import { PatientFormPage } from "./pages/hospital-admin/PatientFormPage";
 import { PatientDetailsPage } from "./pages/hospital-admin/PatientDetailsPage";
 import { AppointmentsPage } from "./pages/hospital-admin/AppointmentsPage";
-import { AppointmentFormPage } from "./pages/hospital-admin/AppointmentFormPage";
 import { AppointmentDetailsPage } from "./pages/hospital-admin/AppointmentDetailsPage";
 import { StaffPage } from "./pages/hospital-admin/StaffPage";
 import { StaffFormPage } from "./pages/hospital-admin/StaffFormPage";
 import { FinancePage } from "./pages/hospital-admin/FinancePage";
-import { InvoiceFormPage } from "./pages/hospital-admin/InvoiceFormPage";
 import { PatientInvoicePage } from "./pages/hospital-admin/PatientInvoicePage";
 import { InventoryPage } from "./pages/hospital-admin/InventoryPage";
 import { InventoryFormPage } from "./pages/hospital-admin/InventoryFormPage";
@@ -156,11 +153,8 @@ export const router = createBrowserRouter([
           { path: "doctors/:id/edit", element: <DoctorFormPage /> },
           { path: "doctors/:id/performance", element: <DoctorPerformancePage /> },
           { path: "patients", element: <PatientsPage /> },
-          { path: "patients/new", element: <PatientFormPage /> },
           { path: "patients/:id", element: <PatientDetailsPage /> },
-          { path: "patients/:id/edit", element: <PatientFormPage /> },
           { path: "appointments", element: <AppointmentsPage /> },
-          { path: "appointments/new", element: <AppointmentFormPage /> },
           { path: "appointments/:id", element: <AppointmentDetailsPage /> },
           { path: "staff", element: <StaffPage /> },
           { path: "staff/new", element: <StaffFormPage /> },
@@ -170,7 +164,6 @@ export const router = createBrowserRouter([
           { path: "departments/:id/edit", element: <DepartmentFormPage /> },
           { path: "departments/:id/metrics", element: <DepartmentMetricsPage /> },
           { path: "finance", element: <FinancePage /> },
-          { path: "finance/invoices/new", element: <InvoiceFormPage /> },
           { path: "finance/invoices/:id", element: <PatientInvoicePage /> },
           { path: "inventory", element: <InventoryPage /> },
           { path: "inventory/new", element: <InventoryFormPage /> },

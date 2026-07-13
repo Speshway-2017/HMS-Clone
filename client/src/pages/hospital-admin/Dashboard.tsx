@@ -16,16 +16,16 @@ export function HospitalAdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Today's Appointments" value={counts?.todaysAppointments ?? 0} icon={<CalendarClock className="h-5 w-5" />} emphasis />
-        <KpiCard label="Bed Occupancy" value={`${counts?.bedOccupancyPercent ?? 0}%`} icon={<BedDouble className="h-5 w-5" />} trend={{ direction: "up", text: `${counts?.occupiedBeds ?? 0}/${counts?.totalBeds ?? 0} beds` }} />
-        <KpiCard label="Total Revenue (Paid)" value={`₹${(counts?.totalRevenue ?? 0).toFixed(2)}`} icon={<Wallet className="h-5 w-5" />} />
-        <KpiCard label="Critical Stock Alerts" value={counts?.criticalStockCount ?? 0} icon={<AlertTriangle className="h-5 w-5" />} />
+        <KpiCard label="Today's Appointments" value={counts?.todaysAppointments ?? 0} icon={<CalendarClock className="h-5 w-5" />} emphasis to="/admin/appointments" />
+        <KpiCard label="Bed Occupancy" value={`${counts?.bedOccupancyPercent ?? 0}%`} icon={<BedDouble className="h-5 w-5" />} trend={{ direction: "up", text: `${counts?.occupiedBeds ?? 0}/${counts?.totalBeds ?? 0} beds` }} to="/admin/departments" />
+        <KpiCard label="Total Revenue (Paid)" value={`₹${(counts?.totalRevenue ?? 0).toFixed(2)}`} icon={<Wallet className="h-5 w-5" />} to="/admin/finance" />
+        <KpiCard label="Critical Stock Alerts" value={counts?.criticalStockCount ?? 0} icon={<AlertTriangle className="h-5 w-5" />} to="/admin/inventory" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <KpiCard label="Doctors" value={counts?.totalDoctors ?? 0} icon={<Stethoscope className="h-5 w-5" />} />
-        <KpiCard label="Staff" value={counts?.totalStaff ?? 0} icon={<Users2 className="h-5 w-5" />} />
-        <KpiCard label="Patients" value={counts?.totalPatients ?? 0} icon={<Users2 className="h-5 w-5" />} />
+        <KpiCard label="Doctors" value={counts?.totalDoctors ?? 0} icon={<Stethoscope className="h-5 w-5" />} to="/admin/doctors" />
+        <KpiCard label="Staff" value={counts?.totalStaff ?? 0} icon={<Users2 className="h-5 w-5" />} to="/admin/staff" />
+        <KpiCard label="Patients" value={counts?.totalPatients ?? 0} icon={<Users2 className="h-5 w-5" />} to="/admin/patients" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -39,12 +39,6 @@ export function HospitalAdminDashboard() {
         <Card>
           <h3 className="mb-3 text-base font-semibold text-slate-800">Quick Actions</h3>
           <div className="space-y-2">
-            <Link to="/admin/appointments/new" className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">
-              <Plus className="h-4 w-4 text-navy-700" /> Schedule Appointment
-            </Link>
-            <Link to="/admin/patients/new" className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">
-              <Plus className="h-4 w-4 text-navy-700" /> Register Patient
-            </Link>
             <Link to="/admin/doctors/new" className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">
               <Plus className="h-4 w-4 text-navy-700" /> Add Doctor
             </Link>
