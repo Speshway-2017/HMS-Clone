@@ -10,6 +10,7 @@ const hospitalSchema = new Schema(
     logoUrl: { type: String, default: "" },
     licenseUrl: { type: String, default: "" },
     bedCapacity: { type: Number, default: 0 },
+    opExpiryLimit: { type: Number, default: 10 },
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },
   },

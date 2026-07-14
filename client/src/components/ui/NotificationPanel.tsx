@@ -32,6 +32,8 @@ const TYPE_META: Record<NotificationType, { icon: React.ElementType; label: stri
   inventory: { icon: Package, label: "Inventory" },
   invoice: { icon: Receipt, label: "Invoice" },
   patient: { icon: UserPlus, label: "Patient" },
+  admission_request: { icon: CalendarClock, label: "Admission Request" },
+  general: { icon: Bell, label: "Notification" },
 };
 
 const SEVERITY_STYLES: Record<NotificationSeverity, { bg: string; icon: string; dot: string }> = {

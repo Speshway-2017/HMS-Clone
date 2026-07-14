@@ -9,6 +9,7 @@ export interface Hospital {
   licenseUrl: string;
   bedCapacity: number;
   status: "active" | "inactive";
+  opExpiryLimit?: number;
   createdAt: string;
   primaryAdminName?: string | null;
 }

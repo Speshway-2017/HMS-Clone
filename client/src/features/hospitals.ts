@@ -75,3 +75,26 @@ export function useDeleteHospital() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["hospitals"] }),
   });
 }
+
+export function useMyHospital() {
+  return useQuery({
+    queryKey: ["hospitals", "me"],
+    queryFn: async () => {
+      const res = await api.get("/hospitals/me");
+      return res.data.data.hospital as Hospital;
+    },
+  });
+}
+
+export function useUpdateMyHospital() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: Partial<Hospital>) => {
+      const res = await api.patch("/hospitals/me", payload);
+      return res.data.data.hospital as Hospital;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["hospitals", "me"] });
+    },
+  });
+}

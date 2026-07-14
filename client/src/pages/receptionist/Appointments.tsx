@@ -16,6 +16,7 @@ import {
   usePatientDetail
 } from "../../features/receptionist";
 import { useDepartments } from "../../features/departments";
+import { useMyHospital } from "../../features/hospitals";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -289,7 +290,46 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const selectedDayName = selectedDayIdx !== -1 ? weekdayNames[selectedDayIdx] : "";
   const isDoctorOffDuty = selectedDoc?.workingHours?.some((wh: any) => wh.day.toLowerCase() === selectedDayName && wh.isActive === false);
 
+  const { data: hospital } = useMyHospital();
   const { data: patientDetail, isLoading: patientLoading, isError: patientError } = usePatientDetail(selectedPatientId);
+
+  const isWithinRevisitWindow = () => {
+    if (!selectedDoc || !patientDetail?.patient?.medicalHistory) return false;
+    
+    const limitDays = hospital?.opExpiryLimit ?? 10;
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - limitDays);
+
+    return patientDetail.patient.medicalHistory.some((history: any) => {
+      const isCompleted = history.status === "Completed" || String(history.visitType).toLowerCase().includes("consultation");
+      if (!isCompleted) return false;
+
+      const sameDoc = String(history.doctorName).toLowerCase().replace("dr. ", "").trim() === 
+                      String(selectedDoc.name).toLowerCase().replace("dr. ", "").trim();
+      if (!sameDoc) return false;
+
+      const historyDate = new Date(history.date);
+      return historyDate >= cutoffDate;
+    });
+  };
+
+  const getRegFee = () => {
+    if (patientDetail?.hasExistingAppointments) return 0;
+    return watch("type") === "Emergency" ? 200 : 100;
+  };
+
+  const getConsultationFeeValue = () => {
+    if (watch("type") === "Emergency") return 500;
+    if (isWithinRevisitWindow()) return 0;
+    if (!selectedDoc || !selectedDoc.consultationFee) return 300;
+    const cleaned = String(selectedDoc.consultationFee).replace(/[₹, \s]/g, "");
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? 300 : parsed;
+  };
+
+  const getTotalBill = () => {
+    return getRegFee() + getConsultationFeeValue();
+  };
 
   // Autofill patient query search box and handle auto-focus to Department field
   useEffect(() => {
@@ -782,16 +822,28 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                 </div>
                 <div className="flex justify-between text-slate-500">
                   <span>Registration Fee:</span>
-                  <span className="font-semibold text-slate-800">{formatINR(watch("type") === "Emergency" ? 200 : 100)}</span>
+                  <span className="font-semibold text-slate-800">
+                    {getRegFee() === 0 ? (
+                      <span className="text-emerald-600 font-semibold">₹0 (Existing Patient - Free)</span>
+                    ) : (
+                      formatINR(getRegFee())
+                    )}
+                  </span>
                 </div>
                 <div className="flex justify-between text-slate-500">
                   <span>Consultation Fee:</span>
-                  <span className="font-semibold text-slate-800">{formatINR(watch("type") === "Emergency" ? 500 : 300)}</span>
+                  <span className="font-semibold text-slate-800">
+                    {getConsultationFeeValue() === 0 ? (
+                      <span className="text-emerald-600 font-bold">₹0 (Free Revisit)</span>
+                    ) : (
+                      formatINR(getConsultationFeeValue())
+                    )}
+                  </span>
                 </div>
               </div>
               <div className="flex justify-between font-bold text-sm text-slate-800">
                 <span>Total Consultation Bill:</span>
-                <span>{formatINR(watch("type") === "Emergency" ? 700 : 400)}</span>
+                <span>{formatINR(getTotalBill())}</span>
               </div>
               {isFollowUp && (
                 <div className="flex items-center gap-1.5 mt-1 rounded bg-blue-100 px-2 py-1">

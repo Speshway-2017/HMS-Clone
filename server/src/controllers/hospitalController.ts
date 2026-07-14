@@ -16,6 +16,7 @@ const hospitalSchema = z.object({
   logoUrl: z.string().optional().default(""),
   licenseUrl: z.string().optional().default(""),
   bedCapacity: z.coerce.number().min(0).optional().default(0),
+  opExpiryLimit: z.coerce.number().min(0).optional().default(10),
   primaryAdminId: z.string().optional(),
 });
 
@@ -124,4 +125,29 @@ export const deleteHospital = catchAsync(async (req: Request, res: Response) => 
 export const listUnassignedHospitalAdmins = catchAsync(async (_req: Request, res: Response) => {
   const admins = await User.find({ role: "hospital_admin", hospital: null }).select("name email");
   res.json({ status: "success", data: { admins } });
+});
+
+export const getMyHospital = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.user!.hospital;
+  if (!hospitalId) {
+    throw new AppError("No hospital assigned to this user.", 404);
+  }
+  const hospital = await Hospital.findById(hospitalId);
+  if (!hospital) {
+    throw new AppError("Hospital not found.", 404);
+  }
+  res.json({ status: "success", data: { hospital } });
+});
+
+export const updateMyHospital = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.user!.hospital;
+  if (!hospitalId) {
+    throw new AppError("No hospital assigned to this user.", 404);
+  }
+  const body = hospitalSchema.partial().parse(req.body);
+  const hospital = await Hospital.findByIdAndUpdate(hospitalId, body, {
+    new: true,
+    runValidators: true,
+  });
+  res.json({ status: "success", data: { hospital } });
 });

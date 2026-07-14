@@ -28,9 +28,10 @@ export function Topbar() {
       </div>
 
       <div className="flex items-center gap-3">
-        {/* Notification bell — for hospital_admin, doctor, accountant, pharmacist, and laboratory roles */}
+        {/* Notification bell — for hospital_admin, doctor, receptionist, accountant, pharmacist, and laboratory roles */}
         {(user?.role === "hospital_admin" || 
           user?.role === "doctor" || 
+          user?.role === "receptionist" ||
           user?.role === "accountant" || 
           user?.role === "pharmacist" ||
           user?.role === "laboratory") && <NotificationPanel />}

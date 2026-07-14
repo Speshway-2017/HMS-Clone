@@ -7,9 +7,14 @@ import {
   updateHospital,
   deleteHospital,
   listUnassignedHospitalAdmins,
+  getMyHospital,
+  updateMyHospital,
 } from "../controllers/hospitalController";
 
 const router = Router();
+
+router.get("/me", protect, restrictTo("hospital_admin", "super_admin", "receptionist"), getMyHospital);
+router.patch("/me", protect, restrictTo("hospital_admin"), updateMyHospital);
 
 router.use(protect, restrictTo("super_admin"));
 
