@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   Search, User, AlertTriangle, FileText, Activity, Stethoscope,
-  ChevronRight, Heart, FlaskConical, ScanLine, Pill, ShieldAlert,
+  ChevronRight, Heart, FlaskConical, ScanLine, Pill, Download, Eye,
 } from "lucide-react";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
@@ -12,6 +12,8 @@ import { KpiCard } from "../../components/ui/KpiCard";
 // enforces doctor ownership at the MongoDB level (no cross-doctor leakage).
 import { useDoctorPatients } from "../../features/doctorDashboard";
 import type { Patient } from "../../types/domain";
+import { usePatients } from "../../features/patients";
+import { usePrescriptions } from "../../features/doctorDashboard";
 
 const RECORD_TABS = ["Profile", "Medical History", "Diagnoses", "Prescriptions", "Lab Reports", "Radiology", "Surgeries"];
 

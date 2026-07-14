@@ -9,12 +9,15 @@ import {
   deleteDoctor,
   getDoctorPerformance,
   getDoctorProfileMe,
+  updateDoctorProfileMe,
 } from "../controllers/doctorController";
 
 const router = Router();
 
-// Allow logged in doctors to retrieve their own doctor profile
-router.get("/me", protect, restrictTo("doctor"), getDoctorProfileMe);
+// Allow logged in doctors to retrieve and update their own doctor profile
+router.route("/me")
+  .get(protect, restrictTo("doctor"), getDoctorProfileMe)
+  .patch(protect, restrictTo("doctor"), updateDoctorProfileMe);
 
 router.use(protect, restrictTo("hospital_admin", "receptionist", "accountant", "pharmacist", "laboratory"), scopeToHospital);
 

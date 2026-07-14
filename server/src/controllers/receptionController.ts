@@ -5,6 +5,7 @@ import { ReceptionService } from "../services/receptionService";
 import { ReceptionRepository } from "../repositories/receptionRepository";
 import { AppError } from "../utils/AppError";
 import { Types } from "mongoose";
+import { getDoctorDynamicStatus, getBusyDoctorIds } from "../utils/doctorStatus";
 import { Doctor } from "../models/Doctor";
 import { Patient } from "../models/Patient";
 import { Queue } from "../models/Queue";
@@ -276,8 +277,12 @@ export const requestDischarge = catchAsync(async (req: Request, res: Response) =
 });
 
 export const getDoctorsAvailability = catchAsync(async (req: Request, res: Response) => {
+  const busyDoctorIds = await getBusyDoctorIds(req.hospitalFilter!.hospital as any);
   const doctors = await Doctor.find({ hospital: req.hospitalFilter!.hospital as any }).populate("department", "name");
-  res.json({ status: "success", data: { doctors } });
+  const resolvedDoctors = doctors.map(d => {
+    return { ...d.toObject(), status: getDoctorDynamicStatus(d, busyDoctorIds) };
+  });
+  res.json({ status: "success", data: { doctors: resolvedDoctors } });
 });
 
 export const getRoomsAvailability = catchAsync(async (req: Request, res: Response) => {

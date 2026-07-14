@@ -1,6 +1,7 @@
 import mongoose, { Types } from "mongoose";
 import { ReceptionRepository } from "../repositories/receptionRepository";
 import { AppError } from "../utils/AppError";
+import { getDoctorDynamicStatus, getBusyDoctorIds } from "../utils/doctorStatus";
 import { Doctor } from "../models/Doctor";
 import { Room } from "../models/Room";
 import { Bed } from "../models/Bed";
@@ -77,8 +78,12 @@ export class ReceptionService {
     const completedPaymentsCount = invoices.filter((inv: any) => inv.status === "paid").length;
     const totalCollectionsToday = collectionsToday.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
-    const doctorsAvailable = doctorsCount.filter((d: any) => d.status === "on_duty").length;
-    const doctorsBusy = doctorsCount.filter((d: any) => d.status === "off_duty").length; // busy/off duty
+    const busyDoctorIds = await getBusyDoctorIds(hospitalId);
+    const resolvedDoctors = doctorsCount.map((d: any) => {
+      return { ...d.toObject(), status: getDoctorDynamicStatus(d, busyDoctorIds) };
+    });
+    const doctorsAvailable = resolvedDoctors.filter((d: any) => d.status === "on_duty").length;
+    const doctorsBusy = resolvedDoctors.filter((d: any) => d.status === "off_duty").length; // busy/off duty
 
     // Beds availability
     const bedsTotal = bedsAvailable.length;

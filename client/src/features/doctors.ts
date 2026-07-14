@@ -89,3 +89,17 @@ export function useDoctorProfileMe() {
   });
 }
 
+export function useUpdateDoctorProfileMe() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: Partial<Doctor> & { workingHours?: any[]; consultationSettings?: any }) => {
+      const res = await api.patch("/doctors/me", payload);
+      return res.data.data.doctor as Doctor;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["doctors", "me"] });
+      queryClient.invalidateQueries({ queryKey: ["reception", "doctors"] });
+    },
+  });
+}
+

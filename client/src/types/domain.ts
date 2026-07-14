@@ -122,6 +122,10 @@ export interface Doctor {
   bio: string;
   status: "on_duty" | "on_leave" | "off_duty";
   rating: number;
+  workingHours?: Array<{ day: string; from: string; to: string; active: boolean }>;
+  consultationSettings?: { slotDuration: number; maxPatients: number; breakTime: string };
+  languages?: string;
+  consultationFee?: string;
 }
 
 export interface Staff {

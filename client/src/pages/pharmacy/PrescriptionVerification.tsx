@@ -197,8 +197,17 @@ export function PharmacyPrescriptionVerification() {
                   variant="secondary" 
                   className="flex-1 text-xs py-1.5 flex items-center justify-center gap-1"
                 >
-                  <Eye className="h-3.5 w-3.5" /> Details
+                  Details
                 </Button>
+
+                <a
+                  href={`/api/v1/prescriptions/${p._id}/download?token=${sessionStorage.getItem("hms_token") || ""}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-1 inline-flex items-center justify-center gap-1 rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 text-xs font-semibold transition"
+                >
+                  <Eye className="h-3.5 w-3.5" /> View PDF
+                </a>
 
                 {p.status === "Pending" && (
                   <>
@@ -284,6 +293,14 @@ export function PharmacyPrescriptionVerification() {
             )}
 
             <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+              <a
+                href={`/api/v1/prescriptions/${selectedPresc._id}/download?token=${sessionStorage.getItem("hms_token") || ""}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 text-xs font-semibold transition"
+              >
+                <Eye className="h-3.5 w-3.5" /> View PDF
+              </a>
               <Button variant="secondary" onClick={() => setIsDetailsOpen(false)}>Close</Button>
               {selectedPresc.status === "Pending" && (
                 <>

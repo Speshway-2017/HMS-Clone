@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { useChangePassword } from "../../features/auth";
 import { useAuth } from "../../context/AuthContext";
-import { useDoctorProfileMe } from "../../features/doctors";
+import { useDoctorProfileMe, useUpdateDoctorProfileMe } from "../../features/doctors";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 
@@ -136,6 +136,7 @@ export function DoctorSettingsPage() {
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const { data: doctorProfile } = useDoctorProfileMe();
+  const updateProfileMutation = useUpdateDoctorProfileMe();
 
   // Profile tab state
   const [profileForm, setProfileForm] = useState({
@@ -149,22 +150,6 @@ export function DoctorSettingsPage() {
     consultationFee:"₹500",
     languages:      "English, Hindi",
   });
-
-  useEffect(() => {
-    if (doctorProfile) {
-      setProfileForm({
-        name: doctorProfile.name || "",
-        email: doctorProfile.email || "",
-        phone: doctorProfile.phone || "",
-        specialization: doctorProfile.specialization || "",
-        qualification: doctorProfile.qualification || "",
-        licenseNo: doctorProfile.licenseNo || "",
-        bio: doctorProfile.bio || "",
-        consultationFee: "₹500",
-        languages: "English, Hindi",
-      });
-    }
-  }, [doctorProfile]);
 
   // Notification state
   const [notif, setNotif] = useState({
@@ -193,7 +178,33 @@ export function DoctorSettingsPage() {
   // Availability state
   const [hours, setHours] = useState(WORKING_HOURS);
   const [consultDuration, setConsultDuration] = useState("15");
+  const [maxPatients, setMaxPatients] = useState(25);
+  const [breakTime, setBreakTime] = useState("13:00");
   const [activeTab, setActiveTab] = useState("profile");
+
+  useEffect(() => {
+    if (doctorProfile) {
+      setProfileForm({
+        name: doctorProfile.name || "",
+        email: doctorProfile.email || "",
+        phone: doctorProfile.phone || "",
+        specialization: doctorProfile.specialization || "",
+        qualification: doctorProfile.qualification || "",
+        licenseNo: doctorProfile.licenseNo || "",
+        bio: doctorProfile.bio || "",
+        consultationFee: doctorProfile.consultationFee || "₹500",
+        languages: doctorProfile.languages || "English, Hindi",
+      });
+      if (doctorProfile.workingHours && doctorProfile.workingHours.length > 0) {
+        setHours(doctorProfile.workingHours);
+      }
+      if (doctorProfile.consultationSettings) {
+        setConsultDuration(String(doctorProfile.consultationSettings.slotDuration ?? "15"));
+        setMaxPatients(doctorProfile.consultationSettings.maxPatients ?? 25);
+        setBreakTime(doctorProfile.consultationSettings.breakTime ?? "13:00");
+      }
+    }
+  }, [doctorProfile]);
 
   // ─── Derived states ──────────────────────────────────────────────────────────
   const passwordsMatch   = newPassword !== "" && newPassword === confirmPassword;
@@ -203,6 +214,42 @@ export function DoctorSettingsPage() {
     setToast({ type, message });
     setTimeout(() => setToast(null), 4500);
   }
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await updateProfileMutation.mutateAsync({
+        name: profileForm.name,
+        phone: profileForm.phone,
+        specialization: profileForm.specialization,
+        qualification: profileForm.qualification,
+        licenseNo: profileForm.licenseNo,
+        bio: profileForm.bio,
+        consultationFee: profileForm.consultationFee,
+        languages: profileForm.languages,
+      });
+      showToast("success", "Profile updated successfully!");
+    } catch (err: any) {
+      showToast("error", err?.response?.data?.message || err?.message || "Failed to update profile.");
+    }
+  };
+
+  const handleSaveSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await updateProfileMutation.mutateAsync({
+        workingHours: hours,
+        consultationSettings: {
+          slotDuration: parseInt(consultDuration, 10),
+          maxPatients: maxPatients,
+          breakTime: breakTime,
+        },
+      });
+      showToast("success", "Schedule updated successfully!");
+    } catch (err: any) {
+      showToast("error", err?.response?.data?.message || err?.message || "Failed to update schedule.");
+    }
+  };
 
   function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
@@ -339,8 +386,13 @@ export function DoctorSettingsPage() {
               />
             </div>
             <div className="mt-4 flex justify-end">
-              <button className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors">
-                <Save className="h-4 w-4" /> Save Profile
+              <button
+                type="button"
+                onClick={handleSaveProfile}
+                disabled={updateProfileMutation.isPending}
+                className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {updateProfileMutation.isPending ? "Saving..." : <><Save className="h-4 w-4" /> Save Profile</>}
               </button>
             </div>
           </Section>
@@ -520,18 +572,33 @@ export function DoctorSettingsPage() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold uppercase text-slate-400">Max Patients / Day</label>
-                <input type="number" defaultValue={25} min={1} max={60}
-                  className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200" />
+                <input
+                  type="number"
+                  value={maxPatients}
+                  onChange={(e) => setMaxPatients(parseInt(e.target.value) || 0)}
+                  min={1}
+                  max={60}
+                  className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold uppercase text-slate-400">Break Time</label>
-                <input type="time" defaultValue="13:00"
-                  className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200" />
+                <input
+                  type="time"
+                  value={breakTime}
+                  onChange={(e) => setBreakTime(e.target.value)}
+                  className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                />
               </div>
             </div>
             <div className="mt-4 flex justify-end">
-              <button className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors">
-                <Save className="h-4 w-4" /> Save Schedule
+              <button
+                type="button"
+                onClick={handleSaveSchedule}
+                disabled={updateProfileMutation.isPending}
+                className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {updateProfileMutation.isPending ? "Saving..." : <><Save className="h-4 w-4" /> Save Schedule</>}
               </button>
             </div>
           </Section>

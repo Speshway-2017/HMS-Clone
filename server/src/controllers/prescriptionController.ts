@@ -16,6 +16,7 @@ import { emitToHospital } from "../config/socket";
 import { catchAsync } from "../utils/catchAsync";
 import { AppError } from "../utils/AppError";
 import { env } from "../config/env";
+import { cloudinary } from "../config/cloudinary";
 
 async function getLoggedDoctor(req: Request) {
   const doctor = await Doctor.findOne({ email: req.user!.email, isActive: { $ne: false } });
@@ -175,14 +176,12 @@ export async function createOrUpdatePrescriptionCore(
   );
 
   const verificationUrl = `${env.clientUrl}/verify-prescription/${prescription._id}`;
-  const downloadUrl = `${reqHostUrl}/api/v1/prescriptions/${prescription._id}/download?token=${token}`;
-
-  prescription.pdfUrl = `/api/v1/prescriptions/${prescription._id}/download?token=${token}`;
-  prescription.downloadUrl = downloadUrl;
-  await prescription.save({ session });
 
   // 5. Generate secure PDF file
   const secureDir = path.join(__dirname, "../../../secure_prescriptions");
+  if (!fs.existsSync(secureDir)) {
+    fs.mkdirSync(secureDir, { recursive: true });
+  }
   const pdfPath = path.join(secureDir, `${prescription._id}.pdf`);
 
   await generatePrescriptionPDF({
@@ -211,6 +210,24 @@ export async function createOrUpdatePrescriptionCore(
     followUpDate: prescription.followUpDate ? new Date(prescription.followUpDate) : null,
     verificationUrl
   }, pdfPath);
+
+  // Upload to Cloudinary
+  const uploadResult = await cloudinary.uploader.upload(pdfPath, {
+    folder: "hms/prescriptions",
+    resource_type: "auto"
+  });
+
+  // Cleanup local temp file
+  try {
+    fs.unlinkSync(pdfPath);
+  } catch (err) {
+    console.error("Failed to delete local temp prescription PDF:", err);
+  }
+
+  const downloadUrl = uploadResult.secure_url;
+  prescription.pdfUrl = uploadResult.secure_url;
+  prescription.downloadUrl = downloadUrl;
+  await prescription.save({ session });
 
   const safeRx = prescription;
 
@@ -350,11 +367,14 @@ export const savePrescription = catchAsync(async (req: Request, res: Response) =
  */
 export const listPrescriptions = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
-  const { status } = req.query;
+  const { status, patient } = req.query;
   
   const query: any = { hospital: hospitalId };
   if (status) {
     query.status = status;
+  }
+  if (patient) {
+    query.patient = patient;
   }
 
   // Enforce doctor data isolation: doctors only see their own prescriptions
@@ -432,8 +452,15 @@ export const downloadPrescription = catchAsync(async (req: Request, res: Respons
   if (token) {
     try {
       verifiedPayload = jwt.verify(token, env.jwtSecret);
-      if (verifiedPayload.prescriptionId !== prescriptionId) {
-        throw new AppError("Invalid signed token for this prescription.", 403);
+      if (verifiedPayload.prescriptionId) {
+        if (verifiedPayload.prescriptionId !== prescriptionId) {
+          throw new AppError("Invalid signed token for this prescription.", 403);
+        }
+      } else if (verifiedPayload.id) {
+        // Authenticated user token passed in query parameter (e.g. from target="_blank" click)
+        req.user = { _id: verifiedPayload.id, name: "Hospital Staff" } as any;
+      } else {
+        throw new AppError("Invalid token payload.", 403);
       }
     } catch (err: any) {
       throw new AppError("Secure link has expired or is invalid.", 403);
@@ -477,8 +504,32 @@ export const downloadPrescription = catchAsync(async (req: Request, res: Respons
     }
   );
 
-  res.setHeader("Content-Type", "application/pdf");
-  res.download(pdfPath, `prescription_${prescriptionId}.pdf`);
+  if (prescription.pdfUrl && (prescription.pdfUrl.startsWith("http://") || prescription.pdfUrl.startsWith("https://"))) {
+    return res.redirect(prescription.pdfUrl);
+  }
+
+  const pdfPath = path.join(__dirname, "../../../secure_prescriptions", `${prescriptionId}.pdf`);
+  if (fs.existsSync(pdfPath)) {
+    // Lazy migration: Upload existing local prescription to Cloudinary on first view
+    const uploadResult = await cloudinary.uploader.upload(pdfPath, {
+      folder: "hms/prescriptions",
+      resource_type: "auto"
+    });
+
+    try {
+      fs.unlinkSync(pdfPath);
+    } catch (err) {
+      console.error("Lazy migration cleanup failed:", err);
+    }
+
+    prescription.pdfUrl = uploadResult.secure_url;
+    prescription.downloadUrl = uploadResult.secure_url;
+    await prescription.save();
+
+    return res.redirect(uploadResult.secure_url);
+  }
+
+  throw new AppError("Prescription document file not found.", 404);
 });
 
 /**
