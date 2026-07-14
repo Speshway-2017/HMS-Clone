@@ -377,6 +377,12 @@ export const listPrescriptions = catchAsync(async (req: Request, res: Response) 
     query.patient = patient;
   }
 
+  // Enforce doctor data isolation: doctors only see their own prescriptions
+  if (req.user!.role === "doctor") {
+    const doctor = await getLoggedDoctor(req);
+    query.doctor = doctor._id;
+  }
+
   const prescriptions = await Prescription.find(query)
     .populate("patient")
     .populate("doctor")
@@ -469,6 +475,19 @@ export const downloadPrescription = catchAsync(async (req: Request, res: Respons
   const prescription = await Prescription.findById(prescriptionId);
   if (!prescription) {
     throw new AppError("Prescription not found.", 404);
+  }
+
+  // Doctor ownership validation
+  if (req.user && req.user.role === "doctor") {
+    const doctor = await getLoggedDoctor(req);
+    if (prescription.doctor.toString() !== doctor._id.toString()) {
+      throw new AppError("You do not have access to this prescription.", 403);
+    }
+  }
+
+  const pdfPath = path.join(__dirname, "../../../secure_prescriptions", `${prescriptionId}.pdf`);
+  if (!fs.existsSync(pdfPath)) {
+    throw new AppError("Prescription document file not found.", 404);
   }
 
   // Determine downloadedBy name for Audit Log

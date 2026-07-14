@@ -33,11 +33,24 @@ export interface Department {
   _id: string;
   hospital: { _id: string; name: string } | string;
   branch: string | null;
+
+  // Core identity
   name: string;
+  code: string;
   description: string;
+  specialization: string;
   category: string;
+
+  // Leadership
   headName: string;
+  departmentHead: { _id: string; name: string; specialization?: string } | string | null;
+
+  // Location
   location: string;
+  floor: string;
+  building: string;
+
+  // Operations
   totalBeds: number;
   occupiedBeds: number;
   doctors: number;
@@ -45,7 +58,26 @@ export interface Department {
   support: number;
   services: string[];
   rating: number;
-  status: "operational" | "critical_load" | "peak_hours" | "inactive";
+  status:
+    | "operational"
+    | "critical_load"
+    | "peak_hours"
+    | "inactive"
+    | "under_maintenance"
+    | "temporarily_closed";
+
+  // Extended details
+  consultationFee: number;
+  isEmergency: boolean;
+  colorTheme: string;
+  displayOrder: number;
+
+  // Soft-disable
+  isDisabled: boolean;
+  disabledAt: string | null;
+
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Admin {
@@ -135,6 +167,7 @@ export interface Patient {
   address: string;
   assignedDoctor: { _id: string; name: string } | string | null;
   status: "admitted" | "opd" | "discharged";
+  isActive?: boolean;
   allergies: string;
   insuranceProvider: string;
   insurancePolicyNumber: string;

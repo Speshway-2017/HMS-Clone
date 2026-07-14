@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { usePatients } from "../../features/patients";
-import { useCreatePrescription } from "../../features/doctorDashboard";
+import { useDoctorPatients, useCreatePrescription } from "../../features/doctorDashboard";
 import { Card } from "../../components/ui/Card";
 import { InputField, TextareaField, SelectField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
@@ -20,7 +19,7 @@ export function NewPrescriptionPage() {
   const [searchParams] = useSearchParams();
   const defaultPatientId = searchParams.get("patientId") || "";
 
-  const { data: patientData, isLoading: isPatientsLoading } = usePatients({ page: 1 });
+  const { data: patientData, isLoading: isPatientsLoading } = useDoctorPatients();
   const createPrescriptionMutation = useCreatePrescription();
 
   const [patientId, setPatientId] = useState(defaultPatientId);
@@ -79,7 +78,7 @@ export function NewPrescriptionPage() {
     }
   };
 
-  const patients = patientData?.data || [];
+  const patients = patientData?.patients || [];
 
   return (
     <div className="space-y-6">

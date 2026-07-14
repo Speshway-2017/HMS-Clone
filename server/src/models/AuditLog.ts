@@ -7,8 +7,14 @@ const auditLogSchema = new Schema(
     action: { type: String, required: true },
     details: { type: String, required: true },
     ipAddress: { type: String, default: "" },
+
+    // ── Resource tracking (additive — existing logs have these null) ──────
+    resource: { type: String, default: null },          // e.g. "department"
+    resourceId: { type: Schema.Types.ObjectId, default: null }, // affected doc _id
+    oldValues: { type: Schema.Types.Mixed, default: null },     // snapshot before edit
+    newValues: { type: Schema.Types.Mixed, default: null },     // snapshot after edit
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 export type AuditLog = InferSchemaType<typeof auditLogSchema> & { _id: Types.ObjectId };

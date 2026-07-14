@@ -129,11 +129,11 @@ export class DoctorDashboardRepository {
       .sort({ time: 1 });
   }
 
-  // 9. Notifications for Doctor Role
-  static async getNotifications(hospitalId: Types.ObjectId) {
+  // 9. Notifications for Doctor
+  static async getNotifications(hospitalId: Types.ObjectId, doctorId: string) {
     return await DbNotification.find({
       hospital: hospitalId,
-      recipientRole: "doctor",
+      recipientDoctor: doctorId,
     }).sort({ createdAt: -1 });
   }
 

@@ -585,7 +585,7 @@ export function useCancelPrescription() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const res = await api.patch<{ status: string; data: any }>(`/prescriptions/${id}/cancel`);
+      const res = await api.patch<{ status: string; data: unknown }>(`/prescriptions/${id}/cancel`);
       return res.data.data;
     },
     onSuccess: () => {
@@ -593,3 +593,121 @@ export function useCancelPrescription() {
     },
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Doctor-scoped Patient Records
+// These hooks call the SECURED endpoints that enforce doctor ownership on the
+// server. They must NEVER be replaced with the generic usePatients() hook in
+// doctor-role pages.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DoctorPatientListResponse {
+  patients: import("../types/domain").Patient[];
+  counts: { total: number; admitted: number; opd: number; discharged: number };
+}
+
+/**
+ * Fetch only the patients assigned to the authenticated doctor.
+ * Filtering is enforced at the MongoDB level — no frontend filtering.
+ */
+export function useDoctorPatients(params?: { search?: string }) {
+  return useQuery({
+    queryKey: ["doctorDashboard", "myPatients", params],
+    queryFn: async () => {
+      const res = await api.get<{ status: string; data: DoctorPatientListResponse }>(
+        "/doctors/dashboard/my-patients",
+        { params },
+      );
+      return res.data.data;
+    },
+  });
+}
+
+export interface DoctorPatientDetailResponse {
+  patient: import("../types/domain").Patient;
+  appointments: import("../types/domain").Appointment[];
+  prescriptions: Prescription[];
+  labOrders: LabOrder[];
+  radiologyOrders: unknown[];
+  admissions: unknown[];
+}
+
+/**
+ * Fetch a single patient by ID — server enforces ownership check.
+ * Returns 403 if this patient does not belong to the authenticated doctor.
+ */
+export function useDoctorPatientById(patientId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["doctorDashboard", "myPatients", patientId],
+    enabled: !!patientId,
+    queryFn: async () => {
+      const res = await api.get<{ status: string; data: DoctorPatientDetailResponse }>(
+        `/doctors/dashboard/my-patients/${patientId}`,
+      );
+      return res.data.data;
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Doctor-scoped Lab Orders
+// These hooks call the SECURED endpoints that enforce doctor ownership on the
+// server.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DoctorLabOrdersResponse {
+  orders: LabOrder[];
+  counts: { total: number; pending: number; completed: number; rejected: number };
+}
+
+/**
+ * Fetch lab orders created by or assigned to the authenticated doctor.
+ */
+export function useDoctorLabOrders(params?: { status?: string; search?: string }) {
+  return useQuery({
+    queryKey: ["doctorDashboard", "myLabOrders", params],
+    queryFn: async () => {
+      const res = await api.get<{ status: string; data: DoctorLabOrdersResponse }>(
+        "/doctors/dashboard/my-lab-orders",
+        { params },
+      );
+      return res.data.data;
+    },
+  });
+}
+
+/**
+ * Fetch a single lab order by ID with ownership validation.
+ */
+export function useDoctorLabOrderById(labOrderId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["doctorDashboard", "myLabOrders", labOrderId],
+    enabled: !!labOrderId,
+    queryFn: async () => {
+      const res = await api.get<{ status: string; data: { order: LabOrder } }>(
+        `/doctors/dashboard/my-lab-orders/${labOrderId}`,
+      );
+      return res.data.data.order;
+    },
+  });
+}
+
+/**
+ * Mark a doctor's notification as read.
+ */
+export function useMarkDoctorNotificationRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.post<{ status: string; data: { notification: any } }>(
+        `/doctors/dashboard/notifications/${id}/read`
+      );
+      return res.data.data.notification;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard", "notifications"] });
+    },
+  });
+}
+
+

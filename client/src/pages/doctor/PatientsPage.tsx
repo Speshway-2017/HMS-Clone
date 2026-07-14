@@ -1,17 +1,27 @@
 import { useState } from "react";
-import { usePatients } from "../../features/patients";
+// ── SECURITY FIX: use doctor-scoped hook, NOT usePatients() ──────────────────
+// usePatients() calls /api/v1/patients which returns ALL hospital patients.
+// useDoctorPatients() calls /doctors/dashboard/my-patients — the server
+// enforces doctor ownership at the MongoDB level (no cross-doctor leakage).
+import { useDoctorPatients } from "../../features/doctorDashboard";
 import { Card } from "../../components/ui/Card";
-import { InputField } from "../../components/ui/Field";
 import { Badge } from "../../components/ui/Badge";
 import { Search, User, History, ShieldAlert } from "lucide-react";
+import type { Patient } from "../../types/domain";
+
+const STATUS_TONE: Record<string, "success" | "warning" | "danger" | "info" | "neutral"> = {
+  admitted: "warning",
+  opd: "info",
+  discharged: "neutral",
+};
 
 export function PatientsPage() {
   const [search, setSearch] = useState("");
-  const { data: patientData, isLoading, isError, refetch } = usePatients({ search });
+  const { data: myData, isLoading, isError, refetch } = useDoctorPatients({ search });
 
-  const [selectedPatient, setSelectedPatient] = useState<any | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
-  const patients = patientData?.data || [];
+  const patients: Patient[] = myData?.patients ?? [];
 
   if (isLoading && patients.length === 0) {
     return (
@@ -43,8 +53,8 @@ export function PatientsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Patients Registry & History</h1>
-        <p className="text-sm text-slate-500">Search patients and view full medical history logs.</p>
+        <h1 className="text-2xl font-bold text-slate-900">My Patients Registry</h1>
+        <p className="text-sm text-slate-500">Search your patients and view their full medical history logs.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -56,19 +66,24 @@ export function PatientsPage() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search patient name, phone, UHID..."
+                placeholder="Search your patients..."
                 className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-navy-500 focus:border-navy-500"
               />
             </div>
           </Card>
 
           {patients.length === 0 ? (
-            <Card className="py-8 text-center text-xs text-slate-400">
-              No patients found.
+            <Card className="py-12 flex flex-col items-center justify-center text-center border-dashed border-slate-200 bg-slate-50">
+              <User className="mb-2 h-8 w-8 text-slate-300" />
+              <p className="text-sm font-semibold text-slate-500">No patients assigned to you.</p>
+              <p className="text-xs text-slate-400 mt-1 max-w-xs">
+                Patients will appear here once appointments, admissions, lab orders,
+                or radiology orders are assigned to you.
+              </p>
             </Card>
           ) : (
             <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-              {patients.map((p: any) => (
+              {patients.map((p) => (
                 <div
                   key={p._id}
                   onClick={() => setSelectedPatient(p)}
@@ -76,8 +91,10 @@ export function PatientsPage() {
                     selectedPatient?._id === p._id ? "border-navy-700 bg-navy-50/50" : "border-slate-200 bg-white hover:bg-slate-50"
                   }`}
                 >
-                  <h4 className="text-sm font-bold text-slate-800">{p.name}</h4>
-                  <p className="text-xs text-slate-500 mt-1">UHID: {p.uhid || "—"}</p>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-slate-800">{p.name}</h4>
+                    <Badge tone={STATUS_TONE[p.status] ?? "neutral"}>{p.status}</Badge>
+                  </div>
                   <p className="text-xs text-slate-400 mt-0.5">{p.phone ? `Phone: ${p.phone}` : ""}</p>
                 </div>
               ))}
@@ -92,7 +109,7 @@ export function PatientsPage() {
               <div className="border-b pb-4">
                 <h2 className="text-lg font-bold text-slate-900">{selectedPatient.name}</h2>
                 <p className="text-sm text-slate-500 mt-1">
-                  UHID: <span className="font-mono">{selectedPatient.uhid || "—"}</span> · Age: {selectedPatient.age || "—"} · Gender: {selectedPatient.gender || "—"}
+                  Age: {selectedPatient.age || "—"} · Gender: {selectedPatient.gender || "—"}
                 </p>
                 {selectedPatient.allergies && (
                   <div className="mt-3 p-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg font-medium">
@@ -105,11 +122,11 @@ export function PatientsPage() {
                 <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 mb-3">
                   <History className="h-4 w-4" /> Medical History Logs
                 </h3>
-                {selectedPatient.medicalHistory && selectedPatient.medicalHistory.length === 0 ? (
+                {!selectedPatient.medicalHistory || selectedPatient.medicalHistory.length === 0 ? (
                   <p className="text-xs text-slate-400 py-4">No medical history entries recorded for this patient.</p>
                 ) : (
                   <div className="space-y-4">
-                    {selectedPatient.medicalHistory?.map((mh: any, idx: number) => {
+                    {selectedPatient.medicalHistory.map((mh, idx) => {
                       const mhDate = new Date(mh.date).toLocaleDateString("en-IN", {
                         day: "numeric",
                         month: "short",

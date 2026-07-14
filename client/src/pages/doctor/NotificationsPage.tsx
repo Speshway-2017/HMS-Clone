@@ -1,7 +1,9 @@
-import { useDoctorNotifications } from "../../features/doctorDashboard";
+import { useDoctorNotifications, useMarkDoctorNotificationRead } from "../../features/doctorDashboard";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
-import { Bell, AlertTriangle, RefreshCw } from "lucide-react";
+import { Button } from "../../components/ui/Button";
+import { Bell, AlertTriangle, RefreshCw, CheckCheck } from "lucide-react";
+import toast from "react-hot-toast";
 
 const SEVERITY_TONES: Record<string, "success" | "warning" | "danger" | "neutral" | "info"> = {
   info: "info",
@@ -11,6 +13,16 @@ const SEVERITY_TONES: Record<string, "success" | "warning" | "danger" | "neutral
 
 export function NotificationsPage() {
   const { data: notifications, isLoading, isError, refetch } = useDoctorNotifications();
+  const markReadMutation = useMarkDoctorNotificationRead();
+
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      await markReadMutation.mutateAsync(id);
+      toast.success("Notification marked as read");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to mark notification as read");
+    }
+  };
 
   if (isLoading) {
     return (
@@ -73,21 +85,42 @@ export function NotificationsPage() {
             return (
               <div
                 key={notif._id}
-                className="flex items-start gap-4 border border-slate-200 bg-white rounded-xl p-4 transition-all duration-300 hover:shadow-sm hover:bg-slate-50/50"
+                className={`flex items-start gap-4 border rounded-xl p-4 transition-all duration-300 hover:shadow-sm ${
+                  notif.isRead
+                    ? "border-slate-100 bg-slate-50/50 opacity-75"
+                    : "border-slate-200 bg-white ring-1 ring-navy-50/20"
+                }`}
               >
                 <div className={`p-2 rounded-lg shrink-0 ${notif.severity === "critical" ? "bg-red-50 text-red-600" : notif.severity === "warning" ? "bg-amber-50 text-amber-600" : "bg-blue-50 text-blue-600"}`}>
                   <Bell className="h-5 w-5" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-slate-900">{notif.title}</h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className={`text-sm font-bold text-slate-900 ${notif.isRead ? "text-slate-500 font-medium" : ""}`}>
+                      {notif.title}
+                    </h3>
                     <Badge tone={SEVERITY_TONES[notif.severity] || "neutral"}>
                       {notif.severity.toUpperCase()}
                     </Badge>
+                    {!notif.isRead && (
+                      <span className="inline-block h-2 w-2 rounded-full bg-navy-600 animate-pulse" />
+                    )}
                   </div>
-                  <p className="text-sm text-slate-600 mt-1">{notif.message}</p>
+                  <p className={`text-sm mt-1 ${notif.isRead ? "text-slate-500" : "text-slate-600"}`}>{notif.message}</p>
                   <span className="text-[10px] text-slate-400 block mt-2">{dateStr}</span>
                 </div>
+                {!notif.isRead && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="shrink-0 flex items-center gap-1 text-[11px]"
+                    onClick={() => handleMarkAsRead(notif._id)}
+                    disabled={markReadMutation.isPending}
+                  >
+                    <CheckCheck className="h-3.5 w-3.5 text-slate-500" />
+                    Mark Read
+                  </Button>
+                )}
               </div>
             );
           })}
