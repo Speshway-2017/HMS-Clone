@@ -65,11 +65,20 @@ export function DoctorsPage({ activeTab = "availability" }: Props) {
     },
     {
       header: "Consultation Timings",
-      render: (row: any) => (
-        <span className="text-xs text-slate-600">
-          {row.status === "on_leave" ? "N/A" : "09:00 AM - 05:00 PM"}
-        </span>
-      )
+      render: (row: any) => {
+        if (row.status === "on_leave") return <span className="text-xs text-slate-600">N/A</span>;
+        
+        const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        const dayName = days[new Date().getDay()];
+        const schedule = row.workingHours?.find((wh: any) => wh.day === dayName);
+        
+        if (schedule) {
+          if (!schedule.active) return <span className="text-xs text-amber-600 font-medium">Off Today</span>;
+          return <span className="text-xs text-slate-600">{schedule.from} - {schedule.to}</span>;
+        }
+        
+        return <span className="text-xs text-slate-600">09:00 - 17:00</span>;
+      }
     }
   ];
 

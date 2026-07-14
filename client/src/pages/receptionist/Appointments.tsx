@@ -83,16 +83,73 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
 
   const ALL_SLOTS = ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "14:00", "14:30", "15:00", "15:30", "16:00"];
 
-  const getAvailableSlots = (dateStr: string) => {
+  const generateSlots = (from: string, to: string, duration: number, breakTime?: string) => {
+    const slots: string[] = [];
+    const [startH, startM] = from.split(":").map(Number);
+    const [endH, endM] = to.split(":").map(Number);
+    
+    let current = startH * 60 + startM;
+    const end = endH * 60 + endM;
+    
+    let breakStart = -1;
+    let breakEnd = -1;
+    if (breakTime) {
+      const [breakH, breakM] = breakTime.split(":").map(Number);
+      breakStart = breakH * 60 + breakM;
+      breakEnd = breakStart + 60; // 1 hour break
+    }
+    
+    while (current + duration <= end) {
+      if (breakStart !== -1 && current >= breakStart && current < breakEnd) {
+        current += duration;
+        continue;
+      }
+      
+      const h = Math.floor(current / 60);
+      const m = current % 60;
+      const timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      slots.push(timeStr);
+      current += duration;
+    }
+    return slots;
+  };
+
+  const getAvailableSlots = (dateStr: string, doctorId?: string) => {
+    if (!doctorId) {
+      return ALL_SLOTS;
+    }
+    const selectedDoc = doctors?.find((d: any) => d._id === doctorId);
+    if (!selectedDoc) {
+      return ALL_SLOTS;
+    }
+
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const dateObj = new Date(dateStr);
+    const dayName = days[dateObj.getDay()];
+
+    const daySchedule = selectedDoc.workingHours?.find((wh: any) => wh.day === dayName);
+
+    // If day is off duty or schedule not active, return no slots
+    if (daySchedule && !daySchedule.active) {
+      return [];
+    }
+
+    const from = daySchedule?.from && daySchedule.from !== "—" ? daySchedule.from : "09:00";
+    const to = daySchedule?.to && daySchedule.to !== "—" ? daySchedule.to : "17:00";
+    const duration = selectedDoc.consultationSettings?.slotDuration ?? 15;
+    const breakTime = selectedDoc.consultationSettings?.breakTime ?? "13:00";
+
+    let generated = generateSlots(from, to, duration, breakTime);
+
     const todayStr = new Date().toISOString().split("T")[0];
     if (dateStr === todayStr) {
       const now = new Date();
-      return ALL_SLOTS.filter((slot) => {
+      generated = generated.filter((slot) => {
         const [h, m] = slot.split(":").map(Number);
         return h > now.getHours() || (h === now.getHours() && m > now.getMinutes());
       });
     }
-    return ALL_SLOTS;
+    return generated;
   };
 
   const openDialog = (row: any) => {
@@ -221,6 +278,12 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const selectedDeptId = watch("departmentId");
   const selectedDate = watch("date");
 
+  const selectedDoc = doctors?.find((d: any) => d._id === selectedDoctorId);
+  const daysOfWeekList = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const selectedDayOfWeekName = selectedDate ? daysOfWeekList[new Date(selectedDate).getDay()] : "";
+  const selectedDaySchedule = selectedDoc?.workingHours?.find((wh: any) => wh.day === selectedDayOfWeekName);
+  const isDoctorOffDuty = selectedDaySchedule && !selectedDaySchedule.active;
+
   // ── Real-time Duplicate Appointment Check ──
   const { data: dupCheck, isFetching: dupChecking } = useCheckDuplicateAppointment(
     selectedPatientId,
@@ -233,15 +296,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
 
   const getFilteredSlots = () => {
     if (!selectedDate) return ALL_SLOTS;
-    const todayStr = new Date().toISOString().split("T")[0];
-    if (selectedDate === todayStr) {
-      const now = new Date();
-      return ALL_SLOTS.filter((slot) => {
-        const [h, m] = slot.split(":").map(Number);
-        return h > now.getHours() || (h === now.getHours() && m > now.getMinutes());
-      });
-    }
-    return ALL_SLOTS;
+    return getAvailableSlots(selectedDate, selectedDoctorId);
   };
 
   const handleBook = async (data: any) => {
@@ -521,6 +576,19 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                   <option value="Walk-in">Walk-in Visit</option>
                   <option value="Emergency">Emergency Visit</option>
                 </SelectField>
+
+                {/* ── Real-time Doctor Off Duty Warning ── */}
+                {selectedDoctorId && selectedDate && isDoctorOffDuty && (
+                  <div className="sm:col-span-3 flex items-start gap-2.5 rounded-md bg-amber-50 border border-amber-200 px-3 py-2.5">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-amber-700">Doctor is Unavailable</p>
+                      <p className="mt-0.5 text-xs text-amber-600 leading-snug">
+                        Dr. {selectedDoc?.name || "the selected doctor"} is marked as "Off" on {selectedDayOfWeekName || "this day"}. Please choose a different date or select another consultant.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
               <TextareaField label="Chief Complaints / Notes" {...register("notes")} rows={2} />
             </Card>
@@ -732,7 +800,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                       className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1 ${rescheduleErrors.time ? "border-red-400 focus:ring-red-400" : "border-slate-300 focus:border-navy-500 focus:ring-navy-500"}`}
                     >
                       <option value="">Select Slot</option>
-                      {getAvailableSlots(rescheduleDate).map((s) => <option key={s} value={s}>{s}</option>)}
+                      {getAvailableSlots(rescheduleDate, rescheduleDoctor).map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                     {rescheduleErrors.time && <p className="mt-0.5 text-xs text-red-500">{rescheduleErrors.time}</p>}
                   </div>

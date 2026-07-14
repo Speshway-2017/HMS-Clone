@@ -8,6 +8,7 @@ import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { generateTempPassword } from "../utils/idGenerator";
 import { getPagination, paginatedResponse } from "../utils/pagination";
+import { getDoctorDynamicStatus, getBusyDoctorIds } from "../utils/doctorStatus";
 
 const doctorSchema = z.object({
   department: z.string().optional().nullable(),
@@ -32,19 +33,33 @@ export const listDoctors = catchAsync(async (req: Request, res: Response) => {
   if (status) filter.status = status;
   if (search) filter.name = new RegExp(search, "i");
 
-  const [doctors, total, statusCounts] = await Promise.all([
+  const busyDoctorIds = await getBusyDoctorIds(req.hospitalFilter!.hospital as any);
+
+  const [doctors, allHospitalDoctors] = await Promise.all([
     Doctor.find(filter).populate("department", "name").sort({ createdAt: -1 }).skip(skip).limit(limit),
-    Doctor.countDocuments(filter),
-    Doctor.aggregate([{ $match: req.hospitalFilter as Record<string, unknown> }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
+    Doctor.find(req.hospitalFilter as Record<string, unknown>),
   ]);
+
+  const resolvedPaginated = doctors.map(d => {
+    return { ...d.toObject(), status: getDoctorDynamicStatus(d, busyDoctorIds) };
+  });
+
+  const allResolvedDoctors = allHospitalDoctors.map(d => {
+    return { ...d.toObject(), status: getDoctorDynamicStatus(d, busyDoctorIds) };
+  });
+
+  const totalFiltered = await Doctor.countDocuments(filter);
+  const total = allResolvedDoctors.length;
+  const onDutyCount = allResolvedDoctors.filter(d => d.status === "on_duty").length;
+  const onLeaveCount = allResolvedDoctors.filter(d => d.status === "on_leave").length;
 
   res.json({
     status: "success",
-    ...paginatedResponse(doctors, total, { page, limit, skip }),
+    ...paginatedResponse(resolvedPaginated, totalFiltered, { page, limit, skip }),
     counts: {
       total,
-      onDuty: statusCounts.find((s) => s._id === "on_duty")?.count ?? 0,
-      onLeave: statusCounts.find((s) => s._id === "on_leave")?.count ?? 0,
+      onDuty: onDutyCount,
+      onLeave: onLeaveCount,
     },
   });
 });
@@ -82,9 +97,12 @@ export const getDoctor = catchAsync(async (req: Request, res: Response) => {
     throw new AppError("Doctor not found.", 404);
   }
 
+  const busyDoctorIds = await getBusyDoctorIds(req.hospitalFilter!.hospital as any);
+  const resolvedDoctor = { ...doctor.toObject(), status: getDoctorDynamicStatus(doctor, busyDoctorIds) };
+
   const patientsTreated = await Appointment.countDocuments({ doctor: doctor._id, status: "completed" });
 
-  res.json({ status: "success", data: { doctor, stats: { patientsTreated } } });
+  res.json({ status: "success", data: { doctor: resolvedDoctor, stats: { patientsTreated } } });
 });
 
 export const updateDoctor = catchAsync(async (req: Request, res: Response) => {
@@ -150,6 +168,54 @@ export const getDoctorProfileMe = catchAsync(async (req: Request, res: Response)
   if (!doctor) {
     throw new AppError("Doctor profile not found for the logged-in user.", 404);
   }
-  res.json({ status: "success", data: { doctor } });
+  const busyDoctorIds = await getBusyDoctorIds(doctor.hospital);
+  const resolvedDoctor = { ...doctor.toObject(), status: getDoctorDynamicStatus(doctor, busyDoctorIds) };
+  res.json({ status: "success", data: { doctor: resolvedDoctor } });
+});
+
+const updateDoctorMeSchema = z.object({
+  name: z.string().optional(),
+  phone: z.string().optional(),
+  specialization: z.string().optional(),
+  qualification: z.string().optional(),
+  licenseNo: z.string().optional(),
+  bio: z.string().optional(),
+  languages: z.string().optional(),
+  consultationFee: z.string().optional(),
+  workingHours: z.array(z.object({
+    day: z.string(),
+    from: z.string(),
+    to: z.string(),
+    active: z.boolean()
+  })).optional(),
+  consultationSettings: z.object({
+    slotDuration: z.number(),
+    maxPatients: z.number(),
+    breakTime: z.string()
+  }).optional(),
+});
+
+export const updateDoctorProfileMe = catchAsync(async (req: Request, res: Response) => {
+  const body = updateDoctorMeSchema.parse(req.body);
+  
+  const doctor = await Doctor.findOneAndUpdate(
+    { email: req.user!.email },
+    body,
+    { new: true, runValidators: true }
+  );
+  
+  if (!doctor) {
+    throw new AppError("Doctor profile not found for the logged-in user.", 404);
+  }
+
+  // Sync user's name if name is updated in profile
+  if (body.name) {
+    await User.findOneAndUpdate({ email: req.user!.email }, { name: body.name });
+  }
+
+  const busyDoctorIds = await getBusyDoctorIds(doctor.hospital);
+  const resolvedDoctor = { ...doctor.toObject(), status: getDoctorDynamicStatus(doctor, busyDoctorIds) };
+
+  res.json({ status: "success", data: { doctor: resolvedDoctor } });
 });
 
