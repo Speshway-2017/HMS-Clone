@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import {
   Search, User, AlertTriangle, FileText, Activity, Stethoscope,
-  ChevronRight, Heart, FlaskConical, ScanLine, Pill,
+  ChevronRight, Heart, FlaskConical, ScanLine, Pill, Download, Eye,
 } from "lucide-react";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { usePatients } from "../../features/patients";
+import { usePrescriptions } from "../../features/doctorDashboard";
 
 const RECORD_TABS = ["Profile", "Medical History", "Diagnoses", "Prescriptions", "Lab Reports", "Radiology", "Surgeries"];
 
@@ -29,6 +30,10 @@ export function PatientRecordsPage() {
   }, [patients, selectedPatientId]);
 
   const selectedPatient = patients.find((p) => p._id === selectedPatientId) || patients[0];
+
+  const { data: realPrescriptions, isLoading: loadingPresc } = usePrescriptions(
+    selectedPatient?._id ? { patient: selectedPatient._id } : undefined
+  );
 
   const filtered = patients.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -234,27 +239,58 @@ export function PatientRecordsPage() {
               {/* Prescriptions Tab */}
               {activeTab === 3 && selectedPatient && (
                 <div className="space-y-4">
-                  {prescriptions.map((rx, i) => (
-                    <Card key={i}>
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <h3 className="text-sm font-semibold text-slate-800">Prescription — {rx.date}</h3>
-                          <p className="text-xs text-slate-500">Prescribed by {rx.doctor}</p>
-                        </div>
-                        <Badge tone="info">Issued</Badge>
-                      </div>
-                      <div className="space-y-1">
-                        {rx.drugs.map((drug, j) => (
-                          <div key={j} className="flex items-center gap-2">
-                            <Pill className="h-3.5 w-3.5 text-navy-400" />
-                            <p className="text-sm text-slate-700">{drug}</p>
+                  {loadingPresc ? (
+                    <div className="py-8 text-center text-slate-400">Loading Prescriptions...</div>
+                  ) : realPrescriptions && realPrescriptions.length > 0 ? (
+                    realPrescriptions.map((rx: any) => (
+                      <Card key={rx._id}>
+                        <div className="flex items-center justify-between border-b pb-2 mb-3">
+                          <div>
+                            <h3 className="text-sm font-semibold text-slate-800">
+                              Prescription {rx.prescriptionNumber || `#${rx._id.slice(-6)}`}
+                            </h3>
+                            <p className="text-xs text-slate-400">
+                              Date: {new Date(rx.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                            </p>
                           </div>
-                        ))}
-                      </div>
-                    </Card>
-                  ))}
-                  {prescriptions.length === 0 && (
-                    <p className="text-sm text-slate-400 text-center py-6">No prescriptions issued.</p>
+                          <div className="flex items-center gap-2">
+                            <Badge tone={rx.status === "completed" ? "success" : "info"}>
+                              {rx.status || "Issued"}
+                            </Badge>
+                            <a
+                              href={`/api/v1/prescriptions/${rx._id}/download?token=${sessionStorage.getItem("hms_token") || ""}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 rounded bg-navy-50 hover:bg-navy-100 text-navy-700 px-2 py-1 text-xs font-semibold transition"
+                            >
+                              <Eye className="h-3 w-3" /> View PDF
+                            </a>
+                          </div>
+                        </div>
+                        <div className="space-y-2 text-xs">
+                          {rx.diagnosis && (
+                            <p className="text-slate-600">
+                              <span className="font-semibold text-slate-700">Diagnosis:</span> {rx.diagnosis}
+                            </p>
+                          )}
+                          <p className="text-slate-600">
+                            <span className="font-semibold text-slate-700">Prescriber:</span> Dr. {rx.doctor?.name || "Attending Physician"}
+                          </p>
+                          <div className="bg-slate-50 p-2.5 rounded-lg mt-2">
+                            <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Prescribed Medicines</div>
+                            <ul className="list-disc pl-4 space-y-1 text-slate-700">
+                              {rx.medications?.map((m: any, idx: number) => (
+                                <li key={idx}>
+                                  <span className="font-semibold">{m.name}</span> {m.strength && `(${m.strength})`} — {m.dosage} ({m.frequency} for {m.duration})
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </Card>
+                    ))
+                  ) : (
+                    <div className="py-8 text-center text-slate-400">No prescriptions issued.</div>
                   )}
                 </div>
               )}

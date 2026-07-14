@@ -558,7 +558,7 @@ export function useRadiologyOrders() {
   });
 }
 
-export function usePrescriptions(params?: { status?: string }) {
+export function usePrescriptions(params?: { status?: string; patient?: string }) {
   return useQuery({
     queryKey: ["prescriptions", params],
     queryFn: async () => {
