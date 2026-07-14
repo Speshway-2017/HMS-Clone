@@ -92,11 +92,26 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
   // Selected billing states (OPD)
   const [invoice, setInvoice] = useState<any | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"UPI" | "Cash" | "Card" | "Mixed">("UPI");
+  const [payAmount, setPayAmount] = useState("");
 
   // Mixed Payment breakdowns (OPD)
   const [upiAmount, setUpiAmount] = useState("0");
   const [cashAmount, setCashAmount] = useState("0");
   const [cardAmount, setCardAmount] = useState("0");
+
+  useEffect(() => {
+    if (invoice) {
+      const initialAmt = invoice.totals?.patientBalance !== undefined 
+        ? invoice.totals.patientBalance 
+        : invoice.totals?.total || 0;
+      setPayAmount(initialAmt.toString());
+      setUpiAmount("0");
+      setCashAmount("0");
+      setCardAmount("0");
+    } else {
+      setPayAmount("");
+    }
+  }, [invoice]);
 
   // Receipt outcomes (OPD)
   const [receiptData, setReceiptData] = useState<any | null>(null);
@@ -223,16 +238,33 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
     e.preventDefault();
     if (!invoice) return;
 
-    const totalToPay = invoice.totals?.total || invoice.totals?.patientBalance || 400;
+    const maxDue = invoice.totals?.patientBalance !== undefined 
+      ? invoice.totals.patientBalance 
+      : invoice.totals?.total || 0;
+
+    let amt = parseFloat(payAmount);
+    if (paymentMethod === "Mixed") {
+      amt = parseFloat(upiAmount || "0") + parseFloat(cashAmount || "0") + parseFloat(cardAmount || "0");
+    }
+
+    if (isNaN(amt) || amt <= 0) {
+      alert("Please enter a valid payment amount.");
+      return;
+    }
+
+    if (amt > maxDue + 0.01) {
+      alert(`Payment amount (${formatINR(amt)}) cannot exceed the remaining due amount (${formatINR(maxDue)})`);
+      return;
+    }
 
     const payload = {
       invoiceId: invoice._id,
-      amount: totalToPay,
+      amount: amt,
       paymentMethod,
       mixedDetails: paymentMethod === "Mixed" ? {
-        upiAmount: parseFloat(upiAmount),
-        cashAmount: parseFloat(cashAmount),
-        cardAmount: parseFloat(cardAmount),
+        upiAmount: parseFloat(upiAmount || "0"),
+        cashAmount: parseFloat(cashAmount || "0"),
+        cardAmount: parseFloat(cardAmount || "0"),
       } : undefined
     };
 
@@ -408,14 +440,26 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
     },
     {
       header: "Amount Due",
-      render: (row: any) => <span className="text-xs font-semibold text-slate-800">{formatINR(row.totals?.total)}</span>
+      render: (row: any) => (
+        <span className="text-xs font-semibold text-slate-800">
+          {formatINR(row.totals?.patientBalance !== undefined ? row.totals.patientBalance : row.totals?.total)}
+        </span>
+      )
     },
     {
       header: "Action",
       render: (row: any) => (
         <Button
           type="button"
-          onClick={() => { loadInvoice(row._id); setTab("consultation"); }}
+          onClick={() => {
+            if (row.billingType === "IP" || row.outstanding !== undefined) {
+              setSelectedAdmissionId(row.admission?._id || row.admission);
+              setTab("ip");
+            } else {
+              loadInvoice(row._id);
+              setTab("consultation");
+            }
+          }}
           className="text-xs px-3 py-1 flex items-center gap-1"
         >
           <CreditCard className="h-3.5 w-3.5" /> Process Payment
@@ -592,6 +636,12 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                     <span>Total Bill:</span>
                     <span>{formatINR(invoice.totals?.total)}</span>
                   </div>
+                  {invoice.totals?.patientBalance !== undefined && invoice.totals.patientBalance < invoice.totals?.total && (
+                    <div className="flex justify-between w-48 text-amber-700 font-bold text-xs pt-1">
+                      <span>Remaining Due:</span>
+                      <span>{formatINR(invoice.totals.patientBalance)}</span>
+                    </div>
+                  )}
                 </div>
               </Card>
             ) : (
@@ -625,8 +675,24 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                     </div>
                   )}
 
+                  {paymentMethod !== "Mixed" && (
+                    <InputField
+                      label="Payment Amount (₹)"
+                      type="number"
+                      value={payAmount}
+                      onChange={(e) => setPayAmount(e.target.value)}
+                      max={invoice.totals?.patientBalance !== undefined ? invoice.totals.patientBalance : invoice.totals?.total}
+                      min="1"
+                      required
+                    />
+                  )}
+
                   <Button type="submit" className="w-full" disabled={payMutation.isPending}>
-                    {payMutation.isPending ? "Processing..." : `Confirm & Collect ${formatINR(invoice.totals?.total)}`}
+                    {payMutation.isPending ? "Processing..." : `Confirm & Collect ${formatINR(
+                      paymentMethod === "Mixed" 
+                        ? (parseFloat(upiAmount || "0") + parseFloat(cashAmount || "0") + parseFloat(cardAmount || "0")) 
+                        : (parseFloat(payAmount || "0"))
+                    )}`}
                   </Button>
                 </form>
               </Card>

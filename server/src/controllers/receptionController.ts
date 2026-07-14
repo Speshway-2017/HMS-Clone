@@ -12,6 +12,8 @@ import { Queue } from "../models/Queue";
 import { Payment } from "../models/Payment";
 import { Invoice } from "../models/Invoice";
 import { Admission } from "../models/Admission";
+import { IPBill } from "../models/IPBill";
+import { IPBillPayment } from "../models/IPBillPayment";
 
 
 // Validation Schemas
@@ -332,10 +334,40 @@ export const getAuditLogs = catchAsync(async (req: Request, res: Response) => {
  */
 export const getPendingInvoices = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as any;
-  const invoices = await Invoice.find({ hospital: hospitalId, status: "pending" })
+
+  // 1. Fetch pending OP invoices
+  const invoices = await Invoice.find({ hospital: hospitalId, status: { $in: ["pending", "partially_paid"] } })
     .populate("patient", "name uhid phone")
     .sort({ createdAt: -1 });
-  res.json({ status: "success", data: { invoices, total: invoices.length } });
+
+  // 2. Fetch pending IP bills
+  const ipBills = await IPBill.find({ hospital: hospitalId, status: "Generated", outstanding: { $gt: 0 } })
+    .populate("patient", "name uhid phone")
+    .populate("admission")
+    .sort({ createdAt: -1 });
+
+  // Map IP bills to conformed invoice structure
+  const mappedIpBills = ipBills.map(bill => {
+    return {
+      _id: bill._id,
+      patient: bill.patient,
+      issuedAt: bill.billingDate || (bill as any).createdAt,
+      billingType: "IP",
+      totals: {
+        subtotal: bill.grandTotal,
+        taxAmount: bill.taxRate,
+        total: bill.grandTotal,
+        patientBalance: bill.outstanding
+      },
+      status: "partially_paid",
+      outstanding: bill.outstanding,
+      admission: bill.admission
+    };
+  });
+
+  const combined = [...invoices, ...mappedIpBills];
+
+  res.json({ status: "success", data: { invoices: combined, total: combined.length } });
 });
 
 /**
@@ -356,13 +388,45 @@ export const getPaymentHistory = catchAsync(async (req: Request, res: Response) 
     filter.paidAt = { $gte: today, $lt: tomorrow };
   }
 
-  const payments = await Payment.find(filter)
+  // 1. Fetch OP payments
+  const opPayments = await Payment.find(filter)
     .populate("patient", "name uhid phone")
     .populate({ path: "invoice", select: "items totals status" })
     .sort({ paidAt: -1 });
 
-  const totalAmount = payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
-  res.json({ status: "success", data: { payments, total: payments.length, totalAmount } });
+  // 2. Fetch IP payments
+  const ipPayments = await IPBillPayment.find(filter)
+    .populate("patient", "name uhid phone")
+    .populate({ path: "bill", select: "billNumber grandTotal outstanding status" })
+    .sort({ paidAt: -1 });
+
+  // Map IP payments to conformed layout
+  const mappedIpPayments = ipPayments.map(p => {
+    return {
+      _id: p._id,
+      patient: p.patient,
+      amount: p.amount,
+      paymentMethod: p.paymentMethod,
+      transactionId: p.transactionId,
+      paidAt: p.paidAt,
+      billingType: "IP",
+      invoice: {
+        _id: p.bill?._id,
+        items: [{ description: "Inpatient stay & treatment charges" }],
+        totals: {
+          total: (p.bill as any)?.grandTotal || p.amount,
+          patientBalance: (p.bill as any)?.outstanding || 0
+        },
+        status: (p.bill as any)?.status === "Paid" ? "paid" : "partially_paid"
+      }
+    };
+  });
+
+  const combinedPayments = [...opPayments, ...mappedIpPayments];
+  combinedPayments.sort((a: any, b: any) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime());
+
+  const totalAmount = combinedPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+  res.json({ status: "success", data: { payments: combinedPayments, total: combinedPayments.length, totalAmount } });
 });
 
 /**

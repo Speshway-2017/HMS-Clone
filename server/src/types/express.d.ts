@@ -5,7 +5,7 @@ declare global {
   namespace Express {
     interface Request {
       user?: UserDocument;
-      hospitalFilter?: { hospital?: Types.ObjectId | string };
+      hospitalFilter?: any;
     }
   }
 }

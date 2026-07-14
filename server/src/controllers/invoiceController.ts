@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import { Invoice, INVOICE_STATUSES } from "../models/Invoice";
+import { Payment } from "../models/Payment";
+import { IPBill } from "../models/IPBill";
+import { IPBillPayment } from "../models/IPBillPayment";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
@@ -42,39 +45,110 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
   if (patient) filter.patient = patient;
   if (billingType) filter.billingType = billingType;
 
+  // Query OP invoices
+  const opInvoicesPromise = Invoice.find(filter)
+    .populate("patient", "name")
+    .sort({ createdAt: -1 });
+
+  // Determine IP Bill filters
+  const ipFilter: any = { ...req.hospitalFilter };
+  if (status) {
+    if (status === "pending" || status === "partially_paid") {
+      ipFilter.status = "Generated";
+      ipFilter.outstanding = { $gt: 0 };
+    } else if (status === "paid") {
+      ipFilter.status = "Paid";
+    } else {
+      ipFilter.status = status;
+    }
+  }
+  if (patient) ipFilter.patient = patient;
+
+  const includeIP = !billingType || billingType === "IP";
+
+  const ipBillsPromise = includeIP
+    ? IPBill.find(ipFilter).populate("patient", "name").sort({ createdAt: -1 })
+    : Promise.resolve([]);
+
   const [
-    invoices,
-    total,
+    opInvoices,
+    ipBills,
     allForHospital,
+    allIPBillsForHospital,
     opCount,
-    ipCount,
     pharmacyCount,
-    labCount
+    labCount,
+    allPayments,
+    allIPPaymentsForHospital
   ] = await Promise.all([
-    Invoice.find(filter).populate("patient", "name").sort({ createdAt: -1 }).skip(skip).limit(limit),
-    Invoice.countDocuments(filter),
+    opInvoicesPromise,
+    ipBillsPromise,
     Invoice.find(req.hospitalFilter as Record<string, unknown>),
+    IPBill.find(req.hospitalFilter as Record<string, unknown>),
     Invoice.countDocuments({ ...req.hospitalFilter, billingType: "OP" }),
-    Invoice.countDocuments({ ...req.hospitalFilter, billingType: "IP" }),
     Invoice.countDocuments({ ...req.hospitalFilter, billingType: "PHARMACY" }),
-    Invoice.countDocuments({ ...req.hospitalFilter, billingType: "LAB" })
+    Invoice.countDocuments({ ...req.hospitalFilter, billingType: "LAB" }),
+    Payment.find(req.hospitalFilter as Record<string, unknown>),
+    IPBillPayment.find(req.hospitalFilter as Record<string, unknown>)
   ]);
 
-  const totalBilling = allForHospital.reduce((sum, inv) => sum + computeTotals(inv).total, 0);
-  const netRevenue = allForHospital.filter((inv) => inv.status === "paid").reduce((sum, inv) => sum + computeTotals(inv).total, 0);
-  const pendingCount = allForHospital.filter((inv) => inv.status === "pending" || inv.status === "overdue").length;
+  // Map IP bills to conformed invoice structure
+  const mappedIpInvoices = ipBills.map((bill: any) => {
+    return {
+      _id: bill._id,
+      patient: bill.patient,
+      issuedAt: bill.billingDate || bill.createdAt,
+      dueDate: bill.billingDate || bill.createdAt,
+      billingType: "IP",
+      status: bill.status === "Paid" ? "paid" : (bill.status === "Generated" ? "partially_paid" : "pending"),
+      items: [{ description: "Inpatient stay & treatment charges", quantity: 1, amount: bill.grandTotal }],
+      totals: {
+        subtotal: bill.grandTotal,
+        taxAmount: bill.taxRate,
+        total: bill.grandTotal,
+        insuranceCovered: bill.insuranceCovered,
+        patientBalance: bill.outstanding
+      }
+    };
+  });
+
+  // Map OP invoices
+  const mappedOpInvoices = opInvoices.map((inv: any) => ({
+    ...inv.toObject(),
+    totals: computeTotals(inv)
+  }));
+
+  // Combine and sort
+  const combined = [...mappedOpInvoices, ...mappedIpInvoices];
+  combined.sort((a: any, b: any) => new Date(b.issuedAt).getTime() - new Date(a.issuedAt).getTime());
+
+  // Paginate combined list
+  const paginatedData = combined.slice(skip, skip + limit);
+  const total = combined.length;
+
+  const totalBilling = 
+    allForHospital.reduce((sum: number, inv: any) => sum + computeTotals(inv).total, 0) +
+    allIPBillsForHospital.reduce((sum: number, bill: any) => sum + (bill.grandTotal || 0), 0);
+
+  const netRevenue = 
+    allPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) +
+    allIPPaymentsForHospital.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+  const pendingCount = 
+    allForHospital.filter((inv: any) => inv.status === "pending" || inv.status === "overdue" || inv.status === "partially_paid").length +
+    allIPBillsForHospital.filter((bill: any) => bill.status === "Generated" && bill.outstanding > 0).length;
 
   res.json({
     status: "success",
-    data: invoices.map((inv) => ({ ...inv.toObject(), totals: computeTotals(inv) })),
-    pagination: paginatedResponse(invoices, total, { page, limit, skip }).pagination,
+    data: paginatedData,
+    pagination: paginatedResponse(paginatedData, total, { page, limit, skip }).pagination,
     counts: {
       totalBilling,
       netRevenue,
       pendingCount,
-      all: allForHospital.length,
+      all: allForHospital.length + allIPBillsForHospital.length,
       op: opCount,
-      ip: ipCount,
+      ip: allIPBillsForHospital.length,
       pharmacy: pharmacyCount,
       laboratory: labCount
     },

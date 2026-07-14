@@ -19,6 +19,8 @@ import { DbNotification } from "../models/DbNotification";
 import { Ward } from "../models/Ward";
 import { emitToHospital, emitToDoctor } from "../config/socket";
 import { createDoctorNotification } from "../utils/notificationHelper";
+import { IPBill } from "../models/IPBill";
+import { IPBillPayment } from "../models/IPBillPayment";
 
 
 function generateDigits(length: number): string {
@@ -48,7 +50,10 @@ export class ReceptionService {
       emergencyQueue,
       doctorsCount,
       activeRooms,
-      bedsAvailable
+      bedsAvailable,
+      ipCollectionsToday,
+      pendingIpBillsCount,
+      completedIpBillsCount
     ] = await Promise.all([
       // Today's Registrations
       Patient.countDocuments({ hospital: hospitalId, createdAt: { $gte: today, $lt: tomorrow } }),
@@ -71,12 +76,20 @@ export class ReceptionService {
       // Active rooms
       Room.find({ hospital: hospitalId, status: { $in: ["active", "Active"] } }),
       // Bed counts
-      Bed.find({ hospital: hospitalId })
+      Bed.find({ hospital: hospitalId }),
+      // Today's IP collections from IPBillPayment
+      IPBillPayment.find({ hospital: hospitalId, paidAt: { $gte: today, $lt: tomorrow } }),
+      // Pending IP bills
+      IPBill.countDocuments({ hospital: hospitalId, status: "Generated", outstanding: { $gt: 0 } }),
+      // Completed IP bills
+      IPBill.countDocuments({ hospital: hospitalId, status: "Paid" })
     ]);
 
-    const pendingPaymentsCount = invoices.filter((inv: any) => inv.status === "pending").length;
-    const completedPaymentsCount = invoices.filter((inv: any) => inv.status === "paid").length;
-    const totalCollectionsToday = collectionsToday.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+    const pendingPaymentsCount = invoices.filter((inv: any) => inv.status === "pending" || inv.status === "partially_paid").length + pendingIpBillsCount;
+    const completedPaymentsCount = invoices.filter((inv: any) => inv.status === "paid").length + completedIpBillsCount;
+    const totalCollectionsToday = 
+      collectionsToday.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) +
+      ipCollectionsToday.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
     const busyDoctorIds = await getBusyDoctorIds(hospitalId);
     const resolvedDoctors = doctorsCount.map((d: any) => {
@@ -552,8 +565,22 @@ export class ReceptionService {
       paidAt: new Date()
     });
 
-    // Update invoice status
-    const updatedInvoice = await ReceptionRepository.updateInvoiceStatus(hospitalId, invoiceId, "paid");
+    // Fetch all payments for this invoice
+    const allPayments = await Payment.find({ invoice: invoiceId, hospital: hospitalId });
+    const totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    const invoiceTotal = invoice.totals.total;
+    const remainingBalance = Math.max(0, invoiceTotal - totalPaid);
+    const newStatus = remainingBalance === 0 ? "paid" : "partially_paid";
+
+    const updatedInvoice = await Invoice.findOneAndUpdate(
+      { _id: invoiceId, hospital: hospitalId },
+      { 
+        status: newStatus, 
+        "totals.patientBalance": remainingBalance 
+      },
+      { new: true }
+    );
 
     // After successful payment, confirm appointment and generate Token + Queue Number + Receipt
     // Fetch latest scheduled appointment linked to this invoice's patient
@@ -573,56 +600,73 @@ export class ReceptionService {
     endOfToday.setHours(23, 59, 59, 999);
 
     if (appointment) {
-      // Confirm appointment status to checked_in
-      appointment.status = "checked_in";
-      await appointment.save();
-
-      // Generate Token Number: T + 3-digit zero-padded serial (global for hospital today)
-      const todayTokenCount = await Queue.countDocuments({
+      // Generate Token Number only if not already in queue today
+      const existingQueue = await Queue.findOne({
         hospital: hospitalId,
-        createdAt: { $gte: startOfToday, $lte: endOfToday }
-      });
-      tokenNumber = `T${String(todayTokenCount + 1).padStart(3, "0")}`;
-
-      // Generate Queue Number: Q + 3-digit zero-padded position for this doctor today
-      const doctorQueueCount = await Queue.countDocuments({
-        hospital: hospitalId,
-        doctor: (appointment.doctor as any)._id,
-        createdAt: { $gte: startOfToday, $lte: endOfToday }
-      });
-      queueNumber = `Q${String(doctorQueueCount + 1).padStart(3, "0")}`;
-
-      // Create queue record
-      queueRecord = await ReceptionRepository.createQueueToken({
-        hospital: hospitalId,
-        tokenNumber,
-        type: appointment.type === "Emergency" ? "emergency" : "regular",
-        status: "waiting",
-        patient: invoice.patient._id,
-        doctor: (appointment.doctor as any)._id,
-        department: (appointment.department as any)?._id || (appointment.doctor as any).department,
-        appointment: appointment._id,
-        date: appointment.date
+        appointment: appointment._id
       });
 
-      // Notify doctor of checked in OP patient
-      try {
-        await createDoctorNotification({
+      if (!existingQueue) {
+        // Confirm appointment status to checked_in
+        appointment.status = "checked_in";
+        await appointment.save();
+
+        // Generate Token Number: T + 3-digit zero-padded serial (global for hospital today)
+        const todayTokenCount = await Queue.countDocuments({
           hospital: hospitalId,
-          title: "OP Patient Checked In",
-          message: `OP patient ${(invoice.patient as any).name} has checked in. You have been assigned this patient (Token: ${tokenNumber}, Queue: ${queueNumber}).`,
-          type: "appointment",
-          severity: "info",
-          recipientDoctor: (appointment.doctor as any)._id.toString(),
-          link: `/doctor/op-management`,
-          data: {
-            appointmentId: appointment._id.toString(),
-            tokenNumber,
-            queueNumber,
-          }
+          createdAt: { $gte: startOfToday, $lte: endOfToday }
         });
-      } catch (err) {
-        console.error("Failed to notify doctor of checked-in OP patient:", err);
+        tokenNumber = `T${String(todayTokenCount + 1).padStart(3, "0")}`;
+
+        // Generate Queue Number: Q + 3-digit zero-padded position for this doctor today
+        const doctorQueueCount = await Queue.countDocuments({
+          hospital: hospitalId,
+          doctor: (appointment.doctor as any)._id,
+          createdAt: { $gte: startOfToday, $lte: endOfToday }
+        });
+        queueNumber = `Q${String(doctorQueueCount + 1).padStart(3, "0")}`;
+
+        // Create queue record
+        queueRecord = await ReceptionRepository.createQueueToken({
+          hospital: hospitalId,
+          tokenNumber,
+          type: appointment.type === "Emergency" ? "emergency" : "regular",
+          status: "waiting",
+          patient: invoice.patient._id,
+          doctor: (appointment.doctor as any)._id,
+          department: (appointment.department as any)?._id || (appointment.doctor as any).department,
+          appointment: appointment._id,
+          date: appointment.date
+        });
+
+        // Notify doctor of checked in OP patient
+        try {
+          await createDoctorNotification({
+            hospital: hospitalId,
+            title: "OP Patient Checked In",
+            message: `OP patient ${(invoice.patient as any).name} has checked in. You have been assigned this patient (Token: ${tokenNumber}, Queue: ${queueNumber}).`,
+            type: "appointment",
+            severity: "info",
+            recipientDoctor: (appointment.doctor as any)._id.toString(),
+            link: `/doctor/op-management`,
+            data: {
+              appointmentId: appointment._id.toString(),
+              tokenNumber,
+              queueNumber,
+            }
+          });
+        } catch (err) {
+          console.error("Failed to notify doctor of checked-in OP patient:", err);
+        }
+      } else {
+        const doctorQueueIndex = await Queue.countDocuments({
+          hospital: hospitalId,
+          doctor: (appointment.doctor as any)._id,
+          createdAt: { $lt: (existingQueue as any).createdAt }
+        });
+        queueNumber = `Q${String(doctorQueueIndex + 1).padStart(3, "0")}`;
+        tokenNumber = existingQueue.tokenNumber;
+        queueRecord = existingQueue;
       }
     }
 
