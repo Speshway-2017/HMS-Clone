@@ -187,7 +187,7 @@ export function AccountantBillingPage() {
   const outstanding = Math.max(0, netPayable - advancePaid);
 
   // Blockages
-  const clinicalBlockages = ipDetails?.blockages || [];
+  const clinicalBlockages = (ipDetails as any)?.blockages || [];
   const billingBlockages = outstanding > 1 
     ? [`Patient has outstanding balance of ₹${outstanding.toFixed(2)}. Settlement required before discharge.`] 
     : [];
@@ -969,7 +969,7 @@ export function AccountantBillingPage() {
                         {typeof inv.patient === "object" ? (inv.patient as any).name : "Walk-in"}
                       </td>
                       <td className="px-4 py-3 text-slate-600">
-                        <span className="capitalize">{inv.billingType || inv.items[0]?.category.toUpperCase() || "OP"}</span>
+                        <span className="capitalize">{(inv as any).billingType || inv.items[0]?.category.toUpperCase() || "OP"}</span>
                       </td>
                       <td className="px-4 py-3 text-slate-600">
                         {new Date(inv.issuedAt).toLocaleDateString()}
@@ -978,7 +978,7 @@ export function AccountantBillingPage() {
                         ₹{inv.totals.total.toFixed(2)}
                       </td>
                       <td className="px-4 py-3">
-                        <Badge tone={STATUS_TONE[inv.status as any]} className="w-36">{inv.status.replace("_", " ")}</Badge>
+                        <Badge tone={STATUS_TONE[inv.status as keyof typeof STATUS_TONE] || "info"} className="w-36">{inv.status.replace("_", " ")}</Badge>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
