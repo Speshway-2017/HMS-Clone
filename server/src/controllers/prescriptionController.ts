@@ -485,10 +485,6 @@ export const downloadPrescription = catchAsync(async (req: Request, res: Respons
     }
   }
 
-  const pdfPath = path.join(__dirname, "../../../secure_prescriptions", `${prescriptionId}.pdf`);
-  if (!fs.existsSync(pdfPath)) {
-    throw new AppError("Prescription document file not found.", 404);
-  }
 
   // Determine downloadedBy name for Audit Log
   const userName = req.user ? req.user.name : "Patient";

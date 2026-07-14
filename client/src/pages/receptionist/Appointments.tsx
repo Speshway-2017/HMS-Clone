@@ -282,6 +282,13 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const selectedDeptId = watch("departmentId");
   const selectedDate = watch("date");
 
+  const selectedDoc = doctors?.find((d: any) => d._id === selectedDoctorId);
+  const selectedDayOfWeekName = selectedDate ? new Date(selectedDate).toLocaleDateString("en-US", { weekday: "long" }) : "";
+  const selectedDayIdx = selectedDate ? new Date(selectedDate).getDay() : -1;
+  const weekdayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const selectedDayName = selectedDayIdx !== -1 ? weekdayNames[selectedDayIdx] : "";
+  const isDoctorOffDuty = selectedDoc?.workingHours?.some((wh: any) => wh.day.toLowerCase() === selectedDayName && wh.isActive === false);
+
   const { data: patientDetail, isLoading: patientLoading, isError: patientError } = usePatientDetail(selectedPatientId);
 
   // Autofill patient query search box and handle auto-focus to Department field

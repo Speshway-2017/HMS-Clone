@@ -1111,11 +1111,11 @@ export const getMyPatients = catchAsync(async (req: Request, res: Response) => {
 
   // Merge and deduplicate using string keys, then convert back to ObjectIds
   const patientIdSet = new Set<string>([
-    ...apptPatients.map((id) => id.toString()),
-    ...admissionPatients.map((id) => id.toString()),
-    ...labPatients.map((id) => id.toString()),
-    ...radioPatients.map((id) => id.toString()),
-    ...assignedPatients.map((id) => id.toString()),
+    ...apptPatients.map((id: any) => id.toString()),
+    ...admissionPatients.map((id: any) => id.toString()),
+    ...labPatients.map((id: any) => id.toString()),
+    ...radioPatients.map((id: any) => id.toString()),
+    ...assignedPatients.map((id: any) => id.toString()),
   ]);
 
   const patientIds = Array.from(patientIdSet).map((id) => new Types.ObjectId(id));
