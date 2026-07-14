@@ -190,8 +190,14 @@ export class ReceptionService {
       }
     });
 
+    const hasExistingAppointments = await Appointment.exists({
+      hospital: hospitalId,
+      patient: patientId
+    });
+
     return {
       patient,
+      hasExistingAppointments: !!hasExistingAppointments,
       activeAdmission: activeAdmission ? {
         _id: activeAdmission._id,
         admissionNumber: activeAdmission.admissionNumber,
@@ -398,14 +404,61 @@ export class ReceptionService {
     const newAppointment = await ReceptionRepository.createAppointment(appointmentPayload);
 
     // 7. Automatically create a consultation billing Invoice
-    const registrationFee = type === "Emergency" ? 200 : 100;
-    const consultationFee = type === "Emergency" ? 500 : 300;
+    const hasOtherAppointments = await Appointment.exists({
+      hospital: hospitalId,
+      patient: patientId,
+      _id: { $ne: newAppointment._id }
+    });
+
+    const registrationFee = hasOtherAppointments ? 0 : (type === "Emergency" ? 200 : 100);
+    let consultationFee = type === "Emergency" ? 500 : 300;
+    if (type !== "Emergency" && doctor.consultationFee) {
+      const cleanedFee = String(doctor.consultationFee).replace(/[₹, \s]/g, "");
+      const parsedFee = parseFloat(cleanedFee);
+      if (!isNaN(parsedFee)) {
+        consultationFee = parsedFee;
+      }
+    }
+
+    // Check if patient has a completed appointment with this doctor within the opExpiryLimit
+    const hospitalRecord = await Hospital.findById(hospitalId);
+    const opExpiryLimit = hospitalRecord?.opExpiryLimit ?? 10;
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() - opExpiryLimit);
+
+    const pastCompletedAppt = await Appointment.findOne({
+      hospital: hospitalId,
+      patient: patientId,
+      doctor: doctorId,
+      status: "completed",
+      date: { $gte: expiryDate }
+    });
+
+    const isWithinExpiry = !!pastCompletedAppt;
+    if (isWithinExpiry) {
+      consultationFee = 0;
+    }
+
     const gst = 0;
     const discount = 0;
 
     const items = [
-      { description: "Registration Fee", category: "registration", quantity: 1, amount: registrationFee },
-      { description: `${type || "General"} Doctor Consultation`, category: "consultation", quantity: 1, amount: consultationFee }
+      { 
+        description: hasOtherAppointments 
+          ? "Registration Fee (Existing Patient - Free)" 
+          : "Registration Fee", 
+        category: "registration", 
+        quantity: 1, 
+        amount: registrationFee 
+      },
+      { 
+        description: isWithinExpiry 
+          ? `${type || "General"} Doctor Consultation (Revisit - Free)` 
+          : `${type || "General"} Doctor Consultation`, 
+        category: "consultation", 
+        quantity: 1, 
+        amount: consultationFee 
+      }
     ];
 
     const subtotal = registrationFee + consultationFee;
@@ -551,6 +604,26 @@ export class ReceptionService {
         appointment: appointment._id,
         date: appointment.date
       });
+
+      // Notify doctor of checked in OP patient
+      try {
+        await createDoctorNotification({
+          hospital: hospitalId,
+          title: "OP Patient Checked In",
+          message: `OP patient ${(invoice.patient as any).name} has checked in. You have been assigned this patient (Token: ${tokenNumber}, Queue: ${queueNumber}).`,
+          type: "appointment",
+          severity: "info",
+          recipientDoctor: (appointment.doctor as any)._id.toString(),
+          link: `/doctor/op-management`,
+          data: {
+            appointmentId: appointment._id.toString(),
+            tokenNumber,
+            queueNumber,
+          }
+        });
+      } catch (err) {
+        console.error("Failed to notify doctor of checked-in OP patient:", err);
+      }
     }
 
     // Generate Receipt Number: RCP + year + 5-digit serial
@@ -1145,6 +1218,28 @@ export class ReceptionService {
 
       await session.commitTransaction();
       session.endSession();
+
+      // Notify doctor of receptionist-initiated IP admission
+      if (admissionMode === "Receptionist Initiated" && admittingDoctor) {
+        try {
+          await createDoctorNotification({
+            hospital: hospitalId,
+            title: "New Inpatient Assigned",
+            message: `You have been assigned as the admitting doctor for inpatient ${patient.name} (IP No: ${admissionNumber}, Ward: ${ward}).`,
+            type: "admission_request",
+            severity: "info",
+            recipientDoctor: admittingDoctor.toString(),
+            link: `/doctor/ip-management`,
+            data: {
+              admissionId: createdAdmission._id.toString(),
+              admissionNumber,
+              patientId: patientId.toString(),
+            }
+          });
+        } catch (err) {
+          console.error("Failed to notify doctor of receptionist-initiated IP admission:", err);
+        }
+      }
 
       // Retrieve patient's last OP visit for slip auto-fills
       const lastOpVisit = await OPVisit.findOne({ hospital: hospitalId, patient: patientId })

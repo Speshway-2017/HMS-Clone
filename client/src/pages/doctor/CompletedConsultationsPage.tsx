@@ -75,7 +75,7 @@ export function CompletedConsultationsPage() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <Badge tone="success">Completed</Badge>
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{appt.notes || "No notes recorded."}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{appt.clinicalNotes || appt.notes || "No notes recorded."}</td>
                   </tr>
                 );
               })}

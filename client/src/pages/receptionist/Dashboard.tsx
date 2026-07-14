@@ -12,9 +12,21 @@ import {
   LayoutGrid
 } from "lucide-react";
 import { useReceptionStats } from "../../features/receptionist";
+import { useNotifications } from "../../features/notifications";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { Card } from "../../components/ui/Card";
 import { formatINR } from "../../lib/currency";
+
+function relativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
 
 function KpiSkeleton() {
   return (
@@ -30,6 +42,8 @@ function KpiSkeleton() {
 
 export function ReceptionistDashboard() {
   const { data: stats, isLoading } = useReceptionStats();
+  const { data: notifData } = useNotifications();
+  const notifications = notifData?.data?.notifications ?? [];
 
   if (isLoading) {
     return (
@@ -137,31 +151,79 @@ export function ReceptionistDashboard() {
           </div>
         </Card>
 
-        <Card>
-          <h3 className="mb-4 text-base font-semibold text-slate-800">Quick Desk Actions</h3>
-          <div className="space-y-2.5">
-            <Link to="/receptionist/patients/new" className="flex items-center justify-between rounded-lg border border-slate-200 px-3.5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">
-              <span className="flex items-center gap-2.5">
-                <Users className="h-4.5 w-4.5 text-navy-700" /> Register New Patient
-              </span>
-            </Link>
-            <Link to="/receptionist/appointments/new" className="flex items-center justify-between rounded-lg border border-slate-200 px-3.5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">
-              <span className="flex items-center gap-2.5">
-                <CalendarCheck className="h-4.5 w-4.5 text-navy-700" /> Book OP Appointment
-              </span>
-            </Link>
-            <Link to="/receptionist/billing/consultation" className="flex items-center justify-between rounded-lg border border-slate-200 px-3.5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">
-              <span className="flex items-center gap-2.5">
-                <CreditCard className="h-4.5 w-4.5 text-navy-700" /> consultation Billing
-              </span>
-            </Link>
-            <Link to="/receptionist/doctors/availability" className="flex items-center justify-between rounded-lg border border-slate-200 px-3.5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">
-              <span className="flex items-center gap-2.5">
-                <Stethoscope className="h-4.5 w-4.5 text-navy-700" /> Check Doctor Schedules
-              </span>
-            </Link>
-          </div>
-        </Card>
+        <div className="space-y-6">
+          <Card>
+            <h3 className="mb-4 text-base font-semibold text-slate-800">Quick Desk Actions</h3>
+            <div className="space-y-2.5">
+              <Link to="/receptionist/patients/new" className="flex items-center justify-between rounded-lg border border-slate-200 px-3.5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">
+                <span className="flex items-center gap-2.5">
+                  <Users className="h-4.5 w-4.5 text-navy-700" /> Register New Patient
+                </span>
+              </Link>
+              <Link to="/receptionist/appointments/new" className="flex items-center justify-between rounded-lg border border-slate-200 px-3.5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">
+                <span className="flex items-center gap-2.5">
+                  <CalendarCheck className="h-4.5 w-4.5 text-navy-700" /> Book OP Appointment
+                </span>
+              </Link>
+              <Link to="/receptionist/billing/consultation" className="flex items-center justify-between rounded-lg border border-slate-200 px-3.5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">
+                <span className="flex items-center gap-2.5">
+                  <CreditCard className="h-4.5 w-4.5 text-navy-700" /> consultation Billing
+                </span>
+              </Link>
+              <Link to="/receptionist/doctors/availability" className="flex items-center justify-between rounded-lg border border-slate-200 px-3.5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">
+                <span className="flex items-center gap-2.5">
+                  <Stethoscope className="h-4.5 w-4.5 text-navy-700" /> Check Doctor Schedules
+                </span>
+              </Link>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+              <h3 className="text-base font-semibold text-slate-800 flex items-center gap-1.5">
+                <TrendingUp className="h-4.5 w-4.5 text-navy-700" /> Notifications & Requests
+              </h3>
+              {notifications.length > 0 && (
+                <span className="rounded-full bg-navy-100 px-2 py-0.5 text-[10px] font-bold text-navy-700">
+                  {notifications.length}
+                </span>
+              )}
+            </div>
+            <div className="space-y-3 max-h-[16rem] overflow-y-auto pr-1">
+              {notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center text-slate-400">
+                  <p className="text-xs">No pending requests or alerts.</p>
+                </div>
+              ) : (
+                notifications.slice(0, 5).map((n: any) => (
+                  <Link
+                    key={n.id}
+                    to={n.link}
+                    className={`block rounded-lg p-3 text-left transition-all border ${
+                      n.severity === "critical"
+                        ? "bg-red-50/60 border-red-100 hover:bg-red-50 text-red-950"
+                        : n.severity === "warning"
+                        ? "bg-amber-50/60 border-amber-100 hover:bg-amber-50 text-amber-950"
+                        : "bg-slate-50 border-slate-150 hover:bg-slate-100/80 text-slate-800"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                        n.severity === "critical" ? "text-red-700" : n.severity === "warning" ? "text-amber-700" : "text-slate-500"
+                      }`}>
+                        {n.title}
+                      </span>
+                      <span className="text-[9px] text-slate-400 font-medium shrink-0">{relativeTime(n.createdAt)}</span>
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed font-medium line-clamp-2">
+                      {n.message}
+                    </p>
+                  </Link>
+                ))
+              )}
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   );

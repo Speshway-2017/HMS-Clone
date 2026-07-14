@@ -593,7 +593,7 @@ export function usePatientDetail(patientId: string) {
   return useQuery({
     queryKey: ["reception", "patient-detail", patientId],
     queryFn: async () => {
-      const res = await api.get<{ data: { patient: any, currentConsultation: any, activeAdmission?: any } }>(`/reception/patients/${patientId}`);
+      const res = await api.get<{ data: { patient: any, currentConsultation: any, activeAdmission?: any, hasExistingAppointments?: boolean } }>(`/reception/patients/${patientId}`);
       return res.data.data;
     },
     enabled: !!patientId

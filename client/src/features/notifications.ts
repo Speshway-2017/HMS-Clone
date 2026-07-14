@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 
-export type NotificationType = "appointment" | "inventory" | "invoice" | "patient";
+export type NotificationType = "appointment" | "inventory" | "invoice" | "patient" | "admission_request" | "general";
 export type NotificationSeverity = "info" | "warning" | "critical";
 
 export interface AppNotification {
