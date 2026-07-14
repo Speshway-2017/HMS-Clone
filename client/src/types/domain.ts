@@ -169,6 +169,7 @@ export interface Patient {
   status: "admitted" | "opd" | "discharged";
   isActive?: boolean;
   allergies: string;
+  uhid?: string;
   insuranceProvider: string;
   insurancePolicyNumber: string;
   medicalHistory: MedicalHistoryEntry[];
