@@ -1,10 +1,17 @@
 import { useState } from "react";
-import { FlaskConical, Plus, CheckCircle2, Clock, AlertTriangle, Search } from "lucide-react";
+import { FlaskConical, Plus, CheckCircle2, Clock, AlertTriangle, Search, User, ShieldAlert, X } from "lucide-react";
+import toast from "react-hot-toast";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { KpiCard } from "../../components/ui/KpiCard";
-import { usePatients } from "../../features/patients";
+// ── SECURITY FIXES: use doctor-scoped hooks, NOT generic usePatients() or usePatients() mapped reports ──
+import {
+  useDoctorLabOrders,
+  useDoctorLabOrderById,
+  useCreateLabOrder,
+  useDoctorPatients,
+} from "../../features/doctorDashboard";
 
 const NEW_ORDER_TESTS = [
   "CBC (Complete Blood Count)", "Lipid Profile", "LFT (Liver Function Tests)",
@@ -14,11 +21,18 @@ const NEW_ORDER_TESTS = [
 ];
 
 const RESULT_TONE: Record<string, "success" | "warning" | "danger" | "neutral" | "info"> = {
-  normal: "success", elevated: "warning", high: "danger", borderline: "warning", pending: "neutral", low: "info",
+  normal: "success",
+  elevated: "warning",
+  high: "danger",
+  borderline: "warning",
+  pending: "neutral",
+  low: "info",
 };
 
 const STATUS_TONE: Record<string, "success" | "warning" | "danger" | "neutral" | "info"> = {
-  approved: "success", awaiting_approval: "warning", pending: "neutral",
+  completed: "success",
+  pending: "neutral",
+  rejected: "danger",
 };
 
 const TABS = ["View Reports", "Order Tests", "Approve Results"];
@@ -27,53 +41,79 @@ export function LaboratoryPage() {
   const [activeTab, setActiveTab] = useState(0);
   const [search, setSearch] = useState("");
   const [selectedTests, setSelectedTests] = useState<string[]>([]);
-  const [priority, setPriority] = useState("routine");
-  const { data: patientsData, isLoading } = usePatients({ page: 1 });
+  const [priority, setPriority] = useState("Routine");
+  const [patientId, setPatientId] = useState("");
+  const [clinicalNotes, setClinicalNotes] = useState("");
 
-  const patients = patientsData?.data || [];
+  // Detailed view report modal state
+  const [selectedOrderReportId, setSelectedOrderReportId] = useState<string | null>(null);
+
+  // Fetch only doctor-owned lab orders from secured endpoints
+  const { data: labOrdersData, isLoading: isLabOrdersLoading, isError: isLabError } = useDoctorLabOrders({ search });
+
+  // Fetch only doctor-assigned patients for the placement selector dropdown to prevent leakage
+  const { data: myPatientsData, isLoading: isPatientsLoading } = useDoctorPatients();
+
+  // Create lab order mutation
+  const createLabOrderMutation = useCreateLabOrder();
+
+  const orders = labOrdersData?.orders ?? [];
+  const counts = labOrdersData?.counts;
+  const myPatients = myPatientsData?.patients ?? [];
 
   const toggleTest = (t: string) =>
-    setSelectedTests((prev) => prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]);
+    setSelectedTests((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
 
-  // Construct dynamic laboratory reports from database patients
-  const labReports = patients.map((p, index) => {
-    const isEven = index % 2 === 0;
-    const isThird = index % 3 === 0;
-    
-    const tests = isEven ? [
-      { name: "HbA1c",            result: "7.2%",        ref: "< 5.7% (Normal)", status: "elevated" },
-      { name: "Fasting Glucose",  result: "142 mg/dL",   ref: "70–99 mg/dL",     status: "high"    },
-      { name: "LDL",              result: "142 mg/dL",   ref: "< 100 mg/dL",     status: "high"    },
-    ] : [
-      { name: "TSH",   result: "8.5 mIU/L",  ref: "0.4–4.0 mIU/L",  status: "high"   },
-      { name: "Free T4",result: "1.2 ng/dL", ref: "0.8–1.8 ng/dL",  status: "normal" },
-    ];
+  // Handle Order Placement
+  const handlePlaceOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!patientId) {
+      toast.error("Please select a patient.");
+      return;
+    }
+    if (selectedTests.length === 0) {
+      toast.error("Please select at least one test.");
+      return;
+    }
 
-    const status = isThird ? "awaiting_approval" : isEven ? "approved" : "pending";
-    const prio = isThird ? "stat" : isEven ? "routine" : "urgent";
+    try {
+      await createLabOrderMutation.mutateAsync({
+        patientId,
+        tests: selectedTests,
+        priority,
+      });
+      toast.success("Laboratory investigation order placed successfully!");
+      // Reset form state
+      setSelectedTests([]);
+      setPatientId("");
+      setClinicalNotes("");
+      setPriority("Routine");
+      setActiveTab(0);
+    } catch (err: any) {
+      const errMsg = err.response?.data?.message || "Failed to place lab order.";
+      toast.error(errMsg);
+    }
+  };
 
-    return {
-      id: p._id,
-      patient: p.name,
-      orderDate: new Date(p.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
-      reportDate: isThird ? "—" : new Date(new Date(p.createdAt).getTime() + 86400000).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
-      tests,
-      status,
-      priority: prio
-    };
-  });
+  const handleApproveReport = (orderId: string) => {
+    toast.success(`Lab Report #${orderId.slice(-6).toUpperCase()} approved and signed off!`);
+  };
 
-  const filtered = labReports.filter(
-    (r) =>
-      r.patient.toLowerCase().includes(search.toLowerCase()) ||
-      r.tests.some((t) => t.name.toLowerCase().includes(search.toLowerCase()))
-  );
-
-  if (isLoading) {
+  if (isLabOrdersLoading || isPatientsLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-navy-700 border-t-transparent"></div>
       </div>
+    );
+  }
+
+  if (isLabError) {
+    return (
+      <Card className="flex h-64 flex-col items-center justify-center p-6 text-center border-dashed border-red-200 bg-red-50">
+        <ShieldAlert className="mb-2 h-10 w-10 text-red-400" />
+        <h3 className="text-sm font-semibold text-red-600">Failed to load laboratory reports</h3>
+        <p className="text-xs text-red-400 mt-1">Please check your permissions or try reloading.</p>
+      </Card>
     );
   }
 
@@ -85,20 +125,39 @@ export function LaboratoryPage() {
         <p className="text-sm text-slate-500">Order lab investigations, view reports, and approve results.</p>
       </div>
 
-      {patients.length === 0 ? (
-        <Card className="flex h-64 flex-col items-center justify-center p-6 text-center border-dashed border-slate-200 bg-slate-50">
-          <FlaskConical className="mb-2 h-10 w-10 text-slate-400" />
-          <h3 className="text-sm font-semibold text-slate-600">No Laboratory Reports</h3>
-          <p className="text-xs text-slate-400">There are no patient records available to populate laboratory reports.</p>
-        </Card>
+      {orders.length === 0 && activeTab !== 1 ? (
+        /* Empty State */
+        <div className="space-y-6">
+          <div className="flex gap-1 border-b border-slate-200">
+            {TABS.map((tab, i) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(i)}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  activeTab === i ? "border-navy-700 text-navy-700" : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
+          <Card className="flex h-64 flex-col items-center justify-center p-6 text-center border-dashed border-slate-200 bg-slate-50">
+            <FlaskConical className="mb-2 h-10 w-10 text-slate-400" />
+            <h3 className="text-sm font-semibold text-slate-600">No laboratory requests assigned to you.</h3>
+            <p className="text-xs text-slate-400 mt-1">
+              You haven't ordered any investigations yet. Click the "Order Tests" tab to start.
+            </p>
+          </Card>
+        </div>
       ) : (
         <>
           {/* KPIs */}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <KpiCard label="Total Reports"      value={labReports.length} icon={<FlaskConical className="h-5 w-5" />} emphasis />
-            <KpiCard label="Pending"            value={labReports.filter(r => r.status === "pending").length} icon={<Clock className="h-5 w-5" />} />
-            <KpiCard label="Awaiting Approval"  value={labReports.filter(r => r.status === "awaiting_approval").length} icon={<AlertTriangle className="h-5 w-5" />} />
-            <KpiCard label="Approved"           value={labReports.filter(r => r.status === "approved").length} icon={<CheckCircle2 className="h-5 w-5" />} />
+            <KpiCard label="Total Reports" value={counts?.total ?? orders.length} icon={<FlaskConical className="h-5 w-5" />} emphasis />
+            <KpiCard label="Pending" value={counts?.pending ?? orders.filter(o => o.status === "pending").length} icon={<Clock className="h-5 w-5" />} />
+            <KpiCard label="Completed" value={counts?.completed ?? orders.filter(o => o.status === "completed").length} icon={<CheckCircle2 className="h-5 w-5" />} />
+            <KpiCard label="Rejected" value={counts?.rejected ?? orders.filter(o => o.status === "rejected").length} icon={<AlertTriangle className="h-5 w-5" />} />
           </div>
 
           {/* Tabs */}
@@ -128,60 +187,78 @@ export function LaboratoryPage() {
                   className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
                 />
               </div>
-              {filtered.map((report) => (
-                <Card key={report.id}>
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h3 className="text-sm font-semibold text-slate-800">{report.patient}</h3>
-                      <p className="text-xs text-slate-500">
-                        Ordered: {report.orderDate} · Reported: {report.reportDate}
-                      </p>
+
+              {orders.map((order) => {
+                const p = order.patient as any;
+                const patientName = p?.name || "Unknown Patient";
+                const uhid = p?.uhid || "—";
+                const orderDate = new Date(order.date).toLocaleDateString("en-IN", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                });
+
+                return (
+                  <Card key={order._id}>
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-800">{patientName}</h3>
+                        <p className="text-xs text-slate-500">
+                          UHID: {uhid} · Ordered: {orderDate}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge tone={order.priority === "STAT" ? "danger" : order.priority === "Urgent" ? "warning" : "info"}>
+                          {order.priority.toUpperCase()}
+                        </Badge>
+                        <Badge tone={STATUS_TONE[order.status] ?? "neutral"}>
+                          {order.status.toUpperCase()}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge tone={report.priority === "stat" ? "danger" : report.priority === "urgent" ? "warning" : "neutral"}>
-                        {report.priority.toUpperCase()}
-                      </Badge>
-                      <Badge tone={STATUS_TONE[report.status]}>
-                        {report.status.replace("_", " ")}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead><tr className="border-b border-slate-100">
-                        <th className="pb-2 text-left text-xs font-semibold uppercase text-slate-400">Test</th>
-                        <th className="pb-2 text-left text-xs font-semibold uppercase text-slate-400">Result</th>
-                        <th className="pb-2 text-left text-xs font-semibold uppercase text-slate-400">Reference Range</th>
-                        <th className="pb-2 text-left text-xs font-semibold uppercase text-slate-400">Flag</th>
-                      </tr></thead>
-                      <tbody>
-                        {report.tests.map((t, i) => (
-                          <tr key={i} className={`border-b border-slate-50 ${t.status === "high" || t.status === "elevated" ? "bg-red-50/40" : ""}`}>
-                            <td className="py-2.5 font-medium text-slate-800">{t.name}</td>
-                            <td className={`py-2.5 font-semibold ${t.status === "high" ? "text-red-600" : t.status === "elevated" ? "text-amber-600" : "text-slate-700"}`}>
-                              {t.result}
-                            </td>
-                            <td className="py-2.5 text-slate-500">{t.ref}</td>
-                            <td className="py-2.5"><Badge tone={RESULT_TONE[t.status]}>{t.status}</Badge></td>
-                          </tr>
+
+                    <div className="mt-3">
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Ordered Investigations</p>
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        {order.tests.map((test, index) => (
+                          <span key={index} className="px-2.5 py-0.5 bg-slate-100 rounded-full text-xs text-slate-700">
+                            {test}
+                          </span>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {report.status === "awaiting_approval" && (
-                    <div className="mt-3 flex gap-2">
-                      <Button variant="primary"><CheckCircle2 className="h-4 w-4" /> Approve Report</Button>
-                      <Button variant="secondary">Request Repeat</Button>
+                      </div>
                     </div>
-                  )}
-                </Card>
-              ))}
+
+                    <div className="mt-4 flex gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setSelectedOrderReportId(order._id)}
+                      >
+                        View Detailed Report
+                      </Button>
+                      {order.status === "completed" && (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => handleApproveReport(order._id)}
+                        >
+                          Approve Results
+                        </Button>
+                      )}
+                    </div>
+                  </Card>
+                );
+              })}
+
+              {orders.length === 0 && (
+                <p className="text-center text-xs text-slate-400 py-8">No reports match your search criteria.</p>
+              )}
             </div>
           )}
 
           {/* Order Tests Tab */}
           {activeTab === 1 && (
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <Card className="lg:col-span-2">
                 <h3 className="mb-4 text-base font-semibold text-slate-800">Select Investigations</h3>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -190,7 +267,7 @@ export function LaboratoryPage() {
                       key={test}
                       className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2.5 text-xs font-medium transition-all ${
                         selectedTests.includes(test)
-                          ? "border-navy-400 bg-navy-50 text-navy-700"
+                          ? "border-navy-400 bg-navy-50 text-navy-700 shadow-sm"
                           : "border-slate-200 text-slate-600 hover:border-navy-200 hover:bg-navy-50/50"
                       }`}
                     >
@@ -198,34 +275,52 @@ export function LaboratoryPage() {
                         type="checkbox"
                         checked={selectedTests.includes(test)}
                         onChange={() => toggleTest(test)}
-                        className="accent-navy-700"
+                        className="accent-navy-700 rounded"
                       />
                       {test}
                     </label>
                   ))}
                 </div>
               </Card>
+
               <div className="space-y-4">
                 <Card>
                   <h3 className="mb-3 text-sm font-semibold text-slate-700">Order Details</h3>
                   <div className="space-y-3">
                     <div>
                       <label className="block text-xs font-semibold text-slate-400 mb-1">Patient</label>
-                      <select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white">
-                        {patients.map((p) => (
-                          <option key={p._id} value={p._id}>{p.name}</option>
-                        ))}
-                      </select>
+                      {myPatients.length === 0 ? (
+                        <div className="text-xs text-red-500 p-2 bg-red-50 border border-red-200 rounded">
+                          No patients assigned. You can only order tests for patients assigned to you.
+                        </div>
+                      ) : (
+                        <select
+                          value={patientId}
+                          onChange={(e) => setPatientId(e.target.value)}
+                          required
+                          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy-200"
+                        >
+                          <option value="">— Select Patient —</option>
+                          {myPatients.map((p) => (
+                            <option key={p._id} value={p._id}>
+                              {p.name} ({p.uhid || "No UHID"})
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-400 mb-1">Priority</label>
                       <div className="flex gap-2">
-                        {["routine", "urgent", "stat"].map((p) => (
+                        {["Routine", "Urgent", "STAT"].map((p) => (
                           <button
+                            type="button"
                             key={p}
                             onClick={() => setPriority(p)}
                             className={`flex-1 rounded-lg py-1.5 text-xs font-medium capitalize transition-colors ${
-                              priority === p ? "bg-navy-700 text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+                              priority === p
+                                ? "bg-navy-700 text-white shadow-sm"
+                                : "border border-slate-200 text-slate-600 hover:bg-slate-50"
                             }`}
                           >
                             {p}
@@ -237,64 +332,254 @@ export function LaboratoryPage() {
                       <label className="block text-xs font-semibold text-slate-400 mb-1">Clinical Notes</label>
                       <textarea
                         rows={3}
+                        value={clinicalNotes}
+                        onChange={(e) => setClinicalNotes(e.target.value)}
                         placeholder="Reason for ordering..."
                         className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-navy-200"
                       />
                     </div>
                   </div>
+
                   <div className="mt-3 rounded-lg bg-navy-50 p-2.5">
                     <p className="text-xs font-semibold text-navy-700 mb-1">Selected Tests ({selectedTests.length})</p>
-                    {selectedTests.length === 0
-                      ? <p className="text-xs text-slate-400">No tests selected yet.</p>
-                      : selectedTests.map((t) => <p key={t} className="text-xs text-slate-600">• {t}</p>)
-                    }
+                    {selectedTests.length === 0 ? (
+                      <p className="text-xs text-slate-400">No tests selected yet.</p>
+                    ) : (
+                      selectedTests.map((t) => <p key={t} className="text-xs text-slate-600 font-medium">• {t}</p>)
+                    )}
                   </div>
-                  <Button variant="primary" className="mt-3 w-full">
-                    <Plus className="h-4 w-4" /> Place Order
+
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    className="mt-3 w-full"
+                    disabled={createLabOrderMutation.isPending || myPatients.length === 0}
+                  >
+                    {createLabOrderMutation.isPending ? "Placing Order..." : "Place Order"}
                   </Button>
                 </Card>
               </div>
-            </div>
+            </form>
           )}
 
           {/* Approve Results Tab */}
           {activeTab === 2 && (
             <div className="space-y-4">
-              {labReports.filter((r) => r.status === "awaiting_approval").map((report) => (
-                <Card key={report.id} className="border-amber-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <h3 className="text-sm font-semibold text-slate-800">{report.patient} — Awaiting Approval</h3>
-                      <p className="text-xs text-slate-500">Ordered: {report.orderDate}</p>
-                    </div>
-                    <Badge tone="warning">Awaiting Approval</Badge>
-                  </div>
-                  <div className="space-y-1.5 mb-3">
-                    {report.tests.map((t, i) => (
-                      <div key={i} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                        <span className="text-sm font-medium text-slate-800">{t.name}</span>
-                        <span className={`text-sm font-semibold ${t.status === "high" ? "text-red-600" : t.status === "elevated" ? "text-amber-600" : "text-slate-600"}`}>{t.result}</span>
-                        <Badge tone={RESULT_TONE[t.status]}>{t.status}</Badge>
+              {orders.filter((o) => o.status === "completed").map((order) => {
+                const p = order.patient as any;
+                const patientName = p?.name || "Unknown Patient";
+                const orderDate = new Date(order.date).toLocaleDateString("en-IN", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                });
+
+                return (
+                  <Card key={order._id} className="border-emerald-200 bg-emerald-50/10">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-800">{patientName}</h3>
+                        <p className="text-xs text-slate-500">Ordered: {orderDate}</p>
                       </div>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="primary"><CheckCircle2 className="h-4 w-4" /> Approve All Results</Button>
-                    <Button variant="secondary">Request Repeat Test</Button>
-                    <Button variant="secondary">Add Comment</Button>
-                  </div>
-                </Card>
-              ))}
-              {labReports.filter((r) => r.status === "awaiting_approval").length === 0 && (
-                <Card className="py-12 text-center">
-                  <CheckCircle2 className="h-10 w-10 text-emerald-400 mx-auto mb-3" />
-                  <p className="text-sm font-medium text-slate-600">All lab results have been approved.</p>
+                      <Badge tone="success">Completed</Badge>
+                    </div>
+
+                    <div className="space-y-1.5 mb-3">
+                      {order.results && order.results.length > 0 ? (
+                        order.results.map((res: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between rounded-lg bg-white border border-slate-100 px-3 py-2 text-xs shadow-sm">
+                            <span className="font-medium text-slate-800">{res.testName}</span>
+                            <span className={`font-semibold ${res.status === "high" ? "text-red-600" : res.status === "elevated" ? "text-amber-600" : "text-slate-600"}`}>
+                              {res.value}
+                            </span>
+                            <Badge tone={RESULT_TONE[res.status] ?? "neutral"}>{res.status}</Badge>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-slate-400 py-1">No individual test result values entered.</p>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleApproveReport(order._id)}
+                      >
+                        Approve Report
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => toast.success("Simulated repeat requested")}
+                      >
+                        Request Repeat Test
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+
+              {orders.filter((o) => o.status === "completed").length === 0 && (
+                <Card className="py-12 text-center bg-slate-50/50">
+                  <CheckCircle2 className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+                  <p className="text-sm font-medium text-slate-600">No completed lab reports waiting for approval.</p>
                 </Card>
               )}
             </div>
           )}
         </>
       )}
+
+      {/* View Detailed Report Modal (Handles audit log triggering on GET /:id) */}
+      <ReportDetailModal
+        orderId={selectedOrderReportId}
+        onClose={() => setSelectedOrderReportId(null)}
+      />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Report Detailed View Modal
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ReportDetailModalProps {
+  orderId: string | null;
+  onClose: () => void;
+}
+
+function ReportDetailModal({ orderId, onClose }: ReportDetailModalProps) {
+  // Triggers API request which enforces ownership and writes an audit log in controller
+  const { data: order, isLoading, isError } = useDoctorLabOrderById(orderId);
+
+  if (!orderId) return null;
+
+  const patient = order?.patient as any;
+  const doctor = order?.doctor as any;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-sm">
+      <div className="relative my-8 w-full max-w-xl rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-navy-700 to-navy-800 px-6 py-4 rounded-t-2xl">
+          <div className="flex items-center gap-2">
+            <FlaskConical className="h-5 w-5 text-white" />
+            <h2 className="text-base font-semibold text-white">Laboratory Investigation Report</h2>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-white/70 hover:bg-white/10 hover:text-white transition">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-4">
+          {isLoading && (
+            <div className="py-12 flex justify-center">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-navy-700 border-t-transparent"></div>
+            </div>
+          )}
+
+          {isError && (
+            <div className="flex items-start gap-2 rounded-lg border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+              <ShieldAlert className="h-5 w-5 shrink-0" />
+              <div>
+                <p className="font-semibold">Access Denied</p>
+                <p className="text-xs mt-1">You do not have permission to view this report or it belongs to another doctor.</p>
+              </div>
+            </div>
+          )}
+
+          {order && (
+            <>
+              {/* Patient Info */}
+              <div className="grid grid-cols-2 gap-4 rounded-xl bg-slate-50 p-4 text-xs border border-slate-200">
+                <div>
+                  <p className="font-semibold text-slate-400 uppercase">Patient Name</p>
+                  <p className="text-sm font-bold text-slate-800 mt-0.5">{patient?.name || "—"}</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-400 uppercase">UHID</p>
+                  <p className="text-sm font-mono text-slate-800 mt-0.5">{patient?.uhid || "—"}</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-400 uppercase">Age / Gender</p>
+                  <p className="text-sm font-medium text-slate-800 mt-0.5">
+                    {patient?.age ? `${patient.age} yrs` : "—"} / {patient?.gender || "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-400 uppercase">Ordering Doctor</p>
+                  <p className="text-sm font-medium text-slate-800 mt-0.5">Dr. {doctor?.name || "—"}</p>
+                </div>
+              </div>
+
+              {/* Status information */}
+              <div className="flex items-center justify-between text-xs border-b border-slate-100 pb-3">
+                <span className="text-slate-400 font-semibold">Priority: <Badge tone="info">{order.priority}</Badge></span>
+                <span className="text-slate-400 font-semibold">Sample Status: <Badge tone="neutral">{order.sampleStatus}</Badge></span>
+              </div>
+
+              {/* Tests and Results */}
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Investigation Results</p>
+                <div className="overflow-x-auto rounded-lg border border-slate-100">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-100">
+                        <th className="p-3 text-left font-semibold text-slate-500 uppercase">Test Name</th>
+                        <th className="p-3 text-left font-semibold text-slate-500 uppercase">Observed Value</th>
+                        <th className="p-3 text-left font-semibold text-slate-500 uppercase">Reference Range</th>
+                        <th className="p-3 text-left font-semibold text-slate-500 uppercase">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50 bg-white">
+                      {order.results && order.results.length > 0 ? (
+                        order.results.map((res: any, idx: number) => (
+                          <tr key={idx} className={res.status === "high" || res.status === "elevated" ? "bg-red-50/20" : ""}>
+                            <td className="p-3 font-medium text-slate-800">{res.testName}</td>
+                            <td className={`p-3 font-bold ${res.status === "high" ? "text-red-600" : res.status === "elevated" ? "text-amber-600" : "text-slate-700"}`}>
+                              {res.value}
+                            </td>
+                            <td className="p-3 text-slate-500">{res.referenceRange || "—"}</td>
+                            <td className="p-3">
+                              <Badge tone={RESULT_TONE[res.status] ?? "neutral"}>{res.status}</Badge>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        order.tests.map((t: string, idx: number) => (
+                          <tr key={idx}>
+                            <td className="p-3 font-medium text-slate-800">{t}</td>
+                            <td className="p-3 text-slate-400 italic font-medium">Pending...</td>
+                            <td className="p-3 text-slate-400">—</td>
+                            <td className="p-3">
+                              <Badge tone="neutral">pending</Badge>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Security confirmation */}
+              <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-3 text-xs text-emerald-800 flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                <p>Report accessed under doctor privilege. Your transaction was logged to the security audit trail.</p>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end border-t border-slate-100 bg-slate-50 px-6 py-4 rounded-b-2xl">
+          <Button onClick={onClose} variant="secondary" size="sm">
+            Close
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

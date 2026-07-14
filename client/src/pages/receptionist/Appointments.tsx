@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -12,7 +12,8 @@ import {
   usePatientsSearch,
   useCancelAppointment,
   useRescheduleAppointment,
-  useCheckDuplicateAppointment
+  useCheckDuplicateAppointment,
+  usePatientDetail
 } from "../../features/receptionist";
 import { useDepartments } from "../../features/departments";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
@@ -195,6 +196,9 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
     }
   };
 
+  const [searchParams] = useSearchParams();
+  const urlPatientId = searchParams.get("patientId") || "";
+
   // ── Booking form ──
   const {
     register,
@@ -206,7 +210,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   } = useForm<any>({
     resolver: zodResolver(appointmentSchema),
     defaultValues: {
-      patientId: "",
+      patientId: urlPatientId,
       doctorId: "",
       departmentId: "",
       date: new Date().toISOString().split("T")[0],
@@ -220,6 +224,27 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const selectedDoctorId = watch("doctorId");
   const selectedDeptId = watch("departmentId");
   const selectedDate = watch("date");
+
+  const { data: patientDetail, isLoading: patientLoading, isError: patientError } = usePatientDetail(selectedPatientId);
+
+  // Autofill patient query search box and handle auto-focus to Department field
+  useEffect(() => {
+    if (urlPatientId && tab === "new") {
+      setValue("patientId", urlPatientId);
+      setTimeout(() => {
+        const deptSelect = document.getElementsByName("departmentId")[0] as HTMLSelectElement | undefined;
+        if (deptSelect) {
+          deptSelect.focus();
+        }
+      }, 300);
+    }
+  }, [urlPatientId, setValue, tab]);
+
+  useEffect(() => {
+    if (patientDetail?.patient) {
+      setPatientQuery(`${patientDetail.patient.name} (${patientDetail.patient.uhid})`);
+    }
+  }, [patientDetail]);
 
   // ── Real-time Duplicate Appointment Check ──
   const { data: dupCheck, isFetching: dupChecking } = useCheckDuplicateAppointment(
@@ -384,36 +409,182 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
               <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                 <User className="h-4.5 w-4.5" /> Patient Selection
               </h3>
-              <div className="relative">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search patient by UHID, phone, or name..."
-                  value={patientQuery}
-                  onChange={(e) => setPatientQuery(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 pl-10 pr-4 py-2 text-sm outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
-                />
-              </div>
-              {searchPatients && searchPatients.length > 0 && (
-                <div className="rounded-lg border border-slate-150 divide-y divide-slate-100 max-h-40 overflow-y-auto">
-                  {searchPatients.map((p) => (
-                    <button
-                      key={p._id}
-                      type="button"
-                      onClick={() => { setValue("patientId", p._id); setPatientQuery(`${p.name} (${p.uhid})`); }}
-                      className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-slate-50 ${selectedPatientId === p._id ? "bg-navy-50 font-semibold" : ""}`}
-                    >
-                      <div>
-                        <div className="font-semibold text-slate-800">{p.name}</div>
-                        <div className="text-slate-450 font-mono text-[10px]">{p.uhid} — {p.phone}</div>
-                      </div>
-                      {selectedPatientId === p._id && <span className="text-[10px] bg-navy-600 text-white rounded px-1.5 py-0.5">Selected</span>}
-                    </button>
-                  ))}
+
+              {patientLoading && (
+                <div className="py-4 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                  <RefreshCw className="h-4 w-4 animate-spin text-navy-600" />
+                  <span>Loading patient details...</span>
                 </div>
+              )}
+
+              {selectedPatientId && !patientLoading && (patientError || !patientDetail?.patient) && (
+                <div className="rounded-lg bg-red-50 border border-red-200 p-4 text-xs text-red-700 space-y-2">
+                  <div className="flex items-center gap-2 font-bold text-red-800">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span>Patient not found.</span>
+                  </div>
+                  <p>The specified patient ID is invalid or does not exist in the registry.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setValue("patientId", "");
+                      setPatientQuery("");
+                    }}
+                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold transition-colors"
+                  >
+                    Return to Patient Search
+                  </button>
+                </div>
+              )}
+
+              {patientDetail?.patient && patientDetail.patient.isActive === false && (
+                <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-700 flex items-start gap-2.5">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+                  <div>
+                    <p className="font-bold text-amber-800">Warning: Inactive Patient Account</p>
+                    <p className="mt-0.5 leading-snug">This patient's registration status is marked as inactive.</p>
+                  </div>
+                </div>
+              )}
+
+              {selectedPatientId && patientDetail?.patient ? (
+                <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-bold text-sm text-slate-800">{patientDetail.patient.name}</div>
+                      <div className="font-mono text-xs text-slate-400 font-semibold mt-0.5">{patientDetail.patient.uhid}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setValue("patientId", "");
+                        setPatientQuery("");
+                      }}
+                      className="text-xs font-bold text-navy-700 hover:text-navy-800 border border-slate-200 bg-white rounded-md px-3 py-1.5 transition-colors shadow-sm"
+                    >
+                      Change Patient
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4 text-xs border-t border-slate-100 pt-3">
+                    <div>
+                      <span className="text-slate-400 block font-semibold mb-0.5">Age / Gender</span>
+                      <span className="font-bold text-slate-700">{patientDetail.patient.age ?? "—"} Yrs / <span className="capitalize">{patientDetail.patient.gender}</span></span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block font-semibold mb-0.5">Phone</span>
+                      <span className="font-bold text-slate-700 font-mono">{patientDetail.patient.phone || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block font-semibold mb-0.5">Blood Group</span>
+                      <span className="font-bold text-slate-700">{patientDetail.patient.bloodGroup || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block font-semibold mb-0.5">Registration Date</span>
+                      <span className="font-bold text-slate-700">
+                        {new Date(patientDetail.patient.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      </span>
+                    </div>
+                    {patientDetail.patient.status && (
+                      <div>
+                        <span className="text-slate-400 block font-semibold mb-0.5">Status</span>
+                        <span className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 capitalize border border-blue-200">
+                          {patientDetail.patient.status}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                !patientLoading && (
+                  <>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Search patient by UHID, phone, or name..."
+                        value={patientQuery}
+                        onChange={(e) => setPatientQuery(e.target.value)}
+                        className="w-full rounded-lg border border-slate-300 pl-10 pr-4 py-2 text-sm outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+                      />
+                    </div>
+                    {searchPatients && searchPatients.length > 0 && (
+                      <div className="rounded-lg border border-slate-150 divide-y divide-slate-100 max-h-40 overflow-y-auto">
+                        {searchPatients.map((p) => (
+                          <button
+                            key={p._id}
+                            type="button"
+                            onClick={() => { setValue("patientId", p._id); setPatientQuery(`${p.name} (${p.uhid})`); }}
+                            className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-slate-50 ${selectedPatientId === p._id ? "bg-navy-50 font-semibold" : ""}`}
+                          >
+                            <div>
+                              <div className="font-semibold text-slate-800">{p.name}</div>
+                              <div className="text-slate-450 font-mono text-[10px]">{p.uhid} — {p.phone}</div>
+                            </div>
+                            {selectedPatientId === p._id && <span className="text-[10px] bg-navy-600 text-white rounded px-1.5 py-0.5">Selected</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )
               )}
               {errors.patientId && <p className="text-xs text-red-500 font-medium">{errors.patientId.message as any}</p>}
             </Card>
+
+            {/* Clinical Profile & History (Only displayed when patient is selected) */}
+            {selectedPatientId && patientDetail?.patient && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card className="space-y-3">
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-slate-500 border-b pb-1.5 flex items-center gap-1.5">
+                    <FolderHeart className="h-4 w-4 text-navy-600" /> Previous Visits & Appointments
+                  </h4>
+                  {patientDetail.patient.medicalHistory && patientDetail.patient.medicalHistory.length > 0 ? (
+                    <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
+                      {patientDetail.patient.medicalHistory.map((item: any, idx: number) => (
+                        <div key={idx} className="border-b border-slate-100 pb-2 last:border-0 last:pb-0 text-xs">
+                          <div className="flex justify-between text-slate-400 font-semibold">
+                            <span>{new Date(item.date).toLocaleDateString("en-IN")} — {item.visitType}</span>
+                            <span className="font-bold text-slate-600 uppercase text-[10px]">{item.status}</span>
+                          </div>
+                          <div className="mt-0.5 text-slate-700 font-bold">{item.diagnosis}</div>
+                          {item.notes && <div className="text-[10px] text-slate-500 mt-1 bg-slate-50 p-1.5 rounded border border-slate-100 leading-snug">{item.notes}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-slate-455 italic py-4 text-center">No previous visits or clinical entries found.</div>
+                  )}
+                </Card>
+
+                <Card className="space-y-3">
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-slate-500 border-b pb-1.5 flex items-center gap-1.5">
+                    <AlertTriangle className="h-4 w-4 text-amber-500" /> Allergies & Medical Alerts
+                  </h4>
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <span className="font-bold text-slate-500 block">Allergies:</span>
+                      {patientDetail.patient.allergies ? (
+                        <div className="mt-1 bg-red-50 border border-red-200 text-red-700 rounded px-2.5 py-1.5 font-bold">
+                          ⚠️ {patientDetail.patient.allergies}
+                        </div>
+                      ) : (
+                        <div className="text-slate-400 italic mt-0.5">No registered allergies.</div>
+                      )}
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-500 block">Medical Alerts / Conditions:</span>
+                      {patientDetail.patient.medicalHistory?.some((m: any) => m.visitType?.toLowerCase().includes("admission") || m.visitType?.toLowerCase().includes("emergency")) ? (
+                        <div className="mt-1 bg-amber-50 border border-amber-200 text-amber-700 rounded px-2.5 py-1.5 font-semibold leading-normal">
+                          🔔 Patient has a history of Admission or Emergency visits. Please review clinical history.
+                        </div>
+                      ) : (
+                        <div className="text-slate-450 italic mt-0.5">No critical medical alerts.</div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            )}
 
             <Card className="space-y-4">
               <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">

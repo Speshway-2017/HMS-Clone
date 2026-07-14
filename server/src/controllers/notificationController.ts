@@ -35,8 +35,14 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
     date: { $gte: startOfToday, $lt: endOfTomorrow },
   };
 
+  const patientFilter: Record<string, any> = {
+    ...hospitalFilter,
+    createdAt: { $gte: last24h },
+  };
+
   if (isDoctor && doctorId) {
     apptFilter.doctor = doctorId;
+    patientFilter.assignedDoctor = doctorId;
   }
 
   const [upcomingAppointments, lowStockItems, actionableInvoices, newPatients] = await Promise.all([
@@ -71,8 +77,8 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
           .lean()
       : Promise.resolve([]),
 
-    // Patients registered in the last 24 hours
-    Patient.find({ ...hospitalFilter, createdAt: { $gte: last24h } })
+    // Patients registered in the last 24 hours (assigned to doctor if user is doctor)
+    Patient.find(patientFilter)
       .sort({ createdAt: -1 })
       .limit(5)
       .lean(),

@@ -2,12 +2,42 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { Patient, PATIENT_STATUSES } from "../models/Patient";
 import { Doctor } from "../models/Doctor";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 import { Admission } from "../models/Admission";
 import { Bed } from "../models/Bed";
+import { Appointment } from "../models/Appointment";
+import { LabOrder } from "../models/LabOrder";
+import { RadiologyOrder } from "../models/RadiologyOrder";
+
+async function getLoggedDoctor(req: Request) {
+  const doctor = await Doctor.findOne({ email: req.user!.email, isActive: { $ne: false } });
+  if (!doctor) {
+    throw new AppError("Doctor profile not found for the logged-in user.", 404);
+  }
+  return doctor;
+}
+
+async function checkPatientDoctorAccess(req: Request, patientId: string) {
+  if (req.user!.role === "doctor") {
+    const doctor = await getLoggedDoctor(req);
+    const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+    const patId = new Types.ObjectId(patientId);
+    
+    const [apptCount, admissionCount, labCount, radioCount, patientAssignedCount] = await Promise.all([
+      Appointment.countDocuments({ hospital: hospitalId, doctor: doctor._id, patient: patId }),
+      Admission.countDocuments({ hospital: hospitalId, admittingDoctor: doctor._id, patient: patId }),
+      LabOrder.countDocuments({ hospital: hospitalId, doctor: doctor._id, patient: patId }),
+      RadiologyOrder.countDocuments({ hospital: hospitalId, doctor: doctor._id, patient: patId }),
+      Patient.countDocuments({ hospital: hospitalId, _id: patId, assignedDoctor: doctor._id }),
+    ]);
+    if (apptCount + admissionCount + labCount + radioCount + patientAssignedCount === 0) {
+      throw new AppError("You do not have access to this patient's records.", 403);
+    }
+  }
+}
 
 const medicalHistoryEntrySchema = z.object({
   date: z.coerce.date(),
@@ -38,9 +68,30 @@ export const listPatients = catchAsync(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req, 20);
   const { status, search } = req.query as Record<string, string | undefined>;
 
-  const filter: Record<string, unknown> = { ...req.hospitalFilter };
+  const filter: Record<string, any> = { ...req.hospitalFilter };
   if (status) filter.status = status;
   if (search) filter.name = new RegExp(search, "i");
+
+  // Enforce doctor data isolation for patient lists
+  if (req.user!.role === "doctor") {
+    const doctor = await getLoggedDoctor(req);
+    const [apptPatients, admissionPatients, labPatients, radioPatients, assignedPatients] = await Promise.all([
+      Appointment.distinct("patient", { hospital: filter.hospital, doctor: doctor._id }),
+      Admission.distinct("patient", { hospital: filter.hospital, admittingDoctor: doctor._id }),
+      LabOrder.distinct("patient", { hospital: filter.hospital, doctor: doctor._id }),
+      RadiologyOrder.distinct("patient", { hospital: filter.hospital, doctor: doctor._id }),
+      Patient.distinct("_id", { hospital: filter.hospital, assignedDoctor: doctor._id }),
+    ]);
+    const patientIdSet = new Set<string>([
+      ...apptPatients.map((id) => id.toString()),
+      ...admissionPatients.map((id) => id.toString()),
+      ...labPatients.map((id) => id.toString()),
+      ...radioPatients.map((id) => id.toString()),
+      ...assignedPatients.map((id) => id.toString()),
+    ]);
+    const patientIds = Array.from(patientIdSet).map((id) => new Types.ObjectId(id));
+    filter._id = { $in: patientIds };
+  }
 
   const [patients, total, statusCounts, admissionsToday] = await Promise.all([
     Patient.find(filter).populate("assignedDoctor", "name").sort({ createdAt: -1 }).skip(skip).limit(limit),
@@ -48,13 +99,13 @@ export const listPatients = catchAsync(async (req: Request, res: Response) => {
     Patient.aggregate([
       { 
         $match: { 
-          ...req.hospitalFilter as Record<string, unknown>
+          ...filter
         } 
       }, 
       { $group: { _id: "$status", count: { $sum: 1 } } }
     ]),
     Patient.countDocuments({ 
-      ...req.hospitalFilter, 
+      ...filter, 
       createdAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) }
     }),
   ]);
@@ -75,10 +126,18 @@ export const listPatients = catchAsync(async (req: Request, res: Response) => {
 export const createPatient = catchAsync(async (req: Request, res: Response) => {
   const body = patientSchema.parse(req.body);
   const patient = await Patient.create({ ...body, hospital: req.hospitalFilter!.hospital });
-  res.status(201).json({ status: "success", data: { patient } });
+  res.status(201).json({
+    success: true,
+    patientId: patient._id,
+    patient,
+    uhid: patient.uhid,
+    status: "success",
+    data: { patient }
+  });
 });
 
 export const getPatient = catchAsync(async (req: Request, res: Response) => {
+  await checkPatientDoctorAccess(req, req.params.id);
   const patient = await Patient.findOne({ _id: req.params.id, ...req.hospitalFilter }).populate("assignedDoctor", "name");
   if (!patient) {
     throw new AppError("Patient not found.", 404);
@@ -87,6 +146,7 @@ export const getPatient = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const updatePatient = catchAsync(async (req: Request, res: Response) => {
+  await checkPatientDoctorAccess(req, req.params.id);
   const body = patientSchema.partial().parse(req.body);
   const patient = await Patient.findOneAndUpdate({ _id: req.params.id, ...req.hospitalFilter }, body, {
     new: true,
@@ -119,6 +179,7 @@ export const deletePatient = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const addMedicalHistoryEntry = catchAsync(async (req: Request, res: Response) => {
+  await checkPatientDoctorAccess(req, req.params.id);
   const entry = medicalHistoryEntrySchema.parse(req.body);
   const patient = await Patient.findOneAndUpdate(
     { _id: req.params.id, ...req.hospitalFilter },

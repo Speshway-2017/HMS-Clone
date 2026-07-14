@@ -5,22 +5,34 @@ import { Sidebar } from "../components/ui/Sidebar";
 import { Topbar } from "../components/ui/Topbar";
 import { useAuth } from "../context/AuthContext";
 import { socket } from "../lib/socket";
+import { useDoctorProfileMe } from "../features/doctors";
 
 export function DashboardLayout() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  const { data: doctorProfile } = useDoctorProfileMe();
+
   useEffect(() => {
     if (user?.hospital) {
       socket.emit("join_hospital", user.hospital);
     }
-  }, [user]);
+    if (user?.role === "doctor" && doctorProfile?._id) {
+      socket.emit("join_doctor", doctorProfile._id);
+    }
+  }, [user, doctorProfile]);
 
   useEffect(() => {
-    const handleUpdate = (data: any) => {
+    const handleUpdate = (data: unknown) => {
       console.log("Real-time update received via Socket.IO:", data);
       // Invalidate all query keys to trigger real-time auto-updates
       queryClient.invalidateQueries();
+    };
+
+    const handleDeptUpdate = () => {
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
+      queryClient.invalidateQueries({ queryKey: ["doctors"] });
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
     };
 
     socket.on("dashboard_update", handleUpdate);
@@ -29,6 +41,12 @@ export function DashboardLayout() {
     socket.on("prescription:new", handleUpdate);
     socket.on("prescription:updated", handleUpdate);
     socket.on("prescription:dispensed", handleUpdate);
+    socket.on("notification:new", handleUpdate);
+    // Department real-time events
+    socket.on("department:updated", handleDeptUpdate);
+    socket.on("department:statusChanged", handleDeptUpdate);
+    socket.on("department:deleted", handleDeptUpdate);
+
     return () => {
       socket.off("dashboard_update", handleUpdate);
       socket.off("admission:request:created", handleUpdate);
@@ -36,6 +54,10 @@ export function DashboardLayout() {
       socket.off("prescription:new", handleUpdate);
       socket.off("prescription:updated", handleUpdate);
       socket.off("prescription:dispensed", handleUpdate);
+      socket.off("notification:new", handleUpdate);
+      socket.off("department:updated", handleDeptUpdate);
+      socket.off("department:statusChanged", handleDeptUpdate);
+      socket.off("department:deleted", handleDeptUpdate);
     };
   }, [queryClient]);
 

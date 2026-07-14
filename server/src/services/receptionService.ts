@@ -16,7 +16,8 @@ import { OPVisit } from "../models/OPVisit";
 import { Hospital } from "../models/Hospital";
 import { DbNotification } from "../models/DbNotification";
 import { Ward } from "../models/Ward";
-import { emitToHospital } from "../config/socket";
+import { emitToHospital, emitToDoctor } from "../config/socket";
+import { createDoctorNotification } from "../utils/notificationHelper";
 
 
 function generateDigits(length: number): string {
@@ -429,6 +430,24 @@ export class ReceptionService {
       }
     });
 
+    const patientRecord = await Patient.findById(patientId);
+    const patientName = patientRecord ? patientRecord.name : "Patient";
+
+    // Notify doctor
+    await createDoctorNotification({
+      hospital: hospitalId,
+      title: "New Appointment",
+      message: `New appointment ${referenceId} booked for ${patientName} on ${bookingDate.toLocaleDateString("en-IN")} at ${time}.`,
+      type: "appointment",
+      severity: "info",
+      recipientDoctor: doctorId,
+      link: `/doctor/op-management`,
+      data: {
+        appointmentId: newAppointment._id.toString(),
+        referenceId,
+      }
+    });
+
     await ReceptionRepository.createAuditLog({
       hospital: hospitalId,
       user: userId,
@@ -748,6 +767,30 @@ export class ReceptionService {
       timestamp: new Date()
     });
 
+    // Notify doctor
+    if (admissionReq.requestedBy) {
+      await createDoctorNotification({
+        hospital: hospitalId,
+        title: "Admission Request Rejected",
+        message: `Your IP admission request ${admissionReq.requestNumber} was rejected by receptionist.`,
+        type: "admission_request",
+        severity: "critical",
+        recipientDoctor: admissionReq.requestedBy.toString(),
+        link: `/doctor/inpatients`,
+        data: {
+          requestId: admissionReq._id.toString(),
+          requestNumber: admissionReq.requestNumber,
+          status: "Rejected",
+        }
+      });
+      emitToDoctor(admissionReq.requestedBy.toString(), "admission_request_update", {
+        requestId: admissionReq._id,
+        requestNumber: admissionReq.requestNumber,
+        status: "Rejected",
+        timestamp: new Date()
+      });
+    }
+
     await ReceptionRepository.createAuditLog({
       hospital: hospitalId,
       user: userId,
@@ -1038,6 +1081,29 @@ export class ReceptionService {
             status: "Approved",
             timestamp: new Date()
           });
+
+          // Notify doctor
+          if (admissionReq.requestedBy) {
+            await createDoctorNotification({
+              hospital: hospitalId,
+              title: "Admission Request Approved",
+              message: `Your IP admission request ${admissionReq.requestNumber} for ${patient.name} has been approved. Bed allocated in ${ward}.`,
+              type: "admission_request",
+              severity: "info",
+              recipientDoctor: admissionReq.requestedBy.toString(),
+              link: `/doctor/inpatients`,
+              data: {
+                requestId: resolvedReqId,
+                patientId: patientId.toString(),
+                admissionNumber,
+              }
+            });
+            emitToDoctor(admissionReq.requestedBy.toString(), "admission_request_update", {
+              requestId: resolvedReqId,
+              status: "Approved",
+              timestamp: new Date()
+            });
+          }
         }
       }
 
@@ -1284,6 +1350,23 @@ export class ReceptionService {
         severity: "info",
       }], { session });
 
+      // Notify doctor
+      if (appointment.doctor) {
+        await createDoctorNotification({
+          hospital: hospitalId,
+          title: "Appointment Cancelled",
+          message: `Appointment ${appointment.referenceId} has been cancelled by receptionist.`,
+          type: "appointment",
+          severity: "warning",
+          recipientDoctor: appointment.doctor.toString(),
+          link: `/doctor/op-management`,
+          data: {
+            appointmentId,
+            referenceId: appointment.referenceId,
+          }
+        });
+      }
+
       // Write audit log
       await ReceptionRepository.createAuditLog({
         hospital: hospitalId,
@@ -1505,6 +1588,25 @@ export class ReceptionService {
         ],
         { session }
       );
+
+      // Notify doctor
+      if (doctorId) {
+        await createDoctorNotification({
+          hospital: hospitalId,
+          title: "Appointment Rescheduled",
+          message: `Appointment ${appointment.referenceId} has been rescheduled to ${parsedDate.toLocaleDateString("en-IN")} at ${newTime}.`,
+          type: "appointment",
+          severity: "info",
+          recipientDoctor: doctorId.toString(),
+          link: `/doctor/op-management`,
+          data: {
+            appointmentId,
+            newDate,
+            newTime,
+            newToken: newTokenNumber,
+          }
+        });
+      }
 
       // ── 14. Audit log ─────────────────────────────────────────────────────
       await ReceptionRepository.createAuditLog({

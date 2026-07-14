@@ -20,6 +20,12 @@ export function initSocket(server: HTTPServer, clientUrl: string) {
       console.log(`Socket ${socket.id} joined hospital room: ${hospitalId}`);
     });
 
+    // Allow joining a doctor-specific room to enforce notification isolation
+    socket.on("join_doctor", (doctorId: string) => {
+      socket.join(`doctor:${doctorId}`);
+      console.log(`Socket ${socket.id} joined doctor room: doctor:${doctorId}`);
+    });
+
     socket.on("disconnect", () => {
       console.log(`Socket disconnected: ${socket.id}`);
     });
@@ -43,3 +49,13 @@ export function emitToHospital(hospitalId: string, event: string, data: any) {
     io.to(hospitalId.toString()).emit(event, data);
   }
 }
+
+/**
+ * Emit an event strictly to a specific doctor's room
+ */
+export function emitToDoctor(doctorId: string, event: string, data: any) {
+  if (io) {
+    io.to(`doctor:${doctorId}`).emit(event, data);
+  }
+}
+

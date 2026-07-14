@@ -11,11 +11,13 @@ import { RadiologyOrder } from "../models/RadiologyOrder";
 import { DbNotification } from "../models/DbNotification";
 import { Admission } from "../models/Admission";
 import { AdmissionRequest } from "../models/AdmissionRequest";
+import { AuditLog } from "../models/AuditLog";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import mongoose, { Types } from "mongoose";
 import { emitToHospital } from "../config/socket";
 import { createOrUpdatePrescriptionCore } from "./prescriptionController";
+
 
 // Helper helper to resolve the logged-in doctor profile
 async function getLoggedDoctor(req: Request) {
@@ -52,7 +54,7 @@ export const getMetrics = catchAsync(async (req: Request, res: Response) => {
     DoctorDashboardRepository.getPendingLabOrders(hospitalId, doctorId),
     DoctorDashboardRepository.getFollowupPatients(hospitalId, doctorId),
     DoctorDashboardRepository.getTodaySurgeries(hospitalId, doctorId),
-    DoctorDashboardRepository.getNotifications(hospitalId),
+    DoctorDashboardRepository.getNotifications(hospitalId, doctorId),
     DoctorDashboardRepository.getCalendarAppointments(hospitalId, doctorId),
   ]);
 
@@ -169,6 +171,19 @@ export const addInpatientNotes = catchAsync(async (req: Request, res: Response) 
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const patientId = req.params.id;
   const { notes, diagnosis } = req.body;
+  const doctor = await getLoggedDoctor(req);
+
+  // Hardened validation: Verify patient has active admission under this doctor
+  const activeAdmission = await Admission.findOne({
+    hospital: hospitalId,
+    patient: patientId,
+    admittingDoctor: doctor._id,
+    status: "admitted",
+  });
+
+  if (!activeAdmission) {
+    throw new AppError("You do not have authorization to add inpatient notes for this patient.", 403);
+  }
 
   const patient = await Patient.findOneAndUpdate(
     { _id: patientId, hospital: hospitalId },
@@ -315,15 +330,16 @@ export const createPrescription = catchAsync(async (req: Request, res: Response)
 export const completePrescription = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const prescriptionId = req.params.id;
+  const doctor = await getLoggedDoctor(req);
 
   const prescription = await Prescription.findOneAndUpdate(
-    { _id: prescriptionId, hospital: hospitalId },
+    { _id: prescriptionId, hospital: hospitalId, doctor: doctor._id },
     { status: "completed" },
     { new: true }
   );
 
   if (!prescription) {
-    throw new AppError("Prescription not found.", 404);
+    throw new AppError("Prescription not found or unauthorized.", 403);
   }
 
   res.json({ status: "success", data: prescription });
@@ -396,8 +412,75 @@ export const getSurgeries = catchAsync(async (req: Request, res: Response) => {
 // 10. Notifications
 export const getNotifications = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
-  const data = await DoctorDashboardRepository.getNotifications(hospitalId);
+  const doctor = await getLoggedDoctor(req);
+  const data = await DoctorDashboardRepository.getNotifications(hospitalId, doctor._id.toString());
+
+  // Log delivery of notifications
+  if (req.user && data.length > 0) {
+    const now = new Date();
+    await Promise.all(
+      data.map((notif) =>
+        AuditLog.create({
+          hospital: hospitalId,
+          user: req.user!._id,
+          action: "doctor_notification_delivered",
+          details: `Notification "${notif.title}" delivered to Dr. ${doctor.name}.`,
+          ipAddress: getClientIp(req),
+          resource: "notification",
+          resourceId: notif._id,
+          oldValues: null,
+          newValues: {
+            recipientDoctorId: doctor._id.toString(),
+            deliveredTime: now,
+            status: notif.isRead ? "read" : "unread",
+          },
+        })
+      )
+    );
+  }
+
   res.json({ status: "success", data });
+});
+
+export const markNotificationRead = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const doctor = await getLoggedDoctor(req);
+  const notificationId = req.params.id;
+
+  const notif = await DbNotification.findOneAndUpdate(
+    {
+      _id: notificationId,
+      hospital: hospitalId,
+      recipientDoctor: doctor._id,
+    },
+    { isRead: true },
+    { new: true }
+  );
+
+  if (!notif) {
+    throw new AppError("Notification not found or unauthorized.", 404);
+  }
+
+  // Log notification read action
+  if (req.user) {
+    await AuditLog.create({
+      hospital: hospitalId,
+      user: req.user._id,
+      action: "doctor_notification_read",
+      details: `Notification "${notif.title}" marked as read by Dr. ${doctor.name}.`,
+      ipAddress: getClientIp(req),
+      resource: "notification",
+      resourceId: notif._id,
+      oldValues: { isRead: false },
+      newValues: {
+        recipientDoctorId: doctor._id.toString(),
+        readTime: new Date(),
+        status: "read",
+      },
+    });
+  }
+
+  res.json({ status: "success", data: { notification: notif } });
 });
 
 // 11. Calendar Schedule
@@ -838,4 +921,344 @@ export const getRadiologyOrders = catchAsync(async (req: Request, res: Response)
     .sort({ createdAt: -1 });
 
   res.json({ status: "success", data: orders });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Laboratory — DOCTOR-SCOPED ONLY
+//
+// Security guarantee: a doctor can ONLY see lab orders they created.
+// The doctor ID comes exclusively from the authenticated JWT — never from the
+// request body or query string.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /doctors/dashboard/my-lab-orders
+ *
+ * Returns ALL lab orders (pending + completed + rejected) created by the
+ * authenticated doctor. Filtered at the MongoDB level. Optional ?status= and
+ * ?search= query params are supported.
+ *
+ * An audit log entry is written on every access.
+ */
+export const getMyLabOrders = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const doctor = await getLoggedDoctor(req);
+  const doctorObjId = doctor._id;
+
+  const { status, search } = req.query as Record<string, string | undefined>;
+
+  // Build doctor-owned filter — doctor id is taken from JWT, never from client
+  const filter: Record<string, unknown> = {
+    hospital: hospitalId,
+    doctor: doctorObjId,
+  };
+
+  if (status && ["pending", "completed", "rejected"].includes(status)) {
+    filter.status = status;
+  }
+
+  const orders = await LabOrder.find(filter)
+    .populate("patient", "name uhid age gender phone allergies bloodGroup")
+    .populate("doctor", "name specialization")
+    .sort({ createdAt: -1 });
+
+  // Apply search filter in memory only (tests is an array of strings — hard to $regex in index)
+  const result = search
+    ? orders.filter((o) => {
+        const patientName = (o.patient as { name?: string })?.name ?? "";
+        return (
+          patientName.toLowerCase().includes(search.toLowerCase()) ||
+          o.tests.some((t) => t.toLowerCase().includes(search.toLowerCase()))
+        );
+      })
+    : orders;
+
+  // Audit log: track who accessed the lab orders list
+  if (req.user) {
+    await AuditLog.create({
+      hospital: hospitalId,
+      user: req.user._id,
+      action: "doctor_lab_orders_accessed",
+      details: `Dr. ${doctor.name} accessed their lab orders list (${result.length} orders).`,
+      ipAddress: getClientIp(req),
+      resource: "lab_order",
+      resourceId: null,
+      oldValues: null,
+      newValues: { doctorId: doctorObjId.toString(), count: result.length, statusFilter: status ?? "all" },
+    });
+  }
+
+  res.json({
+    status: "success",
+    data: {
+      orders: result,
+      counts: {
+        total: result.length,
+        pending: result.filter((o) => o.status === "pending").length,
+        completed: result.filter((o) => o.status === "completed").length,
+        rejected: result.filter((o) => o.status === "rejected").length,
+      },
+    },
+  });
+});
+
+/**
+ * GET /doctors/dashboard/my-lab-orders/:labOrderId
+ *
+ * Returns a single lab order — ONLY if it was created by the authenticated
+ * doctor. Returns 403 with audit log on unauthorized access.
+ */
+export const getMyLabOrderById = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const doctor = await getLoggedDoctor(req);
+  const doctorObjId = doctor._id;
+  const labOrderId = new Types.ObjectId(req.params.labOrderId);
+
+  // Ownership-checked query — both doctor AND hospital must match
+  const order = await LabOrder.findOne({
+    _id: labOrderId,
+    hospital: hospitalId,
+    doctor: doctorObjId,
+  })
+    .populate("patient", "name uhid age gender phone allergies bloodGroup")
+    .populate("doctor", "name specialization");
+
+  if (!order) {
+    // Could be: doesn't exist OR belongs to another doctor — treat both as 403
+    if (req.user) {
+      await AuditLog.create({
+        hospital: hospitalId,
+        user: req.user._id,
+        action: "unauthorized_lab_order_access_attempt",
+        details: `Dr. ${doctor.name} attempted to access lab order ${labOrderId} without ownership. Access denied.`,
+        ipAddress: getClientIp(req),
+        resource: "lab_order",
+        resourceId: labOrderId,
+        oldValues: null,
+        newValues: null,
+      });
+    }
+    throw new AppError("You do not have access to this laboratory order.", 403);
+  }
+
+  // Audit log — authorised access to individual lab report
+  if (req.user) {
+    const patient = order.patient as { _id?: Types.ObjectId; name?: string };
+    await AuditLog.create({
+      hospital: hospitalId,
+      user: req.user._id,
+      action: "doctor_lab_order_report_viewed",
+      details: `Dr. ${doctor.name} viewed lab order ${labOrderId} for patient ${patient?.name ?? "Unknown"}.`,
+      ipAddress: getClientIp(req),
+      resource: "lab_order",
+      resourceId: labOrderId,
+      oldValues: null,
+      newValues: {
+        doctorId: doctorObjId.toString(),
+        patientId: patient?._id?.toString() ?? null,
+        labOrderStatus: order.status,
+      },
+    });
+  }
+
+  res.json({ status: "success", data: { order } });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Patient Records — DOCTOR-SCOPED ONLY
+//
+// Security guarantee: a doctor can ONLY see patients who are linked to them
+// via an appointment, admission, lab order, or radiology order.
+// The doctor ID comes exclusively from the authenticated JWT — never from the
+// request body/query.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Helper — extract IP address (proxy-aware) */
+function getClientIp(req: Request): string {
+  const fwd = req.headers["x-forwarded-for"];
+  if (typeof fwd === "string") return fwd.split(",")[0].trim();
+  return req.socket.remoteAddress ?? "";
+}
+
+/**
+ * GET /doctors/dashboard/my-patients
+ *
+ * Returns ONLY patients that are genuinely assigned to the logged-in doctor
+ * via at least one of:
+ *  - an Appointment (any status)
+ *  - an Admission (admittingDoctor)
+ *  - a LabOrder
+ *  - a RadiologyOrder
+ *
+ * Filtering happens entirely in MongoDB. No client-supplied doctorId is accepted.
+ */
+export const getMyPatients = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const doctor = await getLoggedDoctor(req);
+  const doctorObjId = doctor._id;
+
+  const { search } = req.query as Record<string, string | undefined>;
+
+  // Step 1: collect all patient ObjectIds linked to this doctor across all
+  // relevant collections — entirely at the database level.
+  const [apptPatients, admissionPatients, labPatients, radioPatients, assignedPatients] = await Promise.all([
+    Appointment.distinct("patient", { hospital: hospitalId, doctor: doctorObjId }),
+    Admission.distinct("patient", { hospital: hospitalId, admittingDoctor: doctorObjId }),
+    LabOrder.distinct("patient", { hospital: hospitalId, doctor: doctorObjId }),
+    RadiologyOrder.distinct("patient", { hospital: hospitalId, doctor: doctorObjId }),
+    Patient.distinct("_id", { hospital: hospitalId, assignedDoctor: doctorObjId }),
+  ]);
+
+  // Merge and deduplicate using string keys, then convert back to ObjectIds
+  const patientIdSet = new Set<string>([
+    ...apptPatients.map((id) => id.toString()),
+    ...admissionPatients.map((id) => id.toString()),
+    ...labPatients.map((id) => id.toString()),
+    ...radioPatients.map((id) => id.toString()),
+    ...assignedPatients.map((id) => id.toString()),
+  ]);
+
+  const patientIds = Array.from(patientIdSet).map((id) => new Types.ObjectId(id));
+
+  // Step 2: fetch the actual patient documents — scoped to hospital + owned ids
+  const filter: Record<string, unknown> = {
+    hospital: hospitalId,
+    _id: { $in: patientIds },
+  };
+
+  if (search) {
+    filter.$or = [
+      { name: new RegExp(search, "i") },
+      { phone: new RegExp(search, "i") },
+    ];
+  }
+
+  const patients = await Patient.find(filter)
+    .populate("assignedDoctor", "name")
+    .sort({ createdAt: -1 });
+
+  // Step 3: Audit log — record access
+  if (req.user) {
+    await AuditLog.create({
+      hospital: hospitalId,
+      user: req.user._id,
+      action: "doctor_patient_list_accessed",
+      details: `Dr. ${doctor.name} accessed their patient records list (${patients.length} patients).`,
+      ipAddress: getClientIp(req),
+      resource: "patient",
+      resourceId: null,
+      oldValues: null,
+      newValues: { doctorId: doctorObjId.toString(), count: patients.length },
+    });
+  }
+
+  res.json({
+    status: "success",
+    data: {
+      patients,
+      counts: {
+        total: patients.length,
+        admitted: patients.filter((p) => p.status === "admitted").length,
+        opd: patients.filter((p) => p.status === "opd").length,
+        discharged: patients.filter((p) => p.status === "discharged").length,
+      },
+    },
+  });
+});
+
+/**
+ * GET /doctors/dashboard/my-patients/:patientId
+ *
+ * Returns a single patient — ONLY if the logged-in doctor has ownership
+ * (i.e., at least one appointment, admission, lab order, or radiology order).
+ * Returns 403 if the doctor has no link to this patient.
+ */
+export const getMyPatientById = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const doctor = await getLoggedDoctor(req);
+  const doctorObjId = doctor._id;
+  const patientId = new Types.ObjectId(req.params.patientId);
+
+  // Verify ownership: at least one document must link this doctor to this patient
+  const [apptCount, admissionCount, labCount, radioCount, patientAssignedCount] = await Promise.all([
+    Appointment.countDocuments({ hospital: hospitalId, doctor: doctorObjId, patient: patientId }),
+    Admission.countDocuments({ hospital: hospitalId, admittingDoctor: doctorObjId, patient: patientId }),
+    LabOrder.countDocuments({ hospital: hospitalId, doctor: doctorObjId, patient: patientId }),
+    RadiologyOrder.countDocuments({ hospital: hospitalId, doctor: doctorObjId, patient: patientId }),
+    Patient.countDocuments({ hospital: hospitalId, _id: patientId, assignedDoctor: doctorObjId }),
+  ]);
+
+  const isOwned = apptCount + admissionCount + labCount + radioCount + patientAssignedCount > 0;
+
+  if (!isOwned) {
+    // Write security audit log for unauthorized access attempt
+    if (req.user) {
+      await AuditLog.create({
+        hospital: hospitalId,
+        user: req.user._id,
+        action: "unauthorized_patient_access_attempt",
+        details: `Dr. ${doctor.name} attempted to access patient ${patientId} without ownership. Access denied.`,
+        ipAddress: getClientIp(req),
+        resource: "patient",
+        resourceId: patientId,
+        oldValues: null,
+        newValues: null,
+      });
+    }
+    throw new AppError("You do not have access to this patient's records.", 403);
+  }
+
+  const patient = await Patient.findOne({ _id: patientId, hospital: hospitalId })
+    .populate("assignedDoctor", "name");
+
+  if (!patient) {
+    throw new AppError("Patient not found.", 404);
+  }
+
+  // Audit log — authorised access
+  if (req.user) {
+    await AuditLog.create({
+      hospital: hospitalId,
+      user: req.user._id,
+      action: "doctor_patient_record_accessed",
+      details: `Dr. ${doctor.name} accessed patient record for ${patient.name}.`,
+      ipAddress: getClientIp(req),
+      resource: "patient",
+      resourceId: patientId,
+      oldValues: null,
+      newValues: { patientName: patient.name, doctorId: doctorObjId.toString() },
+    });
+  }
+
+  // Fetch this doctor's clinical data for this patient
+  const [appointments, prescriptions, labOrders, radiologyOrders, admissions] = await Promise.all([
+    Appointment.find({ hospital: hospitalId, doctor: doctorObjId, patient: patientId })
+      .sort({ date: -1 })
+      .limit(20),
+    Prescription.find({ hospital: hospitalId, doctor: doctorObjId, patient: patientId })
+      .sort({ createdAt: -1 })
+      .limit(20),
+    LabOrder.find({ hospital: hospitalId, doctor: doctorObjId, patient: patientId })
+      .sort({ createdAt: -1 })
+      .limit(20),
+    RadiologyOrder.find({ hospital: hospitalId, doctor: doctorObjId, patient: patientId })
+      .sort({ createdAt: -1 })
+      .limit(20),
+    Admission.find({ hospital: hospitalId, admittingDoctor: doctorObjId, patient: patientId })
+      .sort({ admissionDate: -1 })
+      .limit(10),
+  ]);
+
+  res.json({
+    status: "success",
+    data: {
+      patient,
+      // Only this doctor's clinical data — never another doctor's records
+      appointments,
+      prescriptions,
+      labOrders,
+      radiologyOrders,
+      admissions,
+    },
+  });
 });

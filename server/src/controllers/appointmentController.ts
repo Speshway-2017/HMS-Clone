@@ -10,6 +10,14 @@ function generateReferenceId(): string {
   return `APT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 }
 
+async function getLoggedDoctor(req: Request) {
+  const doctor = await Doctor.findOne({ email: req.user!.email, isActive: { $ne: false } });
+  if (!doctor) {
+    throw new AppError("Doctor profile not found for the logged-in user.", 404);
+  }
+  return doctor;
+}
+
 const appointmentSchema = z.object({
   patient: z.string().min(1),
   doctor: z.string().min(1),
@@ -25,9 +33,16 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
   const { page, limit, skip } = getPagination(req, 50);
   const { status, doctor, from, to } = req.query as Record<string, string | undefined>;
 
-  const filter: Record<string, unknown> = { ...req.hospitalFilter };
+  const filter: Record<string, any> = { ...req.hospitalFilter };
   if (status) filter.status = status;
   if (doctor) filter.doctor = doctor;
+
+  // Enforce doctor data isolation for appointment listing
+  if (req.user!.role === "doctor") {
+    const loggedDoctor = await getLoggedDoctor(req);
+    filter.doctor = loggedDoctor._id;
+  }
+
   if (from || to) {
     filter.date = {
       ...(from ? { $gte: new Date(from) } : {}),
@@ -45,7 +60,7 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
       .limit(limit),
     Appointment.countDocuments(filter),
     Appointment.countDocuments({
-      ...req.hospitalFilter,
+      ...filter,
       date: {
         $gte: new Date(new Date().setHours(0, 0, 0, 0)),
         $lt: new Date(new Date().setHours(24, 0, 0, 0)),
@@ -97,32 +112,50 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
 
 
 export const getAppointment = catchAsync(async (req: Request, res: Response) => {
-  const appointment = await Appointment.findOne({ _id: req.params.id, ...req.hospitalFilter })
+  const filter: any = { _id: req.params.id, ...req.hospitalFilter };
+  if (req.user!.role === "doctor") {
+    const loggedDoctor = await getLoggedDoctor(req);
+    filter.doctor = loggedDoctor._id;
+  }
+
+  const appointment = await Appointment.findOne(filter)
     .populate("patient")
     .populate("doctor", "name specialization")
     .populate("department", "name");
   if (!appointment) {
-    throw new AppError("Appointment not found.", 404);
+    throw new AppError("Appointment not found or unauthorized.", 403);
   }
   res.json({ status: "success", data: { appointment } });
 });
 
 export const updateAppointment = catchAsync(async (req: Request, res: Response) => {
+  const filter: any = { _id: req.params.id, ...req.hospitalFilter };
+  if (req.user!.role === "doctor") {
+    const loggedDoctor = await getLoggedDoctor(req);
+    filter.doctor = loggedDoctor._id;
+  }
+
   const body = appointmentSchema.partial().parse(req.body);
-  const appointment = await Appointment.findOneAndUpdate({ _id: req.params.id, ...req.hospitalFilter }, body, {
+  const appointment = await Appointment.findOneAndUpdate(filter, body, {
     new: true,
     runValidators: true,
   });
   if (!appointment) {
-    throw new AppError("Appointment not found.", 404);
+    throw new AppError("Appointment not found or unauthorized.", 403);
   }
   res.json({ status: "success", data: { appointment } });
 });
 
 export const deleteAppointment = catchAsync(async (req: Request, res: Response) => {
-  const appointment = await Appointment.findOneAndDelete({ _id: req.params.id, ...req.hospitalFilter });
+  const filter: any = { _id: req.params.id, ...req.hospitalFilter };
+  if (req.user!.role === "doctor") {
+    const loggedDoctor = await getLoggedDoctor(req);
+    filter.doctor = loggedDoctor._id;
+  }
+
+  const appointment = await Appointment.findOneAndDelete(filter);
   if (!appointment) {
-    throw new AppError("Appointment not found.", 404);
+    throw new AppError("Appointment not found or unauthorized.", 403);
   }
   res.status(204).send();
 });

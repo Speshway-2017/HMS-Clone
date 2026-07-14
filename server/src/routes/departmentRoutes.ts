@@ -6,6 +6,7 @@ import {
   createDepartment,
   getDepartment,
   updateDepartment,
+  toggleDepartmentStatus,
   deleteDepartment,
   getDepartmentMetrics,
 } from "../controllers/departmentController";
@@ -16,6 +17,7 @@ router.use(protect, restrictTo("super_admin", "hospital_admin", "receptionist"),
 
 router.route("/").get(listDepartments).post(createDepartment);
 router.get("/:id/metrics", getDepartmentMetrics);
+router.patch("/:id/toggle-status", toggleDepartmentStatus);
 router.route("/:id").get(getDepartment).patch(updateDepartment).delete(deleteDepartment);
 
 export default router;

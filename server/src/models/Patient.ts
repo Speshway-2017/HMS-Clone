@@ -31,6 +31,7 @@ const patientSchema = new Schema(
     address: { type: String, default: "" },
     assignedDoctor: { type: Schema.Types.ObjectId, ref: "Doctor", default: null },
     status: { type: String, enum: PATIENT_STATUSES, default: "opd" },
+    isActive: { type: Boolean, default: true },
     allergies: { type: String, default: "" },
     insuranceProvider: { type: String, default: "" },
     insurancePolicyNumber: { type: String, default: "" },

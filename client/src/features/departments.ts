@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { Department } from "../types/domain";
@@ -63,6 +64,17 @@ export function useUpdateDepartment(id: string) {
   });
 }
 
+export function useToggleDepartmentStatus(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await api.patch(`/departments/${id}/toggle-status`);
+      return res.data.data as { department: Department; message: string };
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["departments"] }),
+  });
+}
+
 export function useDeleteDepartment() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -71,4 +83,28 @@ export function useDeleteDepartment() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["departments"] }),
   });
+}
+
+/**
+ * Listen for Socket.IO department events and invalidate the departments query
+ * so all open dashboards update in real-time without a page refresh.
+ */
+export function useDepartmentSocketSync(socket: { on: (evt: string, cb: (...args: unknown[]) => void) => void; off: (evt: string, cb: (...args: unknown[]) => void) => void } | null) {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const refresh = () => queryClient.invalidateQueries({ queryKey: ["departments"] });
+
+    socket.on("department:updated", refresh);
+    socket.on("department:statusChanged", refresh);
+    socket.on("department:deleted", refresh);
+
+    return () => {
+      socket.off("department:updated", refresh);
+      socket.off("department:statusChanged", refresh);
+      socket.off("department:deleted", refresh);
+    };
+  }, [socket, queryClient]);
 }

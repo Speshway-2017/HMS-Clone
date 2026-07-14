@@ -111,13 +111,15 @@ export const registerPatient = catchAsync(async (req: Request, res: Response) =>
   );
   res.status(201).json({
     success: true,
+    patientId: patient._id,
     patient: {
       _id: patient._id,
       uhid: patient.uhid,
       patientCode: patient.patientCode,
       name: patient.name,
       createdAt: patient.createdAt
-    }
+    },
+    uhid: patient.uhid
   });
 });
 

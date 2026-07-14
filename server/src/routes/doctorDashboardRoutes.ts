@@ -19,6 +19,7 @@ import {
   getFollowups,
   getSurgeries,
   getNotifications,
+  markNotificationRead,
   getCalendar,
   getCertificates,
   createCertificate,
@@ -30,11 +31,17 @@ import {
   createRadiologyOrder,
   completeConsultation,
   getRadiologyOrders,
+  // Doctor-scoped laboratory endpoints
+  getMyLabOrders,
+  getMyLabOrderById,
+  // Doctor-scoped patient record endpoints
+  getMyPatients,
+  getMyPatientById,
 } from "../controllers/doctorDashboardController";
 
 const router = Router();
 
-// Protect and secure all endpoints
+// Protect and secure all endpoints — doctor role only
 router.use(protect, restrictTo("doctor"), scopeToHospital);
 
 router.get("/metrics", getMetrics);
@@ -62,6 +69,7 @@ router.route("/laboratory")
 router.get("/followups", getFollowups);
 router.get("/surgeries", getSurgeries);
 router.get("/notifications", getNotifications);
+router.post("/notifications/:id/read", markNotificationRead);
 router.get("/calendar", getCalendar);
 
 router.route("/certificates")
@@ -77,5 +85,13 @@ router.post("/appointments/:id/complete", completeConsultation);
 router.post("/appointments/:id/admission", recommendAdmission);
 router.post("/appointments/:id/radiology", createRadiologyOrder);
 router.get("/radiology/list", getRadiologyOrders);
+
+// ── Doctor-scoped lab order records (security-enforced, audit-logged) ─────────
+router.get("/my-lab-orders", getMyLabOrders);
+router.get("/my-lab-orders/:labOrderId", getMyLabOrderById);
+
+// ── Doctor-scoped patient records (security-enforced, no cross-doctor leakage) ─
+router.get("/my-patients", getMyPatients);
+router.get("/my-patients/:patientId", getMyPatientById);
 
 export default router;

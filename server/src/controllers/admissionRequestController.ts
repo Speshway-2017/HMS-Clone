@@ -201,7 +201,13 @@ export const getAdmissionRequests = catchAsync(async (req: Request, res: Respons
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const status = req.query.status || "Pending";
 
-  const requests = await AdmissionRequest.find({ hospital: hospitalId, status })
+  const filter: any = { hospital: hospitalId, status };
+  if (req.user!.role === "doctor") {
+    const doctor = await getLoggedDoctor(req);
+    filter.requestedBy = doctor._id;
+  }
+
+  const requests = await AdmissionRequest.find(filter)
     .populate("patient")
     .populate("doctor", "name specialization")
     .populate("department", "name")
