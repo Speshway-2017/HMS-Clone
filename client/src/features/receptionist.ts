@@ -268,6 +268,20 @@ export function useDoctorsAvailability() {
   });
 }
 
+export function useBookedSlots(doctorId?: string, date?: string) {
+  return useQuery({
+    queryKey: ["reception", "appointments", "booked-slots", doctorId, date],
+    queryFn: async () => {
+      if (!doctorId || !date) return [];
+      const res = await api.get<{ data: { bookedSlots: string[] } }>("/reception/appointments/booked-slots", {
+        params: { doctorId, date }
+      });
+      return res.data.data.bookedSlots;
+    },
+    enabled: !!doctorId && !!date
+  });
+}
+
 // ── Rooms Hooks ──
 export function useRoomsAvailability() {
   return useQuery({

@@ -45,6 +45,17 @@ const doctorSchema = new Schema(
         breakTime: "13:00"
       }
     },
+    monthlyAvailability: {
+      type: [
+        {
+          date: { type: String, required: true }, // YYYY-MM-DD
+          from: { type: String, default: "09:00" },
+          to: { type: String, default: "17:00" },
+          active: { type: Boolean, default: true }
+        }
+      ],
+      default: []
+    },
     languages: { type: String, default: "English, Hindi" },
     consultationFee: { type: String, default: "₹500" },
     status: { type: String, enum: DOCTOR_STATUSES, default: "ACTIVE" },

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import toast from "react-hot-toast";
 import { 
   Building2, 
   DoorOpen, 
@@ -146,6 +147,8 @@ export function BedsPage() {
   const [bedRoomFilter, setBedRoomFilter] = useState("");
   const [bedStatusFilter, setBedStatusFilter] = useState("");
 
+  const [tariffSearch, setTariffSearch] = useState("");
+
   // Data Fetching
   const { data: wardData, isLoading: isLoadingWards } = useWards({
     search: wardSearch || undefined,
@@ -239,6 +242,12 @@ export function BedsPage() {
   const statsTotalBeds = allBedsForStats?.beds.length ?? 0;
   const statsOccupiedBeds = allBedsForStats?.beds.filter(b => b.isOccupied).length ?? 0;
   const statsAvailableBeds = statsTotalBeds - statsOccupiedBeds;
+
+  const filteredTariffs = tariffData?.filter(t => 
+    t.ward?.toLowerCase().includes(tariffSearch.toLowerCase()) ||
+    t.roomType?.toLowerCase().includes(tariffSearch.toLowerCase()) ||
+    t.description?.toLowerCase().includes(tariffSearch.toLowerCase())
+  );
 
   // ── Form Submissions ─────────────────────────────────────────────────────────
 
@@ -525,6 +534,46 @@ export function BedsPage() {
     },
   ];
 
+  const tariffColumns: Column<RoomTariffInfo>[] = [
+    { header: "Ward Name", render: (t) => <span className="font-semibold text-slate-800">{t.ward}</span> },
+    { header: "Room Type", render: (t) => <Badge tone="info">{t.roomType}</Badge> },
+    { header: "Daily Tariff Price", render: (t) => <span className="font-mono text-slate-700 font-bold">₹{t.tariff}</span> },
+    { header: "Nursing Package Price", render: (t) => <span className="font-mono text-slate-600">₹{t.nursingTariff || 300}</span> },
+    { header: "Effective Date", render: (t) => <span className="text-xs text-slate-500">{t.effectiveDate ? new Date(t.effectiveDate).toLocaleDateString("en-IN") : "—"}</span> },
+    { 
+      header: "Status", 
+      render: (t) => (
+        <Badge tone={t.status === "Active" ? "success" : "neutral"}>{t.status.toUpperCase()}</Badge>
+      ) 
+    },
+    {
+      header: "Actions",
+      render: (t) => (
+        <div className="flex items-center gap-3">
+          <button onClick={() => triggerEditTariff(t)} className="text-slate-400 hover:text-navy-700 transition-colors" title="Edit Tariff">
+            <Pencil className="h-4 w-4" />
+          </button>
+          <button 
+            onClick={async () => {
+              if (window.confirm("Are you sure you want to delete this room tariff config?")) {
+                try {
+                  await deleteTariffMutation.mutateAsync(t._id);
+                  toast.success("Room tariff deleted successfully.");
+                } catch {
+                  toast.error("Failed to delete room tariff.");
+                }
+              }
+            }} 
+            className="text-slate-400 hover:text-red-650 transition-colors" 
+            title="Delete Tariff"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6 w-full">
       {/* Header */}
@@ -598,7 +647,7 @@ export function BedsPage() {
               activeTab === "tariffs" ? "border-navy-700 text-navy-700" : "border-transparent text-slate-400 hover:text-slate-600"
             }`}
           >
-            <DollarSign className="h-4 w-4" /> Room Tariffs
+            Room Tariffs
           </button>
         </div>
       </div>
@@ -790,6 +839,33 @@ export function BedsPage() {
               <Pagination page={bedPage} totalPages={bedData.pagination.totalPages} onPageChange={setBedPage} />
             </div>
           )}
+        </Card>
+      )}
+
+      {/* TAB CONTENT 4: ROOM TARIFFS */}
+      {activeTab === "tariffs" && (
+        <Card className="space-y-4">
+          <div className="flex flex-wrap gap-3 items-center justify-between border-b border-slate-50 pb-4">
+            <div className="flex flex-wrap gap-3 items-center">
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search tariffs..."
+                  value={tariffSearch}
+                  onChange={(e) => { setTariffSearch(e.target.value); }}
+                  className="pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-navy-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DataTable 
+            columns={tariffColumns} 
+            rows={filteredTariffs ?? []} 
+            rowKey={(t) => t._id} 
+            emptyMessage={isLoadingTariffs ? "Loading..." : "No room tariffs found."} 
+          />
         </Card>
       )}
 

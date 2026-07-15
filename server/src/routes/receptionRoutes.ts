@@ -31,7 +31,8 @@ import {
   rescheduleAppointment,
   checkDuplicateAppointment,
   getPatientDetail,
-  rejectAdmissionRequest
+  rejectAdmissionRequest,
+  getBookedSlots
 } from "../controllers/receptionController";
 
 const router = Router();
@@ -50,6 +51,7 @@ router.get("/patients/:id", getPatientDetail);
 router.route("/patients").post(registerPatient);
 
 // Appointments
+router.get("/appointments/booked-slots", getBookedSlots);
 router.get("/appointments/check-duplicate", checkDuplicateAppointment);
 router.post("/appointments", bookAppointment);
 router.post("/appointments/:id/cancel", cancelAppointment);

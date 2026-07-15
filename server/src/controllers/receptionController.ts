@@ -14,6 +14,7 @@ import { Invoice } from "../models/Invoice";
 import { Admission } from "../models/Admission";
 import { IPBill } from "../models/IPBill";
 import { IPBillPayment } from "../models/IPBillPayment";
+import { Appointment } from "../models/Appointment";
 
 
 // Validation Schemas
@@ -435,10 +436,40 @@ export const getPaymentHistory = catchAsync(async (req: Request, res: Response) 
  */
 export const getCompletedInvoices = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as any;
+
+  // 1. Fetch completed OP invoices
   const invoices = await Invoice.find({ hospital: hospitalId, status: "paid" })
     .populate("patient", "name uhid phone")
     .sort({ updatedAt: -1 });
-  res.json({ status: "success", data: { invoices, total: invoices.length } });
+
+  // 2. Fetch completed IP bills (Paid status means fully paid)
+  const completedIpBills = await IPBill.find({ hospital: hospitalId, status: "Paid" })
+    .populate("patient", "name uhid phone")
+    .populate("admission")
+    .sort({ updatedAt: -1 });
+
+  // Map IP bills to conformed invoice structure
+  const mappedIpBills = completedIpBills.map(bill => {
+    return {
+      _id: bill._id,
+      patient: bill.patient,
+      issuedAt: bill.billingDate || (bill as any).createdAt,
+      billingType: "IP",
+      totals: {
+        subtotal: bill.grandTotal,
+        taxAmount: bill.taxRate,
+        total: bill.grandTotal,
+        patientBalance: 0
+      },
+      status: "paid",
+      outstanding: 0,
+      admission: bill.admission
+    };
+  });
+
+  const combined = [...invoices, ...mappedIpBills];
+
+  res.json({ status: "success", data: { invoices: combined, total: combined.length } });
 });
 
 /**
@@ -496,5 +527,27 @@ export const rescheduleAppointment = catchAsync(async (req: Request, res: Respon
     req.user!._id
   );
   res.json({ status: "success", data: result });
+});
+
+export const getBookedSlots = catchAsync(async (req: Request, res: Response) => {
+  const { doctorId, date } = req.query as Record<string, string>;
+  if (!doctorId || !date) {
+    throw new AppError("doctorId and date are required query parameters.", 400);
+  }
+  const parsedDate = new Date(date);
+  const startOfDay = new Date(parsedDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(parsedDate);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const appointments = await Appointment.find({
+    hospital: req.hospitalFilter!.hospital,
+    doctor: doctorId,
+    date: { $gte: startOfDay, $lte: endOfDay },
+    status: { $ne: "cancelled" }
+  }).select("time");
+
+  const bookedSlots = appointments.map(appt => appt.time);
+  res.json({ status: "success", data: { bookedSlots } });
 });
 
