@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { List, Plus, Network, BedDouble, UserCheck, ShieldAlert, ArrowRightLeft, DoorOpen, Printer, CheckCircle, FileText, Search } from "lucide-react";
 import {
@@ -8,6 +9,8 @@ import {
   useAdmitPatient,
   useTransferPatient,
   useRequestDischarge,
+  useDischargeRequests,
+  useConfirmDischarge,
   useMarkNotificationRead,
   usePatientsSearch,
   useDoctorsAvailability,
@@ -27,6 +30,7 @@ interface Props {
 }
 
 export function IPManagementPage({ activeTab = "admissions" }: Props) {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<"new" | "admissions" | "rooms" | "transfer" | "discharges">(activeTab);
 
   useEffect(() => {
@@ -94,7 +98,11 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const admitMutation = useAdmitPatient();
   const transferMutation = useTransferPatient();
   const dischargeMutation = useRequestDischarge();
+  const confirmDischargeMutation = useConfirmDischarge();
   const markReadMutation = useMarkNotificationRead();
+
+  // Discharge requests from doctors
+  const { data: dischargeRequests, refetch: refetchDischargeRequests } = useDischargeRequests();
 
   const handleSelectRequest = (req: any) => {
     setSelectedReq(req);
@@ -251,13 +259,15 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
         notes: dischargeNotes
       });
 
-      alert("Discharge completed. Bed is now vacant.");
+      toast.success("Discharge completed. Bed is now vacant. Redirecting to billing...");
+      const idToRedirect = dischargeAdmissionId;
       setDischargeAdmissionId("");
       setDischargeNotes("");
       setIsDischargeOpen(false);
       refetchRooms();
       refetchAdmissions();
       setTab("admissions");
+      navigate(`/receptionist/billing/ip?admissionId=${idToRedirect}`);
     } catch (err: any) {
       alert(err.message || "Failed to complete discharge");
     }
@@ -452,6 +462,19 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
             }`}
           >
             <ArrowRightLeft className="h-3.5 w-3.5" /> Room Transfer
+          </button>
+          <button
+            onClick={() => setTab("discharges")}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+              tab === "discharges" ? "bg-rose-50 text-rose-700 font-bold" : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            <DoorOpen className="h-3.5 w-3.5" /> Discharge Requests
+            {(dischargeRequests?.length ?? 0) > 0 && (
+              <span className="ml-1 rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                {dischargeRequests!.length}
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -1236,6 +1259,103 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
             </Button>
           </div>
         </form>
+      )}
+
+      {/* Discharge Requests Tab — Doctor-initiated, Receptionist confirms */}
+      {tab === "discharges" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-slate-800">Discharge Requests</h2>
+              <p className="text-xs text-slate-500">Patients cleared for discharge by their treating doctor. Review and confirm to vacate the bed.</p>
+            </div>
+          </div>
+          {!dischargeRequests || dischargeRequests.length === 0 ? (
+            <Card className="flex h-48 flex-col items-center justify-center text-center border-dashed">
+              <DoorOpen className="h-10 w-10 text-slate-300 mb-2" />
+              <p className="text-sm font-semibold text-slate-500">No pending discharge requests</p>
+              <p className="text-xs text-slate-400">When a doctor finalizes a discharge, it will appear here for your confirmation.</p>
+            </Card>
+          ) : (
+            dischargeRequests.map((adm: any) => (
+              <Card key={adm._id} className="border-rose-100">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 text-sm font-bold text-rose-700">
+                        {adm.patient?.name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2) || "—"}
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-800">{adm.patient?.name}</h3>
+                        <p className="text-xs text-slate-400">
+                          {adm.patient?.uhid} · {adm.patient?.gender}/{adm.patient?.age} yrs · Ward: {adm.ward} · Bed {adm.bed?.bedNumber}
+                        </p>
+                      </div>
+                      <span className="ml-auto rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">Discharge Pending</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-400 mb-0.5">Diagnosis at Discharge</p>
+                        <p className="text-xs text-slate-700">{adm.diagnosisAtDischarge || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-400 mb-0.5">Discharge Medications</p>
+                        <p className="text-xs text-slate-700">{adm.dischargeMedications || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-400 mb-0.5">Follow-up Instructions</p>
+                        <p className="text-xs text-slate-700">{adm.followUp || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-400 mb-0.5">Special Instructions</p>
+                        <p className="text-xs text-slate-700">{adm.specialInstructions || "—"}</p>
+                      </div>
+                    </div>
+                    {adm.dischargeRequestedBy && (
+                      <p className="text-xs text-slate-400 mt-2">
+                        Requested by Dr. {adm.dischargeRequestedBy?.name || "—"} ·{" "}
+                        {adm.dischargeRequestedAt ? new Date(adm.dischargeRequestedAt).toLocaleString("en-IN") : ""}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2 min-w-[140px]">
+                    <Button
+                      type="button"
+                      variant="primary"
+                      onClick={async () => {
+                        if (!window.confirm(`Confirm discharge for ${adm.patient?.name}? This will vacate the bed.`)) return;
+                        try {
+                          await confirmDischargeMutation.mutateAsync({ admissionId: adm._id, notes: adm.diagnosisAtDischarge || "Doctor finalized discharge" });
+                          toast.success(`${adm.patient?.name} has been discharged. Bed is now vacant. Redirecting to billing...`);
+                          refetchDischargeRequests();
+                          refetchAdmissions();
+                          refetchRooms();
+                          navigate(`/receptionist/billing/ip?admissionId=${adm._id}`);
+                        } catch (err: any) {
+                          toast.error(err?.response?.data?.message || "Failed to confirm discharge.");
+                        }
+                      }}
+                      className="flex items-center gap-1.5 text-xs"
+                    >
+                      <CheckCircle className="h-4 w-4" /> Confirm Discharge
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="flex items-center gap-1.5 text-xs"
+                      onClick={() => {
+                        setTransferAdmissionId(adm._id);
+                        setTab("transfer");
+                      }}
+                    >
+                      <ArrowRightLeft className="h-3.5 w-3.5" /> Transfer Instead
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
       )}
 
       {/* Discharge Dialog */}

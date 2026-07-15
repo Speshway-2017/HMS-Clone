@@ -219,6 +219,13 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
       loadInvoice(invId);
       setTab("consultation");
     }
+
+    // IP Billing redirect — auto-select admission after discharge confirmation
+    const admId = params.get("admissionId");
+    if (admId) {
+      setSelectedAdmissionId(admId);
+      setTab("ip");
+    }
   }, [location]);
 
   const loadInvoice = async (id: string) => {

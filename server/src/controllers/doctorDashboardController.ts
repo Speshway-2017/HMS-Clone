@@ -1262,3 +1262,62 @@ export const getMyPatientById = catchAsync(async (req: Request, res: Response) =
     },
   });
 });
+
+/**
+ * POST /doctor/admissions/:admissionId/finalize-discharge
+ * Doctor fills in the discharge summary and marks the admission as "discharge_requested".
+ * The receptionist then sees it in their "Discharge Requests" tab and confirms it.
+ */
+export const finalizeDischarge = catchAsync(async (req: Request, res: Response) => {
+  const { admissionId } = req.params;
+  const { diagnosisAtDischarge, dischargeMedications, followUp, specialInstructions } = req.body;
+
+  if (!diagnosisAtDischarge) {
+    throw new AppError("Diagnosis at discharge is required.", 400);
+  }
+
+  const doctor = await getLoggedDoctor(req);
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+
+  const admission = await Admission.findOne({ _id: admissionId, hospital: hospitalId });
+  if (!admission) {
+    throw new AppError("Admission record not found.", 404);
+  }
+  if ((admission.status as string) === "discharge_requested" || admission.status === "discharged" || (admission.status as string) === "Discharged") {
+    throw new AppError("Discharge has already been requested or completed for this admission.", 400);
+  }
+
+  // Update admission with discharge summary and change status
+  admission.status = "discharge_requested" as any;
+  (admission as any).diagnosisAtDischarge = diagnosisAtDischarge;
+  (admission as any).dischargeMedications = dischargeMedications || "";
+  (admission as any).followUp = followUp || "";
+  (admission as any).specialInstructions = specialInstructions || "";
+  (admission as any).dischargeRequestedAt = new Date();
+  (admission as any).dischargeRequestedBy = doctor._id;
+  await admission.save();
+
+  // Notify the receptionist about the discharge request
+  await DbNotification.create({
+    hospital: hospitalId,
+    targetRole: "receptionist",
+    type: "discharge_request",
+    title: "Discharge Request",
+    message: `Dr. ${doctor.name} has requested discharge for a patient. Please review and confirm.`,
+    isRead: false,
+    data: { admissionId: admission._id, doctorId: doctor._id }
+  });
+
+  // Emit real-time socket event
+  emitToHospital(hospitalId.toString(), "discharge_requested", {
+    admissionId: admission._id,
+    doctorName: doctor.name,
+  });
+
+  res.json({
+    status: "success",
+    message: "Discharge request submitted successfully. The receptionist will confirm shortly.",
+    data: { admission },
+  });
+});
+

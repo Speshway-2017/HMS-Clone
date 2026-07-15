@@ -48,7 +48,12 @@ export function PharmacySalesAnalytics() {
     const dispensing = savedDispensing ? JSON.parse(savedDispensing) : [];
 
     const savedPOs = localStorage.getItem("hms_pharmacy_purchase_orders");
-    const purchaseOrders = savedPOs ? JSON.parse(savedPOs) : [];
+    const purchaseOrders = (savedPOs ? JSON.parse(savedPOs) : []).filter(
+      (po: any) =>
+        po.supplierName !== "Global Pharma Distributors" &&
+        po.supplierName !== "Acme Healthcare Corp" &&
+        po.supplierName !== "Apex MediSupplies"
+    );
 
     // 1. Calculate Daily Sales (last 7 days)
     const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Boxes, Plus, Search, Edit3, Trash2, AlertTriangle, AlertCircle } from "lucide-react";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
@@ -58,6 +58,15 @@ export function PharmacyInventoryManagement() {
   const [price, setPrice] = useState(0);
   const [batchNo, setBatchNo] = useState("");
   const [supplier, setSupplier] = useState("");
+  const [appSuppliers, setAppSuppliers] = useState<{ _id: string; name: string }[]>([]);
+
+  // Load suppliers from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("hms_pharmacy_suppliers");
+    if (saved) {
+      setAppSuppliers(JSON.parse(saved));
+    }
+  }, [isAddEditOpen]);
 
   // TanStack Query Hooks
   const { data: inventoryData, isLoading } = useInventory({ category: "medicines", search });
@@ -203,6 +212,7 @@ export function PharmacyInventoryManagement() {
             <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">Near Expiry Alert</div>
             <div className="mt-1 text-2xl font-bold text-amber-600">
               {medicines.filter(m => {
+                if (!m.expiryDate) return false;
                 const exp = new Date(m.expiryDate);
                 const threeM = new Date();
                 threeM.setMonth(threeM.getMonth() + 3);
@@ -302,7 +312,9 @@ export function PharmacyInventoryManagement() {
             {
               header: "Expiry Date",
               render: (r) => {
-                const exp = new Date(r.expiryDate);
+                const expDate = r.expiryDate;
+                if (!expDate) return <span className="text-xs text-slate-400">N/A</span>;
+                const exp = new Date(expDate);
                 const today = new Date();
                 const diff = exp.getTime() - today.getTime();
                 const diffDays = Math.ceil(diff / (1000 * 3600 * 24));
@@ -312,7 +324,7 @@ export function PharmacyInventoryManagement() {
                 return (
                   <div>
                     <span className={`text-xs ${isExpired ? "text-red-600 font-bold" : isNearExpiry ? "text-amber-600 font-semibold" : "text-slate-600"}`}>
-                      {r.expiryDate}
+                      {expDate}
                     </span>
                     {isExpired && <span className="block text-[9px] text-red-500 font-bold uppercase">EXPIRED</span>}
                     {isNearExpiry && <span className="block text-[9px] text-amber-500 font-semibold">EXPIRING SOON</span>}
@@ -403,14 +415,6 @@ export function PharmacyInventoryManagement() {
             />
 
             <InputField
-              label="Expiry Date"
-              type="date"
-              required
-              value={expiryDate}
-              onChange={(e) => setExpiryDate(e.target.value)}
-            />
-
-            <InputField
               label="Retail Unit Price (₹)"
               type="number"
               step="0.01"
@@ -422,11 +426,21 @@ export function PharmacyInventoryManagement() {
 
             <InputField
               label="Supplier"
-              placeholder="e.g. Acme Pharma Distributors"
+              required
               value={supplier}
               onChange={(e) => setSupplier(e.target.value)}
+              placeholder="e.g. Acme Pharma Distributors"
               className="sm:col-span-2"
+              list="suppliers-datalist"
             />
+            <datalist id="suppliers-datalist">
+              {supplier.trim().length > 0 &&
+                appSuppliers
+                  .filter((s) =>
+                    s.name.toLowerCase().includes(supplier.toLowerCase())
+                  )
+                  .map((s) => <option key={s._id} value={s.name} />)}
+            </datalist>
           </div>
 
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">

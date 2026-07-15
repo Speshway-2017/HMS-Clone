@@ -22,6 +22,7 @@ const admissionSchema = new Schema(
       enum: [
         "admitted",
         "discharged",
+        "discharge_requested",
         "Admitted",
         "Bed Allocated",
         "Under Observation",
@@ -41,7 +42,15 @@ const admissionSchema = new Schema(
     },
     dischargeDate: { type: Date, default: null },
     dischargeNotes: { type: String, default: "" },
-    
+
+    // Discharge summary (filled by doctor when finalizing discharge)
+    diagnosisAtDischarge: { type: String, default: "" },
+    dischargeMedications: { type: String, default: "" },
+    followUp: { type: String, default: "" },
+    specialInstructions: { type: String, default: "" },
+    dischargeRequestedAt: { type: Date, default: null },
+    dischargeRequestedBy: { type: Schema.Types.ObjectId, ref: "Doctor", default: null },
+
     // Receptionist Initiated Admission & Audit Fields
     admittingDoctor: { type: Schema.Types.ObjectId, ref: "Doctor", default: null },
     priority: { type: String, enum: ["Routine", "Urgent", "Emergency"], default: "Routine" },

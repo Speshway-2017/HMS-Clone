@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   useConsultationWorkspace,
   useSaveVitals,
@@ -11,6 +11,7 @@ import {
   useCreateLabOrder,
   useStartConsultation,
 } from "../../features/doctorDashboard";
+import { useInventory } from "../../features/inventory";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -49,6 +50,7 @@ const COMMON_LAB_TESTS = [
 export function ConsultationWorkspacePage() {
   const { id: appointmentId } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
 
   const { data: workspaceData, isLoading, isError, refetch } = useConsultationWorkspace(appointmentId || "");
@@ -60,8 +62,11 @@ export function ConsultationWorkspacePage() {
   const prescriptionMutation = useCreatePrescription();
   const labMutation = useCreateLabOrder();
   const startConsultationMutation = useStartConsultation();
+  const { data: inventoryData } = useInventory({ category: "medicines" });
+  const rawMeds = inventoryData?.data || [];
 
-  const [activeTab, setActiveTab] = useState<TabType>("overview");
+  const initialTab = (location.state as any)?.activeTab || "overview";
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
 
   // Vitals form state
   const [temperature, setTemperature] = useState("");
@@ -81,7 +86,17 @@ export function ConsultationWorkspacePage() {
 
   // Prescription form state
   const [prescriptionMeds, setPrescriptionMeds] = useState<any[]>([
-    { name: "", strength: "", dosage: "", frequency: "", duration: "", instructions: "" },
+    { 
+      name: "", 
+      strength: "", 
+      dosage: "", 
+      frequency: "", 
+      duration: "", 
+      instructions: "",
+      morning: false,
+      afternoon: false,
+      night: false
+    },
   ]);
 
   // Success delivery tracking states
@@ -227,7 +242,20 @@ export function ConsultationWorkspacePage() {
   };
 
   const handleAddMed = () => {
-    setPrescriptionMeds([...prescriptionMeds, { name: "", strength: "", dosage: "", frequency: "", duration: "", instructions: "" }]);
+    setPrescriptionMeds([
+      ...prescriptionMeds,
+      {
+        name: "",
+        strength: "",
+        dosage: "",
+        frequency: "",
+        duration: "",
+        instructions: "",
+        morning: false,
+        afternoon: false,
+        night: false
+      }
+    ]);
   };
 
   const handleRemoveMed = (index: number) => {
@@ -236,6 +264,20 @@ export function ConsultationWorkspacePage() {
 
   const handleMedChange = (index: number, field: string, val: string) => {
     const updated = prescriptionMeds.map((m, idx) => (idx === index ? { ...m, [field]: val } : m));
+    setPrescriptionMeds(updated);
+  };
+
+  const handleCheckboxToggle = (index: number, time: "morning" | "afternoon" | "night") => {
+    const updated = [...prescriptionMeds];
+    updated[index][time] = !updated[index][time];
+    
+    // Combine the checked values into a comma-separated instructions string
+    const selectedTimes = [];
+    if (updated[index].morning) selectedTimes.push("Morning");
+    if (updated[index].afternoon) selectedTimes.push("Afternoon");
+    if (updated[index].night) selectedTimes.push("Night");
+    
+    updated[index].instructions = selectedTimes.join(", ");
     setPrescriptionMeds(updated);
   };
 
@@ -559,25 +601,81 @@ export function ConsultationWorkspacePage() {
                     {prescriptionMeds.map((med, index) => (
                       <div key={index} className="flex flex-wrap gap-2 items-end border-b border-slate-100 pb-3">
                         <div className="flex-1 min-w-[150px]">
-                          <InputField label={index === 0 ? "Medicine Name" : ""} value={med.name} onChange={(e) => handleMedChange(index, "name", e.target.value)} placeholder="e.g. Amoxicillin" required />
+                          <InputField
+                            label={index === 0 ? "Medicine Name" : ""}
+                            value={med.name}
+                            onChange={(e) => handleMedChange(index, "name", e.target.value)}
+                            placeholder="e.g. Amoxicillin"
+                            required
+                            list={`med-datalist-${index}`}
+                          />
+                          <datalist id={`med-datalist-${index}`}>
+                            {med.name.trim().length > 0 &&
+                              rawMeds
+                                .filter((m: any) =>
+                                  m.name.toLowerCase().includes(med.name.toLowerCase())
+                                )
+                                .map((m: any) => (
+                                  <option key={m._id} value={m.name} />
+                                ))}
+                          </datalist>
                         </div>
                         <div className="w-24">
                           <InputField label={index === 0 ? "Strength" : ""} value={med.strength || ""} onChange={(e) => handleMedChange(index, "strength", e.target.value)} placeholder="e.g. 500mg" />
                         </div>
-                        <div className="w-24">
-                          <InputField label={index === 0 ? "Dosage" : ""} value={med.dosage} onChange={(e) => handleMedChange(index, "dosage", e.target.value)} placeholder="e.g. 1 tab" />
+                        <div className="w-20">
+                          <InputField label={index === 0 ? "Dosage" : ""} value={med.dosage} onChange={(e) => handleMedChange(index, "dosage", e.target.value)} placeholder="e.g. 1" />
                         </div>
-                        <div className="w-28">
-                          <InputField label={index === 0 ? "Frequency" : ""} value={med.frequency} onChange={(e) => handleMedChange(index, "frequency", e.target.value)} placeholder="e.g. Once daily" />
+                        <div className="w-20">
+                          <InputField label={index === 0 ? "Frequency" : ""} value={med.frequency} onChange={(e) => handleMedChange(index, "frequency", e.target.value)} placeholder="e.g. 3" />
                         </div>
-                        <div className="w-24">
-                          <InputField label={index === 0 ? "Duration" : ""} value={med.duration} onChange={(e) => handleMedChange(index, "duration", e.target.value)} placeholder="e.g. 5 days" />
+                        <div className="w-20">
+                          <InputField label={index === 0 ? "Duration" : ""} value={med.duration} onChange={(e) => handleMedChange(index, "duration", e.target.value)} placeholder="e.g. 5" />
                         </div>
-                        <div className="flex-1 min-w-[120px]">
-                          <InputField label={index === 0 ? "Instructions" : ""} value={med.instructions} onChange={(e) => handleMedChange(index, "instructions", e.target.value)} placeholder="e.g. After meals" />
+                        <div className="w-20">
+                          <InputField
+                            label={index === 0 ? "Total Qty" : ""}
+                            value={((parseFloat(med.dosage) || 0) * (parseFloat(med.frequency) || 0) * (parseFloat(med.duration) || 0)) || ""}
+                            disabled
+                            placeholder="Auto"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-[200px]">
+                          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">
+                            {index === 0 ? "Instructions (Time of Use)" : <span className="invisible">Instructions</span>}
+                          </label>
+                          <div className="flex items-center gap-3 border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white min-h-[38px]">
+                            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={!!med.morning}
+                                onChange={() => handleCheckboxToggle(index, "morning")}
+                                className="rounded text-navy-600 focus:ring-navy-500 h-4 w-4"
+                              />
+                              <span>Morning</span>
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={!!med.afternoon}
+                                onChange={() => handleCheckboxToggle(index, "afternoon")}
+                                className="rounded text-navy-600 focus:ring-navy-500 h-4 w-4"
+                              />
+                              <span>Afternoon</span>
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={!!med.night}
+                                onChange={() => handleCheckboxToggle(index, "night")}
+                                className="rounded text-navy-600 focus:ring-navy-500 h-4 w-4"
+                              />
+                              <span>Night</span>
+                            </label>
+                          </div>
                         </div>
                         {prescriptionMeds.length > 1 && (
-                          <button type="button" onClick={() => handleRemoveMed(index)} className="p-2 text-red-500 hover:bg-red-50 rounded">
+                          <button type="button" onClick={() => handleRemoveMed(index)} className="p-2 text-red-500 hover:bg-red-50 rounded mb-0.5">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         )}
@@ -625,6 +723,7 @@ export function ConsultationWorkspacePage() {
                           <th className="py-2">Dosage</th>
                           <th className="py-2">Frequency</th>
                           <th className="py-2">Duration</th>
+                          <th className="py-2">Total Qty</th>
                           <th className="py-2">Instructions</th>
                         </tr>
                       </thead>
@@ -635,6 +734,7 @@ export function ConsultationWorkspacePage() {
                             <td className="py-2">{med.dosage}</td>
                             <td className="py-2">{med.frequency}</td>
                             <td className="py-2">{med.duration}</td>
+                            <td className="py-2">{(parseFloat(med.dosage) || 0) * (parseFloat(med.frequency) || 0) * (parseFloat(med.duration) || 0) || "—"}</td>
                             <td className="py-2 text-slate-500">{med.instructions}</td>
                           </tr>
                         ))}

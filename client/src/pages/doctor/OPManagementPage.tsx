@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Search, Filter, Clock, User, ChevronRight, Stethoscope,
   FileText, Pill, CalendarClock, CheckCircle2, XCircle, RotateCcw, Plus,
@@ -22,6 +22,7 @@ const STATUS_BADGE: Record<string, { tone: "success" | "warning" | "info" | "neu
 type View = "queue" | "consultation" | "prescription";
 
 export function OPManagementPage() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [activeView, setActiveView] = useState<View>("queue");
@@ -29,10 +30,8 @@ export function OPManagementPage() {
   const [diagnosis, setDiagnosis] = useState("");
 
   const { data: doctorProfile } = useDoctorProfileMe();
-  const todayStr = new Date().toISOString().split("T")[0];
-  
   const { data: appointmentsData, isLoading } = useAppointments(
-    { doctor: doctorProfile?._id, from: todayStr, to: todayStr },
+    { doctor: doctorProfile?._id },
     { enabled: !!doctorProfile?._id }
   );
 
@@ -74,11 +73,27 @@ export function OPManagementPage() {
     }
   };
 
+  const handleRedirectToWorkspace = async (targetTab: "overview" | "prescription", forceStatusUpdate = false) => {
+    if (!selectedAppt) return;
+    
+    let activeTab: "overview" | "prescription" | "history" = targetTab;
+    if (selectedAppt.status === "completed") {
+      activeTab = "history";
+    }
+
+    if (forceStatusUpdate && selectedAppt.status !== "completed") {
+      await handleUpdateStatus("in_consultation");
+    }
+
+    navigate(`/doctor/consultation/${selectedAppt._id}`, { state: { activeTab } });
+  };
+
   const mapStatus = (status: string) => {
     if (status === "completed") return "completed";
     if (status === "in_consultation") return "in_progress";
-    if (["checked_in", "scheduled"].includes(status)) return "waiting";
-    return "scheduled";
+    if (status === "checked_in") return "waiting";
+    if (status === "scheduled") return "scheduled";
+    return "cancelled"; // fallback for cancelled/no_show
   };
 
   const filtered = appointments.filter((appt) => {
@@ -115,7 +130,15 @@ export function OPManagementPage() {
           {(["queue", "consultation", "prescription"] as View[]).map((v) => (
             <button
               key={v}
-              onClick={() => setActiveView(v)}
+              onClick={() => {
+                if (v === "queue") {
+                  setActiveView("queue");
+                } else if (v === "consultation") {
+                  handleRedirectToWorkspace("overview");
+                } else if (v === "prescription") {
+                  handleRedirectToWorkspace("prescription");
+                }
+              }}
               className={`rounded-lg px-4 py-2 text-sm font-medium capitalize transition-colors ${
                 activeView === v ? "bg-navy-700 text-white" : "text-slate-600 hover:bg-slate-50"
               }`}
@@ -129,8 +152,8 @@ export function OPManagementPage() {
       {appointments.length === 0 ? (
         <Card className="flex h-64 flex-col items-center justify-center p-6 text-center border-dashed border-slate-200 bg-slate-50">
           <CalendarClock className="mb-2 h-10 w-10 text-slate-400" />
-          <h3 className="text-sm font-semibold text-slate-600">No OP Appointments Today</h3>
-          <p className="text-xs text-slate-400">There are no outpatient consultations scheduled on your list today.</p>
+          <h3 className="text-sm font-semibold text-slate-600">No OP Appointments Found</h3>
+          <p className="text-xs text-slate-400">There are no outpatient consultations scheduled on your list.</p>
         </Card>
       ) : (
         <>
@@ -152,7 +175,7 @@ export function OPManagementPage() {
                       />
                     </div>
                     <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
-                      {["all", "waiting", "in_progress", "scheduled", "completed"].map((s) => (
+                      {["all", "waiting", "in_progress", "scheduled", "completed", "cancelled"].map((s) => (
                         <button
                           key={s}
                           onClick={() => setStatusFilter(s)}
@@ -201,7 +224,7 @@ export function OPManagementPage() {
                             {STATUS_BADGE[appt.status]?.label || appt.status}
                           </Badge>
                           <p className="mt-1 text-xs text-slate-400 flex items-center justify-end gap-1">
-                            <Clock className="h-3 w-3" /> {appt.time}
+                            <Clock className="h-3 w-3" /> {new Date(appt.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {appt.time}
                           </p>
                         </div>
                         <ChevronRight className="h-4 w-4 text-slate-300" />
@@ -241,43 +264,35 @@ export function OPManagementPage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => {
-                        handleUpdateStatus("in_consultation");
-                        setActiveView("consultation");
-                      }}
-                      className="flex items-center justify-center gap-2 w-full rounded-lg bg-navy-700 px-3 py-2 text-sm font-medium text-white hover:bg-navy-800 transition-colors"
-                    >
-                      <Stethoscope className="h-4 w-4" /> Start Consultation
-                    </button>
-                    <button
-                      onClick={() => setActiveView("prescription")}
-                      className="flex items-center justify-center gap-2 w-full rounded-lg border border-navy-200 px-3 py-2 text-sm font-medium text-navy-700 hover:bg-navy-50 transition-colors"
-                    >
-                      <Pill className="h-4 w-4" /> Write Prescription
-                    </button>
-                    <div className="grid grid-cols-3 gap-2">
+                  {selectedAppt.status === "completed" ? (
+                    <div className="flex flex-col gap-2">
+                      <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 mb-2 text-emerald-800">
+                        <p className="text-xs font-semibold uppercase text-emerald-600 mb-1">Consultation Completed</p>
+                        <p className="text-sm text-xs">This consultation has been successfully finalized. You can view the full record and past history logs below.</p>
+                      </div>
                       <button
-                        onClick={() => handleUpdateStatus("in_consultation")}
-                        className="flex items-center justify-center gap-1 rounded-lg border border-emerald-200 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
+                        onClick={() => handleRedirectToWorkspace("overview")}
+                        className="flex items-center justify-center gap-2 w-full rounded-lg bg-navy-700 px-3 py-2 text-sm font-medium text-white hover:bg-navy-800 transition-colors"
                       >
-                        <CheckCircle2 className="h-3 w-3" /> Accept
-                      </button>
-                      <button
-                        onClick={() => handleUpdateStatus("cancelled")}
-                        className="flex items-center justify-center gap-1 rounded-lg border border-red-200 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
-                      >
-                        <XCircle className="h-3 w-3" /> Cancel
-                      </button>
-                      <button
-                        onClick={() => handleUpdateStatus("scheduled")}
-                        className="flex items-center justify-center gap-1 rounded-lg border border-amber-200 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50"
-                      >
-                        <RotateCcw className="h-3 w-3" /> Re-schedule
+                        <FileText className="h-4 w-4" /> View Consultation Record
                       </button>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => handleRedirectToWorkspace("overview", true)}
+                        className="flex items-center justify-center gap-2 w-full rounded-lg bg-navy-700 px-3 py-2 text-sm font-medium text-white hover:bg-navy-800 transition-colors"
+                      >
+                        <Stethoscope className="h-4 w-4" /> Start Consultation
+                      </button>
+                      <button
+                        onClick={() => handleRedirectToWorkspace("prescription")}
+                        className="flex items-center justify-center gap-2 w-full rounded-lg border border-navy-200 px-3 py-2 text-sm font-medium text-navy-700 hover:bg-navy-50 transition-colors"
+                      >
+                        <Pill className="h-4 w-4" /> Write Prescription
+                      </button>
+                    </div>
+                  )}
                 </Card>
               </div>
             </div>
