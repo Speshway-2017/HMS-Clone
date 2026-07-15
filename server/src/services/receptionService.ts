@@ -439,6 +439,7 @@ export class ReceptionService {
     const opExpiryLimit = hospitalRecord?.opExpiryLimit ?? 10;
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() - opExpiryLimit);
+    expiryDate.setHours(0, 0, 0, 0);
 
     const pastCompletedAppt = await Appointment.findOne({
       hospital: hospitalId,

@@ -46,6 +46,7 @@ import { formatINR } from "../../lib/currency";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
+import { Badge } from "../../components/ui/Badge";
 import { Modal } from "../../components/ui/Modal";
 
 interface Props {
@@ -127,6 +128,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
 
   // Selected billing states (OPD)
   const [invoice, setInvoice] = useState<any | null>(null);
+  const [billingSearchQuery, setBillingSearchQuery] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"UPI" | "Cash" | "Card" | "Mixed">("UPI");
   const [payAmount, setPayAmount] = useState("");
 
@@ -163,6 +165,26 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
   const completedInvoices = completedData?.invoices ?? [];
   const todayPayments = collectionsData?.payments ?? [];
   const todayTotal = collectionsData?.totalAmount ?? 0;
+
+  const filteredPendingInvoices = pendingInvoices.filter((inv: any) => {
+    const q = billingSearchQuery.toLowerCase();
+    return (
+      inv.patient?.name?.toLowerCase().includes(q) ||
+      inv.patient?.uhid?.toLowerCase().includes(q) ||
+      inv.patient?.phone?.toLowerCase().includes(q) ||
+      inv._id?.toLowerCase().includes(q)
+    );
+  });
+
+  const filteredCompletedInvoices = completedInvoices.filter((inv: any) => {
+    const q = billingSearchQuery.toLowerCase();
+    return (
+      inv.patient?.name?.toLowerCase().includes(q) ||
+      inv.patient?.uhid?.toLowerCase().includes(q) ||
+      inv.patient?.phone?.toLowerCase().includes(q) ||
+      inv._id?.toLowerCase().includes(q)
+    );
+  });
 
   // ── IP Billing States ──
   const [admissionSearch, setAdmissionSearch] = useState("");
@@ -650,9 +672,18 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
             ) : invoice ? (
               <Card className="space-y-4">
                 <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-800">Invoice ID: {invoice._id}</h3>
-                    <p className="text-[10px] text-slate-400">Issued: {new Date(invoice.issuedAt).toLocaleString()}</p>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="secondary" 
+                      onClick={() => setInvoice(null)} 
+                      className="text-xs px-2.5 py-1"
+                    >
+                      ← Back
+                    </Button>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-800">Invoice ID: {invoice._id}</h3>
+                      <p className="text-[10px] text-slate-400">Issued: {new Date(invoice.issuedAt).toLocaleString()}</p>
+                    </div>
                   </div>
                   <span className="rounded-full bg-amber-50 border border-amber-200 text-amber-700 px-2 py-0.5 text-[10px] font-bold uppercase">
                     Unpaid
@@ -713,9 +744,113 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                 </div>
               </Card>
             ) : (
-              <Card className="py-12 text-center text-slate-450 italic">
-                No selected invoice. Use "Pending Bills" to process payment.
-              </Card>
+              <div className="space-y-6">
+                <Card className="space-y-4">
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <h3 className="text-sm font-bold text-slate-800">Search Patient Dues & Payments</h3>
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search patient by UHID, Name, or Phone..."
+                      value={billingSearchQuery}
+                      onChange={(e) => setBillingSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-navy-500"
+                    />
+                  </div>
+                </Card>
+
+                {billingSearchQuery.trim() !== "" ? (
+                  <div className="space-y-4">
+                    {/* Dues / Pending Invoices */}
+                    <Card className="space-y-3">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-amber-700">Dues (Pending Invoices)</h4>
+                      {filteredPendingInvoices.length === 0 ? (
+                        <p className="text-xs text-slate-400 italic">No pending dues found for this patient.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {filteredPendingInvoices.map((inv: any) => (
+                            <div key={inv._id} className="flex justify-between items-center rounded-lg border border-slate-100 p-3 text-xs hover:bg-slate-50">
+                              <div>
+                                <p className="font-semibold text-slate-850">{inv.patient?.name} ({inv.patient?.uhid})</p>
+                                <p className="text-[10px] text-slate-400">Date: {new Date(inv.issuedAt).toLocaleDateString("en-IN")} · ID: {inv._id}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-700 mr-2">{formatINR(inv.totals?.patientBalance !== undefined ? inv.totals.patientBalance : inv.totals?.total)}</span>
+                                <Button
+                                  type="button"
+                                  onClick={() => loadInvoice(inv._id)}
+                                  className="text-[10px] px-2.5 py-1 flex items-center gap-1"
+                                >
+                                  <CreditCard className="h-3 w-3" /> Process
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </Card>
+
+                    {/* Payments / Completed Invoices */}
+                    <Card className="space-y-3">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-700">Completed Payments</h4>
+                      {filteredCompletedInvoices.length === 0 ? (
+                        <p className="text-xs text-slate-400 italic">No completed payments found for this patient.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {filteredCompletedInvoices.map((inv: any) => (
+                            <div key={inv._id} className="flex justify-between items-center rounded-lg border border-slate-100 p-3 text-xs hover:bg-slate-50">
+                              <div>
+                                <p className="font-semibold text-slate-850">{inv.patient?.name} ({inv.patient?.uhid})</p>
+                                <p className="text-[10px] text-slate-400">Date: {new Date(inv.issuedAt).toLocaleDateString("en-IN")} · ID: {inv._id}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-700 mr-2">{formatINR(inv.totals?.total)}</span>
+                                <Badge tone="success">PAID</Badge>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </Card>
+                  </div>
+                ) : (
+                  /* Default list if no search query: show all pending dues */
+                  <Card className="space-y-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Recent Pending Invoices</h4>
+                    {pendingInvoices.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic">No pending invoices found.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {pendingInvoices.slice(0, 5).map((inv: any) => (
+                          <div key={inv._id} className="flex justify-between items-center rounded-lg border border-slate-100 p-3 text-xs hover:bg-slate-50">
+                            <div>
+                              <p className="font-semibold text-slate-850">{inv.patient?.name} ({inv.patient?.uhid})</p>
+                              <p className="text-[10px] text-slate-400">Date: {new Date(inv.issuedAt).toLocaleDateString("en-IN")} · ID: {inv._id}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-700 mr-2">{formatINR(inv.totals?.patientBalance !== undefined ? inv.totals.patientBalance : inv.totals?.total)}</span>
+                              <Button
+                                type="button"
+                                onClick={() => loadInvoice(inv._id)}
+                                className="text-[10px] px-2.5 py-1 flex items-center gap-1"
+                              >
+                                <CreditCard className="h-3 w-3" /> Process
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                        {pendingInvoices.length > 5 && (
+                          <button onClick={() => setTab("pending")} className="w-full text-center text-xs font-bold text-navy-700 hover:underline mt-2">
+                            View All {pendingInvoices.length} Pending Invoices
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </Card>
+                )}
+              </div>
             )}
           </div>
 

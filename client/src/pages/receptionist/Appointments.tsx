@@ -13,7 +13,8 @@ import {
   useCancelAppointment,
   useRescheduleAppointment,
   useCheckDuplicateAppointment,
-  usePatientDetail
+  usePatientDetail,
+  useBookedSlots
 } from "../../features/receptionist";
 import { useDepartments } from "../../features/departments";
 import { useMyHospital } from "../../features/hospitals";
@@ -125,19 +126,32 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
       return ALL_SLOTS;
     }
 
-    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    const dateObj = new Date(dateStr);
-    const dayName = days[dateObj.getDay()];
+    let from = "09:00";
+    let to = "17:00";
+    
+    const monthlyOverride = selectedDoc.monthlyAvailability?.find((ma: any) => ma.date === dateStr);
+    if (monthlyOverride) {
+      if (!monthlyOverride.active) {
+        return [];
+      }
+      from = monthlyOverride.from || "09:00";
+      to = monthlyOverride.to || "17:00";
+    } else {
+      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const dateObj = new Date(dateStr);
+      const dayName = days[dateObj.getDay()];
 
-    const daySchedule = selectedDoc.workingHours?.find((wh: any) => wh.day === dayName);
+      const daySchedule = selectedDoc.workingHours?.find((wh: any) => wh.day === dayName);
 
-    // If day is off duty or schedule not active, return no slots
-    if (daySchedule && !daySchedule.active) {
-      return [];
+      // If day is off duty or schedule not active, return no slots
+      if (daySchedule && !daySchedule.active) {
+        return [];
+      }
+
+      from = daySchedule?.from && daySchedule.from !== "—" ? daySchedule.from : "09:00";
+      to = daySchedule?.to && daySchedule.to !== "—" ? daySchedule.to : "17:00";
     }
 
-    const from = daySchedule?.from && daySchedule.from !== "—" ? daySchedule.from : "09:00";
-    const to = daySchedule?.to && daySchedule.to !== "—" ? daySchedule.to : "17:00";
     const duration = selectedDoc.consultationSettings?.slotDuration ?? 15;
     const breakTime = selectedDoc.consultationSettings?.breakTime ?? "13:00";
 
@@ -292,6 +306,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
 
   const { data: hospital } = useMyHospital();
   const { data: patientDetail, isLoading: patientLoading, isError: patientError } = usePatientDetail(selectedPatientId);
+  const { data: bookedSlots } = useBookedSlots(selectedDoctorId, selectedDate);
 
   const isWithinRevisitWindow = () => {
     if (!selectedDoc || !patientDetail?.patient?.medicalHistory) return false;
@@ -299,6 +314,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
     const limitDays = hospital?.opExpiryLimit ?? 10;
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - limitDays);
+    cutoffDate.setHours(0, 0, 0, 0);
 
     return patientDetail.patient.medicalHistory.some((history: any) => {
       const isCompleted = history.status === "Completed" || String(history.visitType).toLowerCase().includes("consultation");
@@ -779,15 +795,57 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
               </h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <InputField label="Appointment Date" type="date" required min={new Date().toISOString().split("T")[0]} {...register("date")} hint={errors.date?.message as any} />
-                <SelectField label="Available Slot" required {...register("time")} hint={errors.time?.message as any}>
-                  <option value="">Select Slot</option>
-                  {getFilteredSlots().map((slot) => <option key={slot} value={slot}>{slot}</option>)}
-                </SelectField>
+                
                 <SelectField label="Appointment Type" required {...register("type")} hint={errors.type?.message as any}>
                   <option value="Consultation">Regular Consult</option>
                   <option value="Walk-in">Walk-in Visit</option>
                   <option value="Emergency">Emergency Visit</option>
                 </SelectField>
+
+                <div className="sm:col-span-3 space-y-2">
+                  <label className="block text-xs font-semibold text-slate-700">Available Time Slots *</label>
+                  {!selectedDoctorId ? (
+                    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-xs text-slate-400">
+                      Please select a doctor to load available times.
+                    </div>
+                  ) : getFilteredSlots().length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-xs text-slate-400">
+                      No slots available for this doctor on the selected date.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
+                      {getFilteredSlots().map((slot) => {
+                        const isBooked = bookedSlots?.includes(slot);
+                        const isSelected = watch("time") === slot;
+
+                        return (
+                          <button
+                            key={slot}
+                            type="button"
+                            disabled={isBooked}
+                            onClick={() => {
+                              setValue("time", slot, { shouldValidate: true });
+                            }}
+                            className={`flex flex-col items-center justify-center rounded-lg border py-2 text-xs font-semibold shadow-sm transition-all focus:outline-none ${
+                              isBooked
+                                ? "border-rose-100 bg-rose-50 text-rose-450 line-through cursor-not-allowed"
+                                : isSelected
+                                ? "border-navy-600 bg-navy-600 text-white ring-2 ring-navy-100"
+                                : "border-emerald-200 bg-emerald-50/50 text-emerald-700 hover:border-emerald-400 hover:bg-emerald-100 active:scale-95"
+                            }`}
+                          >
+                            <span>{slot}</span>
+                            {isBooked && <span className="text-[8px] font-bold tracking-tight mt-0.5 opacity-80">Booked</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {errors.time?.message && (
+                    <p className="mt-1 text-xs text-red-500">{errors.time.message as string}</p>
+                  )}
+                  <input type="hidden" {...register("time")} />
+                </div>
 
                 {/* ── Real-time Doctor Off Duty Warning ── */}
                 {selectedDoctorId && selectedDate && isDoctorOffDuty && (
@@ -807,58 +865,67 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
           </div>
 
           <div className="space-y-6">
-            <Card className="space-y-4">
-              <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                <FolderHeart className="h-4.5 w-4.5" /> Booking Summary
-              </h3>
-              <div className="space-y-2 text-xs border-b border-slate-100 pb-3">
-                <div className="flex justify-between text-slate-500">
-                  <span>Patient selected:</span>
-                  <span className="font-semibold text-slate-800">{selectedPatientId ? "Yes" : "No"}</span>
+            {selectedPatientId && selectedDoctorId && selectedDate && watch("time") ? (
+              <Card className="space-y-4">
+                <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                  <FolderHeart className="h-4.5 w-4.5" /> Booking Summary
+                </h3>
+                <div className="space-y-2 text-xs border-b border-slate-100 pb-3">
+                  <div className="flex justify-between text-slate-500">
+                    <span>Patient selected:</span>
+                    <span className="font-semibold text-slate-800">{selectedPatientId ? "Yes" : "No"}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500">
+                    <span>Booking Type:</span>
+                    <span className="font-semibold text-slate-800">{watch("type")}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-500">
+                    <span>Registration Fee:</span>
+                    <span className="font-semibold text-slate-800">
+                      {getRegFee() === 0 ? (
+                        <span className="text-emerald-600 font-semibold">₹0 (Existing Patient - Free)</span>
+                      ) : (
+                        formatINR(getRegFee())
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-slate-500">
+                    <span>Consultation Fee:</span>
+                    <span className="font-semibold text-slate-800">
+                      {getConsultationFeeValue() === 0 ? (
+                        <span className="text-emerald-600 font-bold">₹0 (Free Revisit)</span>
+                      ) : (
+                        formatINR(getConsultationFeeValue())
+                      )}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between text-slate-500">
-                  <span>Booking Type:</span>
-                  <span className="font-semibold text-slate-800">{watch("type")}</span>
+                <div className="flex justify-between font-bold text-sm text-slate-800">
+                  <span>Total Consultation Bill:</span>
+                  <span>{formatINR(getTotalBill())}</span>
                 </div>
-                <div className="flex justify-between text-slate-500">
-                  <span>Registration Fee:</span>
-                  <span className="font-semibold text-slate-800">
-                    {getRegFee() === 0 ? (
-                      <span className="text-emerald-600 font-semibold">₹0 (Existing Patient - Free)</span>
-                    ) : (
-                      formatINR(getRegFee())
-                    )}
-                  </span>
+                {isFollowUp && (
+                  <div className="flex items-center gap-1.5 mt-1 rounded bg-blue-100 px-2 py-1">
+                    <RefreshCw className="h-3 w-3 text-blue-600" />
+                    <span className="text-[10px] font-semibold text-blue-700">Booking as Follow-up Visit</span>
+                  </div>
+                )}
+                <p className="text-[10px] text-slate-455 italic mt-2">Note: Confirmed bookings generate a bill, which must be processed before calling the patient.</p>
+                <div className="pt-2">
+                  <Button type="submit" className="w-full" disabled={bookMutation.isPending || isDuplicate}>
+                    {bookMutation.isPending ? "Booking..." : isDuplicate ? "⚠ Duplicate — Cannot Book" : "Confirm & Open Billing"}
+                  </Button>
                 </div>
-                <div className="flex justify-between text-slate-500">
-                  <span>Consultation Fee:</span>
-                  <span className="font-semibold text-slate-800">
-                    {getConsultationFeeValue() === 0 ? (
-                      <span className="text-emerald-600 font-bold">₹0 (Free Revisit)</span>
-                    ) : (
-                      formatINR(getConsultationFeeValue())
-                    )}
-                  </span>
-                </div>
-              </div>
-              <div className="flex justify-between font-bold text-sm text-slate-800">
-                <span>Total Consultation Bill:</span>
-                <span>{formatINR(getTotalBill())}</span>
-              </div>
-              {isFollowUp && (
-                <div className="flex items-center gap-1.5 mt-1 rounded bg-blue-100 px-2 py-1">
-                  <RefreshCw className="h-3 w-3 text-blue-600" />
-                  <span className="text-[10px] font-semibold text-blue-700">Booking as Follow-up Visit</span>
-                </div>
-              )}
-              <p className="text-[10px] text-slate-455 italic mt-2">Note: Confirmed bookings generate a bill, which must be processed before calling the patient.</p>
-              <div className="pt-2">
-                <Button type="submit" className="w-full" disabled={bookMutation.isPending || isDuplicate}>
-                  {bookMutation.isPending ? "Booking..." : isDuplicate ? "⚠ Duplicate — Cannot Book" : "Confirm & Open Billing"}
-                </Button>
-              </div>
-
-            </Card>
+              </Card>
+            ) : (
+              <Card className="flex flex-col items-center justify-center p-6 text-center border-dashed border-slate-200 bg-slate-50 h-[300px]">
+                <FolderHeart className="mb-2 h-10 w-10 text-slate-300" />
+                <h4 className="text-sm font-semibold text-slate-600">Booking Summary</h4>
+                <p className="text-xs text-slate-400 mt-1 max-w-[200px]">
+                  Please select patient, doctor, appointment date, and time slot to view summary and confirm booking.
+                </p>
+              </Card>
+            )}
           </div>
         </form>
       )}

@@ -125,6 +125,7 @@ export interface Doctor {
   rating: number;
   workingHours?: Array<{ day: string; from: string; to: string; active: boolean }>;
   consultationSettings?: { slotDuration: number; maxPatients: number; breakTime: string };
+  monthlyAvailability?: Array<{ date: string; from: string; to: string; active: boolean }>;
   languages?: string;
   consultationFee?: string;
 }

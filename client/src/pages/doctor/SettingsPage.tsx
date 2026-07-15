@@ -182,6 +182,35 @@ export function DoctorSettingsPage() {
   const [breakTime, setBreakTime] = useState("13:00");
   const [activeTab, setActiveTab] = useState("profile");
 
+  const [monthlyAvailability, setMonthlyAvailability] = useState<any[]>([]);
+  const [overrideDate, setOverrideDate] = useState("");
+  const [overrideFrom, setOverrideFrom] = useState("09:00");
+  const [overrideTo, setOverrideTo] = useState("17:00");
+  const [overrideActive, setOverrideActive] = useState(true);
+
+  const handleAddOverride = () => {
+    if (!overrideDate) {
+      showToast("error", "Please select a date.");
+      return;
+    }
+    if (monthlyAvailability.some((ma) => ma.date === overrideDate)) {
+      showToast("error", `Override for ${overrideDate} already exists. Please remove it first.`);
+      return;
+    }
+    const newOverride = {
+      date: overrideDate,
+      from: overrideActive ? overrideFrom : "—",
+      to: overrideActive ? overrideTo : "—",
+      active: overrideActive
+    };
+    setMonthlyAvailability((prev) => [...prev, newOverride].sort((a, b) => a.date.localeCompare(b.date)));
+    setOverrideDate("");
+  };
+
+  const handleRemoveOverride = (date: string) => {
+    setMonthlyAvailability((prev) => prev.filter((ma) => ma.date !== date));
+  };
+
   useEffect(() => {
     if (doctorProfile) {
       setProfileForm({
@@ -202,6 +231,9 @@ export function DoctorSettingsPage() {
         setConsultDuration(String(doctorProfile.consultationSettings.slotDuration ?? "15"));
         setMaxPatients(doctorProfile.consultationSettings.maxPatients ?? 25);
         setBreakTime(doctorProfile.consultationSettings.breakTime ?? "13:00");
+      }
+      if (doctorProfile.monthlyAvailability) {
+        setMonthlyAvailability(doctorProfile.monthlyAvailability);
       }
     }
   }, [doctorProfile]);
@@ -244,6 +276,7 @@ export function DoctorSettingsPage() {
           maxPatients: maxPatients,
           breakTime: breakTime,
         },
+        monthlyAvailability,
       });
       showToast("success", "Schedule updated successfully!");
     } catch (err: any) {
@@ -553,6 +586,95 @@ export function DoctorSettingsPage() {
                   </label>
                 </div>
               ))}
+            </div>
+          </Section>
+
+          <Section title="Monthly Date Overrides & Exceptions" subtitle="Add specific dates when you are on leave or have different hours." icon={<Calendar className="h-5 w-5 text-navy-700" />}>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 items-end bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-semibold uppercase text-slate-400">Date *</label>
+                  <input
+                    type="date"
+                    value={overrideDate}
+                    min={new Date().toISOString().split("T")[0]}
+                    onChange={(e) => setOverrideDate(e.target.value)}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-navy-500"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-semibold uppercase text-slate-400">From</label>
+                  <input
+                    type="time"
+                    value={overrideFrom}
+                    disabled={!overrideActive}
+                    onChange={(e) => setOverrideFrom(e.target.value)}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-navy-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-semibold uppercase text-slate-400">To</label>
+                  <input
+                    type="time"
+                    value={overrideTo}
+                    disabled={!overrideActive}
+                    onChange={(e) => setOverrideTo(e.target.value)}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-navy-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-650">
+                    <input
+                      type="checkbox"
+                      checked={overrideActive}
+                      onChange={(e) => setOverrideActive(e.target.checked)}
+                      className="accent-navy-700 h-4 w-4"
+                    />
+                    <span>Available</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddOverride}
+                    className="rounded-lg bg-navy-700 px-4 py-2 text-xs font-bold text-white hover:bg-navy-800 transition-colors"
+                  >
+                    Add Override
+                  </button>
+                </div>
+              </div>
+
+              {/* List of current overrides */}
+              {monthlyAvailability.length === 0 ? (
+                <p className="text-xs text-slate-400 italic text-center py-2">No monthly availability overrides set.</p>
+              ) : (
+                <div className="divide-y divide-slate-100 border border-slate-100 rounded-lg overflow-hidden bg-white">
+                  {monthlyAvailability.map((ma, idx) => (
+                    <div key={idx} className="flex justify-between items-center px-4 py-3 text-xs">
+                      <div>
+                        <span className="font-bold text-slate-800">{new Date(ma.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                        <span className="ml-2 font-mono text-[10px] text-slate-400">({ma.date})</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {ma.active ? (
+                          <span className="rounded-full bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 font-semibold text-emerald-700">
+                            Available: {ma.from} - {ma.to}
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-rose-50 border border-rose-100 px-2.5 py-0.5 font-semibold text-rose-700">
+                            On Leave / Off
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveOverride(ma.date)}
+                          className="text-rose-600 hover:text-rose-800 font-bold"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </Section>
 

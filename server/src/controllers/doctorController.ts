@@ -193,6 +193,12 @@ const updateDoctorMeSchema = z.object({
     maxPatients: z.number(),
     breakTime: z.string()
   }).optional(),
+  monthlyAvailability: z.array(z.object({
+    date: z.string(),
+    from: z.string(),
+    to: z.string(),
+    active: z.boolean()
+  })).optional(),
 });
 
 export const updateDoctorProfileMe = catchAsync(async (req: Request, res: Response) => {
