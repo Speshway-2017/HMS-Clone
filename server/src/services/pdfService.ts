@@ -158,25 +158,41 @@ export async function generatePrescriptionPDF(data: PDFData, outputPath: string)
       currentY += 22;
       
       // Table Headers
-      const colWidths = { name: 155, strength: 60, dosage: 60, frequency: 80, duration: 60, instructions: 80 };
+      const colWidths = { 
+        name: 145, 
+        strength: 45, 
+        dosage: 40, 
+        frequency: 45, 
+        duration: 45, 
+        qty: 45, 
+        morning: 40, 
+        afternoon: 40, 
+        night: 50 
+      };
       const colX = {
         name: 50,
         strength: 50 + colWidths.name,
         dosage: 50 + colWidths.name + colWidths.strength,
         frequency: 50 + colWidths.name + colWidths.strength + colWidths.dosage,
         duration: 50 + colWidths.name + colWidths.strength + colWidths.dosage + colWidths.frequency,
-        instructions: 50 + colWidths.name + colWidths.strength + colWidths.dosage + colWidths.frequency + colWidths.duration,
+        qty: 50 + colWidths.name + colWidths.strength + colWidths.dosage + colWidths.frequency + colWidths.duration,
+        morning: 50 + colWidths.name + colWidths.strength + colWidths.dosage + colWidths.frequency + colWidths.duration + colWidths.qty,
+        afternoon: 50 + colWidths.name + colWidths.strength + colWidths.dosage + colWidths.frequency + colWidths.duration + colWidths.qty + colWidths.morning,
+        night: 50 + colWidths.name + colWidths.strength + colWidths.dosage + colWidths.frequency + colWidths.duration + colWidths.qty + colWidths.morning + colWidths.afternoon,
       };
 
       // Header background
       doc.rect(50, currentY, 495, 20).fill("#F1F5F9");
-      doc.fillColor(darkColor).font("Helvetica-Bold").fontSize(8.5);
+      doc.fillColor(darkColor).font("Helvetica-Bold").fontSize(8);
       doc.text("Medicine Name", colX.name + 6, currentY + 6);
       doc.text("Strength", colX.strength + 4, currentY + 6);
       doc.text("Dosage", colX.dosage + 4, currentY + 6);
-      doc.text("Frequency", colX.frequency + 4, currentY + 6);
-      doc.text("Duration", colX.duration + 4, currentY + 6);
-      doc.text("Instructions", colX.instructions + 4, currentY + 6);
+      doc.text("Freq", colX.frequency + 4, currentY + 6);
+      doc.text("Dur", colX.duration + 4, currentY + 6);
+      doc.text("Qty", colX.qty + 4, currentY + 6);
+      doc.text("Morn", colX.morning + 4, currentY + 6);
+      doc.text("Aftn", colX.afternoon + 4, currentY + 6);
+      doc.text("Night", colX.night + 4, currentY + 6);
 
       currentY += 20;
 
@@ -186,7 +202,7 @@ export async function generatePrescriptionPDF(data: PDFData, outputPath: string)
         doc.fillColor(secondaryColor).font("Helvetica-Oblique").fontSize(9).text("No medications prescribed.", 60, currentY + 6);
         currentY += 20;
       } else {
-        doc.font("Helvetica").fontSize(8.5);
+        doc.fontSize(8);
         for (const med of data.medications) {
           // Zebra striping
           doc.rect(50, currentY, 495, 22).strokeColor(borderColor).stroke();
@@ -197,7 +213,36 @@ export async function generatePrescriptionPDF(data: PDFData, outputPath: string)
           doc.text(med.dosage || "—", colX.dosage + 4, currentY + 7);
           doc.text(med.frequency || "—", colX.frequency + 4, currentY + 7);
           doc.text(med.duration || "—", colX.duration + 4, currentY + 7);
-          doc.fillColor(secondaryColor).text(med.instructions || "—", colX.instructions + 4, currentY + 7);
+
+          const qty = (parseFloat(med.dosage || "") || 0) * (parseFloat(med.frequency || "") || 0) * (parseFloat(med.duration || "") || 0);
+          const qtyStr = qty > 0 ? String(qty) : "—";
+          doc.text(qtyStr, colX.qty + 4, currentY + 7);
+
+          const instLower = (med.instructions || "").toLowerCase();
+          const hasMorning = instLower.includes("morning");
+          const hasAfternoon = instLower.includes("afternoon");
+          const hasNight = instLower.includes("night");
+
+          // For morning
+          if (hasMorning) {
+            doc.fillColor("#059669").font("Helvetica-Bold").text("Yes", colX.morning + 8, currentY + 7);
+          } else {
+            doc.fillColor("#94A3B8").font("Helvetica").text("—", colX.morning + 14, currentY + 7);
+          }
+
+          // For afternoon
+          if (hasAfternoon) {
+            doc.fillColor("#059669").font("Helvetica-Bold").text("Yes", colX.afternoon + 8, currentY + 7);
+          } else {
+            doc.fillColor("#94A3B8").font("Helvetica").text("—", colX.afternoon + 14, currentY + 7);
+          }
+
+          // For night
+          if (hasNight) {
+            doc.fillColor("#059669").font("Helvetica-Bold").text("Yes", colX.night + 10, currentY + 7);
+          } else {
+            doc.fillColor("#94A3B8").font("Helvetica").text("—", colX.night + 16, currentY + 7);
+          }
 
           currentY += 22;
         }
@@ -247,12 +292,12 @@ export async function generatePrescriptionPDF(data: PDFData, outputPath: string)
 
       // --- FOOTER BLOCK: QR CODE, SIGNATURE, SEAL ---
       // Stay on current page, but make sure footer fits
-      if (currentY > 620) {
+      if (currentY > 600) {
         doc.addPage();
         currentY = 50;
       }
 
-      const footerTop = 680; // Push down to bottom of page (A4 height is 841.89)
+      const footerTop = 660; // Push down to bottom of page (A4 height is 841.89)
 
       // QR Code
       doc.image(qrBuffer, 50, footerTop, { width: 85 });
@@ -283,7 +328,7 @@ export async function generatePrescriptionPDF(data: PDFData, outputPath: string)
       doc.fillColor(secondaryColor).font("Helvetica").fontSize(7).text(
         "This is an electronically generated and validated digital prescription. Any alteration invalidates this record. In case of emergency or severe adverse reactions, please visit the nearest hospital emergency room immediately.",
         50,
-        795,
+        760,
         { width: 495, align: "center" }
       );
 

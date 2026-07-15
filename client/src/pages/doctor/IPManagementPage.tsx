@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import {
   BedDouble, User, Clock, FileText, Pill, AlertTriangle,
-  ChevronRight, CheckCircle2, ClipboardList, HeartPulse, Thermometer,
+  ChevronRight, CheckCircle2, ClipboardList, HeartPulse, Thermometer, LogOut, Loader2
 } from "lucide-react";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { usePatients } from "../../features/patients";
+import { api } from "../../lib/api";
+import toast from "react-hot-toast";
 
 const STATUS_BADGE: Record<string, { tone: "danger" | "warning" | "success" | "info" | "neutral"; label: string }> = {
   critical: { tone: "danger",  label: "Critical" },
@@ -23,8 +25,19 @@ export function IPManagementPage() {
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [progressNote, setProgressNote] = useState("");
 
+  // Discharge form state
+  const [dischargingId, setDischargingId] = useState<string | null>(null);
+  const [dischargeForm, setDischargeForm] = useState<Record<string, {
+    diagnosis: string;
+    medications: string;
+    followUp: string;
+    specialInstructions: string;
+  }>>({});
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [finalizedIds, setFinalizedIds] = useState<Set<string>>(new Set());
+
   const patients = patientsData?.data || [];
-  
+
   // Set default selected patient once data loads
   useEffect(() => {
     if (patients.length > 0 && !selectedPatientId) {
@@ -38,6 +51,76 @@ export function IPManagementPage() {
   const handleSelect = (p: any) => {
     setSelectedPatientId(p._id);
     setProgressNote(p.medicalHistory?.[0]?.notes || "Admitted. Patient stable. Watching vitals.");
+  };
+
+  const getDischargeField = (patientId: string, field: string) => {
+    return (dischargeForm[patientId] as any)?.[field] || "";
+  };
+
+  const setDischargeField = (patientId: string, field: string, value: string) => {
+    setDischargeForm(prev => ({
+      ...prev,
+      [patientId]: {
+        diagnosis: prev[patientId]?.diagnosis || getPatientDiagnosis(patients.find(p => p._id === patientId)),
+        medications: prev[patientId]?.medications || "Paracetamol 500mg TDS",
+        followUp: prev[patientId]?.followUp || "OPD after 2 weeks",
+        specialInstructions: prev[patientId]?.specialInstructions || "Rest, avoid heavy lifting, wound care daily.",
+        [field]: value
+      }
+    }));
+  };
+
+  const initDischargeForm = (p: any) => {
+    if (!dischargeForm[p._id]) {
+      setDischargeForm(prev => ({
+        ...prev,
+        [p._id]: {
+          diagnosis: getPatientDiagnosis(p),
+          medications: "Paracetamol 500mg TDS",
+          followUp: "OPD after 2 weeks",
+          specialInstructions: "Rest, avoid heavy lifting, wound care daily.",
+        }
+      }));
+    }
+    setDischargingId(p._id);
+  };
+
+  const handleFinalizeDischarge = async (p: any) => {
+    const form = dischargeForm[p._id];
+    if (!form?.diagnosis) {
+      toast.error("Please fill in the diagnosis at discharge");
+      return;
+    }
+    setSubmittingId(p._id);
+    try {
+      // Look up the admission record for this patient
+      const admissionsRes = await api.get<any>("/doctors/dashboard/inpatients");
+      const admissions = admissionsRes.data?.data || [];
+      const admission = admissions.find((a: any) => {
+        const pid = typeof a.patient === "object" ? a.patient._id : a.patient;
+        return pid === p._id;
+      });
+
+      if (!admission) {
+        toast.error("No active admission found for this patient");
+        return;
+      }
+
+      await api.post(`/doctors/dashboard/admissions/${admission._id}/finalize-discharge`, {
+        diagnosisAtDischarge: form.diagnosis,
+        dischargeMedications: form.medications,
+        followUp: form.followUp,
+        specialInstructions: form.specialInstructions,
+      });
+
+      setFinalizedIds(prev => new Set([...prev, p._id]));
+      setDischargingId(null);
+      toast.success(`Discharge request sent for ${p.name}. Awaiting receptionist approval.`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to finalize discharge. Please try again.");
+    } finally {
+      setSubmittingId(null);
+    }
   };
 
   if (isLoading) {
@@ -60,7 +143,7 @@ export function IPManagementPage() {
   };
 
   const getPatientDiagnosis = (p: any) => {
-    return p.medicalHistory?.[0]?.diagnosis || "Observation / Check-up";
+    return p?.medicalHistory?.[0]?.diagnosis || "Observation / Check-up";
   };
 
   return (
@@ -298,36 +381,126 @@ export function IPManagementPage() {
           {activeTab === 3 && (
             <div className="space-y-4">
               {patients.map((p) => {
-                const isCritical = p.allergies?.toLowerCase().includes("penicillin");
-                const pStatus = isCritical ? "critical" : p.age && p.age > 60 ? "moderate" : "stable";
+                const isFinalized = finalizedIds.has(p._id);
+                const isExpanded = dischargingId === p._id;
+                const isSubmitting = submittingId === p._id;
 
                 return (
-                  <Card key={p._id}>
+                  <Card key={p._id} className={isFinalized ? "border-emerald-200 bg-emerald-50/30" : ""}>
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <h3 className="text-sm font-semibold text-slate-800">Discharge Summary — {p.name}</h3>
                         <p className="text-xs text-slate-500">Admitted {getDaysAdmitted(p)} days ago · Bed C-{p.age || "—"}</p>
                       </div>
-                      <Button variant="primary"><CheckCircle2 className="h-4 w-4" /> Finalize Discharge</Button>
+                      {isFinalized ? (
+                        <span className="flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Discharge Request Sent
+                        </span>
+                      ) : (
+                        <Button
+                          variant="primary"
+                          onClick={() => isExpanded ? setDischargingId(null) : initDischargeForm(p)}
+                        >
+                          <LogOut className="h-4 w-4" /> {isExpanded ? "Cancel" : "Finalize Discharge"}
+                        </Button>
+                      )}
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs font-semibold text-slate-400 mb-1">Diagnosis at Discharge</p>
-                        <p className="text-sm text-slate-700">{getPatientDiagnosis(p)}</p>
+
+                    {isFinalized ? (
+                      <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3">
+                        <p className="text-xs font-semibold text-emerald-700 mb-0.5">Awaiting receptionist confirmation</p>
+                        <p className="text-xs text-emerald-600">The discharge request has been sent to the front desk. The receptionist will process and confirm the discharge shortly.</p>
                       </div>
-                      <div>
-                        <p className="text-xs font-semibold text-slate-400 mb-1">Discharge Medications</p>
-                        <p className="text-xs text-slate-600">• Paracetamol 500mg TDS</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-slate-400 mb-1">Follow-up</p>
-                        <p className="text-sm text-slate-700">OPD after 2 weeks</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-slate-400 mb-1">Special Instructions</p>
-                        <p className="text-sm text-slate-700">Rest, avoid heavy lifting, wound care daily.</p>
-                      </div>
-                    </div>
+                    ) : (
+                      <>
+                        {/* Always-visible summary preview */}
+                        {!isExpanded && (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-xs font-semibold text-slate-400 mb-1">Diagnosis at Discharge</p>
+                              <p className="text-sm text-slate-700">{getPatientDiagnosis(p)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold text-slate-400 mb-1">Discharge Medications</p>
+                              <p className="text-xs text-slate-600">• Paracetamol 500mg TDS</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold text-slate-400 mb-1">Follow-up</p>
+                              <p className="text-sm text-slate-700">OPD after 2 weeks</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold text-slate-400 mb-1">Special Instructions</p>
+                              <p className="text-sm text-slate-700">Rest, avoid heavy lifting, wound care daily.</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Expanded discharge form */}
+                        {isExpanded && (
+                          <div className="border-t border-slate-100 pt-4 space-y-4">
+                            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Fill Discharge Summary</p>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="col-span-2">
+                                <label className="block text-xs font-semibold text-slate-500 mb-1">Diagnosis at Discharge <span className="text-red-500">*</span></label>
+                                <input
+                                  type="text"
+                                  value={getDischargeField(p._id, "diagnosis")}
+                                  onChange={e => setDischargeField(p._id, "diagnosis", e.target.value)}
+                                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                                  placeholder="e.g. Acute Viral Fever, Resolved"
+                                />
+                              </div>
+                              <div className="col-span-2">
+                                <label className="block text-xs font-semibold text-slate-500 mb-1">Discharge Medications</label>
+                                <textarea
+                                  value={getDischargeField(p._id, "medications")}
+                                  onChange={e => setDischargeField(p._id, "medications", e.target.value)}
+                                  rows={3}
+                                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-navy-200"
+                                  placeholder="List medications to continue after discharge..."
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-500 mb-1">Follow-up Instructions</label>
+                                <input
+                                  type="text"
+                                  value={getDischargeField(p._id, "followUp")}
+                                  onChange={e => setDischargeField(p._id, "followUp", e.target.value)}
+                                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                                  placeholder="e.g. OPD after 2 weeks"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-slate-500 mb-1">Special Instructions</label>
+                                <input
+                                  type="text"
+                                  value={getDischargeField(p._id, "specialInstructions")}
+                                  onChange={e => setDischargeField(p._id, "specialInstructions", e.target.value)}
+                                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                                  placeholder="e.g. Rest, avoid heavy lifting"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex gap-3 pt-2">
+                              <button
+                                onClick={() => handleFinalizeDischarge(p)}
+                                disabled={isSubmitting}
+                                className="flex items-center gap-2 rounded-lg bg-navy-700 px-4 py-2 text-sm font-semibold text-white hover:bg-navy-800 disabled:opacity-60 transition-colors"
+                              >
+                                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                                {isSubmitting ? "Sending Request..." : "Send Discharge Request"}
+                              </button>
+                              <button
+                                onClick={() => setDischargingId(null)}
+                                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </Card>
                 );
               })}

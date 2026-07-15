@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import {
   Activity,
   BedDouble,
@@ -32,6 +33,7 @@ const STATUS_BADGE: Record<string, { tone: "success" | "warning" | "info" | "neu
 };
 
 export function DoctorDashboard() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const today = new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   
@@ -40,6 +42,18 @@ export function DoctorDashboard() {
 
   // Fetch today's schedule for list display
   const { data: appointments, isLoading: isApptsLoading } = useDoctorTodayAppointments();
+
+  const handleQuickAction = (actionType: "prescription" | "history" | "lab" | "documents") => {
+    const targetAppt = appointments?.find(a => a.status === "in_consultation");
+
+    if (!targetAppt) {
+      toast.error("No active consultation in progress. Redirecting to OP Queue to select patient.");
+      navigate("/doctor/op-management");
+      return;
+    }
+
+    navigate(`/doctor/consultation/${targetAppt._id}`, { state: { activeTab: actionType } });
+  };
 
   const isLoading = isMetricsLoading || isApptsLoading;
 
@@ -237,19 +251,19 @@ export function DoctorDashboard() {
             <h3 className="mb-3 text-base font-semibold text-slate-800">Quick Actions</h3>
             <div className="space-y-2">
               {[
-                { label: "New Prescription",     to: "/doctor/prescriptions/new",   icon: <Plus className="h-4 w-4 text-navy-700" /> },
-                { label: "Patient History",      to: "/doctor/patients",            icon: <User className="h-4 w-4 text-navy-700" /> },
-                { label: "Create Lab Order",     to: "/doctor/laboratory/new",      icon: <Stethoscope className="h-4 w-4 text-navy-700" /> },
-                { label: "Medical Certificate",  to: "/doctor/certificates/new",    icon: <FileText className="h-4 w-4 text-navy-700" /> },
+                { label: "New Prescription",     type: "prescription", icon: <Plus className="h-4 w-4 text-navy-700" /> },
+                { label: "Patient History",      type: "history",      icon: <User className="h-4 w-4 text-navy-700" /> },
+                { label: "Create Lab Order",     type: "lab",          icon: <Stethoscope className="h-4 w-4 text-navy-700" /> },
+                { label: "Medical Certificate",  type: "documents",    icon: <FileText className="h-4 w-4 text-navy-700" /> },
               ].map((action) => (
-                <Link
-                  key={action.to}
-                  to={action.to}
-                  className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                <button
+                  key={action.label}
+                  onClick={() => handleQuickAction(action.type as any)}
+                  className="flex items-center gap-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
                 >
                   {action.icon} {action.label}
                   <ChevronRight className="ml-auto h-3.5 w-3.5 text-slate-400" />
-                </Link>
+                </button>
               ))}
             </div>
           </Card>

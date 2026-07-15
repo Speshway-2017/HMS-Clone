@@ -293,7 +293,7 @@ export function useAdmissionRequests() {
   });
 }
 
-export function useAdmissions(status: "admitted" | "discharged" = "admitted") {
+export function useAdmissions(status: "admitted" | "discharged" | "discharge_requested" = "admitted") {
   return useQuery({
     queryKey: ["reception", "admissions", "list", status],
     queryFn: async () => {
@@ -301,6 +301,35 @@ export function useAdmissions(status: "admitted" | "discharged" = "admitted") {
         params: { status }
       });
       return res.data.data.admissions;
+    },
+    refetchInterval: status === "discharge_requested" ? 10000 : undefined
+  });
+}
+
+export function useDischargeRequests() {
+  return useQuery({
+    queryKey: ["reception", "admissions", "list", "discharge_requested"],
+    queryFn: async () => {
+      const res = await api.get<{ data: { admissions: any[] } }>("/reception/admissions", {
+        params: { status: "discharge_requested" }
+      });
+      return res.data.data.admissions;
+    },
+    refetchInterval: 10000
+  });
+}
+
+export function useConfirmDischarge() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { admissionId: string; notes?: string }) => {
+      const res = await api.post(`/reception/admissions/${payload.admissionId}/discharge`, { notes: payload.notes || "" });
+      return res.data.data.admission;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reception", "admissions"] });
+      queryClient.invalidateQueries({ queryKey: ["reception", "rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["reception", "stats"] });
     }
   });
 }
@@ -361,6 +390,7 @@ export function useRequestDischarge() {
     }
   });
 }
+
 
 // ── Notifications Hooks ──
 export function useReceptionNotifications() {

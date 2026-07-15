@@ -52,23 +52,33 @@ export function PharmacySupplierManagement() {
   ]);
 
   useEffect(() => {
-    // Load suppliers
+    // Load suppliers and remove dummy data if present
     const savedSuppliers = localStorage.getItem("hms_pharmacy_suppliers");
+    let suppliersList: Supplier[] = [];
     if (savedSuppliers) {
-      setSuppliers(JSON.parse(savedSuppliers));
-    } else {
-      localStorage.setItem("hms_pharmacy_suppliers", JSON.stringify([]));
-      setSuppliers([]);
+      suppliersList = JSON.parse(savedSuppliers).filter(
+        (s: Supplier) =>
+          s.name !== "Global Pharma Distributors" &&
+          s.name !== "Acme Healthcare Corp" &&
+          s.name !== "Apex MediSupplies"
+      );
     }
+    localStorage.setItem("hms_pharmacy_suppliers", JSON.stringify(suppliersList));
+    setSuppliers(suppliersList);
 
-    // Load POs
+    // Load POs and remove dummy purchase orders associated with dummy suppliers
     const savedOrders = localStorage.getItem("hms_pharmacy_purchase_orders");
+    let ordersList: PurchaseOrder[] = [];
     if (savedOrders) {
-      setPurchaseOrders(JSON.parse(savedOrders));
-    } else {
-      localStorage.setItem("hms_pharmacy_purchase_orders", JSON.stringify([]));
-      setPurchaseOrders([]);
+      ordersList = JSON.parse(savedOrders).filter(
+        (po: PurchaseOrder) =>
+          po.supplierName !== "Global Pharma Distributors" &&
+          po.supplierName !== "Acme Healthcare Corp" &&
+          po.supplierName !== "Apex MediSupplies"
+      );
     }
+    localStorage.setItem("hms_pharmacy_purchase_orders", JSON.stringify(ordersList));
+    setPurchaseOrders(ordersList);
   }, []);
 
   const handleAddSupplierSubmit = (e: React.FormEvent) => {

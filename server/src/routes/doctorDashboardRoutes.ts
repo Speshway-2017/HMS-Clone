@@ -37,6 +37,8 @@ import {
   // Doctor-scoped patient record endpoints
   getMyPatients,
   getMyPatientById,
+  // Discharge
+  finalizeDischarge,
 } from "../controllers/doctorDashboardController";
 
 const router = Router();
@@ -93,5 +95,8 @@ router.get("/my-lab-orders/:labOrderId", getMyLabOrderById);
 // ── Doctor-scoped patient records (security-enforced, no cross-doctor leakage) ─
 router.get("/my-patients", getMyPatients);
 router.get("/my-patients/:patientId", getMyPatientById);
+
+// ── IP Discharge (Doctor initiates, Receptionist confirms) ─
+router.post("/admissions/:admissionId/finalize-discharge", finalizeDischarge);
 
 export default router;

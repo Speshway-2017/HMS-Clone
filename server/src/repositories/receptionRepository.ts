@@ -229,38 +229,45 @@ export class ReceptionRepository {
     });
   }
 
-  static async listAdmissions(hospitalId: Types.ObjectId, status: "admitted" | "discharged") {
-    const statusFilter = status === "admitted"
-      ? {
-          $in: [
-            "admitted",
-            "Admitted",
-            "Bed Allocated",
-            "Under Observation",
-            "Waiting for Bed",
-            "In Ward",
-            "ICU",
-            "Operation Scheduled",
-            "Under Treatment",
-            "Transferred"
-          ]
-        }
-      : {
-          $in: [
-            "discharged",
-            "Discharged",
-            "Cancelled",
-            "Expired",
-            "Against Medical Advice (AMA)",
-            "Transferred Out (Final)"
-          ]
-        };
+
+  static async listAdmissions(hospitalId: Types.ObjectId, status: "admitted" | "discharged" | "discharge_requested") {
+    let statusFilter: any;
+    if (status === "admitted") {
+      statusFilter = {
+        $in: [
+          "admitted",
+          "Admitted",
+          "Bed Allocated",
+          "Under Observation",
+          "Waiting for Bed",
+          "In Ward",
+          "ICU",
+          "Operation Scheduled",
+          "Under Treatment",
+          "Transferred"
+        ]
+      };
+    } else if (status === "discharge_requested") {
+      statusFilter = { $in: ["discharge_requested"] };
+    } else {
+      statusFilter = {
+        $in: [
+          "discharged",
+          "Discharged",
+          "Cancelled",
+          "Expired",
+          "Against Medical Advice (AMA)",
+          "Transferred Out (Final)"
+        ]
+      };
+    }
 
     return await Admission.find({ hospital: hospitalId, status: statusFilter })
       .populate("patient", "name uhid phone age gender bloodGroup")
       .populate("room")
       .populate("bed")
       .populate("admittingDoctor", "name specialization")
+      .populate("dischargeRequestedBy", "name specialization")
       .sort({ admissionDate: -1 });
   }
 

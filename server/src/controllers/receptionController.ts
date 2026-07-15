@@ -266,7 +266,7 @@ export const transferPatient = catchAsync(async (req: Request, res: Response) =>
 });
 
 export const getAdmissions = catchAsync(async (req: Request, res: Response) => {
-  const status = (req.query.status as "admitted" | "discharged") || "admitted";
+  const status = (req.query.status as "admitted" | "discharged" | "discharge_requested") || "admitted";
   const admissions = await ReceptionRepository.listAdmissions(req.hospitalFilter!.hospital as any, status);
   res.json({ status: "success", data: { admissions } });
 });

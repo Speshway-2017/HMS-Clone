@@ -251,6 +251,7 @@ export const router = createBrowserRouter([
           { path: "billing/completed", element: <ReceptionBillingPage activeTab="completed" /> },
           { path: "billing/receipts", element: <ReceptionBillingPage activeTab="completed" /> },
           { path: "billing/collections", element: <ReceptionBillingPage activeTab="collections" /> },
+          { path: "billing/ip", element: <ReceptionBillingPage activeTab="ip" /> },
           { path: "queue", element: <QueuePage /> },
           { path: "queue/tokens", element: <QueuePage /> },
           { path: "doctors", element: <ReceptionDoctorsPage /> },
