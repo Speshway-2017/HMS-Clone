@@ -17,6 +17,7 @@ import { catchAsync } from "../utils/catchAsync";
 import { AppError } from "../utils/AppError";
 import { env } from "../config/env";
 import { cloudinary } from "../config/cloudinary";
+import { InventoryItem } from "../models/InventoryItem";
 
 async function getLoggedDoctor(req: Request) {
   const doctor = await Doctor.findOne({ email: req.user!.email, isActive: { $ne: false } });
@@ -535,27 +536,57 @@ export const dispensePrescription = catchAsync(async (req: Request, res: Respons
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const prescriptionId = req.params.id;
 
-  const prescription = await Prescription.findOneAndUpdate(
-    { _id: prescriptionId, hospital: hospitalId },
-    { status: "Dispensed" },
-    { new: true }
-  );
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  if (!prescription) {
-    throw new AppError("Prescription not found.", 404);
+  try {
+    const prescription = await Prescription.findOneAndUpdate(
+      { _id: prescriptionId, hospital: hospitalId },
+      { status: "Dispensed" },
+      { new: true, session }
+    );
+
+    if (!prescription) {
+      throw new AppError("Prescription not found.", 404);
+    }
+
+    // Deduct stock from inventory
+    for (const med of prescription.medications) {
+      const durationNum = parseInt(med.duration);
+      const qty = !isNaN(durationNum) ? durationNum * 2 : 10;
+
+      const invItem = await InventoryItem.findOne({
+        hospital: hospitalId,
+        name: new RegExp(`^${med.name.trim()}$`, "i"),
+        category: "medicines"
+      }).session(session);
+
+      if (invItem) {
+        invItem.stockQty = Math.max(0, invItem.stockQty - qty);
+        await invItem.save({ session });
+      }
+    }
+
+    // Update audit log
+    await PrescriptionAuditLog.findOneAndUpdate(
+      { prescription: prescription._id },
+      { $set: { dispensedTime: new Date() } },
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // Emit Socket update events
+    emitToHospital(hospitalId.toString(), "prescription:dispensed", prescription);
+    emitToHospital(hospitalId.toString(), "prescription:updated", prescription);
+
+    res.json({ status: "success", data: prescription });
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    throw err;
   }
-
-  // Update audit log
-  await PrescriptionAuditLog.findOneAndUpdate(
-    { prescription: prescription._id },
-    { $set: { dispensedTime: new Date() } }
-  );
-
-  // Emit Socket update events
-  emitToHospital(hospitalId.toString(), "prescription:dispensed", prescription);
-  emitToHospital(hospitalId.toString(), "prescription:updated", prescription);
-
-  res.json({ status: "success", data: prescription });
 });
 
 /**

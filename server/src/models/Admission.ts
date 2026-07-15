@@ -62,7 +62,23 @@ const admissionSchema = new Schema(
     department: { type: Schema.Types.ObjectId, ref: "Department", default: null },
     admissionType: { type: String, enum: ["Emergency", "Elective", "Direct Admission"], default: "Direct Admission" },
     expectedStay: { type: String, default: "" },
-    primaryDiagnosis: { type: String, default: "" }
+    primaryDiagnosis: { type: String, default: "" },
+    accommodationHistory: {
+      type: [
+        {
+          ward: { type: String, required: true },
+          roomType: { type: String, required: true },
+          room: { type: Schema.Types.ObjectId, ref: "Room", required: true },
+          bed: { type: Schema.Types.ObjectId, ref: "Bed", required: true },
+          dailyTariff: { type: Number, required: true },
+          nursingTariff: { type: Number, required: true },
+          startDate: { type: Date, required: true },
+          endDate: { type: Date, default: null },
+          occupiedDays: { type: Number, default: 0 }
+        }
+      ],
+      default: []
+    }
   },
   { timestamps: true }
 );

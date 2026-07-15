@@ -13,6 +13,11 @@ const roomSchema = new Schema(
       enum: ["General", "Semi-Private", "Private", "ICU", "NICU", "Emergency"],
       required: true
     },
+    acType: {
+      type: String,
+      enum: ["AC", "Non AC"],
+      default: "Non AC"
+    },
     capacity: { type: Number, required: true },
     description: { type: String, default: "" },
     status: { type: String, enum: ["Active", "Inactive"], default: "Active" }

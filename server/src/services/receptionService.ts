@@ -21,6 +21,7 @@ import { emitToHospital, emitToDoctor } from "../config/socket";
 import { createDoctorNotification } from "../utils/notificationHelper";
 import { IPBill } from "../models/IPBill";
 import { IPBillPayment } from "../models/IPBillPayment";
+import { RoomTariff } from "../models/RoomTariff";
 
 
 function generateDigits(length: number): string {
@@ -1084,6 +1085,28 @@ export class ReceptionService {
       bed.isOccupied = true;
       await bed.save({ session });
 
+      // Fetch daily tariff and nursing rate for this room/ward
+      const tariffConfig = await RoomTariff.findOne({
+        hospital: hospitalId,
+        ward: ward,
+        roomType: room.acType || "Non AC"
+      }).session(session);
+
+      const getWardDefaultRate = (wType: string): number => {
+        switch (wType) {
+          case "ICU": return 8000;
+          case "NICU": return 7000;
+          case "Private Ward": return 4000;
+          case "Semi-Private Ward": return 2000;
+          case "General Ward": return 1000;
+          case "Emergency Ward": return 3000;
+          default: return 1500;
+        }
+      };
+
+      const dailyTariff = tariffConfig ? tariffConfig.tariff : getWardDefaultRate(ward);
+      const nursingTariff = tariffConfig ? tariffConfig.nursingTariff : 300;
+
       // Create admission record
       const [createdAdmission] = await Admission.create([{
         hospital: hospitalId,
@@ -1112,7 +1135,20 @@ export class ReceptionService {
         department: departmentId || null,
         admissionType,
         expectedStay,
-        primaryDiagnosis
+        primaryDiagnosis,
+        accommodationHistory: [
+          {
+            ward,
+            roomType: room.acType || "Non AC",
+            room: roomId,
+            bed: bedId,
+            dailyTariff,
+            nursingTariff,
+            startDate: new Date(admissionDate),
+            endDate: null,
+            occupiedDays: 0
+          }
+        ]
       }], { session });
 
       let createdInvoice: any = null;
@@ -1369,36 +1405,121 @@ export class ReceptionService {
   static async transferPatient(hospitalId: Types.ObjectId, transferData: any, userId: Types.ObjectId) {
     const { admissionId, newRoomId, newBedId, notes } = transferData;
 
-    const admission = await Admission.findOne({ _id: admissionId, hospital: hospitalId });
-    if (!admission || admission.status !== "admitted") {
-      throw new AppError("Active admission record not found.", 404);
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const admission = await Admission.findOne({ _id: admissionId, hospital: hospitalId }).session(session);
+      if (!admission || admission.status !== "admitted") {
+        throw new AppError("Active admission record not found.", 404);
+      }
+
+      const newBed = await Bed.findOne({ _id: newBedId, hospital: hospitalId }).session(session);
+      if (!newBed || newBed.isOccupied || newBed.status !== "Available") {
+        throw new AppError("Selected bed is not available.", 400);
+      }
+
+      const newRoom = await Room.findOne({ _id: newRoomId, hospital: hospitalId }).session(session);
+      if (!newRoom || newRoom.status !== "Active") {
+        throw new AppError("Selected room is not active or not found.", 404);
+      }
+
+      // Verify cascading references
+      if (newBed.room.toString() !== newRoomId) {
+        throw new AppError("Selected Bed does not belong to the selected Room.", 400);
+      }
+
+      // Fetch tariff configuration for new room
+      const tariffConfig = await RoomTariff.findOne({
+        hospital: hospitalId,
+        ward: newRoom.wardName,
+        roomType: newRoom.acType || "Non AC"
+      }).session(session);
+
+      const getWardDefaultRate = (wType: string): number => {
+        switch (wType) {
+          case "ICU": return 8000;
+          case "NICU": return 7000;
+          case "Private Ward": return 4000;
+          case "Semi-Private Ward": return 2000;
+          case "General Ward": return 1000;
+          case "Emergency Ward": return 3000;
+          default: return 1500;
+        }
+      };
+
+      const dailyTariff = tariffConfig ? tariffConfig.tariff : getWardDefaultRate(newRoom.wardName);
+      const nursingTariff = tariffConfig ? tariffConfig.nursingTariff : 300;
+
+      // Close current active accommodation history entry
+      const activeEntry = admission.accommodationHistory.find((h: any) => h.endDate === null);
+      let oldTariff = 0;
+      if (activeEntry) {
+        const start = new Date(activeEntry.startDate);
+        const end = new Date();
+        start.setHours(0, 0, 0, 0);
+        end.setHours(0, 0, 0, 0);
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        activeEntry.occupiedDays = diffDays || 1;
+        activeEntry.endDate = new Date();
+        oldTariff = activeEntry.dailyTariff;
+      }
+
+      // Open new accommodation history entry
+      admission.accommodationHistory.push({
+        ward: newRoom.wardName,
+        roomType: newRoom.acType || "Non AC",
+        room: newRoomId,
+        bed: newBedId,
+        dailyTariff,
+        nursingTariff,
+        startDate: new Date(),
+        endDate: null,
+        occupiedDays: 0
+      });
+
+      // Release old bed
+      await ReceptionRepository.updateBedOccupancy(hospitalId, admission.bed.toString(), false);
+
+      // Occupy new bed
+      await ReceptionRepository.updateBedOccupancy(hospitalId, newBedId, true);
+
+      // Update admission record
+      admission.room = newRoomId;
+      admission.bed = newBedId;
+      admission.ward = newRoom.wardName;
+      admission.admissionNotes += `\n[Room Transfer on ${new Date().toLocaleString()}]: Transferred to Room ${newRoom.roomNumber}, Bed ${newBed.bedNumber}. Notes: ${notes || ""}`;
+      
+      await admission.save({ session });
+
+      await ReceptionRepository.createAuditLog({
+        hospital: hospitalId,
+        user: userId,
+        action: "IP_TRANSFER",
+        details: `Transferred patient in admission ${admission.admissionNumber} from Bed ${admission.bed} to Bed ${newBed.bedNumber}. Tariff changed from ₹${oldTariff}/day to ₹${dailyTariff}/day.`
+      });
+
+      await session.commitTransaction();
+      session.endSession();
+
+      // Emit Socket update events
+      emitToHospital(hospitalId.toString(), "ip_billing_update", {
+        type: "IP_TRANSFER",
+        admissionId: admission._id,
+        timestamp: new Date()
+      });
+      emitToHospital(hospitalId.toString(), "dashboard_update", {
+        type: "IP_TRANSFER",
+        timestamp: new Date()
+      });
+
+      return admission;
+    } catch (err) {
+      await session.abortTransaction();
+      session.endSession();
+      throw err;
     }
-
-    const newBed = await Bed.findOne({ _id: newBedId, hospital: hospitalId });
-    if (!newBed || newBed.isOccupied) {
-      throw new AppError("Selected bed is not available.", 400);
-    }
-
-    // Release old bed
-    await ReceptionRepository.updateBedOccupancy(hospitalId, admission.bed.toString(), false);
-
-    // Occupy new bed
-    await ReceptionRepository.updateBedOccupancy(hospitalId, newBedId, true);
-
-    // Update admission record
-    admission.room = newRoomId;
-    admission.bed = newBedId;
-    admission.admissionNotes += `\n[Room Transfer on ${new Date().toLocaleString()}]: Transferred to new Room. Notes: ${notes || ""}`;
-    await admission.save();
-
-    await ReceptionRepository.createAuditLog({
-      hospital: hospitalId,
-      user: userId,
-      action: "IP_TRANSFER",
-      details: `Transferred patient in admission ${admissionId} to Bed ${newBedId}`
-    });
-
-    return admission;
   }
 
   static async requestDischarge(hospitalId: Types.ObjectId, admissionId: string, notes: string, userId: Types.ObjectId) {
@@ -1409,6 +1530,19 @@ export class ReceptionService {
 
     // Release bed
     await ReceptionRepository.updateBedOccupancy(hospitalId, admission.bed.toString(), false);
+
+    // Close active accommodation history entry
+    const activeEntry = admission.accommodationHistory.find((h: any) => h.endDate === null);
+    if (activeEntry) {
+      const start = new Date(activeEntry.startDate);
+      const end = new Date();
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      activeEntry.occupiedDays = diffDays || 1;
+      activeEntry.endDate = new Date();
+    }
 
     // Change admission status to discharged
     admission.status = "discharged";

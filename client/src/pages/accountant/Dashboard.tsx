@@ -281,7 +281,7 @@ export function AccountantDashboard() {
                       {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "Immediate"}
                     </td>
                     <td className="px-4 py-3 font-semibold text-slate-800">
-                      ₹{inv.totals.total.toFixed(2)}
+                      ₹{(inv.totals?.total ?? 0).toFixed(2)}
                     </td>
                     <td className="px-4 py-3">
                       <Badge tone={STATUS_TONE[inv.status]} className="w-36">{inv.status.replace("_", " ")}</Badge>

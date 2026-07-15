@@ -16,7 +16,9 @@ import {
   CreditCard,
   Calendar,
   Layers,
-  ArrowRight
+  ArrowRight,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 import { useInvoices, useCreateInvoice } from "../../features/invoices";
 import { usePatients } from "../../features/patients";
@@ -52,7 +54,7 @@ interface BillingItem {
 
 const CATEGORIES = [
   "Admission Charges",
-  "Room Charges",
+  "Accommodation Charges",
   "Doctor Charges",
   "Nursing Charges",
   "Laboratory Charges",
@@ -64,6 +66,42 @@ const CATEGORIES = [
   "Diet Charges",
   "Miscellaneous"
 ];
+
+interface AccordionGroup {
+  id: string;
+  name: string;
+  categories: string[];
+  subtotal: number;
+  itemCount: number;
+  items: any[];
+}
+
+const groupIPCharges = (charges: any[]) => {
+  const groups: AccordionGroup[] = [
+    { id: "accommodation", name: "Accommodation Charges", categories: ["Accommodation Charges"], subtotal: 0, itemCount: 0, items: [] },
+    { id: "doctor", name: "Doctor Charges", categories: ["Doctor Charges", "Doctor Visit Charges"], subtotal: 0, itemCount: 0, items: [] },
+    { id: "clinical", name: "Clinical Services", categories: ["Laboratory Charges", "Radiology Charges", "Procedure Charges", "Operation Theatre Charges"], subtotal: 0, itemCount: 0, items: [] },
+    { id: "pharmacy", name: "Pharmacy", categories: ["Pharmacy Charges"], subtotal: 0, itemCount: 0, items: [] },
+    { id: "nursing", name: "Nursing & Support", categories: ["Nursing Charges", "Equipment Charges", "Miscellaneous"], subtotal: 0, itemCount: 0, items: [] },
+    { id: "other", name: "Other Charges", categories: ["Admission Charges", "Diet Charges"], subtotal: 0, itemCount: 0, items: [] }
+  ];
+
+  charges.forEach(c => {
+    const group = groups.find(g => g.categories.includes(c.category));
+    if (group) {
+      group.items.push(c);
+      group.subtotal += c.total || 0;
+      group.itemCount += 1;
+    } else {
+      const other = groups.find(g => g.id === "other")!;
+      other.items.push(c);
+      other.subtotal += c.total || 0;
+      other.itemCount += 1;
+    }
+  });
+
+  return groups.filter(g => g.items.length > 0);
+};
 
 export function AccountantBillingPage() {
   const [activeTab, setActiveTab] = useState<"all" | "op" | "ip" | "pharmacy" | "laboratory">("all");
@@ -108,6 +146,16 @@ export function AccountantBillingPage() {
   // ── IP Billing States ──
   const [admissionSearch, setAdmissionSearch] = useState("");
   const [selectedAdmissionId, setSelectedAdmissionId] = useState<string | null>(null);
+
+  // Accordion UI state
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupId]: !prev[groupId]
+    }));
+  };
   
   // Custom Charge form state
   const [customCategory, setCustomCategory] = useState("Admission Charges");
@@ -158,13 +206,26 @@ export function AccountantBillingPage() {
     };
 
     socket.on("ip_billing_update", handleIPUpdate);
+    socket.on("ip_bill_update", handleIPUpdate);
     socket.on("dashboard_update", handleIPUpdate);
 
     return () => {
       socket.off("ip_billing_update", handleIPUpdate);
+      socket.off("ip_bill_update", handleIPUpdate);
       socket.off("dashboard_update", handleIPUpdate);
     };
   }, [selectedAdmissionId, refetchIPDetails, refetchAdmissions]);
+
+  useEffect(() => {
+    if (ipDetails?.charges) {
+      const activeGroups = groupIPCharges(ipDetails.charges);
+      const initial: Record<string, boolean> = {};
+      activeGroups.forEach(g => {
+        initial[g.id] = true;
+      });
+      setExpandedGroups(initial);
+    }
+  }, [ipDetails?.charges]);
 
   // Totals calculations
   const subtotal = items.reduce((sum, item) => sum + item.quantity * item.amount, 0);
@@ -582,66 +643,81 @@ export function AccountantBillingPage() {
                       <h3 className="text-base font-bold text-slate-800 flex items-center gap-1.5">
                         <FileText className="h-5 w-5 text-navy-700" /> Itemized Charges Breakdown
                       </h3>
-                      {CATEGORIES.map((category) => {
-                        const catCharges = ipDetails?.charges?.filter((c: any) => c.category === category) || [];
-                        if (catCharges.length === 0) return null;
-                        const catTotal = catCharges.reduce((sum: number, c: any) => sum + c.total, 0);
+                      {groupIPCharges(ipDetails?.charges || []).map((group) => {
+                        const isExpanded = !!expandedGroups[group.id];
 
                         return (
-                          <Card key={category} className="space-y-2 border-l-4 border-l-navy-600">
-                            <div className="flex justify-between items-center border-b border-slate-100 pb-1.5">
-                              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                                {category}
-                              </h4>
+                          <div key={group.id} className="border border-slate-200 rounded-lg overflow-hidden shadow-sm bg-white">
+                            {/* Accordion Header */}
+                            <div 
+                              onClick={() => toggleGroup(group.id)}
+                              className="flex items-center justify-between p-3.5 bg-slate-50 hover:bg-slate-100 cursor-pointer select-none border-b border-slate-200/50 transition"
+                            >
+                              <div className="flex items-center gap-2">
+                                {isExpanded ? <ChevronDown className="h-4 w-4 text-slate-500" /> : <ChevronRight className="h-4 w-4 text-slate-500" />}
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">{group.name}</h4>
+                                <span className="bg-navy-50 text-navy-700 text-[10px] font-bold px-2 py-0.5 rounded border border-navy-150 ml-2">
+                                  {group.itemCount} {group.itemCount === 1 ? "Item" : "Items"}
+                                </span>
+                              </div>
                               <span className="text-xs font-bold text-navy-700 bg-navy-50 px-2 py-0.5 rounded border border-navy-150">
-                                Subtotal: {formatINR(catTotal)}
+                                Subtotal: {formatINR(group.subtotal)}
                               </span>
                             </div>
 
-                            <table className="w-full text-left text-xs whitespace-nowrap">
-                              <thead>
-                                <tr className="text-[10px] font-bold uppercase text-slate-400">
-                                  <th className="py-1">Description / Item</th>
-                                  <th className="py-1 text-center">Qty</th>
-                                  <th className="py-1 text-right">Price</th>
-                                  <th className="py-1 text-right">Discount</th>
-                                  <th className="py-1 text-right">Tax</th>
-                                  <th className="py-1 text-right">Total</th>
-                                  <th className="py-1 text-right">Type / Action</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-100 text-slate-650">
-                                {catCharges.map((c: any) => (
-                                  <tr key={c._id} className="hover:bg-slate-50/50">
-                                    <td className="py-1.5 font-medium text-slate-850">
-                                      {c.serviceName}
-                                      {c.remarks && <span className="block text-[9px] text-slate-400 font-normal leading-tight">{c.remarks}</span>}
-                                    </td>
-                                    <td className="py-1.5 text-center">{c.quantity}</td>
-                                    <td className="py-1.5 text-right">{formatINR(c.unitPrice)}</td>
-                                    <td className="py-1.5 text-right font-medium text-red-500">-{formatINR(c.discount || 0)}</td>
-                                    <td className="py-1.5 text-right font-medium text-slate-500">+{formatINR(c.tax || 0)}</td>
-                                    <td className="py-1.5 text-right font-bold text-slate-850">{formatINR(c.total)}</td>
-                                    <td className="py-1.5 text-right">
-                                      {c.isSystemGenerated ? (
-                                        <span className="inline-flex rounded bg-emerald-50 border border-emerald-200 text-[9px] px-1.5 py-0.5 font-bold uppercase tracking-wider text-emerald-700 shadow-sm">
-                                          Auto
-                                        </span>
-                                      ) : (
-                                        <button
-                                          onClick={() => handleDeleteCharge(c._id)}
-                                          className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
-                                          title="Remove charge"
-                                        >
-                                          <Trash2 className="h-3.5 w-3.5" />
-                                        </button>
-                                      )}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </Card>
+                            {/* Accordion Body */}
+                            {isExpanded && (
+                              <div className="p-4 bg-white">
+                                <table className="w-full text-left text-xs whitespace-nowrap">
+                                  <thead>
+                                    <tr className="text-[10px] font-bold uppercase text-slate-400">
+                                      <th className="py-2">Category</th>
+                                      <th className="py-2">Description / Item</th>
+                                      <th className="py-2 text-center">Qty</th>
+                                      <th className="py-2 text-right">Price</th>
+                                      <th className="py-2 text-right">Discount</th>
+                                      <th className="py-2 text-right">Tax</th>
+                                      <th className="py-2 text-right">Total</th>
+                                      <th className="py-2 text-right">Type / Action</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100 text-slate-650">
+                                    {group.items.map((c: any) => (
+                                      <tr key={c._id} className="hover:bg-slate-50/50">
+                                        <td className="py-2 text-[10px] font-bold text-slate-400 uppercase">
+                                          {c.category}
+                                        </td>
+                                        <td className="py-2 font-medium text-slate-850">
+                                          {c.serviceName}
+                                          {c.remarks && <span className="block text-[9px] text-slate-400 font-normal leading-tight">{c.remarks}</span>}
+                                        </td>
+                                        <td className="py-2 text-center">{c.quantity}</td>
+                                        <td className="py-2 text-right font-mono">{formatINR(c.unitPrice)}</td>
+                                        <td className="py-2 text-right font-medium text-red-500 font-mono">-{formatINR(c.discount || 0)}</td>
+                                        <td className="py-2 text-right font-medium text-slate-500 font-mono">+{formatINR(c.tax || 0)}</td>
+                                        <td className="py-2 text-right font-bold text-slate-850 font-mono">{formatINR(c.total)}</td>
+                                        <td className="py-2 text-right">
+                                          {c.isSystemGenerated ? (
+                                            <span className="inline-flex rounded bg-emerald-50 border border-emerald-200 text-[9px] px-1.5 py-0.5 font-bold uppercase tracking-wider text-emerald-700 shadow-sm animate-pulse">
+                                              Auto
+                                            </span>
+                                          ) : (
+                                            <button
+                                              onClick={() => handleDeleteCharge(c._id)}
+                                              className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
+                                              title="Remove charge"
+                                            >
+                                              <Trash2 className="h-3.5 w-3.5" />
+                                            </button>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
@@ -659,7 +735,7 @@ export function AccountantBillingPage() {
                             onChange={(e) => setCustomCategory(e.target.value)}
                             required
                           >
-                            {CATEGORIES.map((c) => (
+                            {CATEGORIES.map((c: string) => (
                               <option key={c} value={c}>{c}</option>
                             ))}
                           </SelectField>
@@ -975,7 +1051,7 @@ export function AccountantBillingPage() {
                         {new Date(inv.issuedAt).toLocaleDateString()}
                       </td>
                       <td className="px-4 py-3 font-medium text-slate-800">
-                        ₹{inv.totals.total.toFixed(2)}
+                        ₹{(inv.totals?.total ?? 0).toFixed(2)}
                       </td>
                       <td className="px-4 py-3">
                         <Badge tone={STATUS_TONE[inv.status as keyof typeof STATUS_TONE] || "info"} className="w-36">{inv.status.replace("_", " ")}</Badge>
@@ -1262,10 +1338,10 @@ export function AccountantBillingPage() {
                     Mode: {selectedInvoice.paymentMode || "Cash"}
                   </p>
                   <p className="text-slate-700">
-                    Coverage: {selectedInvoice.insuranceCoveragePercent ? `${selectedInvoice.insuranceCoveragePercent.toFixed(1)}%` : "0%"} Covered
+                    Coverage: {selectedInvoice.insuranceCoveragePercent ? `${(selectedInvoice.insuranceCoveragePercent ?? 0).toFixed(1)}%` : "0%"} Covered
                   </p>
                   <p className="text-slate-700">
-                    Advance Settled: {selectedInvoice.advancePaid ? `₹${selectedInvoice.advancePaid.toFixed(2)}` : "None"}
+                    Advance Settled: {selectedInvoice.advancePaid ? `₹${(selectedInvoice.advancePaid ?? 0).toFixed(2)}` : "None"}
                   </p>
                 </div>
               </div>
@@ -1287,8 +1363,8 @@ export function AccountantBillingPage() {
                       <td className="py-2 px-1">{item.description}</td>
                       <td className="py-2 px-1 text-center uppercase text-[10px] text-slate-400">{item.category}</td>
                       <td className="py-2 px-1 text-center">{item.quantity}</td>
-                      <td className="py-2 px-1 text-right">₹{item.amount.toFixed(2)}</td>
-                      <td className="py-2 px-1 text-right font-medium">₹{(item.quantity * item.amount).toFixed(2)}</td>
+                      <td className="py-2 px-1 text-right">₹{(item.amount ?? 0).toFixed(2)}</td>
+                      <td className="py-2 px-1 text-right font-medium">₹{((item.quantity ?? 0) * (item.amount ?? 0)).toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1298,31 +1374,31 @@ export function AccountantBillingPage() {
               <div className="border-t pt-4 flex flex-col items-end text-xs space-y-1.5">
                 <div className="flex w-64 justify-between">
                   <span className="text-slate-500">Subtotal (Gross):</span>
-                  <span className="font-semibold text-slate-800">₹{selectedInvoice.totals.subtotal.toFixed(2)}</span>
+                  <span className="font-semibold text-slate-800">₹{(selectedInvoice.totals?.subtotal ?? 0).toFixed(2)}</span>
                 </div>
                 <div className="flex w-64 justify-between">
                   <span className="text-slate-500">GST Tax ({selectedInvoice.taxRate || 0}%):</span>
-                  <span className="font-semibold text-slate-800">₹{selectedInvoice.totals.taxAmount.toFixed(2)}</span>
+                  <span className="font-semibold text-slate-800">₹{(selectedInvoice.totals?.taxAmount ?? 0).toFixed(2)}</span>
                 </div>
                 <div className="flex w-64 justify-between text-red-650 font-medium">
                   <span>Discounts Applied:</span>
-                  <span>-₹{selectedInvoice.totals.discount.toFixed(2)}</span>
+                  <span>-₹{(selectedInvoice.totals?.discount ?? 0).toFixed(2)}</span>
                 </div>
-                {selectedInvoice.totals.insuranceCovered > 0 && (
+                {selectedInvoice.totals?.insuranceCovered > 0 && (
                   <div className="flex w-64 justify-between text-emerald-600 font-medium">
                     <span>Insurance Split Covered:</span>
-                    <span>-₹{selectedInvoice.totals.insuranceCovered.toFixed(2)}</span>
+                    <span>-₹{(selectedInvoice.totals?.insuranceCovered ?? 0).toFixed(2)}</span>
                   </div>
                 )}
                 {selectedInvoice.advancePaid > 0 && (
                   <div className="flex w-64 justify-between text-blue-700 font-medium">
                     <span>Advance Payment Applied:</span>
-                    <span>-₹{selectedInvoice.advancePaid.toFixed(2)}</span>
+                    <span>-₹{(selectedInvoice.advancePaid ?? 0).toFixed(2)}</span>
                   </div>
                 )}
                 <div className="flex w-64 justify-between text-sm font-bold border-t border-slate-200 pt-1.5">
                   <span className="text-slate-800">Grand Total Net Payable:</span>
-                  <span className="text-navy-700">₹{selectedInvoice.totals.patientBalance.toFixed(2)}</span>
+                  <span className="text-navy-700">₹{(selectedInvoice.totals?.patientBalance ?? 0).toFixed(2)}</span>
                 </div>
               </div>
 
