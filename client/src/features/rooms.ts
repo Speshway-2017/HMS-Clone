@@ -10,6 +10,7 @@ export interface RoomInfo {
   wardName: string;
   floor: number;
   roomType: "General" | "Semi-Private" | "Private" | "ICU" | "NICU" | "Emergency";
+  acType: "AC" | "Non AC";
   capacity: number;
   description: string;
   status: "Active" | "Inactive";
@@ -43,6 +44,7 @@ export interface CreateRoomPayload {
   wardId: string;
   floor: number;
   roomType: string;
+  acType: string;
   capacity: number;
   description?: string;
   status?: string;

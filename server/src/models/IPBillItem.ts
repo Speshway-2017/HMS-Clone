@@ -7,9 +7,7 @@ const ipBillItemSchema = new Schema(
     category: {
       type: String,
       enum: [
-        "Room Charges",
-        "Ward Charges",
-        "Bed Charges",
+        "Accommodation Charges",
         "Doctor Visit Charges",
         "Nursing Charges",
         "Procedure Charges",
@@ -34,7 +32,10 @@ const ipBillItemSchema = new Schema(
     tax: { type: Number, default: 0, min: 0 },
     total: { type: Number, required: true },
     isSystemGenerated: { type: Boolean, default: false },
-    externalId: { type: String, default: null } // used to prevent duplicate auto-charges
+    externalId: { type: String, default: null }, // used to prevent duplicate auto-charges
+    generatedBy: { type: String, default: "System" },
+    department: { type: String, default: "Billing" },
+    postedAt: { type: Date, default: Date.now }
   },
   { timestamps: true }
 );

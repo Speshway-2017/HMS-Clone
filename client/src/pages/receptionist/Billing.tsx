@@ -18,7 +18,9 @@ import {
   RefreshCw, 
   X,
   User,
-  AlertTriangle
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 import {
   usePayBilling,
@@ -51,9 +53,7 @@ interface Props {
 }
 
 const SECTIONS = [
-  "Room Charges",
-  "Ward Charges",
-  "Bed Charges",
+  "Accommodation Charges",
   "Doctor Visit Charges",
   "Nursing Charges",
   "Procedure Charges",
@@ -65,7 +65,6 @@ const SECTIONS = [
   "Medical Equipment",
   "Oxygen Charges",
   "Blood Charges",
-  "ICU Charges",
   "Miscellaneous Charges"
 ];
 
@@ -78,6 +77,43 @@ const calculateStayDays = (admissionDate: any, dischargeDate?: any): number => {
   const diffTime = Math.abs(end.getTime() - start.getTime());
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   return diffDays || 1;
+};
+
+interface AccordionGroup {
+  id: string;
+  name: string;
+  categories: string[];
+  subtotal: number;
+  itemCount: number;
+  items: any[];
+}
+
+const groupIPItems = (items: any[]) => {
+  const groups: AccordionGroup[] = [
+    { id: "accommodation", name: "Accommodation Charges", categories: ["Accommodation Charges"], subtotal: 0, itemCount: 0, items: [] },
+    { id: "doctor", name: "Doctor Charges", categories: ["Doctor Visit Charges", "Doctor Charges"], subtotal: 0, itemCount: 0, items: [] },
+    { id: "clinical", name: "Clinical Services", categories: ["Laboratory Charges", "Radiology Charges", "Procedure Charges", "Operation Charges", "Operation Theatre Charges"], subtotal: 0, itemCount: 0, items: [] },
+    { id: "pharmacy", name: "Pharmacy", categories: ["Pharmacy Charges"], subtotal: 0, itemCount: 0, items: [] },
+    { id: "nursing", name: "Nursing & Support", categories: ["Nursing Charges", "Consumables", "Medical Equipment", "Equipment Charges", "Oxygen Charges", "Blood Charges", "ICU Charges", "Diet Charges"], subtotal: 0, itemCount: 0, items: [] },
+    { id: "other", name: "Other Charges", categories: ["Admission Charges", "Miscellaneous Charges", "Miscellaneous"], subtotal: 0, itemCount: 0, items: [] },
+    { id: "discount", name: "Discount & Insurance", categories: ["Discounts", "Insurance / TPA", "Advance Payments"], subtotal: 0, itemCount: 0, items: [] }
+  ];
+
+  items.forEach(item => {
+    const group = groups.find(g => g.categories.includes(item.category));
+    if (group) {
+      group.items.push(item);
+      group.subtotal += item.total || 0;
+      group.itemCount += 1;
+    } else {
+      const other = groups.find(g => g.id === "other")!;
+      other.items.push(item);
+      other.subtotal += item.total || 0;
+      other.itemCount += 1;
+    }
+  });
+
+  return groups.filter(g => g.items.length > 0);
 };
 
 export function BillingPage({ activeTab = "consultation" }: Props) {
@@ -132,6 +168,18 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
   const [admissionSearch, setAdmissionSearch] = useState("");
   const [selectedAdmissionId, setSelectedAdmissionId] = useState<string | null>(null);
   
+  // Accordion UI state
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [addManualGroup, setAddManualGroup] = useState<string | null>(null);
+  const [manualCategory, setManualCategory] = useState("");
+
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupId]: !prev[groupId]
+    }));
+  };
+
   // Custom Inline Add state per category
   const [addItemCategory, setAddItemCategory] = useState<string | null>(null);
   const [itemDesc, setItemDesc] = useState("");
@@ -203,13 +251,26 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
     };
 
     socket.on("ip_bill_update", handleUpdateEvent);
+    socket.on("ip_billing_update", handleUpdateEvent);
     socket.on("dashboard_update", handleUpdateEvent);
 
     return () => {
       socket.off("ip_bill_update", handleUpdateEvent);
+      socket.off("ip_billing_update", handleUpdateEvent);
       socket.off("dashboard_update", handleUpdateEvent);
     };
   }, [selectedAdmissionId, refetchBillDetails, refetchAdmissions]);
+
+  useEffect(() => {
+    if (ipBillData?.items) {
+      const activeGroups = groupIPItems(ipBillData.items);
+      const initial: Record<string, boolean> = {};
+      activeGroups.forEach(g => {
+        initial[g.id] = true;
+      });
+      setExpandedGroups(initial);
+    }
+  }, [ipBillData?.items]);
 
   // OPD Redirect check
   useEffect(() => {
@@ -952,232 +1013,272 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                         <FileText className="h-5 w-5 text-navy-700" /> Billing Category Sections
                       </h3>
 
-                      {SECTIONS.map((section) => {
-                        const sectionItems = ipBillData?.items?.filter((x: any) => x.category === section) || [];
-                        const catSubtotal = sectionItems.reduce((sum: number, x: any) => sum + x.total, 0);
+                      {groupIPItems(ipBillData?.items || []).map((group) => {
+                        const isExpanded = !!expandedGroups[group.id];
+                        const isAdding = addManualGroup === group.id;
 
                         return (
-                          <Card key={section} className="space-y-3 border-l-4 border-l-navy-600 bg-white">
-                            <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-                              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                                {section}
-                              </h4>
+                          <div key={group.id} className="border border-slate-200 rounded-lg overflow-hidden shadow-sm bg-white">
+                            {/* Accordion Header */}
+                            <div 
+                              onClick={() => toggleGroup(group.id)}
+                              className="flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 cursor-pointer select-none border-b border-slate-200/50 transition"
+                            >
                               <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-navy-700 bg-navy-50 px-2.5 py-0.5 rounded border border-navy-150">
-                                  Subtotal: {formatINR(catSubtotal)}
+                                {isExpanded ? <ChevronDown className="h-4 w-4 text-slate-500" /> : <ChevronRight className="h-4 w-4 text-slate-500" />}
+                                <h4 className="text-sm font-bold text-slate-700">{group.name}</h4>
+                                <span className="bg-navy-50 text-navy-700 text-[10px] font-bold px-2 py-0.5 rounded border border-navy-150 ml-2">
+                                  {group.itemCount} {group.itemCount === 1 ? "Item" : "Items"}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-sm font-black text-slate-800">
+                                  {formatINR(group.subtotal)}
                                 </span>
                                 {ipBillData.bill.status === "Draft" && (
                                   <button
-                                    onClick={() => setAddItemCategory(addItemCategory === section ? null : section)}
-                                    className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (addManualGroup === group.id) {
+                                        setAddManualGroup(null);
+                                      } else {
+                                        setAddManualGroup(group.id);
+                                        setManualCategory(group.categories[0]);
+                                      }
+                                    }}
+                                    className="p-1 rounded bg-navy-600 hover:bg-navy-700 text-white transition flex items-center justify-center"
                                     title="Add manual item"
                                   >
-                                    <Plus className="h-4 w-4" />
+                                    <Plus className="h-3.5 w-3.5" />
                                   </button>
                                 )}
                               </div>
                             </div>
 
-                            {/* Add Inline manual charge input fields */}
-                            {addItemCategory === section && (
-                              <div className="p-3 bg-slate-50 border rounded-lg space-y-3">
-                                <h5 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Add Item details</h5>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                  <input
-                                    type="text"
-                                    placeholder="Service / Item Description"
-                                    value={itemDesc}
-                                    onChange={(e) => setItemDesc(e.target.value)}
-                                    className="rounded border border-slate-200 p-1.5 text-xs outline-none bg-white focus:border-navy-500"
-                                  />
-                                  <div className="grid grid-cols-5 gap-2">
-                                    <input
-                                      type="number"
-                                      placeholder="Qty"
-                                      value={itemQty || ""}
-                                      onChange={(e) => setItemQty(Number(e.target.value))}
-                                      className="rounded border border-slate-200 p-1.5 text-xs outline-none text-center bg-white"
-                                      title="Quantity"
-                                      min="1"
-                                    />
-                                    <input
-                                      type="number"
-                                      placeholder="Days"
-                                      value={itemDays || ""}
-                                      onChange={(e) => setItemDays(Number(e.target.value))}
-                                      className="rounded border border-slate-200 p-1.5 text-xs outline-none text-center bg-white"
-                                      title="Days"
-                                      min="1"
-                                    />
-                                    <input
-                                      type="number"
-                                      placeholder="Price"
-                                      value={itemPrice || ""}
-                                      onChange={(e) => setItemPrice(Number(e.target.value))}
-                                      className="rounded border border-slate-200 p-1.5 text-xs outline-none text-right bg-white col-span-2"
-                                      title="Price"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => handleAddBillItem(section)}
-                                      className="bg-navy-700 hover:bg-navy-800 text-white rounded text-xs font-bold"
-                                      title="Submit item"
-                                    >
-                                      ✓
-                                    </button>
+                            {/* Accordion Body */}
+                            {isExpanded && (
+                              <div className="p-4 space-y-4 bg-white">
+                                {/* Add manual item form */}
+                                {isAdding && (
+                                  <div className="p-4 bg-slate-50 border rounded-lg space-y-3">
+                                    <h5 className="text-[10px] font-bold uppercase tracking-wider text-slate-450">Add Custom Charge details</h5>
+                                    
+                                    <div className="grid grid-cols-1 gap-3">
+                                      {group.categories.length > 1 && (
+                                        <div className="text-xs">
+                                          <label className="block text-slate-500 font-semibold mb-1">Select Specific Category *</label>
+                                          <select
+                                            value={manualCategory}
+                                            onChange={(e) => setManualCategory(e.target.value)}
+                                            className="w-full rounded border border-slate-250 p-1.5 outline-none bg-white text-xs"
+                                          >
+                                            {group.categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                          </select>
+                                        </div>
+                                      )}
+
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <input
+                                          type="text"
+                                          placeholder="Service / Item Description"
+                                          value={itemDesc}
+                                          onChange={(e) => setItemDesc(e.target.value)}
+                                          className="rounded border border-slate-200 p-1.5 text-xs outline-none bg-white focus:border-navy-500"
+                                        />
+                                        <div className="grid grid-cols-5 gap-2">
+                                          <input
+                                            type="number"
+                                            placeholder="Qty"
+                                            value={itemQty || ""}
+                                            onChange={(e) => setItemQty(Number(e.target.value))}
+                                            className="rounded border border-slate-200 p-1.5 text-xs outline-none text-center bg-white"
+                                            title="Quantity"
+                                            min="1"
+                                          />
+                                          <input
+                                            type="number"
+                                            placeholder="Days"
+                                            value={itemDays || ""}
+                                            onChange={(e) => setItemDays(Number(e.target.value))}
+                                            className="rounded border border-slate-200 p-1.5 text-xs outline-none text-center bg-white"
+                                            title="Days"
+                                            min="1"
+                                          />
+                                          <input
+                                            type="number"
+                                            placeholder="Price"
+                                            value={itemPrice || ""}
+                                            onChange={(e) => setItemPrice(Number(e.target.value))}
+                                            className="rounded border border-slate-200 p-1.5 text-xs outline-none text-right bg-white col-span-2"
+                                            title="Price"
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              handleAddBillItem(manualCategory);
+                                              setAddManualGroup(null);
+                                            }}
+                                            className="bg-navy-700 hover:bg-navy-800 text-white rounded text-xs font-bold"
+                                            title="Submit item"
+                                          >
+                                            ✓
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
                                   </div>
+                                )}
+
+                                {/* Items list table */}
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-left text-xs whitespace-nowrap">
+                                    <thead>
+                                      <tr className="text-[10px] font-bold text-slate-400 uppercase border-b border-slate-100">
+                                        <th className="py-2">Category</th>
+                                        <th className="py-2">Description / Item</th>
+                                        <th className="py-2 text-center">Qty</th>
+                                        <th className="py-2 text-center">Days</th>
+                                        <th className="py-2 text-right">Price</th>
+                                        <th className="py-2 text-right">Discount</th>
+                                        <th className="py-2 text-right">Tax</th>
+                                        <th className="py-2 text-right">Total</th>
+                                        <th className="py-2 text-right">Action</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 text-slate-650">
+                                      {group.items.map((item: any) => {
+                                        const isEditing = editingItemId === item._id;
+
+                                        return (
+                                          <tr key={item._id} className="hover:bg-slate-50/50">
+                                            <td className="py-2 text-[10px] font-bold text-slate-400 uppercase">
+                                              {item.category}
+                                            </td>
+                                            <td className="py-2 font-medium text-slate-850">
+                                              {item.description}
+                                            </td>
+                                            <td className="py-2 text-center">
+                                              {isEditing ? (
+                                                <input
+                                                  type="number"
+                                                  value={editQty}
+                                                  onChange={(e) => setEditQty(Number(e.target.value))}
+                                                  className="w-10 rounded border border-slate-200 text-center p-0.5"
+                                                />
+                                              ) : (
+                                                item.quantity
+                                              )}
+                                            </td>
+                                            <td className="py-2 text-center">
+                                              {isEditing ? (
+                                                <input
+                                                  type="number"
+                                                  value={editDays}
+                                                  onChange={(e) => setEditDays(Number(e.target.value))}
+                                                  className="w-10 rounded border border-slate-200 text-center p-0.5"
+                                                />
+                                              ) : (
+                                                item.days
+                                              )}
+                                            </td>
+                                            <td className="py-2 text-right font-mono">
+                                              {isEditing ? (
+                                                <input
+                                                  type="number"
+                                                  value={editPrice}
+                                                  onChange={(e) => setEditPrice(Number(e.target.value))}
+                                                  className="w-14 rounded border border-slate-200 text-right p-0.5"
+                                                />
+                                              ) : (
+                                                formatINR(item.unitPrice)
+                                              )}
+                                            </td>
+                                            <td className="py-2 text-right text-red-500 font-semibold font-mono">
+                                              {isEditing ? (
+                                                <input
+                                                  type="number"
+                                                  value={editDiscount}
+                                                  onChange={(e) => setEditDiscount(Number(e.target.value))}
+                                                  className="w-12 rounded border border-slate-200 text-right p-0.5"
+                                                />
+                                              ) : (
+                                                `-${formatINR(item.discount || 0)}`
+                                              )}
+                                            </td>
+                                            <td className="py-2 text-right text-slate-500 font-medium font-mono">
+                                              {isEditing ? (
+                                                <input
+                                                  type="number"
+                                                  value={editTax}
+                                                  onChange={(e) => setEditTax(Number(e.target.value))}
+                                                  className="w-12 rounded border border-slate-200 text-right p-0.5"
+                                                />
+                                              ) : (
+                                                `+${formatINR(item.tax || 0)}`
+                                              )}
+                                            </td>
+                                            <td className="py-2 text-right font-bold text-slate-800 font-mono">
+                                              {isEditing 
+                                                ? formatINR((editQty * editDays * editPrice) - editDiscount + editTax)
+                                                : formatINR(item.total)
+                                              }
+                                            </td>
+                                            <td className="py-2 text-right">
+                                              {item.isSystemGenerated ? (
+                                                <span className="inline-flex rounded bg-emerald-50 border border-emerald-200 text-[9px] px-1.5 py-0.5 font-bold uppercase tracking-wider text-emerald-700 shadow-sm">
+                                                  Auto
+                                                </span>
+                                              ) : ipBillData.bill.status === "Draft" ? (
+                                                <div className="flex justify-end gap-1.5">
+                                                  {isEditing ? (
+                                                    <>
+                                                      <button
+                                                        onClick={() => handleUpdateBillItem(item._id)}
+                                                        className="p-1 rounded bg-navy-50 hover:bg-navy-100 text-navy-700"
+                                                        title="Save changes"
+                                                      >
+                                                        <Save className="h-3.5 w-3.5" />
+                                                      </button>
+                                                      <button
+                                                        onClick={() => setEditingItemId(null)}
+                                                        className="p-1 rounded bg-slate-50 hover:bg-slate-100 text-slate-500"
+                                                        title="Cancel edit"
+                                                      >
+                                                        <X className="h-3.5 w-3.5" />
+                                                      </button>
+                                                    </>
+                                                  ) : (
+                                                    <>
+                                                      <button
+                                                        onClick={() => handleStartEditItem(item)}
+                                                        className="p-1 rounded bg-slate-50 hover:bg-slate-100 text-slate-650"
+                                                        title="Edit details"
+                                                      >
+                                                        <Edit className="h-3.5 w-3.5" />
+                                                      </button>
+                                                      <button
+                                                        onClick={() => handleDeleteBillItem(item._id)}
+                                                        className="p-1 rounded bg-red-50 hover:bg-red-100 text-red-500"
+                                                        title="Delete item"
+                                                      >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                      </button>
+                                                    </>
+                                                  )}
+                                                </div>
+                                              ) : (
+                                                <span className="text-[10px] text-slate-400 italic font-semibold">Locked</span>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
                                 </div>
                               </div>
                             )}
-
-                            {/* Section Items Listing */}
-                            {sectionItems.length > 0 ? (
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-left text-xs whitespace-nowrap">
-                                  <thead>
-                                    <tr className="text-[10px] font-bold text-slate-400 uppercase border-b border-slate-50">
-                                      <th className="py-1">Description / Item</th>
-                                      <th className="py-1 text-center">Qty</th>
-                                      <th className="py-1 text-center">Days</th>
-                                      <th className="py-1 text-right">Price</th>
-                                      <th className="py-1 text-right">Discount</th>
-                                      <th className="py-1 text-right">Tax</th>
-                                      <th className="py-1 text-right">Total</th>
-                                      <th className="py-1 text-right">Action</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-slate-50 text-slate-650">
-                                    {sectionItems.map((item: any) => {
-                                      const isEditing = editingItemId === item._id;
-
-                                      return (
-                                        <tr key={item._id} className="hover:bg-slate-50/50">
-                                          <td className="py-2 font-medium text-slate-800">
-                                            {item.description}
-                                          </td>
-                                          <td className="py-2 text-center">
-                                            {isEditing ? (
-                                              <input
-                                                type="number"
-                                                value={editQty}
-                                                onChange={(e) => setEditQty(Number(e.target.value))}
-                                                className="w-10 rounded border border-slate-200 text-center p-0.5"
-                                              />
-                                            ) : (
-                                              item.quantity
-                                            )}
-                                          </td>
-                                          <td className="py-2 text-center">
-                                            {isEditing ? (
-                                              <input
-                                                type="number"
-                                                value={editDays}
-                                                onChange={(e) => setEditDays(Number(e.target.value))}
-                                                className="w-10 rounded border border-slate-200 text-center p-0.5"
-                                              />
-                                            ) : (
-                                              item.days
-                                            )}
-                                          </td>
-                                          <td className="py-2 text-right">
-                                            {isEditing ? (
-                                              <input
-                                                type="number"
-                                                value={editPrice}
-                                                onChange={(e) => setEditPrice(Number(e.target.value))}
-                                                className="w-14 rounded border border-slate-200 text-right p-0.5"
-                                              />
-                                            ) : (
-                                              formatINR(item.unitPrice)
-                                            )}
-                                          </td>
-                                          <td className="py-2 text-right text-red-500 font-semibold">
-                                            {isEditing ? (
-                                              <input
-                                                type="number"
-                                                value={editDiscount}
-                                                onChange={(e) => setEditDiscount(Number(e.target.value))}
-                                                className="w-12 rounded border border-slate-200 text-right p-0.5"
-                                              />
-                                            ) : (
-                                              `-${formatINR(item.discount || 0)}`
-                                            )}
-                                          </td>
-                                          <td className="py-2 text-right text-slate-500 font-medium">
-                                            {isEditing ? (
-                                              <input
-                                                type="number"
-                                                value={editTax}
-                                                onChange={(e) => setEditTax(Number(e.target.value))}
-                                                className="w-12 rounded border border-slate-200 text-right p-0.5"
-                                              />
-                                            ) : (
-                                              `+${formatINR(item.tax || 0)}`
-                                            )}
-                                          </td>
-                                          <td className="py-2 text-right font-bold text-slate-800">
-                                            {isEditing 
-                                              ? formatINR((editQty * editDays * editPrice) - editDiscount + editTax)
-                                              : formatINR(item.total)
-                                            }
-                                          </td>
-                                          <td className="py-2 text-right">
-                                            {item.isSystemGenerated ? (
-                                              <span className="inline-flex rounded bg-emerald-50 border border-emerald-200 text-[9px] px-1.5 py-0.5 font-bold uppercase tracking-wider text-emerald-700 shadow-sm">
-                                                Auto
-                                              </span>
-                                            ) : ipBillData.bill.status === "Draft" ? (
-                                              <div className="flex justify-end gap-1.5">
-                                                {isEditing ? (
-                                                  <>
-                                                    <button
-                                                      onClick={() => handleUpdateBillItem(item._id)}
-                                                      className="p-1 rounded bg-navy-50 hover:bg-navy-100 text-navy-700"
-                                                      title="Save changes"
-                                                    >
-                                                      <Save className="h-3.5 w-3.5" />
-                                                    </button>
-                                                    <button
-                                                      onClick={() => setEditingItemId(null)}
-                                                      className="p-1 rounded bg-slate-50 hover:bg-slate-100 text-slate-500"
-                                                      title="Cancel edit"
-                                                    >
-                                                      <X className="h-3.5 w-3.5" />
-                                                    </button>
-                                                  </>
-                                                ) : (
-                                                  <>
-                                                    <button
-                                                      onClick={() => handleStartEditItem(item)}
-                                                      className="p-1 rounded bg-slate-50 hover:bg-slate-100 text-slate-650"
-                                                      title="Edit details"
-                                                    >
-                                                      <Edit className="h-3.5 w-3.5" />
-                                                    </button>
-                                                    <button
-                                                      onClick={() => handleDeleteBillItem(item._id)}
-                                                      className="p-1 rounded bg-red-50 hover:bg-red-100 text-red-500"
-                                                      title="Delete item"
-                                                    >
-                                                      <Trash2 className="h-3.5 w-3.5" />
-                                                    </button>
-                                                  </>
-                                                )}
-                                              </div>
-                                            ) : (
-                                              <span className="text-[10px] text-slate-400 italic font-semibold">Locked</span>
-                                            )}
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : (
-                              <div className="text-[10px] text-slate-400 italic py-2">No charge items posted.</div>
-                            )}
-                          </Card>
+                          </div>
                         );
                       })}
                     </div>

@@ -9,7 +9,7 @@ const ipChargeSchema = new Schema(
       type: String,
       enum: [
         "Admission Charges",
-        "Room Charges",
+        "Accommodation Charges",
         "Doctor Charges",
         "Nursing Charges",
         "Laboratory Charges",
@@ -32,6 +32,8 @@ const ipChargeSchema = new Schema(
     total: { type: Number, required: true },
     isSystemGenerated: { type: Boolean, default: false },
     externalId: { type: String, default: null },
+    generatedBy: { type: String, default: "System" },
+    department: { type: String, default: "Billing" },
     postedAt: { type: Date, default: Date.now }
   },
   { timestamps: true }

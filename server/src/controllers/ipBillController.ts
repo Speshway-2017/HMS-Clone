@@ -75,80 +75,207 @@ const getIPBillItemsSummary = async (bill: any, admission: any, hospitalId: any)
 
   // 1. Fetch manually posted bill items
   const manualItems = await IPBillItem.find({ bill: bill._id, hospital: hospitalId }).lean();
-  const allItems: any[] = [...manualItems];
+  const allItems: any[] = [];
 
-  // Helper to push items avoiding double entries via externalId
+  // Define date limits safely to handle midnight/timezone mismatches
+  const stayStart = new Date(admission.admissionDate);
+  stayStart.setHours(0, 0, 0, 0);
+  stayStart.setDate(stayStart.getDate() - 1);
+
+  const stayEnd = admission.dischargeDate ? new Date(admission.dischargeDate) : new Date();
+  stayEnd.setHours(23, 59, 59, 999);
+
+  // Helper to push items ensuring uniqueness
   const pushUniqueItem = (item: any) => {
     if (!allItems.some(x => x.externalId === item.externalId)) {
-      allItems.push(item);
+      allItems.push({
+        ...item,
+        generatedBy: item.generatedBy || "System",
+        department: item.department || "Billing",
+        postedAt: item.postedAt || new Date()
+      });
     }
   };
 
-  // 2. Room stay charges
-  const days = calculateStayDays(admission.admissionDate, admission.dischargeDate);
-  const roomRate = getDailyWardRate(admission.ward);
-  pushUniqueItem({
-    category: "Room Charges",
-    description: `Daily Room Rent - ${admission.ward}`,
-    quantity: 1,
-    days: days,
-    unitPrice: roomRate,
-    discount: 0,
-    tax: 0,
-    total: days * roomRate,
-    isSystemGenerated: true,
-    externalId: `sys-room-stay-${bill._id}`
+  // Add manual items first
+  manualItems.forEach((item: any) => {
+    pushUniqueItem({
+      ...item,
+      externalId: item.externalId || `manual-${item._id}`
+    });
   });
 
-  pushUniqueItem({
-    category: "Bed Charges",
-    description: `Bed Occupancy Charges - Bed ${admission.bed?.bedNumber || "N/A"}`,
-    quantity: 1,
-    days: days,
-    unitPrice: 200,
-    discount: 0,
-    tax: 0,
-    total: days * 200,
-    isSystemGenerated: true,
-    externalId: `sys-bed-charges-${bill._id}`
-  });
+  // 2. Accommodation charges and Nursing daily charges from history
+  if (admission.accommodationHistory && admission.accommodationHistory.length > 0) {
+    admission.accommodationHistory.forEach((historyEntry: any, index: number) => {
+      const entryDays = calculateStayDays(
+        historyEntry.startDate,
+        historyEntry.endDate || new Date()
+      );
+      
+      // Accommodation Rent
+      pushUniqueItem({
+        category: "Accommodation Charges",
+        description: `Accommodation Rent: ${historyEntry.ward} (${historyEntry.roomType || "Non AC"}) - Room ${historyEntry.room?.roomNumber || "N/A"}, Bed ${historyEntry.bed?.bedNumber || "N/A"}`,
+        quantity: 1,
+        days: entryDays,
+        unitPrice: historyEntry.dailyTariff,
+        discount: 0,
+        tax: 0,
+        total: entryDays * historyEntry.dailyTariff,
+        isSystemGenerated: true,
+        externalId: `sys-accommodation-${historyEntry._id || index}-${bill._id}`,
+        generatedBy: "System",
+        department: "Admission",
+        postedAt: historyEntry.startDate
+      });
 
-  // 3. Nursing Daily charges
-  pushUniqueItem({
-    category: "Nursing Charges",
-    description: "Daily Inpatient Nursing Care & Monitoring",
-    quantity: 1,
-    days: days,
-    unitPrice: 300,
-    discount: 0,
-    tax: 0,
-    total: days * 300,
-    isSystemGenerated: true,
-    externalId: `sys-nursing-${bill._id}`
-  });
+      // Nursing Daily Package for this stay period
+      const nursingRate = historyEntry.nursingTariff !== undefined ? historyEntry.nursingTariff : 300;
+      pushUniqueItem({
+        category: "Nursing Charges",
+        description: `Daily Inpatient Nursing Package - ${historyEntry.ward}`,
+        quantity: 1,
+        days: entryDays,
+        unitPrice: nursingRate,
+        discount: 0,
+        tax: 0,
+        total: entryDays * nursingRate,
+        isSystemGenerated: true,
+        externalId: `sys-nursing-${historyEntry._id || index}-${bill._id}`,
+        generatedBy: "System",
+        department: "Nursing",
+        postedAt: historyEntry.startDate
+      });
+    });
+  } else {
+    // Fallback for legacy admissions
+    const days = calculateStayDays(admission.admissionDate, admission.dischargeDate);
+    const roomRate = getDailyWardRate(admission.ward);
+    
+    pushUniqueItem({
+      category: "Accommodation Charges",
+      description: `Accommodation Rent (Legacy Fallback) - ${admission.ward} - Room ${admission.room?.roomNumber || "N/A"}, Bed ${admission.bed?.bedNumber || "N/A"}`,
+      quantity: 1,
+      days: days,
+      unitPrice: roomRate,
+      discount: 0,
+      tax: 0,
+      total: days * roomRate,
+      isSystemGenerated: true,
+      externalId: `sys-accommodation-fallback-${bill._id}`,
+      generatedBy: "System",
+      department: "Admission",
+      postedAt: admission.admissionDate
+    });
 
-  // 4. Completed Doctor Consultations during admission
+    pushUniqueItem({
+      category: "Nursing Charges",
+      description: "Daily Inpatient Nursing Care & Monitoring (Legacy Fallback)",
+      quantity: 1,
+      days: days,
+      unitPrice: 300,
+      discount: 0,
+      tax: 0,
+      total: days * 300,
+      isSystemGenerated: true,
+      externalId: `sys-nursing-fallback-${bill._id}`,
+      generatedBy: "System",
+      department: "Nursing",
+      postedAt: admission.admissionDate
+    });
+  }
+
+  // 4. Completed Doctor Consultations / Visits during stay
   const appointments = await Appointment.find({
     patient: patientId,
     hospital: hospitalId,
     status: "completed",
-    date: { $gte: admission.admissionDate }
-  }).populate("doctor", "name").lean();
+    date: { $gte: stayStart, $lte: stayEnd }
+  }).populate("doctor", "name specialization consultationFee").lean();
+
+  const seenDoctorVisits = new Set<string>();
+  const seenProcedures = new Set<string>();
 
   appointments.forEach((appt: any) => {
     const docName = appt.doctor?.name || "Consultant Doctor";
-    pushUniqueItem({
-      category: "Doctor Visit Charges",
-      description: `Inpatient Round Visit - Dr. ${docName}`,
-      quantity: 1,
-      days: 1,
-      unitPrice: 500,
-      discount: 0,
-      tax: 0,
-      total: 500,
-      isSystemGenerated: true,
-      externalId: `sys-appt-${appt._id}`
-    });
+    const apptType = appt.type || "Consultation";
+
+    if (apptType === "Consultation") {
+      const visitDateStr = new Date(appt.date).toDateString();
+      const uniqueKey = `${docName.toLowerCase()}-${visitDateStr}`;
+      if (seenDoctorVisits.has(uniqueKey)) return;
+      seenDoctorVisits.add(uniqueKey);
+
+      const feeStr = appt.doctor?.consultationFee || "₹500";
+      const fee = parseFloat(feeStr.replace(/[^0-9.]/g, "")) || 500;
+      
+      pushUniqueItem({
+        category: "Doctor Visit Charges",
+        description: `Inpatient Round Visit - Dr. ${docName}`,
+        quantity: 1,
+        days: 1,
+        unitPrice: fee,
+        discount: 0,
+        tax: 0,
+        total: fee,
+        isSystemGenerated: true,
+        externalId: `sys-appt-${appt._id}`,
+        generatedBy: `Dr. ${docName}`,
+        department: "Doctor Visits",
+        postedAt: appt.date
+      });
+    } else if (apptType === "Procedure") {
+      const procName = appt.notes || "Treatment Procedure";
+      const procDateStr = new Date(appt.date).toDateString();
+      const uniqueKey = `${procName.toLowerCase()}-${procDateStr}`;
+      if (seenProcedures.has(uniqueKey)) return;
+      seenProcedures.add(uniqueKey);
+
+      pushUniqueItem({
+        category: "Procedure Charges",
+        description: `Inpatient Clinical Procedure: ${procName} - Dr. ${docName}`,
+        quantity: 1,
+        days: 1,
+        unitPrice: 3500,
+        discount: 0,
+        tax: 0,
+        total: 3500,
+        isSystemGenerated: true,
+        externalId: `sys-proc-${appt._id}`,
+        generatedBy: `Dr. ${docName}`,
+        department: "Clinical Procedures",
+        postedAt: appt.date
+      });
+    } else if (apptType === "Surgery") {
+      const surgItems = [
+        { category: "Operation Charges", desc: `Surgeon Fee (Surgery) - Dr. ${docName}`, price: 12000, ext: `sys-surg-fee-${appt._id}`, dept: "Surgery" },
+        { category: "Operation Charges", desc: "Assistant Surgeon Fee", price: 4000, ext: `sys-surg-ast-${appt._id}`, dept: "Surgery" },
+        { category: "Operation Charges", desc: "Anaesthetist Fee", price: 6000, ext: `sys-surg-anes-${appt._id}`, dept: "Surgery" },
+        { category: "Operation Charges", desc: "OT Theater & Maintenance Charges", price: 15000, ext: `sys-surg-ot-${appt._id}`, dept: "Operation Theatre" },
+        { category: "Consumables", desc: "OT Specialized Consumables & Kits", price: 4500, ext: `sys-surg-con-${appt._id}`, dept: "Store" },
+        { category: "Medical Equipment", desc: "OT Monitoring & Life Support Equipment Rent", price: 3000, ext: `sys-surg-eq-${appt._id}`, dept: "Equipment" },
+        { category: "Miscellaneous Charges", desc: "Post-Operative Recovery Ward Monitoring", price: 2500, ext: `sys-surg-rec-${appt._id}`, dept: "Recovery" }
+      ];
+
+      surgItems.forEach(item => {
+        pushUniqueItem({
+          category: item.category,
+          description: item.desc,
+          quantity: 1,
+          days: 1,
+          unitPrice: item.price,
+          discount: 0,
+          tax: 0,
+          total: item.price,
+          isSystemGenerated: true,
+          externalId: item.ext,
+          generatedBy: `Dr. ${docName}`,
+          department: item.dept,
+          postedAt: appt.date
+        });
+      });
+    }
   });
 
   // 5. Completed Laboratory Diagnostics since admission
@@ -156,11 +283,17 @@ const getIPBillItemsSummary = async (bill: any, admission: any, hospitalId: any)
     patient: patientId,
     hospital: hospitalId,
     status: "completed",
-    date: { $gte: admission.admissionDate }
+    date: { $gte: stayStart, $lte: stayEnd }
   }).lean();
 
+  const seenLabTests = new Set<string>();
   labOrders.forEach((order: any) => {
     order.tests.forEach((test: string, idx: number) => {
+      const orderDateStr = new Date(order.date).toDateString();
+      const uniqueKey = `${test.toLowerCase()}-${orderDateStr}`;
+      if (seenLabTests.has(uniqueKey)) return;
+      seenLabTests.add(uniqueKey);
+
       const price = getLabTestRate(test);
       pushUniqueItem({
         category: "Laboratory Charges",
@@ -172,7 +305,10 @@ const getIPBillItemsSummary = async (bill: any, admission: any, hospitalId: any)
         tax: 0,
         total: price,
         isSystemGenerated: true,
-        externalId: `sys-lab-${order._id}-${idx}`
+        externalId: `sys-lab-${order._id}-${idx}`,
+        generatedBy: "Lab Technician",
+        department: "Laboratory",
+        postedAt: order.date
       });
     });
   });
@@ -182,10 +318,16 @@ const getIPBillItemsSummary = async (bill: any, admission: any, hospitalId: any)
     patient: patientId,
     hospital: hospitalId,
     status: "completed",
-    date: { $gte: admission.admissionDate }
+    date: { $gte: stayStart, $lte: stayEnd }
   }).lean();
 
+  const seenRadiology = new Set<string>();
   radiologyOrders.forEach((order: any) => {
+    const orderDateStr = new Date(order.date).toDateString();
+    const uniqueKey = `${order.type.toLowerCase()}-${orderDateStr}`;
+    if (seenRadiology.has(uniqueKey)) return;
+    seenRadiology.add(uniqueKey);
+
     const price = getRadiologyRate(order.type);
     pushUniqueItem({
       category: "Radiology Charges",
@@ -197,7 +339,10 @@ const getIPBillItemsSummary = async (bill: any, admission: any, hospitalId: any)
       tax: 0,
       total: price,
       isSystemGenerated: true,
-      externalId: `sys-rad-${order._id}`
+      externalId: `sys-rad-${order._id}`,
+      generatedBy: "Radiologist",
+      department: "Radiology",
+      postedAt: order.date
     });
   });
 
@@ -206,11 +351,17 @@ const getIPBillItemsSummary = async (bill: any, admission: any, hospitalId: any)
     patient: patientId,
     hospital: hospitalId,
     status: { $in: ["Dispensed", "Completed"] },
-    createdAt: { $gte: admission.admissionDate }
+    createdAt: { $gte: stayStart, $lte: stayEnd }
   }).lean();
+
+  const seenPharmacy = new Set<string>();
 
   for (const pres of prescriptions) {
     for (const med of pres.medications) {
+      const uniqueKey = `${pres._id}-${med.name.toLowerCase()}`;
+      if (seenPharmacy.has(uniqueKey)) continue;
+      seenPharmacy.add(uniqueKey);
+
       let qty = 10;
       const durationNum = parseInt(med.duration);
       if (!isNaN(durationNum)) {
@@ -220,15 +371,83 @@ const getIPBillItemsSummary = async (bill: any, admission: any, hospitalId: any)
       // Lookup unitCost in InventoryItem
       const invItem = await InventoryItem.findOne({
         hospital: hospitalId,
-        name: new RegExp(`^${med.name.trim()}$`, "i"),
-        category: "medicines"
+        name: new RegExp(`^${med.name.trim()}$`, "i")
       }).lean();
 
       const rate = invItem && invItem.unitCost > 0 ? invItem.unitCost : 50;
+      const invCategory = invItem?.category || "medicines";
+
+      let finalCategory = "Pharmacy Charges";
+      let finalDept = "Pharmacy";
+
+      if (invCategory === "consumables") {
+        finalCategory = "Consumables";
+        finalDept = "Store";
+      } else if (invCategory === "equipment") {
+        finalCategory = "Medical Equipment";
+        finalDept = "Equipment Department";
+      }
+
+      // Special cases: Oxygen and Blood
+      const medLowerName = med.name.toLowerCase();
+      if (medLowerName.includes("oxygen")) {
+        finalCategory = "Oxygen Charges";
+        finalDept = "Oxygen Plant";
+        const hours = parseInt(med.duration) || 1;
+        qty = hours;
+      } else if (medLowerName.includes("blood")) {
+        // Automatically bill: Blood Unit, Cross Matching, Blood Processing
+        pushUniqueItem({
+          category: "Blood Charges",
+          description: `Blood Unit: ${med.name}`,
+          quantity: qty,
+          days: 1,
+          unitPrice: rate,
+          discount: 0,
+          tax: 0,
+          total: qty * rate,
+          isSystemGenerated: true,
+          externalId: `sys-blood-unit-${pres._id}-${med.name}`,
+          generatedBy: "Pharmacist",
+          department: "Blood Bank",
+          postedAt: pres.createdAt
+        });
+        pushUniqueItem({
+          category: "Blood Charges",
+          description: "Blood Cross Matching",
+          quantity: 1,
+          days: 1,
+          unitPrice: 500,
+          discount: 0,
+          tax: 0,
+          total: 500,
+          isSystemGenerated: true,
+          externalId: `sys-blood-cross-${pres._id}-${med.name}`,
+          generatedBy: "Pharmacist",
+          department: "Blood Bank",
+          postedAt: pres.createdAt
+        });
+        pushUniqueItem({
+          category: "Blood Charges",
+          description: "Blood Processing Fee",
+          quantity: 1,
+          days: 1,
+          unitPrice: 1000,
+          discount: 0,
+          tax: 0,
+          total: 1000,
+          isSystemGenerated: true,
+          externalId: `sys-blood-proc-${pres._id}-${med.name}`,
+          generatedBy: "Pharmacist",
+          department: "Blood Bank",
+          postedAt: pres.createdAt
+        });
+        continue;
+      }
 
       pushUniqueItem({
-        category: "Pharmacy Charges",
-        description: `Medication: ${med.name} (${med.strength || "Standard"})`,
+        category: finalCategory,
+        description: `Medication/Item: ${med.name} (${med.strength || "Standard"})`,
         quantity: qty,
         days: 1,
         unitPrice: rate,
@@ -236,7 +455,10 @@ const getIPBillItemsSummary = async (bill: any, admission: any, hospitalId: any)
         tax: 0,
         total: qty * rate,
         isSystemGenerated: true,
-        externalId: `sys-pharm-${pres._id}-${med.name}`
+        externalId: `sys-pharm-${pres._id}-${med.name}`,
+        generatedBy: "Pharmacist",
+        department: finalDept,
+        postedAt: pres.createdAt
       });
     }
   }
@@ -457,7 +679,9 @@ export const addBillChargeItem = catchAsync(async (req: Request, res: Response) 
     discount: disc,
     tax: tx,
     total,
-    isSystemGenerated: false
+    isSystemGenerated: false,
+    generatedBy: (req as any).user?.name || "Receptionist",
+    department: (req as any).user?.role || "Billing"
   });
 
   // Recalculate bill outstanding
