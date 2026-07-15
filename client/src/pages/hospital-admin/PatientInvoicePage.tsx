@@ -97,27 +97,27 @@ export function PatientInvoicePage() {
             <div className="mt-6 ml-auto max-w-xs space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-slate-500">Subtotal</span>
-                <span className="font-medium text-slate-800">₹{invoice.totals.subtotal.toFixed(2)}</span>
+                <span className="font-medium text-slate-800">₹{(invoice.totals?.subtotal ?? 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Tax ({invoice.taxRate}%)</span>
-                <span className="font-medium text-slate-800">₹{invoice.totals.taxAmount.toFixed(2)}</span>
+                <span className="font-medium text-slate-800">₹{(invoice.totals?.taxAmount ?? 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Service Fees</span>
-                <span className="font-medium text-slate-800">₹{invoice.serviceFee.toFixed(2)}</span>
+                <span className="font-medium text-slate-800">₹{(invoice.serviceFee ?? 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold text-slate-900">
                 <span>Total Amount</span>
-                <span>₹{invoice.totals.total.toFixed(2)}</span>
+                <span>₹{(invoice.totals?.total ?? 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-emerald-600">
                 <span>Insurance Coverage</span>
-                <span>-₹{invoice.totals.insuranceCovered.toFixed(2)}</span>
+                <span>-₹{(invoice.totals?.insuranceCovered ?? 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between font-semibold text-red-600">
                 <span>Patient Balance Due</span>
-                <span>₹{invoice.totals.patientBalance.toFixed(2)}</span>
+                <span>₹{(invoice.totals?.patientBalance ?? 0).toFixed(2)}</span>
               </div>
             </div>
           </Card>

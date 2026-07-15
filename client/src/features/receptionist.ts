@@ -67,6 +67,7 @@ export interface RoomAvailability {
   _id: string;
   roomNumber: string;
   roomType: "General" | "Semi-Private" | "Private" | "ICU";
+  acType?: "AC" | "Non AC";
   wardName: string;
   totalBeds: number;
   occupiedBeds: number;

@@ -22,6 +22,7 @@ import invoiceRoutes from "./routes/invoiceRoutes";
 import ipBillRoutes from "./routes/ipBillRoutes";
 import notificationRoutes from "./routes/notificationRoutes";
 import ipBillingRoutes from "./routes/ipBillingRoutes";
+import roomTariffRoutes from "./routes/roomTariffRoutes";
 import receptionRoutes from "./routes/receptionRoutes";
 import doctorDashboardRoutes from "./routes/doctorDashboardRoutes";
 import wardRoutes from "./routes/wardRoutes";
@@ -71,6 +72,7 @@ app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/reception", receptionRoutes);
 app.use("/api/v1/wards", wardRoutes);
 app.use("/api/v1/rooms", roomRoutes);
+app.use("/api/v1/room-tariffs", roomTariffRoutes);
 app.use("/api/v1/beds", bedRoutes);
 app.use("/api/v1/admission-requests", admissionRequestRoutes);
 

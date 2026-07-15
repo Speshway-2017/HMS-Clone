@@ -58,6 +58,10 @@ const appointmentSchema = new Schema(
     followUpReason: { type: String, default: "" },
 
 
+    // Billing status fields for free revisit consultations
+    billingStatus: { type: String, default: "Pending" },
+    billingReason: { type: String, default: "" },
+
     vitals: {
       temperature: { type: String, default: "" },
       bloodPressure: { type: String, default: "" },

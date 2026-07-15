@@ -47,6 +47,13 @@ export function getIO(): Server {
 export function emitToHospital(hospitalId: string, event: string, data: any) {
   if (io) {
     io.to(hospitalId.toString()).emit(event, data);
+    
+    // Conformed Event Syncing:
+    if (event === "ip_bill_update") {
+      io.to(hospitalId.toString()).emit("ip_billing_update", data);
+    } else if (event === "ip_billing_update") {
+      io.to(hospitalId.toString()).emit("ip_bill_update", data);
+    }
   }
 }
 

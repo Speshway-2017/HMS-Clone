@@ -12,12 +12,20 @@ import {
   Check, 
   AlertTriangle,
   RotateCcw,
-  RefreshCw
+  RefreshCw,
+  DollarSign
 } from "lucide-react";
 
 import { useWards, useCreateWard, useUpdateWard, useDeleteWard, WardInfo } from "../../features/wards";
 import { useRooms, useCreateRoom, useUpdateRoom, useDeleteRoom, RoomInfo } from "../../features/rooms";
 import { useBeds, useCreateBed, useUpdateBed, useDeleteBed, BedInfo } from "../../features/beds";
+import {
+  useRoomTariffs,
+  useCreateRoomTariff,
+  useUpdateRoomTariff,
+  useDeleteRoomTariff,
+  RoomTariffInfo
+} from "../../features/roomTariffs";
 
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -41,7 +49,83 @@ const BED_STATUS_COLORS: Record<string, "success" | "danger" | "warning" | "info
 };
 
 export function BedsPage() {
-  const [activeTab, setActiveTab] = useState<"wards" | "rooms" | "beds">("wards");
+  const [activeTab, setActiveTab] = useState<"wards" | "rooms" | "beds" | "tariffs">("wards");
+
+  // Room Tariff Config states
+  const { data: tariffData, isLoading: isLoadingTariffs } = useRoomTariffs();
+  const createTariffMutation = useCreateRoomTariff();
+  const updateTariffMutation = useUpdateRoomTariff();
+  const deleteTariffMutation = useDeleteRoomTariff();
+  
+  const [isTariffModalOpen, setTariffModalOpen] = useState(false);
+  const [editingTariffId, setEditingTariffId] = useState<string | null>(null);
+  
+  const [tariffForm, setTariffForm] = useState({
+    ward: "",
+    roomType: "Non AC" as "AC" | "Non AC",
+    tariff: 0,
+    nursingTariff: 300,
+    status: "Active" as "Active" | "Inactive",
+    effectiveDate: new Date().toISOString().split("T")[0],
+    description: ""
+  });
+
+  const resetTariffForm = () => {
+    setTariffForm({
+      ward: "",
+      roomType: "Non AC",
+      tariff: 0,
+      nursingTariff: 300,
+      status: "Active",
+      effectiveDate: new Date().toISOString().split("T")[0],
+      description: ""
+    });
+    setEditingTariffId(null);
+  };
+
+  const triggerEditTariff = (t: RoomTariffInfo) => {
+    setTariffForm({
+      ward: t.ward,
+      roomType: t.roomType,
+      tariff: t.tariff,
+      nursingTariff: t.nursingTariff || 300,
+      status: t.status,
+      effectiveDate: t.effectiveDate ? new Date(t.effectiveDate).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+      description: t.description || ""
+    });
+    setEditingTariffId(t._id);
+    setTariffModalOpen(true);
+  };
+
+  const handleTariffSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tariffForm.ward || !tariffForm.roomType || tariffForm.tariff === undefined) {
+      setFormError("Ward, Room Type and Tariff Price are required.");
+      return;
+    }
+    setFormError(null);
+    try {
+      if (editingTariffId) {
+        await updateTariffMutation.mutateAsync({ id: editingTariffId, payload: tariffForm });
+      } else {
+        await createTariffMutation.mutateAsync(tariffForm);
+      }
+      setTariffModalOpen(false);
+      resetTariffForm();
+    } catch (err: any) {
+      setFormError(err.response?.data?.message || "Failed to save Room Tariff.");
+    }
+  };
+
+  const handleDeleteTariff = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this room tariff configuration?")) {
+      try {
+        await deleteTariffMutation.mutateAsync(id);
+      } catch (err: any) {
+        alert(err.response?.data?.message || "Failed to delete room tariff.");
+      }
+    }
+  };
 
   // Pagination states
   const [wardPage, setWardPage] = useState(1);
@@ -131,6 +215,7 @@ export function BedsPage() {
     wardId: "",
     floor: 0,
     roomType: "General",
+    acType: "Non AC",
     capacity: 2,
     description: "",
     status: "Active" as "Active" | "Inactive"
@@ -239,7 +324,7 @@ export function BedsPage() {
   };
 
   const resetRoomForm = () => {
-    setRoomForm({ roomNumber: "", roomName: "", wardId: "", floor: 0, roomType: "General", capacity: 2, description: "", status: "Active" });
+    setRoomForm({ roomNumber: "", roomName: "", wardId: "", floor: 0, roomType: "General", acType: "Non AC", capacity: 2, description: "", status: "Active" });
     setEditingRoomId(null);
     setFormError(null);
   };
@@ -271,6 +356,7 @@ export function BedsPage() {
       wardId: wardId,
       floor: room.floor,
       roomType: room.roomType,
+      acType: room.acType || "Non AC",
       capacity: room.capacity,
       description: room.description,
       status: room.status
@@ -463,6 +549,11 @@ export function BedsPage() {
               <Plus className="h-4 w-4" /> Add Bed
             </Button>
           )}
+          {activeTab === "tariffs" && (
+            <Button variant="primary" onClick={() => { resetTariffForm(); setTariffModalOpen(true); }}>
+              <Plus className="h-4 w-4" /> Add Tariff
+            </Button>
+          )}
         </div>
       </div>
 
@@ -500,6 +591,14 @@ export function BedsPage() {
             }`}
           >
             <BedDouble className="h-4 w-4" /> Beds
+          </button>
+          <button
+            onClick={() => setActiveTab("tariffs")}
+            className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+              activeTab === "tariffs" ? "border-navy-700 text-navy-700" : "border-transparent text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            <DollarSign className="h-4 w-4" /> Room Tariffs
           </button>
         </div>
       </div>
@@ -798,6 +897,15 @@ export function BedsPage() {
           >
             {ROOM_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
           </SelectField>
+          <SelectField 
+            label="AC Type *" 
+            required 
+            value={roomForm.acType || "Non AC"} 
+            onChange={(e) => setRoomForm({ ...roomForm, acType: e.target.value })}
+          >
+            <option value="Non AC">Non AC</option>
+            <option value="AC">AC</option>
+          </SelectField>
           <InputField 
             label="Bed Capacity *" 
             type="number" 
@@ -873,6 +981,79 @@ export function BedsPage() {
           {formError && <p className="text-xs text-red-650 font-semibold">{formError}</p>}
           <Button type="submit" variant="primary" className="w-full justify-center" disabled={createBedMutation.isPending || updateBedMutation.isPending}>
             {createBedMutation.isPending || updateBedMutation.isPending ? "Saving..." : "Save Bed"}
+          </Button>
+        </form>
+      </Modal>
+
+      {/* Room Tariff Add/Edit Modal */}
+      <Modal
+        title={editingTariffId ? "Edit Room Tariff Details" : "Add New Room Tariff"}
+        isOpen={isTariffModalOpen}
+        onClose={() => { setTariffModalOpen(false); resetTariffForm(); }}
+      >
+        <form onSubmit={handleTariffSubmit} className="space-y-4">
+          <SelectField
+            label="Select Ward *"
+            required
+            value={tariffForm.ward}
+            onChange={(e) => setTariffForm({ ...tariffForm, ward: e.target.value })}
+          >
+            <option value="">Select Ward...</option>
+            {allWardsOption?.wards.map(w => (
+              <option key={w._id} value={w.name}>{w.name}</option>
+            ))}
+          </SelectField>
+          <SelectField
+            label="Room Type *"
+            required
+            value={tariffForm.roomType}
+            onChange={(e) => setTariffForm({ ...tariffForm, roomType: e.target.value as any })}
+          >
+            <option value="Non AC">Non AC</option>
+            <option value="AC">AC</option>
+          </SelectField>
+          <InputField
+            label="Daily Tariff Price (₹) *"
+            type="number"
+            required
+            value={tariffForm.tariff}
+            onChange={(e) => setTariffForm({ ...tariffForm, tariff: Number(e.target.value) })}
+            placeholder="e.g. 1500"
+          />
+          <InputField
+            label="Daily Nursing Package Price (₹) *"
+            type="number"
+            required
+            value={tariffForm.nursingTariff}
+            onChange={(e) => setTariffForm({ ...tariffForm, nursingTariff: Number(e.target.value) })}
+            placeholder="e.g. 300"
+          />
+          <InputField
+            label="Effective Date *"
+            type="date"
+            required
+            value={tariffForm.effectiveDate}
+            onChange={(e) => setTariffForm({ ...tariffForm, effectiveDate: e.target.value })}
+          />
+          <TextareaField
+            label="Description"
+            value={tariffForm.description}
+            onChange={(e) => setTariffForm({ ...tariffForm, description: e.target.value })}
+            placeholder="e.g. General ward with sharing bed configuration"
+            rows={2}
+          />
+          <SelectField
+            label="Status"
+            value={tariffForm.status}
+            onChange={(e) => setTariffForm({ ...tariffForm, status: e.target.value as any })}
+          >
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </SelectField>
+
+          {formError && <p className="text-xs text-red-650 font-semibold">{formError}</p>}
+          <Button type="submit" variant="primary" className="w-full justify-center" disabled={createTariffMutation.isPending || updateTariffMutation.isPending}>
+            {createTariffMutation.isPending || updateTariffMutation.isPending ? "Saving..." : "Save Room Tariff"}
           </Button>
         </form>
       </Modal>

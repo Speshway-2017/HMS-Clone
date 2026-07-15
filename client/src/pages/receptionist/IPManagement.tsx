@@ -21,6 +21,7 @@ import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
 import { Badge } from "../../components/ui/Badge";
 import { formatINR } from "../../lib/currency";
+import { api } from "../../lib/api";
 
 interface Props {
   activeTab?: "new" | "admissions" | "rooms" | "transfer" | "discharges";
@@ -52,6 +53,8 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const [admissionDate, setAdmissionDate] = useState(new Date().toISOString().split("T")[0]);
   const [admissionTime, setAdmissionTime] = useState(new Date().toTimeString().split(" ")[0].substring(0, 5));
   const [ward, setWard] = useState("");
+  const [roomType, setRoomType] = useState("");
+  const [dailyTariff, setDailyTariff] = useState(0);
   const [selectedRoomId, setSelectedRoomId] = useState("");
   const [selectedBedId, setSelectedBedId] = useState("");
   const [attenderName, setAttenderName] = useState("");
@@ -67,6 +70,9 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
 
   // Transfer state
   const [transferAdmissionId, setTransferAdmissionId] = useState("");
+  const [transferWard, setTransferWard] = useState("");
+  const [transferRoomType, setTransferRoomType] = useState("");
+  const [transferDailyTariff, setTransferDailyTariff] = useState(0);
   const [transferRoomId, setTransferRoomId] = useState("");
   const [transferBedId, setTransferBedId] = useState("");
   const [transferNotes, setTransferNotes] = useState("");
@@ -95,6 +101,36 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const transferMutation = useTransferPatient();
   const dischargeMutation = useRequestDischarge();
   const markReadMutation = useMarkNotificationRead();
+
+  useEffect(() => {
+    if (ward && roomType) {
+      api.get("/room-tariffs/lookup", { params: { ward, roomType } })
+        .then((res: any) => {
+          setDailyTariff(res.data.data?.tariff || 0);
+        })
+        .catch((err: any) => {
+          console.error("Failed to load daily tariff:", err);
+          setDailyTariff(0);
+        });
+    } else {
+      setDailyTariff(0);
+    }
+  }, [ward, roomType]);
+
+  useEffect(() => {
+    if (transferWard && transferRoomType) {
+      api.get("/room-tariffs/lookup", { params: { ward: transferWard, roomType: transferRoomType } })
+        .then((res: any) => {
+          setTransferDailyTariff(res.data.data?.tariff || 0);
+        })
+        .catch((err: any) => {
+          console.error("Failed to load transfer tariff:", err);
+          setTransferDailyTariff(0);
+        });
+    } else {
+      setTransferDailyTariff(0);
+    }
+  }, [transferWard, transferRoomType]);
 
   const handleSelectRequest = (req: any) => {
     setSelectedReq(req);
@@ -1008,6 +1044,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                           value={ward}
                           onChange={(e) => {
                             setWard(e.target.value);
+                            setRoomType("");
                             setSelectedRoomId("");
                             setSelectedBedId("");
                           }}
@@ -1016,6 +1053,20 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                           {uniqueWards.map((w: string) => (
                             <option key={w} value={w}>{w}</option>
                           ))}
+                        </SelectField>
+                        <SelectField
+                          label="Select Room Type (AC / Non AC)"
+                          required
+                          value={roomType}
+                          onChange={(e) => {
+                            setRoomType(e.target.value);
+                            setSelectedRoomId("");
+                            setSelectedBedId("");
+                          }}
+                        >
+                          <option value="">Select Room Type</option>
+                          <option value="Non AC">Non AC</option>
+                          <option value="AC">AC</option>
                         </SelectField>
                         <SelectField
                           label="Select Room"
@@ -1028,9 +1079,9 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                         >
                           <option value="">Select Room</option>
                           {rooms
-                            ?.filter(r => !ward || r.wardName === ward)
+                            ?.filter(r => (!ward || r.wardName === ward) && (!roomType || r.acType === roomType))
                             .map(r => (
-                              <option key={r._id} value={r._id}>Room {r.roomNumber} ({r.roomType})</option>
+                              <option key={r._id} value={r._id}>Room {r.roomNumber} ({r.roomType} - {r.acType})</option>
                             ))}
                         </SelectField>
                         <SelectField
@@ -1047,6 +1098,12 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                               <option key={b._id} value={b._id}>Bed {b.bedNumber}</option>
                             ))}
                         </SelectField>
+                        <InputField
+                          label="Daily Tariff"
+                          disabled
+                          readOnly
+                          value={dailyTariff > 0 ? `₹${dailyTariff}/day` : "₹0/day (Not Configured)"}
+                        />
                       </div>
                     </Card>
 
@@ -1189,6 +1246,38 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <SelectField
+                label="New Ward"
+                required
+                value={transferWard}
+                onChange={(e) => {
+                  setTransferWard(e.target.value);
+                  setTransferRoomType("");
+                  setTransferRoomId("");
+                  setTransferBedId("");
+                }}
+              >
+                <option value="">Select Ward</option>
+                {uniqueWards.map((w: string) => (
+                  <option key={w} value={w}>{w}</option>
+                ))}
+              </SelectField>
+
+              <SelectField
+                label="New Room Type"
+                required
+                value={transferRoomType}
+                onChange={(e) => {
+                  setTransferRoomType(e.target.value);
+                  setTransferRoomId("");
+                  setTransferBedId("");
+                }}
+              >
+                <option value="">Select Room Type</option>
+                <option value="Non AC">Non AC</option>
+                <option value="AC">AC</option>
+              </SelectField>
+
+              <SelectField
                 label="New Room"
                 required
                 value={transferRoomId}
@@ -1198,9 +1287,11 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                 }}
               >
                 <option value="">Select Room</option>
-                {rooms?.map((r) => (
-                  <option key={r._id} value={r._id}>Room {r.roomNumber} ({r.roomType})</option>
-                ))}
+                {rooms
+                  ?.filter(r => (!transferWard || r.wardName === transferWard) && (!transferRoomType || r.acType === transferRoomType))
+                  .map((r) => (
+                    <option key={r._id} value={r._id}>Room {r.roomNumber} ({r.roomType} - {r.acType})</option>
+                  ))}
               </SelectField>
 
               <SelectField
@@ -1217,6 +1308,13 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                     <option key={b._id} value={b._id}>Bed {b.bedNumber}</option>
                   ))}
               </SelectField>
+
+              <InputField
+                label="New Tariff Price"
+                disabled
+                readOnly
+                value={transferDailyTariff > 0 ? `₹${transferDailyTariff}/day` : "₹0/day"}
+              />
             </div>
 
             <TextareaField
