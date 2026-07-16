@@ -495,7 +495,7 @@ export class ReceptionService {
       department: departmentId,
       date: bookingDate,
       time,
-      type: type,
+      type: type || "Consultation",
       status: appointmentStatus,
       notes: notes || "",
     };
@@ -510,33 +510,32 @@ export class ReceptionService {
 
     const newAppointment = await ReceptionRepository.createAppointment(appointmentPayload);
 
-    // Only create invoice if total > 0
-    let newInvoice = null;
-    if (total > 0) {
-      newInvoice = await ReceptionRepository.createInvoice({
-        hospital: hospitalId,
-        patient: patientId,
-        appointment: newAppointment._id,
-        billingType: "OP",
-        items,
-        taxRate: 0,
+    const appointmentStatus = isFree ? (isToday ? "checked_in" : "scheduled") : "pending_payment";
+
+    const appointmentPayload: Record<string, unknown> = {
+      hospital: hospitalId,
+      referenceId,
+      patient: patientId,
+      appointment: newAppointment._id,
+      billingType: "OP",
+      items,
+      taxRate: 0,
+      serviceFee: 0,
+      discount: 0,
+      insuranceCoveragePercent: 0,
+      status: isFree ? "paid" : "pending",
+      issuedAt: new Date(),
+      dueDate: new Date(),
+      totals: {
+        subtotal,
+        taxAmount: gst,
         serviceFee: 0,
-        discount: 0,
-        insuranceCoveragePercent: 0,
-        status: isFree ? "paid" : "pending",
-        issuedAt: new Date(),
-        dueDate: new Date(),
-        totals: {
-          subtotal,
-          taxAmount: gst,
-          serviceFee: 0,
-          discount,
-          insuranceCovered: 0,
-          total,
-          patientBalance: isFree ? 0 : total
-        }
-      });
-    }
+        discount,
+        insuranceCovered: 0,
+        total,
+        patientBalance: isFree ? 0 : total
+      }
+    });
 
     const patientRecord = await Patient.findById(patientId);
     const patientName = patientRecord ? patientRecord.name : "Patient";
