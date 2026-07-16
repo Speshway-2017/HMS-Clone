@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   useConsultationWorkspace,
@@ -12,6 +12,7 @@ import {
   useStartConsultation,
 } from "../../features/doctorDashboard";
 import { useInventory } from "../../features/inventory";
+import { useMyHospital } from "../../features/hospitals";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -65,6 +66,16 @@ export function ConsultationWorkspacePage() {
   const { data: inventoryData } = useInventory({ category: "medicines" });
   const rawMeds = inventoryData?.data || [];
 
+  const { data: hospitalData } = useMyHospital();
+
+  const labTests = hospitalData?.availableLabTests && hospitalData.availableLabTests.length > 0
+    ? hospitalData.availableLabTests
+    : COMMON_LAB_TESTS;
+
+  const radiologyTests = hospitalData?.availableRadiologyTests && hospitalData.availableRadiologyTests.length > 0
+    ? hospitalData.availableRadiologyTests
+    : ["X-ray", "CT Scan", "MRI", "Ultrasound"];
+
   const initialTab = (location.state as any)?.activeTab || "overview";
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
 
@@ -87,6 +98,7 @@ export function ConsultationWorkspacePage() {
   // Prescription form state
   const [prescriptionMeds, setPrescriptionMeds] = useState<any[]>([
     { 
+      key: "init-med-0",
       name: "", 
       strength: "", 
       dosage: "", 
@@ -115,6 +127,12 @@ export function ConsultationWorkspacePage() {
   const [radioType, setRadioType] = useState("X-ray");
   const [radioPriority, setRadioPriority] = useState("Routine");
   const [radioNotes, setRadioNotes] = useState("");
+
+  useEffect(() => {
+    if (radiologyTests && radiologyTests.length > 0 && !radiologyTests.includes(radioType)) {
+      setRadioType(radiologyTests[0]);
+    }
+  }, [hospitalData, radioType, radiologyTests]);
 
   // Admission form state
   const [admitWard, setAdmitWard] = useState("General");
@@ -243,8 +261,8 @@ export function ConsultationWorkspacePage() {
 
   const handleAddMed = () => {
     setPrescriptionMeds([
-      ...prescriptionMeds,
       {
+        key: Math.random().toString(),
         name: "",
         strength: "",
         dosage: "",
@@ -254,7 +272,8 @@ export function ConsultationWorkspacePage() {
         morning: false,
         afternoon: false,
         night: false
-      }
+      },
+      ...prescriptionMeds
     ]);
   };
 
@@ -599,7 +618,7 @@ export function ConsultationWorkspacePage() {
 
                   <div className="space-y-3">
                     {prescriptionMeds.map((med, index) => (
-                      <div key={index} className="flex flex-wrap gap-2 items-end border-b border-slate-100 pb-3">
+                      <div key={med.key || index} className="flex flex-wrap gap-2 items-end border-b border-slate-100 pb-3">
                         <div className="flex-1 min-w-[150px]">
                           <InputField
                             label={index === 0 ? "Medicine Name" : ""}
@@ -756,7 +775,7 @@ export function ConsultationWorkspacePage() {
                 <Card className="p-4 space-y-4">
                   <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Order Laboratory Tests</h3>
                   <div className="space-y-2">
-                    {COMMON_LAB_TESTS.map((test) => (
+                    {labTests.map((test: string) => (
                       <label key={test} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
                         <input
                           type="checkbox"
@@ -819,10 +838,11 @@ export function ConsultationWorkspacePage() {
                 <Card className="p-4 space-y-4">
                   <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Order Radiology Study</h3>
                   <SelectField label="Modality Type" value={radioType} onChange={(e) => setRadioType(e.target.value)}>
-                    <option value="X-ray">X-Ray</option>
-                    <option value="CT">CT Scan</option>
-                    <option value="MRI">MRI</option>
-                    <option value="Ultrasound">Ultrasound</option>
+                    {radiologyTests.map((t: string) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
                   </SelectField>
 
                   <SelectField label="Priority" value={radioPriority} onChange={(e) => setRadioPriority(e.target.value)}>

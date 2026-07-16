@@ -361,6 +361,137 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
       );
     }
 
+    if (successData) {
+      return (
+        <div className="space-y-6">
+          {/* Success Banner */}
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-6 text-center space-y-2 print:hidden">
+            <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-600 animate-bounce" />
+            <h2 className="text-xl font-bold text-slate-800">OP Patient Converted to Inpatient</h2>
+            <p className="text-sm text-slate-550 max-w-lg mx-auto">
+              Patient <b>{successData.wristBand?.patientName}</b> has been admitted under verbal instruction of doctor. Bed allocation and real-time dashboard notifications have been completed.
+            </p>
+          </div>
+
+          <div className="max-w-xl mx-auto">
+            
+            {/* 1. Admission Slip Card */}
+            <Card className="space-y-4 border border-slate-200 shadow-md p-6 bg-white relative">
+              <div className="absolute top-4 right-4 bg-navy-50 text-navy-700 font-bold font-mono text-xs px-2 py-0.5 rounded border border-navy-100">
+                ADMISSION SLIP
+              </div>
+              
+              {/* Header */}
+              <div className="text-center pb-4 border-b border-dashed border-slate-200">
+                <h3 className="text-base font-bold text-slate-800 uppercase tracking-wide">{successData.admissionSlip?.hospitalName}</h3>
+                <p className="text-[10px] text-slate-450 mt-0.5">INPATIENT DEPT (IPD) RECORD</p>
+              </div>
+
+              {/* Metadata fields */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                <div>
+                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Admission No</span>
+                  <span className="font-bold text-indigo-700 font-mono">{successData.admissionSlip?.admissionNumber}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">UHID / Patient ID</span>
+                  <span className="font-semibold text-slate-700 font-mono">{successData.admissionSlip?.uhid}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Patient Name</span>
+                  <span className="font-bold text-slate-800">{successData.admissionSlip?.patientName}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Age / Gender</span>
+                  <span className="font-semibold text-slate-700">{successData.admissionSlip?.age} Yrs / {successData.admissionSlip?.gender}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Ward & Room</span>
+                  <span className="font-semibold text-slate-700">{successData.admissionSlip?.ward} (Room {successData.admissionSlip?.roomNumber})</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Allocated Bed</span>
+                  <span className="font-semibold text-slate-700">Bed {successData.admissionSlip?.bedNumber}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Admitting Doctor</span>
+                  <span className="font-semibold text-slate-700">Dr. {successData.admissionSlip?.admittingDoctorName}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Attender Name</span>
+                  <span className="font-semibold text-slate-700">{successData.admissionSlip?.attenderName}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Attender Phone</span>
+                  <span className="font-semibold text-slate-700">{successData.admissionSlip?.attenderPhone}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Admission Date & Time</span>
+                  <span className="font-semibold text-slate-700">{successData.admissionSlip?.admissionDate} @ {successData.admissionSlip?.admissionTime}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Insurance Provider</span>
+                  <span className="font-semibold text-slate-700">{successData.admissionSlip?.insuranceProvider}</span>
+                </div>
+              </div>
+
+              {/* OP consultation references */}
+              <div className="mt-4 pt-4 border-t border-slate-100 space-y-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-150">
+                <span className="font-bold text-slate-500 uppercase tracking-wider text-[8px] block">Previous Consultation Details</span>
+                <div className="grid grid-cols-2 gap-2 text-[10px]">
+                  <div>
+                    <span className="text-slate-400 block">Consulting Doctor:</span>
+                    <span className="font-semibold text-slate-755">{successData.admissionSlip?.lastConsultingDoctor}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block">Consulting Dept:</span>
+                    <span className="font-semibold text-slate-755">{successData.admissionSlip?.lastConsultingDepartment}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block">Consultation Date:</span>
+                    <span className="font-semibold text-slate-755">{successData.admissionSlip?.lastOpVisitDate}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block">Consultation Diagnosis:</span>
+                    <span className="font-semibold text-slate-755 italic">{successData.admissionSlip?.diagnosis}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment block */}
+              <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-slate-455 block uppercase tracking-wider text-[9px] font-bold">Advance Deposit Paid</span>
+                  <span className="font-bold text-slate-800">{formatINR(successData.admissionSlip?.advancePaid)}</span>
+                </div>
+                {successData.admissionSlip?.advancePaid > 0 && (
+                  <div className="text-right">
+                    <span className="text-slate-455 block uppercase tracking-wider text-[9px] font-bold">Receipt Number</span>
+                    <span className="font-semibold text-slate-700 font-mono">{successData.admissionSlip?.receiptNumber}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-2 print:hidden space-y-2">
+                <Button onClick={() => window.print()} className="w-full flex items-center justify-center gap-1.5 text-xs py-2">
+                  <Printer className="h-4 w-4" /> Print Admission Slip
+                </Button>
+                
+                <div className="flex gap-2 pt-2">
+                  <Button onClick={() => { setSuccessData(null); }} variant="secondary" className="flex-1 text-xs py-1.5">
+                    Back to Profile
+                  </Button>
+                  <Button onClick={() => navigate("/receptionist/patients")} variant="secondary" className="flex-1 text-xs py-1.5">
+                    Registry list
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between print:hidden">

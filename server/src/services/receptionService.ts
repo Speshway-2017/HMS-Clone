@@ -418,34 +418,10 @@ export class ReceptionService {
     }
     const referenceId = `${aptPrefix}${String(nextSerial).padStart(6, "0")}`;
 
-    const appointmentPayload: Record<string, unknown> = {
-      hospital: hospitalId,
-      referenceId,
-      patient: patientId,
-      doctor: doctorId,
-      department: departmentId,
-      date: bookingDate,
-      time,
-      type: type,
-      status: "scheduled",
-      notes: notes || "",
-    };
-
-    // Attach follow-up metadata if applicable
-    if (followUp) {
-      appointmentPayload.followUp = true;
-      appointmentPayload.parentAppointmentId = parentAppointmentId;
-      appointmentPayload.followUpDate = bookingDate;
-      appointmentPayload.followUpReason = followUpReason || "";
-    }
-
-    const newAppointment = await ReceptionRepository.createAppointment(appointmentPayload);
-
-    // 7. Automatically create a consultation billing Invoice
+    // 7. Calculate consultation/registration fees first to check if appointment is free
     const hasOtherAppointments = await Appointment.exists({
       hospital: hospitalId,
-      patient: patientId,
-      _id: { $ne: newAppointment._id }
+      patient: patientId
     });
 
     const registrationFee = hasOtherAppointments ? 0 : (type === "Emergency" ? 200 : 100);
@@ -461,16 +437,19 @@ export class ReceptionService {
     // Check if patient has a completed appointment with this doctor within the opExpiryLimit
     const hospitalRecord = await Hospital.findById(hospitalId);
     const opExpiryLimit = hospitalRecord?.opExpiryLimit ?? 10;
-    const expiryDate = new Date();
+    const expiryDate = new Date(bookingDate);
     expiryDate.setDate(expiryDate.getDate() - opExpiryLimit);
     expiryDate.setHours(0, 0, 0, 0);
+
+    const bookingDateEnd = new Date(bookingDate);
+    bookingDateEnd.setHours(23, 59, 59, 999);
 
     const pastCompletedAppt = await Appointment.findOne({
       hospital: hospitalId,
       patient: patientId,
       doctor: doctorId,
       status: "completed",
-      date: { $gte: expiryDate }
+      date: { $gte: expiryDate, $lte: bookingDateEnd }
     });
 
     const isWithinExpiry = !!pastCompletedAppt;
@@ -502,6 +481,34 @@ export class ReceptionService {
 
     const subtotal = registrationFee + consultationFee;
     const total = subtotal + gst - discount;
+    const isFree = total === 0;
+
+    const isToday = bookingDateStr === todayStr;
+
+    const appointmentStatus = isFree ? (isToday ? "checked_in" : "scheduled") : "pending_payment";
+
+    const appointmentPayload: Record<string, unknown> = {
+      hospital: hospitalId,
+      referenceId,
+      patient: patientId,
+      doctor: doctorId,
+      department: departmentId,
+      date: bookingDate,
+      time,
+      type: type,
+      status: appointmentStatus,
+      notes: notes || "",
+    };
+
+    // Attach follow-up metadata if applicable
+    if (followUp) {
+      appointmentPayload.followUp = true;
+      appointmentPayload.parentAppointmentId = parentAppointmentId;
+      appointmentPayload.followUpDate = bookingDate;
+      appointmentPayload.followUpReason = followUpReason || "";
+    }
+
+    const newAppointment = await ReceptionRepository.createAppointment(appointmentPayload);
 
     // Only create invoice if total > 0
     let newInvoice = null;
@@ -516,7 +523,7 @@ export class ReceptionService {
         serviceFee: 0,
         discount: 0,
         insuranceCoveragePercent: 0,
-        status: "pending",
+        status: isFree ? "paid" : "pending",
         issuedAt: new Date(),
         dueDate: new Date(),
         totals: {
@@ -526,7 +533,7 @@ export class ReceptionService {
           discount,
           insuranceCovered: 0,
           total,
-          patientBalance: total
+          patientBalance: isFree ? 0 : total
         }
       });
     }
@@ -534,26 +541,68 @@ export class ReceptionService {
     const patientRecord = await Patient.findById(patientId);
     const patientName = patientRecord ? patientRecord.name : "Patient";
 
-    // Notify doctor
-    await createDoctorNotification({
-      hospital: hospitalId,
-      title: "New Appointment",
-      message: `New appointment ${referenceId} booked for ${patientName} on ${bookingDate.toLocaleDateString("en-IN")} at ${time}.`,
-      type: "appointment",
-      severity: "info",
-      recipientDoctor: doctorId,
-      link: `/doctor/op-management`,
-      data: {
-        appointmentId: newAppointment._id.toString(),
-        referenceId,
+    let tokenNumber = "N/A";
+    let queueNumber = "N/A";
+    let queueRecord = null;
+
+    if (isFree && isToday) {
+      // Auto check-in and queue token generation for free consultations
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const endOfToday = new Date();
+      endOfToday.setHours(23, 59, 59, 999);
+
+      const todayTokenCount = await Queue.countDocuments({
+        hospital: hospitalId,
+        createdAt: { $gte: startOfToday, $lte: endOfToday }
+      });
+      tokenNumber = `T${String(todayTokenCount + 1).padStart(3, "0")}`;
+
+      const doctorQueueCount = await Queue.countDocuments({
+        hospital: hospitalId,
+        doctor: doctorId,
+        createdAt: { $gte: startOfToday, $lte: endOfToday }
+      });
+      queueNumber = `Q${String(doctorQueueCount + 1).padStart(3, "0")}`;
+
+      queueRecord = await ReceptionRepository.createQueueToken({
+        hospital: hospitalId,
+        tokenNumber,
+        type: type === "Emergency" ? "emergency" : "regular",
+        status: "waiting",
+        patient: patientId,
+        doctor: doctorId,
+        department: departmentId || doctor.department,
+        appointment: newAppointment._id,
+        date: newAppointment.date
+      });
+
+      // Notify doctor of checked in OP patient
+      try {
+        await createDoctorNotification({
+          hospital: hospitalId,
+          title: "OP Patient Checked In",
+          message: `OP patient ${patientName} has checked in. You have been assigned this patient (Token: ${tokenNumber}, Queue: ${queueNumber}).`,
+          type: "appointment",
+          severity: "info",
+          recipientDoctor: doctorId,
+          link: `/doctor/op-management`,
+          data: {
+            appointmentId: newAppointment._id.toString(),
+            tokenNumber,
+            queueNumber,
+          }
+        });
+      } catch (err) {
+        console.error("Failed to notify doctor of checked-in OP patient:", err);
       }
-    });
+    }
 
     await ReceptionRepository.createAuditLog({
       hospital: hospitalId,
       user: userId,
       action: "APPOINTMENT_BOOK",
-      details: `Booked ${followUp ? "follow-up " : ""}appointment ${referenceId} for patient ID ${patientId} with Dr. ${doctor.name}${followUp ? ` (Parent: ${parentAppointmentId})` : ""}.${newInvoice ? ` Invoice ID ${newInvoice._id}` : " No invoice created (free visit)"}`
+      details: `Booked ${followUp ? "follow-up " : ""}appointment ${referenceId} for patient ID ${patientId} with Dr. ${doctor.name}${followUp ? ` (Parent: ${parentAppointmentId})` : ""}.${newInvoice ? ` Invoice ID ${newInvoice._id}. Status: ${appointmentStatus}` : " No invoice created (free visit). Status: ${appointmentStatus}"}`
     });
 
     let checkInResult = null;
@@ -620,17 +669,103 @@ export class ReceptionService {
       { new: true }
     );
 
-    // Decoupled appointment check-in. Invoices now process payment without generating queue tokens.
+    // After successful payment, confirm appointment and generate Token + Queue Number + Receipt
+    // Fetch specific appointment linked to this invoice
     const appointment = await Appointment.findOne({
-      hospital: hospitalId,
-      patient: invoice.patient._id,
-      status: { $in: ["scheduled", "checked_in"] }
-    }).sort({ createdAt: -1 }).populate("doctor department");
+      _id: invoice.appointment,
+      hospital: hospitalId
+    }).populate("doctor department");
 
     let tokenNumber = "N/A";
     let queueNumber = "N/A";
     let queueRecord = null;
 
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    if (appointment) {
+      const apptDate = new Date(appointment.date);
+      const apptDateStr = apptDate.toISOString().split("T")[0];
+      const todayStr = startOfToday.toISOString().split("T")[0];
+      const isToday = apptDateStr === todayStr;
+
+      if (isToday) {
+        // Generate Token Number only if not already in queue today
+        const existingQueue = await Queue.findOne({
+          hospital: hospitalId,
+          appointment: appointment._id
+        });
+
+        if (!existingQueue) {
+          // Confirm appointment status to checked_in
+          appointment.status = "checked_in";
+          await appointment.save();
+
+          // Generate Token Number: T + 3-digit zero-padded serial (global for hospital today)
+          const todayTokenCount = await Queue.countDocuments({
+            hospital: hospitalId,
+            createdAt: { $gte: startOfToday, $lte: endOfToday }
+          });
+          tokenNumber = `T${String(todayTokenCount + 1).padStart(3, "0")}`;
+
+          // Generate Queue Number: Q + 3-digit zero-padded position for this doctor today
+          const doctorQueueCount = await Queue.countDocuments({
+            hospital: hospitalId,
+            doctor: (appointment.doctor as any)._id,
+            createdAt: { $gte: startOfToday, $lte: endOfToday }
+          });
+          queueNumber = `Q${String(doctorQueueCount + 1).padStart(3, "0")}`;
+
+          // Create queue record
+          queueRecord = await ReceptionRepository.createQueueToken({
+            hospital: hospitalId,
+            tokenNumber,
+            type: appointment.type === "Emergency" ? "emergency" : "regular",
+            status: "waiting",
+            patient: invoice.patient._id,
+            doctor: (appointment.doctor as any)._id,
+            department: (appointment.department as any)?._id || (appointment.doctor as any).department,
+            appointment: appointment._id,
+            date: appointment.date
+          });
+
+          // Notify doctor of checked in OP patient
+          try {
+            await createDoctorNotification({
+              hospital: hospitalId,
+              title: "OP Patient Checked In",
+              message: `OP patient ${(invoice.patient as any).name} has checked in. You have been assigned this patient (Token: ${tokenNumber}, Queue: ${queueNumber}).`,
+              type: "appointment",
+              severity: "info",
+              recipientDoctor: (appointment.doctor as any)._id.toString(),
+              link: `/doctor/op-management`,
+              data: {
+                appointmentId: appointment._id.toString(),
+                tokenNumber,
+                queueNumber,
+              }
+            });
+          } catch (err) {
+            console.error("Failed to notify doctor of checked-in OP patient:", err);
+          }
+        } else {
+          const doctorQueueIndex = await Queue.countDocuments({
+            hospital: hospitalId,
+            doctor: (appointment.doctor as any)._id,
+            createdAt: { $lt: (existingQueue as any).createdAt }
+          });
+          queueNumber = `Q${String(doctorQueueIndex + 1).padStart(3, "0")}`;
+          tokenNumber = existingQueue.tokenNumber;
+          queueRecord = existingQueue;
+        }
+      } else {
+        // Future appointment: change status to scheduled (confirmed booking)
+        appointment.status = "scheduled";
+        await appointment.save();
+      }
+    }
     // Generate Receipt Number: RCP + year + 5-digit serial
     const rcpYear = new Date().getFullYear();
     const rcpPrefix = `RCP${rcpYear}`;

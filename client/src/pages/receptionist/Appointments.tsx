@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { formatINR } from "../../lib/currency";
-import { Calendar, User, Search, Stethoscope, FolderHeart, Clock, Plus, List, AlertTriangle, RefreshCw } from "lucide-react";
+import { Calendar, User, Search, Stethoscope, FolderHeart, Clock, Plus, List, AlertTriangle, RefreshCw, CheckCircle } from "lucide-react";
 import {
   useBookAppointment,
   useReceptionQueue,
@@ -24,6 +24,9 @@ import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
 import { Modal } from "../../components/ui/Modal";
+import { Pagination } from "../../components/ui/Pagination";
+import { useAppointments } from "../../features/appointments";
+import { api } from "../../lib/api";
 import toast from "react-hot-toast";
 
 // Validation schema for booking form
@@ -38,14 +41,17 @@ const appointmentSchema = z.object({
 });
 
 interface Props {
-  activeTab?: "new" | "today" | "calendar";
+  activeTab?: "new" | "today" | "scheduled" | "completed" | "calendar";
 }
 
 export function AppointmentsPage({ activeTab = "today" }: Props) {
-  const [tab, setTab] = useState<"new" | "today" | "calendar">(activeTab);
+  const [tab, setTab] = useState<"new" | "today" | "scheduled" | "completed" | "calendar">(activeTab);
 
   useEffect(() => {
-    setTab(activeTab);
+    const normalizedTab = activeTab === "today" || activeTab === "new" || activeTab === "scheduled" || activeTab === "completed" || activeTab === "calendar"
+      ? activeTab
+      : "today";
+    setTab(normalizedTab);
   }, [activeTab]);
 
   const [patientQuery, setPatientQuery] = useState("");
@@ -60,6 +66,18 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const { data: departmentsResponse } = useDepartments();
   const { data: searchPatients } = usePatientsSearch(patientQuery);
   const { data: todayAppointments, isLoading: listLoading, refetch: refetchQueue } = useReceptionQueue();
+
+  const [scheduledPage, setScheduledPage] = useState(1);
+  const { data: scheduledData, isLoading: scheduledLoading, refetch: refetchScheduled } = useAppointments({
+    page: scheduledPage,
+    dateMode: "other_days"
+  });
+
+  const [completedPage, setCompletedPage] = useState(1);
+  const { data: completedData, isLoading: completedLoading, refetch: refetchCompleted } = useAppointments({
+    page: completedPage,
+    dateMode: "completed"
+  });
 
   const departments = departmentsResponse || [];
 
@@ -194,15 +212,15 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
     if (!row) return null;
     if (typeof row.appointment === "object" && row.appointment?._id) return row.appointment._id;
     if (typeof row.appointment === "string") return row.appointment;
+    if (row._id) return row._id;
     return null;
   };
 
   // Derive whether this appointment has already been rescheduled once
   const getIsAlreadyRescheduled = (row: any): boolean => {
     if (!row) return false;
-    const appt = typeof row.appointment === "object" ? row.appointment : null;
-    if (!appt) return false;
-    const count = appt.rescheduleCount ?? appt.rescheduleHistory?.length ?? 0;
+    const appt = typeof row.appointment === "object" ? row.appointment : row;
+    const count = appt?.rescheduleCount ?? appt?.rescheduleHistory?.length ?? 0;
     return count >= 1;
   };
 
@@ -222,6 +240,8 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
         toast.success("Appointment cancelled successfully!");
         closeDialog();
         refetchQueue();
+        refetchScheduled();
+        refetchCompleted();
       } catch (err: any) {
         toast.error(err?.response?.data?.message || err?.message || "Failed to cancel appointment.");
       }
@@ -264,6 +284,8 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
         toast.success("Appointment rescheduled successfully! New token generated.");
         closeDialog();
         refetchQueue();
+        refetchScheduled();
+        refetchCompleted();
       } catch (err: any) {
         toast.error(err?.response?.data?.message || err?.message || "Failed to reschedule appointment.");
       }
@@ -405,7 +427,13 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
       setIsFollowUp(false);
       setFollowUpParentId("");
       setFollowUpReason("");
-      if (invoiceId) navigate(`/receptionist/billing/consultation?invoiceId=${invoiceId}`);
+      if (invoiceId && result?.invoice?.status !== "paid") {
+        navigate(`/receptionist/billing/consultation?invoiceId=${invoiceId}`);
+      } else {
+        toast.success("Appointment booked and checked in successfully (Free Consultation)!");
+        setTab("today");
+        refetchQueue();
+      }
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || "Failed to book appointment.";
       toast.error(msg);
@@ -540,6 +568,100 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
     }
   ];
 
+  const handlePayClick = async (apptId: string) => {
+    try {
+      const res = await api.get(`/appointments/${apptId}/invoice`);
+      const invoiceId = res.data?.data?.invoice?._id;
+      if (invoiceId) {
+        navigate(`/receptionist/billing/consultation?invoiceId=${invoiceId}`);
+      } else {
+        toast.error("Invoice not found for this appointment.");
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to find invoice.");
+    }
+  };
+
+  const scheduledColumns = [
+    {
+      header: "Reference ID",
+      render: (row: any) => <span className="font-mono text-xs font-semibold text-slate-800">{row.referenceId || "N/A"}</span>
+    },
+    {
+      header: "Date & Time",
+      render: (row: any) => (
+        <div>
+          <div className="font-medium text-slate-900">
+            {new Date(row.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+          </div>
+          <div className="text-[10px] text-slate-400 font-mono">{row.time}</div>
+        </div>
+      )
+    },
+    {
+      header: "Patient",
+      render: (row: any) => (
+        <div>
+          <div className="font-medium text-slate-900">{row.patient?.name}</div>
+          <div className="text-[10px] text-slate-400 font-mono">{row.patient?.uhid}</div>
+        </div>
+      )
+    },
+    {
+      header: "Doctor",
+      render: (row: any) => (
+        <div>
+          <div className="font-medium text-slate-900">{row.doctor?.name}</div>
+        </div>
+      )
+    },
+    {
+      header: "Department",
+      render: (row: any) => <span className="text-xs">{row.department?.name || "N/A"}</span>
+    },
+    {
+      header: "Status",
+      render: (row: any) => (
+        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+          row.status === "pending_payment" 
+            ? "bg-rose-50 text-rose-700 border-rose-200" 
+            : row.status === "scheduled"
+            ? "bg-blue-50 text-blue-700 border-blue-200"
+            : statusColors[row.status] || "bg-slate-50 text-slate-600 border-slate-200"
+        }`}>
+          {row.status.replace("_", " ")}
+        </span>
+      )
+    },
+    {
+      header: "Actions",
+      render: (row: any) => {
+        return (
+          <div className="flex gap-2">
+            {row.status === "pending_payment" && (
+              <button
+                type="button"
+                onClick={() => handlePayClick(row._id)}
+                className="rounded bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-600 hover:bg-emerald-100 transition-colors"
+              >
+                Pay / Check In
+              </button>
+            )}
+            {row.status !== "cancelled" && row.status !== "completed" && row.status !== "skipped" && (
+              <button
+                type="button"
+                onClick={() => openDialog({ ...row, appointment: row._id })}
+                className="rounded bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100 transition-colors"
+              >
+                Cancel / Reschedule
+              </button>
+            )}
+          </div>
+        );
+      }
+    }
+  ];
+
   const isMutating = cancelMutation.isPending || rescheduleMutation.isPending;
 
   return (
@@ -556,6 +678,18 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "today" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
           >
             <List className="h-3.5 w-3.5" /> Today's Queue
+          </button>
+          <button
+            onClick={() => setTab("scheduled")}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "scheduled" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
+          >
+            <Clock className="h-3.5 w-3.5" /> Scheduled Bookings
+          </button>
+          <button
+            onClick={() => setTab("completed")}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "completed" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
+          >
+            <CheckCircle className="h-3.5 w-3.5" /> Completed
           </button>
           <button
             onClick={() => setTab("new")}
@@ -580,6 +714,52 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
             <div className="py-8 text-center text-slate-400">Loading appointments...</div>
           ) : (
             <DataTable columns={columns} rows={todayAppointments || []} rowKey={(row) => row._id} />
+          )}
+        </Card>
+      )}
+
+      {/* Scheduled Bookings */}
+      {tab === "scheduled" && (
+        <Card>
+          <h2 className="mb-4 text-base font-semibold text-slate-800">Scheduled Bookings (Other Days)</h2>
+          {scheduledLoading ? (
+            <div className="py-8 text-center text-slate-400">Loading scheduled bookings...</div>
+          ) : (
+            <>
+              <DataTable columns={scheduledColumns} rows={scheduledData?.data || []} rowKey={(row) => row._id} emptyMessage="No scheduled bookings found." />
+              {scheduledData?.pagination && scheduledData.pagination.totalPages > 1 && (
+                <div className="mt-4 flex justify-end">
+                  <Pagination
+                    page={scheduledPage}
+                    totalPages={scheduledData.pagination.totalPages}
+                    onPageChange={setScheduledPage}
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </Card>
+      )}
+
+      {/* Completed Bookings */}
+      {tab === "completed" && (
+        <Card>
+          <h2 className="mb-4 text-base font-semibold text-slate-800">Completed & Finished Bookings</h2>
+          {completedLoading ? (
+            <div className="py-8 text-center text-slate-400">Loading completed bookings...</div>
+          ) : (
+            <>
+              <DataTable columns={scheduledColumns} rows={completedData?.data || []} rowKey={(row) => row._id} emptyMessage="No completed bookings found." />
+              {completedData?.pagination && completedData.pagination.totalPages > 1 && (
+                <div className="mt-4 flex justify-end">
+                  <Pagination
+                    page={completedPage}
+                    totalPages={completedData.pagination.totalPages}
+                    onPageChange={setCompletedPage}
+                  />
+                </div>
+              )}
+            </>
           )}
         </Card>
       )}

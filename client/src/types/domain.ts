@@ -10,6 +10,8 @@ export interface Hospital {
   bedCapacity: number;
   status: "active" | "inactive";
   opExpiryLimit?: number;
+  availableLabTests?: string[];
+  availableRadiologyTests?: string[];
   createdAt: string;
   primaryAdminName?: string | null;
 }
@@ -187,7 +189,7 @@ export interface Appointment {
   date: string;
   time: string;
   type: string;
-  status: "scheduled" | "checked_in" | "in_consultation" | "completed" | "cancelled" | "no_show";
+  status: "pending_payment" | "scheduled" | "checked_in" | "in_consultation" | "completed" | "cancelled" | "no_show";
   notes: string;
   chiefComplaint?: string;
   symptoms?: string;

@@ -11,6 +11,7 @@ import { Pagination } from "../../components/ui/Pagination";
 import { Appointment } from "../../types/domain";
 
 const STATUS_TONE: Record<Appointment["status"], "success" | "info" | "warning" | "danger" | "neutral"> = {
+  pending_payment: "danger",
   scheduled: "info",
   checked_in: "warning",
   in_consultation: "warning",
@@ -74,7 +75,7 @@ export function AppointmentsPage() {
 
       <Card>
         <div className="mb-4 flex flex-wrap gap-2">
-          {["", "scheduled", "checked_in", "in_consultation", "completed", "cancelled", "no_show"].map((s) => (
+          {["", "pending_payment", "scheduled", "checked_in", "in_consultation", "completed", "cancelled", "no_show"].map((s) => (
             <button
               key={s}
               onClick={() => {
