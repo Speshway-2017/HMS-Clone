@@ -675,7 +675,7 @@ export class ReceptionService {
     session.startTransaction();
 
     try {
-      const invoice = await ReceptionRepository.findInvoiceById(hospitalId, invoiceId);
+      const invoice = await ReceptionRepository.findInvoiceById(hospitalId, invoiceId, session);
       if (!invoice) {
         throw new AppError("Invoice not found.", 404);
       }
@@ -705,7 +705,7 @@ export class ReceptionService {
         mixedDetails: paymentMethod === "Mixed" ? mixedDetails : { upiAmount: 0, cashAmount: 0, cardAmount: 0 },
         transactionId,
         paidAt: new Date()
-      });
+      }, session);
 
       // Fetch all payments for this invoice (including new one)
       const allPayments = await Payment.find({ invoice: invoiceId, hospital: hospitalId }).session(session);
@@ -851,13 +851,13 @@ export class ReceptionService {
           appointmentPayload.followUpReason = provisionalData.followUpReason;
         }
 
-        appointment = await ReceptionRepository.createAppointment(appointmentPayload);
+        appointment = await ReceptionRepository.createAppointment(appointmentPayload, session);
 
-        // Update invoice with appointment ID
+        // Update invoice with appointment ID without overwriting other fields
         await Invoice.findOneAndUpdate(
           { _id: invoiceId, hospital: hospitalId },
-          { appointment: appointment._id },
-          { session }
+          { $set: { appointment: appointment._id } },
+          { new: true, session }
         );
 
         // If it's today, generate token
@@ -890,7 +890,7 @@ export class ReceptionService {
             department: provisionalData.departmentId,
             appointment: appointment._id,
             date: new Date(provisionalData.date)
-          });
+          }, session);
         }
       } else if (invoice.appointment) {
         // Existing appointment (for free visits or already created appointments)

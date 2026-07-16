@@ -97,8 +97,10 @@ export class ReceptionRepository {
     });
   }
 
-  static async createAppointment(data: any) {
-    return await Appointment.create(data);
+  static async createAppointment(data: any, session?: any) {
+    const options = session ? { session } : undefined;
+    const result = await Appointment.create([data], options);
+    return result[0];
   }
 
   static async findAppointmentById(hospitalId: Types.ObjectId, id: string) {
@@ -276,20 +278,26 @@ export class ReceptionRepository {
   }
 
   // ── Billing & Payment Operations ──
-  static async createInvoice(data: any) {
-    return await Invoice.create(data);
+  static async createInvoice(data: any, session?: any) {
+    const options = session ? { session } : undefined;
+    const result = await Invoice.create([data], options);
+    return result[0];
   }
 
-  static async findInvoiceById(hospitalId: Types.ObjectId, id: string) {
-    return await Invoice.findOne({ _id: id, hospital: hospitalId }).populate("patient", "name uhid phone age gender");
+  static async findInvoiceById(hospitalId: Types.ObjectId, id: string, session?: any) {
+    const query = Invoice.findOne({ _id: id, hospital: hospitalId }).populate("patient", "name uhid phone age gender");
+    return session ? query.session(session) : query;
   }
 
-  static async updateInvoiceStatus(hospitalId: Types.ObjectId, id: string, status: string) {
-    return await Invoice.findOneAndUpdate({ _id: id, hospital: hospitalId }, { status }, { new: true });
+  static async updateInvoiceStatus(hospitalId: Types.ObjectId, id: string, status: string, session?: any) {
+    const options = { new: true, ...(session ? { session } : {}) };
+    return await Invoice.findOneAndUpdate({ _id: id, hospital: hospitalId }, { status }, options);
   }
 
-  static async createPayment(data: any) {
-    return await Payment.create(data);
+  static async createPayment(data: any, session?: any) {
+    const options = session ? { session } : undefined;
+    const result = await Payment.create([data], options);
+    return result[0];
   }
 
   static async getPaymentHistory(hospitalId: Types.ObjectId) {
@@ -361,8 +369,10 @@ export class ReceptionRepository {
       .sort({ createdAt: 1 });
   }
 
-  static async createQueueToken(data: any) {
-    return await Queue.create(data);
+  static async createQueueToken(data: any, session?: any) {
+    const options = session ? { session } : undefined;
+    const result = await Queue.create([data], options);
+    return result[0];
   }
 
   static async updateQueueTokenStatus(hospitalId: Types.ObjectId, id: string, status: "waiting" | "called" | "completed" | "skipped") {
