@@ -8,6 +8,7 @@ import { Appointment } from "../../types/domain";
 const STATUS_FLOW: Appointment["status"][] = ["scheduled", "checked_in", "in_consultation", "completed"];
 
 const STATUS_TONE: Record<Appointment["status"], "success" | "info" | "warning" | "danger" | "neutral"> = {
+  pending_payment: "danger",
   scheduled: "info",
   checked_in: "warning",
   in_consultation: "warning",

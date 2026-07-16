@@ -544,7 +544,7 @@ export const getBookedSlots = catchAsync(async (req: Request, res: Response) => 
     hospital: req.hospitalFilter!.hospital,
     doctor: doctorId,
     date: { $gte: startOfDay, $lte: endOfDay },
-    status: { $ne: "cancelled" }
+    status: { $in: ["scheduled", "checked_in", "in_consultation"] }
   }).select("time");
 
   const bookedSlots = appointments.map(appt => appt.time);

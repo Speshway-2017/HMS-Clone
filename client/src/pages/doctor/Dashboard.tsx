@@ -24,6 +24,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useDoctorDashboardMetrics, useDoctorTodayAppointments } from "../../features/doctorDashboard";
 
 const STATUS_BADGE: Record<string, { tone: "success" | "warning" | "info" | "neutral" | "danger"; label: string }> = {
+  pending_payment: { tone: "danger",   label: "Pending Payment" },
   completed:       { tone: "success",  label: "Completed"       },
   in_consultation: { tone: "warning",  label: "In Consultation" },
   checked_in:      { tone: "info",     label: "Checked In"      },

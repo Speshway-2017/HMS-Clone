@@ -536,8 +536,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                 </p>
               </div>
 
-              {/* Wrist Band and Admission Slip Side by Side */}
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div className="max-w-xl mx-auto">
                 
                 {/* 1. Admission Slip Card */}
                 <Card className="space-y-4 border border-slate-200 shadow-md p-6 bg-white relative">
@@ -616,75 +615,11 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                     </div>
                   )}
 
-                  <div className="pt-2">
+                  <div className="pt-2 space-y-2">
                     <Button onClick={() => window.print()} className="w-full flex items-center justify-center gap-1.5 text-xs py-2">
                       <Printer className="h-4 w-4" /> Print Admission Slip
                     </Button>
-                  </div>
-                </Card>
-
-                {/* 2. Wrist Band Card */}
-                <Card className="space-y-6 border border-slate-200 shadow-md p-6 bg-white flex flex-col justify-between">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-sm font-bold text-slate-800">Patient Identification Wristband</h3>
-                      <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200">
-                        IPD BAND
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-550">
-                      Generate and print the secure identification band to be strapped onto the patient's wrist immediately upon check-in.
-                    </p>
-
-                    {/* Band Preview Render */}
-                    <div className="rounded-xl border border-sky-200 bg-sky-50/20 p-5 space-y-4 relative overflow-hidden ring-1 ring-sky-100">
-                      {/* Medical alert line */}
-                      <div className="absolute left-0 top-0 bottom-0 w-2.5 bg-sky-500" />
-                      
-                      <div className="pl-2 space-y-3">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="text-[10px] font-bold text-sky-700 tracking-wider uppercase block">HMS SECURE ID BAND</span>
-                            <h4 className="text-base font-bold text-slate-900 mt-0.5">{successData.wristBand?.patientName}</h4>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-[10px] font-bold text-slate-400 block">IP NUM</span>
-                            <span className="text-xs font-bold font-mono text-indigo-700">{successData.wristBand?.admissionNumber}</span>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 text-[11px] border-t border-slate-100 pt-2 text-slate-600">
-                          <div>
-                            <span className="font-semibold text-slate-400">UHID:</span> <span className="font-medium font-mono">{successData.wristBand?.uhid}</span>
-                          </div>
-                          <div>
-                            <span className="font-semibold text-slate-400">Gender/Age:</span> <span className="font-medium">{successData.wristBand?.gender} / {successData.wristBand?.age} Yrs</span>
-                          </div>
-                          <div>
-                            <span className="font-semibold text-slate-400">Ward/Room/Bed:</span> <span className="font-medium">{successData.wristBand?.ward} - R{successData.wristBand?.roomNumber}/B{successData.wristBand?.bedNumber}</span>
-                          </div>
-                          <div>
-                            <span className="font-semibold text-red-500">Allergies:</span> <span className="font-bold text-red-600">{successData.wristBand?.allergies}</span>
-                          </div>
-                        </div>
-
-                        {/* Simulated barcode representation */}
-                        <div className="pt-2 text-center select-none font-mono tracking-widest text-slate-450 text-xs border-t border-dashed border-slate-200">
-                          <div className="h-6 w-full bg-slate-800 rounded opacity-90 mb-1 flex items-center justify-center text-white text-[9px] font-bold uppercase tracking-wider">
-                            |||||| | |||| ||| | ||||| | |||
-                          </div>
-                          {successData.wristBand?.admissionNumber}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 pt-4">
-                    <Button onClick={() => window.print()} className="w-full flex items-center justify-center gap-1.5 text-xs py-2 bg-sky-700 hover:bg-sky-800">
-                      <Printer className="h-4 w-4" /> Print Patient Wristband
-                    </Button>
-                    
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 pt-2">
                       <Button onClick={() => { setSuccessData(null); }} variant="secondary" className="flex-1 text-xs py-1.5">
                         New Admission
                       </Button>

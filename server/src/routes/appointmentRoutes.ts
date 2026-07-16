@@ -7,11 +7,14 @@ import {
   getAppointment,
   updateAppointment,
   deleteAppointment,
+  getInvoiceByAppointmentId,
 } from "../controllers/appointmentController";
 
 const router = Router();
 
 router.use(protect, restrictTo("hospital_admin", "doctor", "receptionist", "accountant", "pharmacist", "laboratory"), scopeToHospital);
+
+router.get("/:id/invoice", getInvoiceByAppointmentId);
 
 router.route("/")
   .get(listAppointments)

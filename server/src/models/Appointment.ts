@@ -1,6 +1,7 @@
 import { Schema, model, InferSchemaType, Types } from "mongoose";
 
 export const APPOINTMENT_STATUSES = [
+  "pending_payment",
   "scheduled",
   "checked_in",
   "in_consultation",

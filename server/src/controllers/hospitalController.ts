@@ -17,6 +17,8 @@ const hospitalSchema = z.object({
   licenseUrl: z.string().optional().default(""),
   bedCapacity: z.coerce.number().min(0).optional().default(0),
   opExpiryLimit: z.coerce.number().min(0).optional().default(10),
+  availableLabTests: z.array(z.string()).optional(),
+  availableRadiologyTests: z.array(z.string()).optional(),
   primaryAdminId: z.string().optional(),
 });
 

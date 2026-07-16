@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { Appointment, APPOINTMENT_STATUSES } from "../models/Appointment";
 import { Doctor } from "../models/Doctor";
+import { Invoice } from "../models/Invoice";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
@@ -31,7 +32,7 @@ const appointmentSchema = z.object({
 
 export const listAppointments = catchAsync(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req, 50);
-  const { status, doctor, from, to } = req.query as Record<string, string | undefined>;
+  const { status, doctor, from, to, dateMode } = req.query as Record<string, string | undefined>;
 
   const filter: Record<string, any> = { ...req.hospitalFilter };
   if (status) filter.status = status;
@@ -41,9 +42,23 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
   if (req.user!.role === "doctor") {
     const loggedDoctor = await getLoggedDoctor(req);
     filter.doctor = loggedDoctor._id;
+    if (filter.status === "pending_payment") {
+      filter.status = "never_match_status";
+    } else if (!status) {
+      filter.status = { $ne: "pending_payment" };
+    }
   }
 
-  if (from || to) {
+  if (dateMode === "other_days") {
+    const today = new Date();
+    const endOfToday = new Date(today);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    filter.date = { $gt: endOfToday };
+    filter.status = { $nin: ["completed", "cancelled", "no_show"] };
+  } else if (dateMode === "completed") {
+    filter.status = { $in: ["completed", "cancelled", "no_show"] };
+  } else if (from || to) {
     filter.date = {
       ...(from ? { $gte: new Date(from) } : {}),
       ...(to ? { $lte: new Date(to) } : {}),
@@ -52,10 +67,10 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
 
   const [appointments, total, todayCount] = await Promise.all([
     Appointment.find(filter)
-      .populate("patient", "name")
-      .populate("doctor", "name")
+      .populate("patient", "name uhid")
+      .populate("doctor", "name specialization")
       .populate("department", "name")
-      .sort({ date: 1, time: 1 })
+      .sort(dateMode === "completed" ? { date: -1, time: -1 } : { date: 1, time: 1 })
       .skip(skip)
       .limit(limit),
     Appointment.countDocuments(filter),
@@ -158,4 +173,15 @@ export const deleteAppointment = catchAsync(async (req: Request, res: Response) 
     throw new AppError("Appointment not found or unauthorized.", 403);
   }
   res.status(204).send();
+});
+
+export const getInvoiceByAppointmentId = catchAsync(async (req: Request, res: Response) => {
+  const invoice = await Invoice.findOne({
+    appointment: req.params.id,
+    hospital: req.hospitalFilter!.hospital,
+  });
+  if (!invoice) {
+    throw new AppError("Invoice not found for this appointment", 404);
+  }
+  res.json({ status: "success", data: { invoice } });
 });
