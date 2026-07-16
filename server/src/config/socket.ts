@@ -7,8 +7,11 @@ let isSocketInitialized = false;
 export function initSocket(server: HTTPServer, clientUrl: string) {
   io = new Server(server, {
     cors: {
-      origin: clientUrl,
+      // Allow all origins for development (LAN testing)
+      // In production, it's recommended to restrict to specific origins using CLIENT_URL
+      origin: true,
       methods: ["GET", "POST"],
+      credentials: true,
     },
   });
 

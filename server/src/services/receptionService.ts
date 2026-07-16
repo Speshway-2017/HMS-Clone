@@ -355,7 +355,7 @@ export class ReceptionService {
       throw new AppError("Doctor is currently on leave.", 400);
     }
 
-    // 4. Duplicate appointment validation:
+    // 4. Duplicate appointment validation (check existing PAID appointments):
     //    Patient + Doctor + Date (regardless of time slot) → BLOCKED
     //    Exception: followUp === true with a valid parentAppointmentId
     if (!followUp) {
@@ -400,7 +400,7 @@ export class ReceptionService {
       throw new AppError("Doctor is already booked for this time slot. Please choose a different slot.", 400);
     }
 
-    // 6. Generate unique auto-incremented appointment reference ID: APT-YYYYMMDD-XXXXXX
+    // 6. Generate unique auto-incremented appointment reference ID: APT-YYYYMMDD-XXXXXX (we'll reserve this for later)
     const bookingDateNoHyphens = bookingDate.toISOString().split("T")[0].replace(/-/g, "");
     const aptPrefix = `APT-${bookingDateNoHyphens}-`;
     const latestAppt = await Appointment.findOne({
@@ -483,139 +483,175 @@ export class ReceptionService {
     const total = subtotal + gst - discount;
     const isFree = total === 0;
 
-    const isToday = bookingDateStr === todayStr;
-
-    const appointmentStatus = isFree ? (isToday ? "checked_in" : "scheduled") : "pending_payment";
-
-    const appointmentPayload: Record<string, unknown> = {
+    // Create provisional invoice
+    const newInvoice = await ReceptionRepository.createInvoice({
       hospital: hospitalId,
       referenceId,
       patient: patientId,
-      doctor: doctorId,
-      department: departmentId,
-      date: bookingDate,
-      time,
-      type: type || "Consultation",
-      status: appointmentStatus,
-      notes: notes || "",
-    };
-
-    // Attach follow-up metadata if applicable
-    if (followUp) {
-      appointmentPayload.followUp = true;
-      appointmentPayload.parentAppointmentId = parentAppointmentId;
-      appointmentPayload.followUpDate = bookingDate;
-      appointmentPayload.followUpReason = followUpReason || "";
-    }
-
-    const newAppointment = await ReceptionRepository.createAppointment(appointmentPayload);
-
-    let newInvoice: any = null;
-    if (total > 0) {
-      newInvoice = await ReceptionRepository.createInvoice({
-        hospital: hospitalId,
-        referenceId,
-        patient: patientId,
-        appointment: newAppointment._id,
-        billingType: "OP",
-        items,
-        taxRate: 0,
+      appointment: null, // We'll link this after payment
+      billingType: "OP",
+      items,
+      taxRate: 0,
+      serviceFee: 0,
+      discount: 0,
+      insuranceCoveragePercent: 0,
+      status: isFree ? "paid" : "pending",
+      issuedAt: new Date(),
+      dueDate: new Date(),
+      totals: {
+        subtotal,
+        taxAmount: gst,
         serviceFee: 0,
-        discount: 0,
-        insuranceCoveragePercent: 0,
-        status: isFree ? "paid" : "pending",
-        issuedAt: new Date(),
-        dueDate: new Date(),
-        totals: {
-          subtotal,
-          taxAmount: gst,
-          serviceFee: 0,
-          discount,
-          insuranceCovered: 0,
-          total,
-          patientBalance: isFree ? 0 : total
-        }
-      });
-    }
-
-    const patientRecord = await Patient.findById(patientId);
-    const patientName = patientRecord ? patientRecord.name : "Patient";
-
-    let tokenNumber = "N/A";
-    let queueNumber = "N/A";
-    let queueRecord = null;
-
-    if (isFree && isToday) {
-      // Auto check-in and queue token generation for free consultations
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
-      const endOfToday = new Date();
-      endOfToday.setHours(23, 59, 59, 999);
-
-      const todayTokenCount = await Queue.countDocuments({
-        hospital: hospitalId,
-        createdAt: { $gte: startOfToday, $lte: endOfToday }
-      });
-      tokenNumber = `T${String(todayTokenCount + 1).padStart(3, "0")}`;
-
-      const doctorQueueCount = await Queue.countDocuments({
-        hospital: hospitalId,
-        doctor: doctorId,
-        createdAt: { $gte: startOfToday, $lte: endOfToday }
-      });
-      queueNumber = `Q${String(doctorQueueCount + 1).padStart(3, "0")}`;
-
-      queueRecord = await ReceptionRepository.createQueueToken({
-        hospital: hospitalId,
-        tokenNumber,
-        type: type === "Emergency" ? "emergency" : "regular",
-        status: "waiting",
-        patient: patientId,
-        doctor: doctorId,
-        department: departmentId || doctor.department,
-        appointment: newAppointment._id,
-        date: newAppointment.date
-      });
-
-      // Notify doctor of checked in OP patient
-      try {
-        await createDoctorNotification({
-          hospital: hospitalId,
-          title: "OP Patient Checked In",
-          message: `OP patient ${patientName} has checked in. You have been assigned this patient (Token: ${tokenNumber}, Queue: ${queueNumber}).`,
-          type: "appointment",
-          severity: "info",
-          recipientDoctor: doctorId,
-          link: `/doctor/op-management`,
-          data: {
-            appointmentId: newAppointment._id.toString(),
-            tokenNumber,
-            queueNumber,
-          }
-        });
-      } catch (err) {
-        console.error("Failed to notify doctor of checked-in OP patient:", err);
+        discount,
+        insuranceCovered: 0,
+        total,
+        patientBalance: isFree ? 0 : total
+      },
+      // Store provisional appointment data in the invoice for later use
+      provisionalData: {
+        doctorId,
+        departmentId,
+        date: bookingDate,
+        time,
+        type,
+        notes,
+        followUp,
+        parentAppointmentId,
+        followUpReason
       }
-    }
+    });
 
     await ReceptionRepository.createAuditLog({
       hospital: hospitalId,
       user: userId,
-      action: "APPOINTMENT_BOOK",
-      details: `Booked ${followUp ? "follow-up " : ""}appointment ${referenceId} for patient ID ${patientId} with Dr. ${doctor.name}${followUp ? ` (Parent: ${parentAppointmentId})` : ""}.${newInvoice ? ` Invoice ID ${newInvoice._id}. Status: ${appointmentStatus}` : " No invoice created (free visit). Status: ${appointmentStatus}"}`
+      action: "PROVISIONAL_INVOICE_CREATED",
+      details: `Created provisional invoice ${newInvoice._id} for patient ID ${patientId} with Dr. ${doctor.name}. Reference ID: ${referenceId}`
     });
 
-    let checkInResult = null;
-    if (type === "Walk-in" || type === "Emergency") {
-      try {
-        checkInResult = await this.checkInAppointment(hospitalId, newAppointment._id.toString(), userId);
-      } catch (err) {
-        console.error("Immediate check-in failed for walk-in/emergency:", err);
+    // If the appointment is free, create the appointment immediately (since payment is not needed)
+    if (isFree) {
+      const isToday = bookingDateStr === todayStr;
+      const appointmentStatus = isToday ? "checked_in" : "scheduled";
+
+      const appointmentPayload: Record<string, unknown> = {
+        hospital: hospitalId,
+        referenceId,
+        patient: patientId,
+        doctor: doctorId,
+        department: departmentId,
+        date: bookingDate,
+        time,
+        type: type || "Consultation",
+        status: appointmentStatus,
+        notes: notes || "",
+      };
+
+      // Attach follow-up metadata if applicable
+      if (followUp) {
+        appointmentPayload.followUp = true;
+        appointmentPayload.parentAppointmentId = parentAppointmentId;
+        appointmentPayload.followUpDate = bookingDate;
+        appointmentPayload.followUpReason = followUpReason || "";
       }
+
+      const newAppointment = await ReceptionRepository.createAppointment(appointmentPayload);
+      
+      // Update invoice to link appointment
+      newInvoice.appointment = newAppointment._id;
+      await newInvoice.save();
+
+      const patientRecord = await Patient.findById(patientId);
+      const patientName = patientRecord ? patientRecord.name : "Patient";
+
+      let tokenNumber = "N/A";
+      let queueNumber = "N/A";
+      let queueRecord = null;
+
+      if (isToday) {
+        // Auto check-in and queue token generation for free consultations
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const endOfToday = new Date();
+        endOfToday.setHours(23, 59, 59, 999);
+
+        const todayTokenCount = await Queue.countDocuments({
+          hospital: hospitalId,
+          createdAt: { $gte: startOfToday, $lte: endOfToday }
+        });
+        tokenNumber = `T${String(todayTokenCount + 1).padStart(3, "0")}`;
+
+        const doctorQueueCount = await Queue.countDocuments({
+          hospital: hospitalId,
+          doctor: doctorId,
+          createdAt: { $gte: startOfToday, $lte: endOfToday }
+        });
+        queueNumber = `Q${String(doctorQueueCount + 1).padStart(3, "0")}`;
+
+        queueRecord = await ReceptionRepository.createQueueToken({
+          hospital: hospitalId,
+          tokenNumber,
+          type: type === "Emergency" ? "emergency" : "regular",
+          status: "waiting",
+          patient: patientId,
+          doctor: doctorId,
+          department: departmentId || doctor.department,
+          appointment: newAppointment._id,
+          date: newAppointment.date
+        });
+
+        // Notify doctor of checked in OP patient
+        try {
+          await createDoctorNotification({
+            hospital: hospitalId,
+            title: "OP Patient Checked In",
+            message: `OP patient ${patientName} has checked in. You have been assigned this patient (Token: ${tokenNumber}, Queue: ${queueNumber}).`,
+            type: "appointment",
+            severity: "info",
+            recipientDoctor: doctorId,
+            link: `/doctor/op-management`,
+            data: {
+              appointmentId: newAppointment._id.toString(),
+              tokenNumber,
+              queueNumber,
+            }
+          });
+        } catch (err) {
+          console.error("Failed to notify doctor of checked-in OP patient:", err);
+        }
+      }
+
+      await ReceptionRepository.createAuditLog({
+        hospital: hospitalId,
+        user: userId,
+        action: "APPOINTMENT_BOOKED_FREE",
+        details: `Booked ${followUp ? "follow-up " : ""}appointment ${referenceId} for patient ID ${patientId} with Dr. ${doctor.name} (free visit).`
+      });
+
+      let checkInResult = null;
+      if (type === "Walk-in" || type === "Emergency") {
+        try {
+          checkInResult = await this.checkInAppointment(hospitalId, newAppointment._id.toString(), userId);
+        } catch (err) {
+          console.error("Immediate check-in failed for walk-in/emergency:", err);
+        }
+      }
+
+      return {
+        appointment: newAppointment,
+        invoice: newInvoice,
+        billing: {
+          registrationFee,
+          consultationFee,
+          gst,
+          discount,
+          total
+        },
+        token: checkInResult ? { tokenNumber: checkInResult.tokenNumber } : null
+      };
     }
 
+    // For paid appointments, only return the invoice
     return {
-      appointment: newAppointment,
       invoice: newInvoice,
       billing: {
         registrationFee,
@@ -623,205 +659,370 @@ export class ReceptionService {
         gst,
         discount,
         total
-      },
-      token: checkInResult ? { tokenNumber: checkInResult.tokenNumber } : null
+      }
     };
   }
 
   static async processPayment(hospitalId: Types.ObjectId, paymentData: any, userId: Types.ObjectId) {
     const { invoiceId, amount, paymentMethod, mixedDetails } = paymentData;
 
-    const invoice = await ReceptionRepository.findInvoiceById(hospitalId, invoiceId);
-    if (!invoice) {
-      throw new AppError("Invoice not found.", 404);
-    }
-    if (invoice.status === "paid") {
-      throw new AppError("Invoice is already paid.", 400);
-    }
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    const transactionId = `TXN-${generateDigits(10)}`;
+    try {
+      const invoice = await ReceptionRepository.findInvoiceById(hospitalId, invoiceId);
+      if (!invoice) {
+        throw new AppError("Invoice not found.", 404);
+      }
+      if (invoice.status === "paid") {
+        throw new AppError("Invoice is already paid.", 400);
+      }
 
-    const newPayment = await ReceptionRepository.createPayment({
-      hospital: hospitalId,
-      invoice: invoiceId,
-      patient: invoice.patient._id,
-      amount,
-      paymentMethod,
-      mixedDetails: paymentMethod === "Mixed" ? mixedDetails : { upiAmount: 0, cashAmount: 0, cardAmount: 0 },
-      transactionId,
-      paidAt: new Date()
-    });
+      // Calculate current outstanding before this payment
+      const existingPayments = await Payment.find({ invoice: invoiceId, hospital: hospitalId }).session(session);
+      const currentPaid = existingPayments.reduce((sum, p) => sum + p.amount, 0);
+      const invoiceTotal = invoice.totals.total;
+      const currentOutstanding = invoiceTotal - currentPaid;
 
-    // Fetch all payments for this invoice
-    const allPayments = await Payment.find({ invoice: invoiceId, hospital: hospitalId });
-    const totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
+      // Validate payment amount doesn't exceed outstanding
+      if (amount > currentOutstanding) {
+        throw new AppError(`Payment amount cannot exceed outstanding balance of ₹${currentOutstanding}`, 400);
+      }
 
-    const invoiceTotal = invoice.totals.total;
-    const remainingBalance = Math.max(0, invoiceTotal - totalPaid);
-    const newStatus = remainingBalance === 0 ? "paid" : "partially_paid";
+      const transactionId = `TXN-${generateDigits(10)}`;
 
-    const updatedInvoice = await Invoice.findOneAndUpdate(
-      { _id: invoiceId, hospital: hospitalId },
-      { 
-        status: newStatus, 
-        "totals.patientBalance": remainingBalance 
-      },
-      { new: true }
-    );
+      const newPayment = await ReceptionRepository.createPayment({
+        hospital: hospitalId,
+        invoice: invoiceId,
+        patient: invoice.patient._id,
+        amount,
+        paymentMethod,
+        mixedDetails: paymentMethod === "Mixed" ? mixedDetails : { upiAmount: 0, cashAmount: 0, cardAmount: 0 },
+        transactionId,
+        paidAt: new Date()
+      });
 
-    // After successful payment, confirm appointment and generate Token + Queue Number + Receipt
-    // Fetch specific appointment linked to this invoice
-    const appointment = await Appointment.findOne({
-      _id: invoice.appointment,
-      hospital: hospitalId
-    }).populate("doctor department");
+      // Fetch all payments for this invoice (including new one)
+      const allPayments = await Payment.find({ invoice: invoiceId, hospital: hospitalId }).session(session);
+      const totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
 
-    let tokenNumber = "N/A";
-    let queueNumber = "N/A";
-    let queueRecord = null;
+      const remainingBalance = Math.max(0, invoiceTotal - totalPaid);
+      const newStatus = remainingBalance === 0 ? "paid" : "partially_paid";
 
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
+      const updatedInvoice = await Invoice.findOneAndUpdate(
+        { _id: invoiceId, hospital: hospitalId },
+        { 
+          status: newStatus, 
+          "totals.patientBalance": remainingBalance 
+        },
+        { new: true, session }
+      );
 
-    if (appointment) {
-      const apptDate = new Date(appointment.date);
-      const apptDateStr = apptDate.toISOString().split("T")[0];
-      const todayStr = startOfToday.toISOString().split("T")[0];
-      const isToday = apptDateStr === todayStr;
+      let appointment: any = null;
+      let tokenNumber = "N/A";
+      let queueNumber = "N/A";
+      let queueRecord: any = null;
+      const isFirstPayment = existingPayments.length === 0; // Check if this is the first payment
 
-      if (isToday) {
-        // Generate Token Number only if not already in queue today
-        const existingQueue = await Queue.findOne({
+      // If invoice has provisional data AND it's the FIRST payment (partial or full), create appointment now
+      if (isFirstPayment && (invoice as any).provisionalData?.doctorId) {
+        const provisionalData = (invoice as any).provisionalData;
+        const bookingDate = new Date(provisionalData.date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Re-check doctor availability
+        const doctor = await Doctor.findOne({ 
+          _id: provisionalData.doctorId, hospital: hospitalId, isActive: { $ne: false } 
+        }).session(session);
+        if (!doctor) {
+          throw new AppError("Doctor not found or inactive.", 404);
+        }
+
+        // Re-check slot overlap
+        const overlap = await ReceptionRepository.checkDoctorSlotOverlap(
+          hospitalId, 
+          provisionalData.doctorId.toString(), 
+          bookingDate, 
+          provisionalData.time
+        );
+        if (overlap) {
+          // Slot is now taken: commit the invoice payment, return with slot unavailable
+          await session.commitTransaction();
+          session.endSession();
+          
+          // Emit billing update
+          emitToHospital(hospitalId.toString(), "billing_updated", { invoice: updatedInvoice });
+
+          // Compute billing breakdown from invoice items
+          const registrationItem = (invoice as any).items?.find((i: any) => i.category === "registration");
+          const consultationItem = (invoice as any).items?.find((i: any) => i.category === "consultation");
+          const billingBreakdown = {
+            registrationFee: registrationItem?.amount ?? 0,
+            consultationFee: consultationItem?.amount ?? 0,
+            gst: 0,
+            discount: 0,
+            total: invoiceTotal
+          };
+
+          return {
+            success: true,
+            message: "Selected slot is no longer available. Please choose another slot.",
+            appointmentNumber: "N/A",
+            tokenNumber: "N/A",
+            queueNumber: "N/A",
+            receiptNumber: "N/A",
+            queuePosition: 0,
+            paymentStatus: newStatus,
+            billing: billingBreakdown,
+            token: { tokenNumber: "N/A", queueNumber: "N/A" },
+            payment: newPayment,
+            invoice: updatedInvoice,
+            appointment: null,
+            queueRecord: null,
+            slotUnavailable: true
+          };
+        }
+
+        // Check duplicate appointment
+        const startOfDay = new Date(bookingDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(bookingDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const existingAppointment = await Appointment.findOne({
           hospital: hospitalId,
-          appointment: appointment._id
-        });
+          patient: invoice.patient._id,
+          doctor: provisionalData.doctorId,
+          date: { $gte: startOfDay, $lte: endOfDay },
+          status: { $nin: ["cancelled", "no_show", "completed"] }
+        }).session(session);
 
-        if (!existingQueue) {
-          // Confirm appointment status to checked_in
-          appointment.status = "checked_in";
-          await appointment.save();
+        if (existingAppointment) {
+          throw new AppError("Duplicate appointment already exists for this patient and doctor on this date.", 409);
+        }
 
-          // Generate Token Number: T + 3-digit zero-padded serial (global for hospital today)
+        // Generate reference ID
+        const bookingDateNoHyphens = new Date(provisionalData.date).toISOString().split("T")[0].replace(/-/g, "");
+        const aptPrefix = `APT-${bookingDateNoHyphens}-`;
+        const latestAppt = await Appointment.findOne({
+          hospital: hospitalId,
+          referenceId: new RegExp(`^${aptPrefix}`)
+        }).sort({ createdAt: -1 }).session(session);
+
+        let nextSerial = 1;
+        if (latestAppt) {
+          const serialPart = latestAppt.referenceId.replace(aptPrefix, "");
+          const lastSerial = parseInt(serialPart, 10);
+          if (!isNaN(lastSerial)) {
+            nextSerial = lastSerial + 1;
+          }
+        }
+        const referenceId = `${aptPrefix}${String(nextSerial).padStart(6, "0")}`;
+
+        // Create appointment payload
+        const isToday = new Date(provisionalData.date).toDateString() === today.toDateString();
+        const appointmentStatus = isToday ? "checked_in" : "scheduled";
+        const appointmentPayload: Record<string, any> = {
+          hospital: hospitalId,
+          referenceId,
+          patient: invoice.patient._id,
+          doctor: provisionalData.doctorId,
+          department: provisionalData.departmentId,
+          date: new Date(provisionalData.date),
+          time: provisionalData.time,
+          type: provisionalData.type,
+          status: appointmentStatus,
+          notes: provisionalData.notes
+        };
+        if (provisionalData.followUp) {
+          appointmentPayload.followUp = true;
+          appointmentPayload.parentAppointmentId = provisionalData.parentAppointmentId;
+          appointmentPayload.followUpDate = new Date(provisionalData.date);
+          appointmentPayload.followUpReason = provisionalData.followUpReason;
+        }
+
+        appointment = await ReceptionRepository.createAppointment(appointmentPayload);
+
+        // Update invoice with appointment ID
+        await Invoice.findOneAndUpdate(
+          { _id: invoiceId, hospital: hospitalId },
+          { appointment: appointment._id },
+          { session }
+        );
+
+        // If it's today, generate token
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const endOfToday = new Date();
+        endOfToday.setHours(23, 59, 59, 999);
+
+        if (isToday) {
           const todayTokenCount = await Queue.countDocuments({
             hospital: hospitalId,
             createdAt: { $gte: startOfToday, $lte: endOfToday }
-          });
+          }).session(session);
           tokenNumber = `T${String(todayTokenCount + 1).padStart(3, "0")}`;
 
-          // Generate Queue Number: Q + 3-digit zero-padded position for this doctor today
           const doctorQueueCount = await Queue.countDocuments({
             hospital: hospitalId,
-            doctor: (appointment.doctor as any)._id,
+            doctor: provisionalData.doctorId,
             createdAt: { $gte: startOfToday, $lte: endOfToday }
-          });
+          }).session(session);
           queueNumber = `Q${String(doctorQueueCount + 1).padStart(3, "0")}`;
 
-          // Create queue record
           queueRecord = await ReceptionRepository.createQueueToken({
             hospital: hospitalId,
             tokenNumber,
-            type: appointment.type === "Emergency" ? "emergency" : "regular",
+            type: provisionalData.type === "Emergency" ? "emergency" : "regular",
             status: "waiting",
             patient: invoice.patient._id,
-            doctor: (appointment.doctor as any)._id,
-            department: (appointment.department as any)?._id || (appointment.doctor as any).department,
+            doctor: provisionalData.doctorId,
+            department: provisionalData.departmentId,
             appointment: appointment._id,
-            date: appointment.date
+            date: new Date(provisionalData.date)
           });
-
-          // Notify doctor of checked in OP patient
-          try {
-            await createDoctorNotification({
-              hospital: hospitalId,
-              title: "OP Patient Checked In",
-              message: `OP patient ${(invoice.patient as any).name} has checked in. You have been assigned this patient (Token: ${tokenNumber}, Queue: ${queueNumber}).`,
-              type: "appointment",
-              severity: "info",
-              recipientDoctor: (appointment.doctor as any)._id.toString(),
-              link: `/doctor/op-management`,
-              data: {
-                appointmentId: appointment._id.toString(),
-                tokenNumber,
-                queueNumber,
-              }
-            });
-          } catch (err) {
-            console.error("Failed to notify doctor of checked-in OP patient:", err);
-          }
-        } else {
-          const doctorQueueIndex = await Queue.countDocuments({
-            hospital: hospitalId,
-            doctor: (appointment.doctor as any)._id,
-            createdAt: { $lt: (existingQueue as any).createdAt }
-          });
-          queueNumber = `Q${String(doctorQueueIndex + 1).padStart(3, "0")}`;
-          tokenNumber = existingQueue.tokenNumber;
-          queueRecord = existingQueue;
         }
-      } else {
-        // Future appointment: change status to scheduled (confirmed booking)
-        appointment.status = "scheduled";
-        await appointment.save();
+      } else if (invoice.appointment) {
+        // Existing appointment (for free visits or already created appointments)
+        appointment = await Appointment.findOne({
+          _id: invoice.appointment,
+          hospital: hospitalId
+        }).populate("doctor department").session(session);
+
+        if (appointment) {
+          const apptDate = new Date(appointment.date);
+          const apptDateStr = apptDate.toISOString().split("T")[0];
+          const todayStr = new Date().toISOString().split("T")[0];
+          const isToday = apptDateStr === todayStr;
+          const startOfToday = new Date();
+          startOfToday.setHours(0, 0, 0, 0);
+          const endOfToday = new Date();
+          endOfToday.setHours(23, 59, 59, 999);
+
+          if (isToday) {
+            const existingQueue = await Queue.findOne({
+              hospital: hospitalId,
+              appointment: appointment._id
+            }).session(session);
+            if (!existingQueue) {
+              appointment.status = "checked_in";
+              await appointment.save({ session });
+
+              const todayTokenCount = await Queue.countDocuments({
+                hospital: hospitalId,
+                createdAt: { $gte: startOfToday, $lte: endOfToday }
+              }).session(session);
+              tokenNumber = `T${String(todayTokenCount + 1).padStart(3, "0")}`;
+
+              const doctorQueueCount = await Queue.countDocuments({
+                hospital: hospitalId,
+                doctor: (appointment.doctor as any)._id,
+                createdAt: { $gte: startOfToday, $lte: endOfToday }
+              }).session(session);
+              queueNumber = `Q${String(doctorQueueCount + 1).padStart(3, "0")}`;
+
+              queueRecord = await ReceptionRepository.createQueueToken({
+                hospital: hospitalId,
+                tokenNumber,
+                type: appointment.type === "Emergency" ? "emergency" : "regular",
+                status: "waiting",
+                patient: invoice.patient._id,
+                doctor: (appointment.doctor as any)._id,
+                department: (appointment.department as any)?._id || (appointment.doctor as any).department,
+                appointment: appointment._id,
+                date: appointment.date
+              });
+            } else {
+              const doctorQueueIndex = await Queue.countDocuments({
+                hospital: hospitalId,
+                doctor: (appointment.doctor as any)._id,
+                createdAt: { $lt: (existingQueue as any).createdAt }
+              }).session(session);
+              queueNumber = `Q${String(doctorQueueIndex + 1).padStart(3, "0")}`;
+              tokenNumber = existingQueue.tokenNumber;
+              queueRecord = existingQueue;
+            }
+          } else {
+            appointment.status = "scheduled";
+            await appointment.save({ session });
+          }
+        }
       }
+
+      // Generate Receipt Number: RCP + year + 5-digit serial
+      const rcpYear = new Date().getFullYear();
+      const rcpPrefix = `RCP${rcpYear}`;
+      const latestPaymentWithRcp = await Payment.findOne({
+        hospital: hospitalId,
+        transactionId: new RegExp(`^${rcpPrefix}`)
+      }).sort({ createdAt: -1 }).session(session);
+      let nextRcpSerial = 1;
+      if (latestPaymentWithRcp) {
+        const serialPart = latestPaymentWithRcp.transactionId?.replace(rcpPrefix, "") || "0";
+        const lastRcp = parseInt(serialPart, 10);
+        if (!isNaN(lastRcp)) nextRcpSerial = lastRcp + 1;
+      }
+      const receiptNumber = `${rcpPrefix}${String(nextRcpSerial).padStart(5, "0")}`;
+
+      await ReceptionRepository.createAuditLog({
+        hospital: hospitalId,
+        user: userId,
+        action: "BILLING_PAY",
+        details: `Payment ₹${amount} for invoice ${invoiceId} via ${paymentMethod}. Token: ${tokenNumber}, Queue: ${queueNumber}, Receipt: ${receiptNumber}`
+      });
+
+      // Compute billing breakdown from invoice items
+      const registrationItem = (invoice as any).items?.find((i: any) => i.category === "registration");
+      const consultationItem = (invoice as any).items?.find((i: any) => i.category === "consultation");
+      const billingBreakdown = {
+        registrationFee: registrationItem?.amount ?? 0,
+        consultationFee: consultationItem?.amount ?? 0,
+        gst: 0,
+        discount: 0,
+        total: invoiceTotal
+      };
+
+      await session.commitTransaction();
+      session.endSession();
+
+      // Emit socket events to update dashboards
+      try {
+        emitToHospital(hospitalId.toString(), "appointment_updated", { appointment });
+        emitToHospital(hospitalId.toString(), "queue_updated", { queueRecord });
+        emitToHospital(hospitalId.toString(), "billing_updated", { invoice: updatedInvoice });
+      } catch (err) {
+        console.error("Failed to emit socket events:", err);
+      }
+
+      return {
+        success: true,
+        appointmentNumber: appointment?.referenceId ?? "N/A",
+        tokenNumber,
+        queueNumber,
+        receiptNumber,
+        queuePosition: queueRecord ? parseInt(queueNumber.replace("Q", ""), 10) : 0,
+        paymentStatus: newStatus,
+        billing: billingBreakdown,
+        token: { tokenNumber, queueNumber },
+        payment: newPayment,
+        invoice: updatedInvoice,
+        appointment: appointment ? {
+          _id: appointment._id,
+          referenceId: appointment.referenceId,
+          date: appointment.date,
+          time: appointment.time,
+          doctor: appointment.doctor,
+          department: appointment.department,
+          patient: invoice.patient
+        } : null,
+        queueRecord
+      };
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      throw error;
     }
-    // Generate Receipt Number: RCP + year + 5-digit serial
-    const rcpYear = new Date().getFullYear();
-    const rcpPrefix = `RCP${rcpYear}`;
-    const latestPaymentWithRcp = await Payment.findOne({
-      hospital: hospitalId,
-      transactionId: new RegExp(`^${rcpPrefix}`)
-    }).sort({ createdAt: -1 });
-    let nextRcpSerial = 1;
-    if (latestPaymentWithRcp) {
-      const serialPart = latestPaymentWithRcp.transactionId?.replace(rcpPrefix, "") || "0";
-      const lastRcp = parseInt(serialPart, 10);
-      if (!isNaN(lastRcp)) nextRcpSerial = lastRcp + 1;
-    }
-    const receiptNumber = `${rcpPrefix}${String(nextRcpSerial).padStart(5, "0")}`;
-
-    await ReceptionRepository.createAuditLog({
-      hospital: hospitalId,
-      user: userId,
-      action: "BILLING_PAY",
-      details: `Payment ₹${amount} for invoice ${invoiceId} via ${paymentMethod}. Token: ${tokenNumber}, Queue: ${queueNumber}, Receipt: ${receiptNumber}`
-    });
-
-    // Compute billing breakdown from invoice items
-    const registrationItem = (invoice as any).items?.find((i: any) => i.category === "registration");
-    const consultationItem = (invoice as any).items?.find((i: any) => i.category === "consultation");
-    const billingBreakdown = {
-      registrationFee: registrationItem?.amount ?? 0,
-      consultationFee: consultationItem?.amount ?? 0,
-      gst: 0,
-      discount: 0,
-      total: (invoice as any).totals?.total ?? amount
-    };
-
-    return {
-      success: true,
-      appointmentNumber: appointment?.referenceId ?? "N/A",
-      tokenNumber,
-      queueNumber,
-      receiptNumber,
-      queuePosition: queueRecord ? parseInt(queueNumber.replace("Q", ""), 10) : 0,
-      paymentStatus: "paid",
-      billing: billingBreakdown,
-      token: { tokenNumber, queueNumber },
-      payment: newPayment,
-      invoice: updatedInvoice,
-      appointment: appointment ? {
-        _id: appointment._id,
-        referenceId: appointment.referenceId,
-        date: appointment.date,
-        time: appointment.time,
-        doctor: appointment.doctor,
-        department: appointment.department,
-        patient: invoice.patient
-      } : null,
-      queueRecord
-    };
   }
 
   // ── Simulated Doctor Consultation workflows ──
