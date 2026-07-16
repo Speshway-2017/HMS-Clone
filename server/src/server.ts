@@ -144,9 +144,10 @@ async function main() {
     console.log("✓ Notification worker started");
 
     // Step 8: Start listening
-    httpServer.listen(env.port, () => {
+    httpServer.listen(env.port, "0.0.0.0", () => {
       console.log(`\n✓ Server listening on http://localhost:${env.port}`);
       console.log(`✓ Health check available at http://localhost:${env.port}/api/v1/health`);
+      console.log(`✓ LAN access available at http://[your-local-ip]:${env.port}`);
     });
 
     // Handle server errors (like EADDRINUSE, EACCES)

@@ -39,7 +39,9 @@ import "./config/cloudinary";
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: env.clientUrl }));
+// Allow all origins for development (LAN testing)
+// In production, it's recommended to restrict to specific origins using CLIENT_URL
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 if (env.nodeEnv !== "test") {
   app.use(morgan("dev"));
