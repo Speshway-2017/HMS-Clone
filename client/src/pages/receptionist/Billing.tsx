@@ -516,6 +516,12 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
 
   const pendingColumns = [
     {
+      header: "Invoice Number",
+      render: (row: any) => (
+        <span className="text-xs font-mono text-slate-600">{row._id.toString().slice(-8).toUpperCase()}</span>
+      )
+    },
+    {
       header: "Invoice Date",
       render: (row: any) => <span className="text-xs text-slate-600">{new Date(row.issuedAt).toLocaleDateString("en-IN")}</span>
     },
@@ -529,10 +535,44 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
       )
     },
     {
-      header: "Amount Due",
+      header: "Total Bill",
       render: (row: any) => (
-        <span className="text-xs font-semibold text-slate-800">
+        <span className="text-xs text-slate-600">
+          {formatINR(row.totals?.total)}
+        </span>
+      )
+    },
+    {
+      header: "Amount Paid",
+      render: (row: any) => (
+        <span className="text-xs text-emerald-700 font-semibold">
+          {formatINR(row.amountPaid || 0)}
+        </span>
+      )
+    },
+    {
+      header: "Balance Due",
+      render: (row: any) => (
+        <span className="text-xs font-semibold text-amber-700">
           {formatINR(row.totals?.patientBalance !== undefined ? row.totals.patientBalance : row.totals?.total)}
+        </span>
+      )
+    },
+    {
+      header: "Payment Status",
+      render: (row: any) => (
+        <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase border ${
+          row.status === "pending" ? "bg-slate-100 text-slate-700 border-slate-200" : "bg-amber-50 text-amber-700 border-amber-200"
+        }`}>
+          {row.status.replace("_", " ")}
+        </span>
+      )
+    },
+    {
+      header: "Last Payment Date",
+      render: (row: any) => (
+        <span className="text-xs text-slate-500">
+          {row.lastPaymentDate ? new Date(row.lastPaymentDate).toLocaleString("en-IN") : "—"}
         </span>
       )
     },

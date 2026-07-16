@@ -406,6 +406,50 @@ export const getPendingInvoices = catchAsync(async (req: Request, res: Response)
     .populate("patient", "name uhid phone")
     .sort({ createdAt: -1 });
 
+  // Fetch all related OP payments in one go for efficiency
+  const invoiceIds = invoices.map(inv => inv._id);
+  const payments = await Payment.find({ hospital: hospitalId, invoice: { $in: invoiceIds } }).sort({ paidAt: -1 });
+  
+  // Create a map for invoiceId -> { totalPaid, lastPaymentDate }
+  const invoicePaymentMap = new Map();
+  payments.forEach(payment => {
+    const invId = payment.invoice.toString();
+    if (!invoicePaymentMap.has(invId)) {
+      invoicePaymentMap.set(invId, {
+        totalPaid: 0,
+        lastPaymentDate: payment.paidAt
+      });
+    }
+    const data = invoicePaymentMap.get(invId);
+    data.totalPaid += payment.amount;
+    // Keep the most recent (first) payment date
+  });
+
+  // Enhance OP invoices with payment data
+  const enhancedInvoices = invoices.map(invoice => {
+    const invObj = invoice.toObject();
+    const paymentData = invoicePaymentMap.get(invoice._id.toString()) || { totalPaid: 0, lastPaymentDate: null };
+    
+    // Calculate/normalize the fields
+    const totalAmount = invObj.totalAmount ?? invObj.totals?.total ?? 0;
+    const amountPaid = invObj.amountPaid ?? paymentData.totalPaid;
+    const amountDue = invObj.amountDue ?? Math.max(0, totalAmount - amountPaid);
+    const lastPaymentDate = invObj.lastPaymentDate ?? paymentData.lastPaymentDate;
+
+    return {
+      ...invObj,
+      totalAmount,
+      amountPaid,
+      amountDue,
+      lastPaymentDate,
+      // Also ensure totals.patientBalance is set correctly
+      totals: {
+        ...invObj.totals,
+        patientBalance: amountDue
+      }
+    };
+  });
+
   // 2. Fetch pending IP bills
   const ipBills = await IPBill.find({ hospital: hospitalId, status: "Generated", outstanding: { $gt: 0 } })
     .populate("patient", "name uhid phone")
@@ -414,24 +458,32 @@ export const getPendingInvoices = catchAsync(async (req: Request, res: Response)
 
   // Map IP bills to conformed invoice structure
   const mappedIpBills = ipBills.map(bill => {
+    const totalAmount = bill.grandTotal || 0;
+    const amountPaid = Math.max(0, totalAmount - (bill.outstanding || 0));
+    const amountDue = Math.max(0, bill.outstanding || 0);
+
     return {
       _id: bill._id,
       patient: bill.patient,
       issuedAt: bill.billingDate || (bill as any).createdAt,
       billingType: "IP",
       totals: {
-        subtotal: bill.grandTotal,
+        subtotal: totalAmount,
         taxAmount: bill.taxRate,
-        total: bill.grandTotal,
-        patientBalance: bill.outstanding
+        total: totalAmount,
+        patientBalance: amountDue
       },
       status: "partially_paid",
       outstanding: bill.outstanding,
-      admission: bill.admission
+      admission: bill.admission,
+      totalAmount,
+      amountPaid,
+      amountDue,
+      lastPaymentDate: null
     };
   });
 
-  const combined = [...invoices, ...mappedIpBills];
+  const combined = [...enhancedInvoices, ...mappedIpBills];
 
   res.json({ status: "success", data: { invoices: combined, total: combined.length } });
 });
@@ -507,6 +559,49 @@ export const getCompletedInvoices = catchAsync(async (req: Request, res: Respons
     .populate("patient", "name uhid phone")
     .sort({ updatedAt: -1 });
 
+  // Fetch all related OP payments in one go for efficiency
+  const invoiceIds = invoices.map(inv => inv._id);
+  const payments = await Payment.find({ hospital: hospitalId, invoice: { $in: invoiceIds } }).sort({ paidAt: -1 });
+  
+  // Create a map for invoiceId -> { totalPaid, lastPaymentDate }
+  const invoicePaymentMap = new Map();
+  payments.forEach(payment => {
+    const invId = payment.invoice.toString();
+    if (!invoicePaymentMap.has(invId)) {
+      invoicePaymentMap.set(invId, {
+        totalPaid: 0,
+        lastPaymentDate: payment.paidAt
+      });
+    }
+    const data = invoicePaymentMap.get(invId);
+    data.totalPaid += payment.amount;
+  });
+
+  // Enhance OP invoices with payment data
+  const enhancedInvoices = invoices.map(invoice => {
+    const invObj = invoice.toObject();
+    const paymentData = invoicePaymentMap.get(invoice._id.toString()) || { totalPaid: 0, lastPaymentDate: null };
+    
+    // Calculate/normalize the fields
+    const totalAmount = invObj.totalAmount ?? invObj.totals?.total ?? 0;
+    const amountPaid = invObj.amountPaid ?? paymentData.totalPaid;
+    const amountDue = 0;
+    const lastPaymentDate = invObj.lastPaymentDate ?? paymentData.lastPaymentDate;
+
+    return {
+      ...invObj,
+      totalAmount,
+      amountPaid,
+      amountDue,
+      lastPaymentDate,
+      // Also ensure totals.patientBalance is set correctly
+      totals: {
+        ...invObj.totals,
+        patientBalance: amountDue
+      }
+    };
+  });
+
   // 2. Fetch completed IP bills (Paid status means fully paid)
   const completedIpBills = await IPBill.find({ hospital: hospitalId, status: "Paid" })
     .populate("patient", "name uhid phone")
@@ -515,24 +610,29 @@ export const getCompletedInvoices = catchAsync(async (req: Request, res: Respons
 
   // Map IP bills to conformed invoice structure
   const mappedIpBills = completedIpBills.map(bill => {
+    const totalAmount = bill.grandTotal || 0;
     return {
       _id: bill._id,
       patient: bill.patient,
       issuedAt: bill.billingDate || (bill as any).createdAt,
       billingType: "IP",
       totals: {
-        subtotal: bill.grandTotal,
+        subtotal: totalAmount,
         taxAmount: bill.taxRate,
-        total: bill.grandTotal,
+        total: totalAmount,
         patientBalance: 0
       },
       status: "paid",
       outstanding: 0,
-      admission: bill.admission
+      admission: bill.admission,
+      totalAmount,
+      amountPaid: totalAmount,
+      amountDue: 0,
+      lastPaymentDate: null
     };
   });
 
-  const combined = [...invoices, ...mappedIpBills];
+  const combined = [...enhancedInvoices, ...mappedIpBills];
 
   res.json({ status: "success", data: { invoices: combined, total: combined.length } });
 });

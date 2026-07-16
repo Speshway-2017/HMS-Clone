@@ -92,8 +92,28 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
     IPBillPayment.find(req.hospitalFilter as Record<string, unknown>)
   ]);
 
+  // Fetch all related OP payments for efficiency
+  const opInvoiceIds = opInvoices.map(inv => inv._id);
+  const opPayments = await Payment.find({ 
+    hospital: req.hospitalFilter!.hospital, 
+    invoice: { $in: opInvoiceIds } 
+  }).sort({ paidAt: -1 });
+
+  // Create a map for invoiceId -> { totalPaid, lastPaymentDate }
+  const invoicePaymentMap = new Map();
+  opPayments.forEach(payment => {
+    const invId = payment.invoice.toString();
+    if (!invoicePaymentMap.has(invId)) {
+      invoicePaymentMap.set(invId, { totalPaid: 0, lastPaymentDate: payment.paidAt });
+    }
+    invoicePaymentMap.get(invId).totalPaid += payment.amount;
+  });
+
   // Map IP bills to conformed invoice structure
   const mappedIpInvoices = ipBills.map((bill: any) => {
+    const totalAmount = bill.grandTotal || 0;
+    const amountPaid = Math.max(0, totalAmount - (bill.outstanding || 0));
+    const amountDue = Math.max(0, bill.outstanding || 0);
     return {
       _id: bill._id,
       patient: bill.patient,
@@ -107,16 +127,38 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
         taxAmount: bill.taxRate,
         total: bill.grandTotal,
         insuranceCovered: bill.insuranceCovered,
-        patientBalance: bill.outstanding
-      }
+        patientBalance: amountDue
+      },
+      totalAmount,
+      amountPaid,
+      amountDue,
+      lastPaymentDate: null
     };
   });
 
   // Map OP invoices
-  const mappedOpInvoices = opInvoices.map((inv: any) => ({
-    ...inv.toObject(),
-    totals: computeTotals(inv)
-  }));
+  const mappedOpInvoices = opInvoices.map((inv: any) => {
+    const invObj = inv.toObject();
+    const paymentData = invoicePaymentMap.get(inv._id.toString()) || { totalPaid: 0, lastPaymentDate: null };
+    const computedTotals = computeTotals(inv);
+
+    const totalAmount = invObj.totalAmount ?? computedTotals.total;
+    const amountPaid = invObj.amountPaid ?? paymentData.totalPaid;
+    const amountDue = invObj.amountDue ?? Math.max(0, totalAmount - amountPaid);
+    const lastPaymentDate = invObj.lastPaymentDate ?? paymentData.lastPaymentDate;
+
+    return {
+      ...invObj,
+      totals: {
+        ...computedTotals,
+        patientBalance: amountDue
+      },
+      totalAmount,
+      amountPaid,
+      amountDue,
+      lastPaymentDate
+    };
+  });
 
   // Combine and sort
   const combined = [...mappedOpInvoices, ...mappedIpInvoices];
@@ -176,7 +218,36 @@ export const getInvoice = catchAsync(async (req: Request, res: Response) => {
   if (!invoice) {
     throw new AppError("Invoice not found.", 404);
   }
-  res.json({ status: "success", data: { invoice: { ...invoice.toObject(), totals: computeTotals(invoice) } } });
+  
+  // Fetch payments for this invoice
+  const payments = await Payment.find({ 
+    hospital: req.hospitalFilter!.hospital, 
+    invoice: invoice._id 
+  }).sort({ paidAt: -1 });
+  
+  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+  const lastPaymentDate = payments.length > 0 ? payments[0].paidAt : null;
+  
+  const invObj = invoice.toObject();
+  const computedTotals = computeTotals(invoice);
+  
+  const totalAmount = invObj.totalAmount ?? computedTotals.total;
+  const amountPaid = invObj.amountPaid ?? totalPaid;
+  const amountDue = invObj.amountDue ?? Math.max(0, totalAmount - amountPaid);
+  
+  res.json({ 
+    status: "success", 
+    data: { 
+      invoice: { 
+        ...invObj, 
+        totals: { ...computedTotals, patientBalance: amountDue },
+        totalAmount,
+        amountPaid,
+        amountDue,
+        lastPaymentDate
+      } 
+    } 
+  });
 });
 
 export const updateInvoice = catchAsync(async (req: Request, res: Response) => {

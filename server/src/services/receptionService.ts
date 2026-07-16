@@ -507,6 +507,11 @@ export class ReceptionService {
         total,
         patientBalance: isFree ? 0 : total
       },
+      // New fields for proper partial payment tracking
+      totalAmount: total,
+      amountPaid: isFree ? total : 0,
+      amountDue: isFree ? 0 : total,
+      lastPaymentDate: isFree ? new Date() : null,
       // Store provisional appointment data in the invoice for later use
       provisionalData: {
         doctorId,
@@ -678,6 +683,17 @@ export class ReceptionService {
         throw new AppError("Invoice is already paid.", 400);
       }
 
+      // Calculate current outstanding before this payment
+      const existingPayments = await Payment.find({ invoice: invoiceId, hospital: hospitalId }).session(session);
+      const currentPaid = existingPayments.reduce((sum, p) => sum + p.amount, 0);
+      const invoiceTotal = invoice.totals.total;
+      const currentOutstanding = invoiceTotal - currentPaid;
+
+      // Validate payment amount doesn't exceed outstanding
+      if (amount > currentOutstanding) {
+        throw new AppError(`Payment amount cannot exceed outstanding balance of ₹${currentOutstanding}`, 400);
+      }
+
       const transactionId = `TXN-${generateDigits(10)}`;
 
       const newPayment = await ReceptionRepository.createPayment({
@@ -691,11 +707,10 @@ export class ReceptionService {
         paidAt: new Date()
       });
 
-      // Fetch all payments for this invoice
-      const allPayments = await Payment.find({ invoice: invoiceId, hospital: hospitalId });
+      // Fetch all payments for this invoice (including new one)
+      const allPayments = await Payment.find({ invoice: invoiceId, hospital: hospitalId }).session(session);
       const totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
 
-      const invoiceTotal = invoice.totals.total;
       const remainingBalance = Math.max(0, invoiceTotal - totalPaid);
       const newStatus = remainingBalance === 0 ? "paid" : "partially_paid";
 
@@ -703,7 +718,11 @@ export class ReceptionService {
         { _id: invoiceId, hospital: hospitalId },
         { 
           status: newStatus, 
-          "totals.patientBalance": remainingBalance 
+          "totals.patientBalance": remainingBalance,
+          totalAmount: invoiceTotal,
+          amountPaid: totalPaid,
+          amountDue: remainingBalance,
+          lastPaymentDate: new Date()
         },
         { new: true, session }
       );
@@ -712,9 +731,10 @@ export class ReceptionService {
       let tokenNumber = "N/A";
       let queueNumber = "N/A";
       let queueRecord: any = null;
+      const isFirstPayment = existingPayments.length === 0; // Check if this is the first payment
 
-      // If invoice has provisional data and payment is now fully paid, create appointment now
-      if (newStatus === "paid" && (invoice as any).provisionalData?.doctorId) {
+      // If invoice has provisional data AND it's the FIRST payment (partial or full), create appointment now
+      if (isFirstPayment && (invoice as any).provisionalData?.doctorId) {
         const provisionalData = (invoice as any).provisionalData;
         const bookingDate = new Date(provisionalData.date);
         const today = new Date();
@@ -969,7 +989,7 @@ export class ReceptionService {
         consultationFee: consultationItem?.amount ?? 0,
         gst: 0,
         discount: 0,
-        total: (invoice as any).totals?.total ?? amount
+        total: invoiceTotal
       };
 
       await session.commitTransaction();
