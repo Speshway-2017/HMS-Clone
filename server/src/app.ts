@@ -32,6 +32,8 @@ import admissionRequestRoutes from "./routes/admissionRequestRoutes";
 import prescriptionRoutes from "./routes/prescriptionRoutes";
 import { getPatientPrescriptions } from "./controllers/prescriptionController";
 import { protect } from "./middleware/auth";
+import { getMongoStatus } from "./config/db";
+import { getSocketStatus } from "./config/socket";
 import "./config/cloudinary";
 
 const app = express();
@@ -43,8 +45,17 @@ if (env.nodeEnv !== "test") {
   app.use(morgan("dev"));
 }
 
+const packageJson = require("../package.json");
+
 app.get("/api/v1/health", (_req, res) => {
-  res.json({ status: "ok" });
+  res.json({
+    status: "ok",
+    server: "running",
+    mongodb: getMongoStatus() ? "connected" : "disconnected",
+    socket: getSocketStatus() ? "initialized" : "not_initialized",
+    version: packageJson.version || "1.0.0",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 app.use("/api/v1/auth", authRoutes);

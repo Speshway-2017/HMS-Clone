@@ -83,11 +83,68 @@ export const getTodayAppointments = catchAsync(async (req: Request, res: Respons
   res.json({ status: "success", data });
 });
 
+function getQueuePriorityScore(item: any, now: Date) {
+  const appt = item.appointment;
+  const isEmergency = item.type === "emergency" || appt?.type === "Emergency";
+  if (isEmergency) return 1;
+
+  const isAppointment = appt?.type === "Consultation" || appt?.type === "Appointment";
+  if (isAppointment) {
+    if (!appt.time) return 4;
+    const [hours, minutes] = appt.time.split(":").map(Number);
+    const slotTime = new Date(item.createdAt);
+    slotTime.setHours(hours, minutes, 0, 0);
+
+    if (now >= slotTime) {
+      return 2;
+    } else {
+      return 4;
+    }
+  }
+
+  return 3; // Walk-in
+}
+
+function compareQueueItems(a: any, b: any) {
+  const now = new Date();
+  const scoreA = getQueuePriorityScore(a, now);
+  const scoreB = getQueuePriorityScore(b, now);
+
+  if (scoreA !== scoreB) {
+    return scoreA - scoreB;
+  }
+
+  if (scoreA === 1) {
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  }
+  if (scoreA === 2) {
+    return (a.appointment?.time || "").localeCompare(b.appointment?.time || "");
+  }
+  if (scoreA === 3) {
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  }
+  if (scoreA === 4) {
+    return (a.appointment?.time || "").localeCompare(b.appointment?.time || "");
+  }
+
+  return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+}
+
 // 3. Waiting Queue List & Actions
 export const getQueue = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
-  const data = await DoctorDashboardRepository.getWaitingPatients(hospitalId, doctor._id.toString());
+  const rawQueue = await DoctorDashboardRepository.getWaitingPatients(hospitalId, doctor._id.toString());
+  
+  const sortedQueue = rawQueue.sort(compareQueueItems);
+  const data = sortedQueue.map((item: any, index: number) => {
+    const plain = item.toObject ? item.toObject() : item;
+    return {
+      ...plain,
+      queuePosition: index + 1
+    };
+  });
+
   res.json({ status: "success", data });
 });
 

@@ -9,7 +9,13 @@ import { FormSection } from "../../components/ui/FormSection";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 
-const TYPES = ["Consultation", "Follow-up", "Tele-Health", "Emergency", "Procedure"];
+
+const TYPES = [
+  "Appointment",
+  "Walk-in",
+  "Emergency"
+];
+
 
 export function AppointmentFormPage() {
   const navigate = useNavigate();

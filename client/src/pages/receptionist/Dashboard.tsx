@@ -11,11 +11,13 @@ import {
   Stethoscope,
   LayoutGrid
 } from "lucide-react";
-import { useReceptionStats } from "../../features/receptionist";
+import { useReceptionStats, useQueueDetails } from "../../features/receptionist";
+import { useCheckInAppointment } from "../../features/appointments";
 import { useNotifications } from "../../features/notifications";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { Card } from "../../components/ui/Card";
 import { formatINR } from "../../lib/currency";
+import toast from "react-hot-toast";
 
 function relativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -42,6 +44,8 @@ function KpiSkeleton() {
 
 export function ReceptionistDashboard() {
   const { data: stats, isLoading } = useReceptionStats();
+  const { data: queueDetails, isLoading: queueDetailsLoading, refetch: refetchQueueDetails } = useQueueDetails();
+  const checkInMutation = useCheckInAppointment();
   const { data: notifData } = useNotifications();
   const notifications = notifData?.data?.notifications ?? [];
 
@@ -132,24 +136,116 @@ export function ReceptionistDashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <h3 className="mb-4 text-base font-semibold text-slate-800">Front Desk Queue State</h3>
-          <div className="flex flex-col justify-center space-y-4 rounded-lg bg-slate-50 p-6 text-center text-slate-500 border border-slate-100">
-            <Activity className="mx-auto h-12 w-12 text-slate-400" />
-            <div>
-              <p className="font-semibold text-slate-700">Token Queue Status</p>
-              <p className="text-xs text-slate-500 mt-1">There are currently {stats?.waitingQueue ?? 0} patients in the waiting line.</p>
+        <div className="lg:col-span-2 space-y-6">
+          {/* Upcoming Appointments Widget */}
+          <Card>
+            <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+              <h3 className="text-base font-semibold text-slate-800 flex items-center gap-1.5">
+                <CalendarCheck className="h-4.5 w-4.5 text-indigo-650" />
+                Upcoming Appointments & Live Check-In
+              </h3>
+              <span className="rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-xs font-bold text-indigo-700">
+                {queueDetails?.upcomingAppointments?.length ?? 0} Alerts Today
+              </span>
             </div>
-            <div className="flex justify-center gap-4">
-              <Link to="/receptionist/queue" className="rounded-lg bg-navy-700 px-4 py-2 text-xs font-semibold text-white hover:bg-navy-800">
-                Manage Token Queue
-              </Link>
-              <Link to="/receptionist/queue/display" target="_blank" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                Launch TV Display Board
-              </Link>
+
+            {queueDetailsLoading ? (
+              <div className="py-8 text-center text-slate-400">Loading alerts...</div>
+            ) : !queueDetails?.upcomingAppointments || queueDetails.upcomingAppointments.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs">
+                No upcoming appointments requiring immediate check-in.
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                {queueDetails.upcomingAppointments.map((appt: any) => {
+                  const borderColors = {
+                    green: "border-emerald-250 bg-emerald-50/20",
+                    orange: "border-amber-250 bg-amber-50/20",
+                    red: "border-rose-250 bg-rose-50/20"
+                  };
+                  const badgeColors = {
+                    green: "bg-emerald-100 text-emerald-800 border-emerald-200",
+                    orange: "bg-amber-100 text-amber-800 border-amber-200",
+                    red: "bg-rose-100 text-rose-800 border-rose-200"
+                  };
+                  const color = appt.alertColor || "green";
+
+                  return (
+                    <div
+                      key={appt._id}
+                      className={`flex flex-col sm:flex-row sm:items-center justify-between border rounded-xl p-3.5 transition-all ${borderColors[color]}`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 text-sm">{appt.patient?.name}</span>
+                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${badgeColors[color]}`}>
+                            {appt.alertLabel}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          Dr. {appt.doctor?.name} ({appt.doctor?.specialization || "General"}) · Slot: <span className="font-bold text-slate-700">{appt.time}</span>
+                        </p>
+                      </div>
+
+                      <div className="mt-3 sm:mt-0 flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await checkInMutation.mutateAsync(appt._id);
+                              toast.success("Patient checked in successfully!");
+                              refetchQueueDetails();
+                            } catch (err: any) {
+                              toast.error(err.response?.data?.message || err.message || "Failed to check in");
+                            }
+                          }}
+                          disabled={checkInMutation.isPending}
+                          className="rounded-lg bg-indigo-650 hover:bg-indigo-700 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors"
+                        >
+                          Check-In
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+
+          {/* Detailed Live Queue Analytics */}
+          <Card>
+            <h3 className="mb-4 text-base font-semibold text-slate-800 flex items-center gap-1.5">
+              <Activity className="h-4.5 w-4.5 text-emerald-600" />
+              Live Queue Desk Overview
+            </h3>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-450">Waiting Patients</p>
+                <p className="mt-1 text-2xl font-bold text-amber-600">{queueDetails?.waitingPatients?.length ?? 0}</p>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-450">Walk-In Queue</p>
+                <p className="mt-1 text-2xl font-bold text-indigo-650">{queueDetails?.currentWalkInQueue?.length ?? 0}</p>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-450">Checked-In Today</p>
+                <p className="mt-1 text-2xl font-bold text-slate-800">{queueDetails?.checkedInPatients?.length ?? 0}</p>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-450">In Consultation</p>
+                <p className="mt-1 text-2xl font-bold text-emerald-650">{queueDetails?.currentlyConsulting?.length ?? 0}</p>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-450">Missed Appts</p>
+                <p className="mt-1 text-2xl font-bold text-rose-600">{queueDetails?.missedAppointments?.length ?? 0}</p>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-450">Completed Visits</p>
+                <p className="mt-1 text-2xl font-bold text-green-700">{queueDetails?.completedVisits?.length ?? 0}</p>
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
 
         <div className="space-y-6">
           <Card>

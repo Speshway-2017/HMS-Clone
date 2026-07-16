@@ -2,6 +2,7 @@ import { Server as HTTPServer } from "http";
 import { Server, Socket } from "socket.io";
 
 let io: Server | null = null;
+let isSocketInitialized = false;
 
 export function initSocket(server: HTTPServer, clientUrl: string) {
   io = new Server(server, {
@@ -10,6 +11,8 @@ export function initSocket(server: HTTPServer, clientUrl: string) {
       methods: ["GET", "POST"],
     },
   });
+
+  isSocketInitialized = true;
 
   io.on("connection", (socket: Socket) => {
     console.log(`Socket connected: ${socket.id}`);
@@ -31,7 +34,26 @@ export function initSocket(server: HTTPServer, clientUrl: string) {
     });
   });
 
+  console.log("✓ Socket.IO initialized");
   return io;
+}
+
+export function closeSocket(): Promise<void> {
+  return new Promise((resolve) => {
+    if (io) {
+      io.close(() => {
+        isSocketInitialized = false;
+        console.log("✓ Socket.IO closed");
+        resolve();
+      });
+    } else {
+      resolve();
+    }
+  });
+}
+
+export function getSocketStatus(): boolean {
+  return isSocketInitialized && io !== null;
 }
 
 export function getIO(): Server {

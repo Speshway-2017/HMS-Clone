@@ -21,6 +21,9 @@ async function getLoggedDoctor(req: Request) {
 }
 
 export const createAdmissionRequest = catchAsync(async (req: Request, res: Response) => {
+  if (!["doctor", "hospital_admin", "super_admin"].includes(req.user!.role)) {
+    throw new AppError("Forbidden: You do not have permission to recommend admissions.", 403);
+  }
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const {
     appointmentId,
@@ -37,7 +40,7 @@ export const createAdmissionRequest = catchAsync(async (req: Request, res: Respo
     throw new AppError("Diagnosis is mandatory for admission recommendation.", 400);
   }
 
-  const doctor = await getLoggedDoctor(req);
+    const doctor = await getLoggedDoctor(req);
 
   const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: doctor._id })
     .populate("patient")
@@ -217,6 +220,9 @@ export const getAdmissionRequests = catchAsync(async (req: Request, res: Respons
 });
 
 export const rejectAdmissionRequest = catchAsync(async (req: Request, res: Response) => {
+  if (!["receptionist", "hospital_admin", "super_admin"].includes(req.user!.role)) {
+    throw new AppError("Forbidden: You do not have permission to reject admission requests.", 403);
+  }
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const requestId = req.params.id;
   const { reason = "" } = req.body;

@@ -102,6 +102,7 @@ export const getPatientDetail = catchAsync(async (req: Request, res: Response) =
 });
 
 export const getDashboardStats = catchAsync(async (req: Request, res: Response) => {
+  await ReceptionService.generateScheduledAlerts(req.hospitalFilter!.hospital as any);
   const stats = await ReceptionService.getStats(req.hospitalFilter!.hospital as any);
   res.json({ status: "success", data: stats });
 });
@@ -232,6 +233,9 @@ export const getAdmissionRequests = catchAsync(async (req: Request, res: Respons
 });
 
 export const admitPatient = catchAsync(async (req: Request, res: Response) => {
+  if (!["receptionist", "hospital_admin", "super_admin"].includes(req.user!.role)) {
+    throw new AppError("Forbidden: You do not have permission to perform this action.", 403);
+  }
   const admissionData = admissionSchema.parse(req.body);
   const result = await ReceptionService.admitPatient(
     req.hospitalFilter!.hospital as any,
@@ -242,6 +246,9 @@ export const admitPatient = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const rejectAdmissionRequest = catchAsync(async (req: Request, res: Response) => {
+  if (!["receptionist", "hospital_admin", "super_admin"].includes(req.user!.role)) {
+    throw new AppError("Forbidden: You do not have permission to perform this action.", 403);
+  }
   const result = await ReceptionService.rejectAdmissionRequest(
     req.hospitalFilter!.hospital as any,
     req.params.id,
@@ -251,6 +258,9 @@ export const rejectAdmissionRequest = catchAsync(async (req: Request, res: Respo
 });
 
 export const transferPatient = catchAsync(async (req: Request, res: Response) => {
+  if (!["receptionist", "hospital_admin", "super_admin"].includes(req.user!.role)) {
+    throw new AppError("Forbidden: You do not have permission to perform this action.", 403);
+  }
   const transferData = z.object({
     admissionId: z.string().min(1),
     newRoomId: z.string().min(1),
@@ -267,12 +277,66 @@ export const transferPatient = catchAsync(async (req: Request, res: Response) =>
 });
 
 export const getAdmissions = catchAsync(async (req: Request, res: Response) => {
-  const status = (req.query.status as "admitted" | "discharged" | "discharge_requested") || "admitted";
-  const admissions = await ReceptionRepository.listAdmissions(req.hospitalFilter!.hospital as any, status);
+  const status = (req.query.status as string) || "admitted";
+  const patientId = req.query.patientId as string | undefined;
+
+  let query: any = {
+    hospital: req.hospitalFilter!.hospital as any,
+  };
+
+  if (patientId) {
+    query.patient = patientId;
+  }
+
+  if (status === "admitted") {
+    query.status = {
+      $in: [
+        "admitted",
+        "Admitted",
+        "Bed Allocated",
+        "Under Observation",
+        "Waiting for Bed",
+        "In Ward",
+        "ICU",
+        "Operation Scheduled",
+        "Under Treatment",
+        "Transferred"
+      ]
+    };
+  } else if (status === "discharge_requested") {
+    query.status = "discharge_requested";
+  } else if (status === "discharged") {
+    query.status = {
+      $in: [
+        "discharged",
+        "Discharged",
+        "Cancelled",
+        "Expired",
+        "Against Medical Advice (AMA)",
+        "Transferred Out (Final)"
+      ]
+    };
+  } else if (status === "all") {
+    // No status filter
+  } else {
+    query.status = status;
+  }
+
+  const admissions = await Admission.find(query)
+    .populate("patient", "name uhid phone age gender bloodGroup")
+    .populate("room")
+    .populate("bed")
+    .populate("admittingDoctor", "name specialization")
+    .populate("dischargeRequestedBy", "name specialization")
+    .sort({ admissionDate: -1 });
+
   res.json({ status: "success", data: { admissions } });
 });
 
 export const requestDischarge = catchAsync(async (req: Request, res: Response) => {
+  if (!["receptionist", "hospital_admin", "super_admin"].includes(req.user!.role)) {
+    throw new AppError("Forbidden: You do not have permission to perform this action.", 403);
+  }
   const admissionId = req.params.id;
   const notes = req.body.notes || "";
   const admission = await ReceptionService.requestDischarge(req.hospitalFilter!.hospital as any, admissionId, notes, req.user!._id);
@@ -294,6 +358,7 @@ export const getRoomsAvailability = catchAsync(async (req: Request, res: Respons
 });
 
 export const getNotifications = catchAsync(async (req: Request, res: Response) => {
+  await ReceptionService.generateScheduledAlerts(req.hospitalFilter!.hospital as any);
   const notifs = await ReceptionRepository.getNotificationsByRole(req.hospitalFilter!.hospital as any, "receptionist");
   res.json({ status: "success", data: { notifications: notifs } });
 });
@@ -549,5 +614,116 @@ export const getBookedSlots = catchAsync(async (req: Request, res: Response) => 
 
   const bookedSlots = appointments.map(appt => appt.time);
   res.json({ status: "success", data: { bookedSlots } });
+});
+
+export const checkInAppointment = catchAsync(async (req: Request, res: Response) => {
+  const appointmentId = req.params.id;
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const result = await ReceptionService.checkInAppointment(
+    hospitalId,
+    appointmentId,
+    req.user!._id
+  );
+  res.json({ status: "success", data: result });
+});
+
+export const getQueueDetails = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  
+  // Update scheduled alerts
+  await ReceptionService.generateScheduledAlerts(hospitalId);
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+
+  // Fetch all appointments today
+  const appointments = await Appointment.find({
+    hospital: hospitalId,
+    date: { $gte: startOfToday, $lte: endOfToday }
+  })
+    .populate("patient", "name uhid phone age gender")
+    .populate("doctor", "name specialization department consultationFee")
+    .populate("department", "name")
+    .sort({ time: 1 });
+
+  // Fetch all queue items today
+  const queueItems = await Queue.find({
+    hospital: hospitalId,
+    createdAt: { $gte: startOfToday, $lte: endOfToday }
+  })
+    .populate("patient", "name uhid phone age gender")
+    .populate("doctor", "name specialization")
+    .populate("department", "name")
+    .populate("appointment");
+
+  const now = new Date();
+
+  const getSlotTimeDiff = (timeStr: string) => {
+    if (!timeStr) return 0;
+    const [hours, minutes] = timeStr.split(":").map(Number);
+    const slotTime = new Date();
+    slotTime.setHours(hours, minutes, 0, 0);
+    return (slotTime.getTime() - now.getTime()) / (60 * 1000);
+  };
+
+  const upcomingAppointments: any[] = [];
+  
+  appointments.forEach((appt: any) => {
+    if (appt.status === "scheduled") {
+      const diff = getSlotTimeDiff(appt.time);
+      let alertColor: "green" | "orange" | "red" = "green";
+      let alertLabel = "Upcoming";
+
+      if (diff > 15) {
+        alertColor = "green";
+        alertLabel = "Upcoming";
+      } else if (diff >= 0 && diff <= 15) {
+        alertColor = "green";
+        alertLabel = "Ready for Check-In";
+      } else if (diff < 0 && diff >= -15) {
+        alertColor = "orange";
+        alertLabel = "Due Now";
+      } else {
+        alertColor = "red";
+        alertLabel = "Late Arrival";
+      }
+
+      upcomingAppointments.push({
+        _id: appt._id,
+        referenceId: appt.referenceId,
+        patient: appt.patient,
+        doctor: appt.doctor,
+        department: appt.department,
+        time: appt.time,
+        status: appt.status,
+        type: appt.type,
+        diff,
+        alertColor,
+        alertLabel
+      });
+    }
+  });
+
+  const waitingPatients = queueItems.filter(q => q.status === "waiting");
+  const currentlyConsulting = queueItems.filter(q => q.status === "called");
+  const completedVisits = appointments.filter(a => a.status === "completed");
+  const checkedInPatients = queueItems.filter(q => q.status === "waiting" || q.status === "called");
+  const currentWalkInQueue = queueItems.filter(q => q.status === "waiting" && q.appointment?.type === "Walk-in");
+  const missedAppointments = appointments.filter(a => a.status === "no_show" || a.status === "missed");
+
+  res.json({
+    status: "success",
+    data: {
+      upcomingAppointments,
+      currentWalkInQueue,
+      checkedInPatients,
+      waitingPatients,
+      currentlyConsulting,
+      missedAppointments,
+      completedVisits
+    }
+  });
 });
 

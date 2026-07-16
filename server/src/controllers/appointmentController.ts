@@ -1,13 +1,29 @@
 import { Request, Response } from "express";
 import { z } from "zod";
-import { Appointment, APPOINTMENT_STATUSES } from "../models/Appointment";
+import { Appointment, APPOINTMENT_STATUSES, APPOINTMENT_TYPES } from "../models/Appointment";
 import { Doctor } from "../models/Doctor";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 
-function generateReferenceId(): string {
-  return `APT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+async function generateReferenceId(hospitalId: string, bookingDate: Date): Promise<string> {
+  const dateStr = bookingDate.toISOString().split("T")[0].replace(/-/g, "");
+  const aptPrefix = `APT-${dateStr}-`;
+  
+  const latestAppt = await Appointment.findOne({
+    hospital: hospitalId,
+    referenceId: new RegExp(`^${aptPrefix}`)
+  }).sort({ createdAt: -1 });
+
+  let nextSerial = 1;
+  if (latestAppt) {
+    const serialPart = latestAppt.referenceId.replace(aptPrefix, "");
+    const lastSerial = parseInt(serialPart, 10);
+    if (!isNaN(lastSerial)) {
+      nextSerial = lastSerial + 1;
+    }
+  }
+  return `${aptPrefix}${String(nextSerial).padStart(6, "0")}`;
 }
 
 async function getLoggedDoctor(req: Request) {
@@ -24,7 +40,7 @@ const appointmentSchema = z.object({
   department: z.string().optional().nullable(),
   date: z.coerce.date(),
   time: z.string().min(1),
-  type: z.string().optional().default("Consultation"),
+  type: z.enum(APPOINTMENT_TYPES as unknown as [string, ...string[]]).optional().default("Appointment"),
   status: z.enum(APPOINTMENT_STATUSES).optional(),
   notes: z.string().optional().default(""),
 });
@@ -78,7 +94,7 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
     throw new AppError("The selected doctor is inactive, retired, or does not exist.", 400);
   }
 
-  // Duplicate appointment guard: Patient + Doctor + Date (any status except cancelled/no_show/completed)
+  // 1. Duplicate appointment guard: Patient + Doctor + Date (any status except cancelled/no_show/completed/missed)
   if (body.patient && body.doctor && body.date) {
     const startOfDay = new Date(body.date as unknown as Date);
     startOfDay.setHours(0, 0, 0, 0);
@@ -90,7 +106,7 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
       patient: body.patient,
       doctor: body.doctor,
       date: { $gte: startOfDay, $lte: endOfDay },
-      status: { $nin: ["cancelled", "no_show", "completed"] },
+      status: { $nin: ["cancelled", "no_show", "completed", "missed"] },
     });
 
     if (existing) {
@@ -102,10 +118,24 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
     }
   }
 
+  // 2. Prevent two active appointments for the same doctor and same time slot
+  const slotClash = await Appointment.findOne({
+    hospital: req.hospitalFilter!.hospital,
+    doctor: body.doctor,
+    date: body.date,
+    time: body.time,
+    status: { $nin: ["cancelled", "no_show", "completed", "missed"] }
+  });
+  if (slotClash) {
+    throw new AppError("This time slot is already booked for this doctor. Please choose a different slot.", 409);
+  }
+
+  const referenceId = await generateReferenceId(req.hospitalFilter!.hospital.toString(), new Date(body.date));
+
   const appointment = await Appointment.create({
     ...body,
     hospital: req.hospitalFilter!.hospital,
-    referenceId: generateReferenceId(),
+    referenceId,
   });
   res.status(201).json({ status: "success", data: { appointment } });
 });

@@ -307,12 +307,14 @@ export function useAdmissionRequests() {
   });
 }
 
-export function useAdmissions(status: "admitted" | "discharged" | "discharge_requested" = "admitted") {
+export function useAdmissions(params?: string | { status?: string; patientId?: string }) {
+  const queryParams = typeof params === "string" ? { status: params } : params;
+  const status = queryParams?.status || "admitted";
   return useQuery({
-    queryKey: ["reception", "admissions", "list", status],
+    queryKey: ["reception", "admissions", "list", queryParams],
     queryFn: async () => {
       const res = await api.get<{ data: { admissions: InpatientAdmission[] } }>("/reception/admissions", {
-        params: { status }
+        params: queryParams
       });
       return res.data.data.admissions;
     },
@@ -507,8 +509,11 @@ export function usePatientDetails(id: string | undefined) {
     queryKey: ["reception", "patients", "one", id],
     enabled: !!id,
     queryFn: async () => {
-      const res = await api.get<{ data: { patient: any } }>(`/patients/${id}`);
-      return res.data.data.patient;
+      const res = await api.get<{ data: { patient: any; activeAdmission?: any } }>(`/patients/${id}`);
+      return {
+        ...res.data.data.patient,
+        activeAdmission: res.data.data.activeAdmission
+      };
     }
   });
 }
@@ -642,6 +647,26 @@ export function usePatientDetail(patientId: string) {
       return res.data.data;
     },
     enabled: !!patientId
+  });
+}
+
+export interface QueueDetails {
+  upcomingAppointments: any[];
+  currentWalkInQueue: any[];
+  checkedInPatients: any[];
+  waitingPatients: any[];
+  currentlyConsulting: any[];
+  missedAppointments: any[];
+  completedVisits: any[];
+}
+
+export function useQueueDetails() {
+  return useQuery({
+    queryKey: ["reception", "queue-details"],
+    queryFn: async () => {
+      const res = await api.get<{ data: QueueDetails }>("/reception/dashboard/queue-details");
+      return res.data.data;
+    },
   });
 }
 

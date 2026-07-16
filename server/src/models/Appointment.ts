@@ -1,12 +1,20 @@
 import { Schema, model, InferSchemaType, Types } from "mongoose";
 
+export const APPOINTMENT_TYPES = [
+  "Appointment",
+  "Walk-in",
+  "Emergency",
+] as const;
+
 export const APPOINTMENT_STATUSES = [
   "scheduled",
   "checked_in",
+  "waiting",
   "in_consultation",
   "completed",
   "cancelled",
   "no_show",
+  "missed",
 ] as const;
 
 const appointmentSchema = new Schema(
@@ -18,7 +26,11 @@ const appointmentSchema = new Schema(
     department: { type: Schema.Types.ObjectId, ref: "Department", default: null },
     date: { type: Date, required: true },
     time: { type: String, required: true },
-    type: { type: String, default: "Consultation" },
+    type: { 
+      type: String, 
+      enum: APPOINTMENT_TYPES, 
+      default: "Appointment" 
+    },
     status: { type: String, enum: APPOINTMENT_STATUSES, default: "scheduled" },
     notes: { type: String, default: "" },
     chiefComplaint: { type: String, default: "" },

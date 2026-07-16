@@ -142,7 +142,46 @@ export const getPatient = catchAsync(async (req: Request, res: Response) => {
   if (!patient) {
     throw new AppError("Patient not found.", 404);
   }
-  res.json({ status: "success", data: { patient } });
+
+  // Find active admission and populate room, bed, admitting doctor
+  const activeAdmission = await Admission.findOne({
+    hospital: req.hospitalFilter?.hospital,
+    patient: patient._id,
+    status: {
+      $in: [
+        "admitted",
+        "Admitted",
+        "Bed Allocated",
+        "Under Observation",
+        "Waiting for Bed",
+        "In Ward",
+        "ICU",
+        "Operation Scheduled",
+        "Under Treatment",
+        "Transferred"
+      ]
+    }
+  })
+  .populate("room", "roomNumber")
+  .populate("bed", "bedNumber")
+  .populate("admittingDoctor", "name");
+
+  res.json({
+    status: "success",
+    data: {
+      patient,
+      activeAdmission: activeAdmission ? {
+        _id: activeAdmission._id,
+        admissionNumber: activeAdmission.admissionNumber,
+        status: activeAdmission.status,
+        admissionDate: activeAdmission.admissionDate,
+        ward: activeAdmission.ward,
+        roomNumber: (activeAdmission.room as any)?.roomNumber || "N/A",
+        bedNumber: (activeAdmission.bed as any)?.bedNumber || "N/A",
+        admittingDoctor: (activeAdmission.admittingDoctor as any)?.name || "N/A"
+      } : null
+    }
+  });
 });
 
 export const updatePatient = catchAsync(async (req: Request, res: Response) => {

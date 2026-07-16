@@ -101,12 +101,17 @@ export function QueuePage() {
             const patientName = patient?.name || "Unknown Patient";
             const arrivalTime = new Date(item.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
             const waitingTimeMins = Math.floor((new Date().getTime() - new Date(item.createdAt).getTime()) / (60 * 1000));
-            const priority = item.type || "regular";
+            const visitType = item.appointment?.type || (item.type === "emergency" ? "Emergency" : "Walk-in");
+            const visitTypeColors = {
+              "Emergency": "bg-red-50 text-red-700 border-red-200",
+              "Walk-in": "bg-amber-50 text-amber-700 border-amber-200",
+              "Consultation": "bg-emerald-50 text-emerald-700 border-emerald-200"
+            } as any;
 
             return (
               <div
                 key={item._id}
-                className={`flex flex-col md:flex-row md:items-center justify-between border rounded-xl p-4 transition-all duration-300 hover:shadow-sm ${
+                className={`flex flex-col lg:flex-row lg:items-center justify-between border rounded-xl p-4 transition-all duration-300 hover:shadow-sm ${
                   item.status === "called" ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-white"
                 }`}
               >
@@ -117,9 +122,9 @@ export function QueuePage() {
                   <div>
                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                       {patientName}
-                      <Badge tone={PRIORITY_TONES[priority] || "neutral"}>
-                        {priority.toUpperCase()}
-                      </Badge>
+                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${visitTypeColors[visitType] || "bg-slate-50 text-slate-650 border-slate-200"}`}>
+                        {visitType}
+                      </span>
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
                       UHID: <span className="font-mono">{patient?.uhid || "—"}</span> · Age: {patient?.age || "—"} · Gender: {patient?.gender || "—"}
@@ -127,12 +132,20 @@ export function QueuePage() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-6 mt-4 md:mt-0">
-                  <div className="text-left md:text-right">
-                    <p className="text-xs text-slate-400">Arrival Time</p>
+                <div className="flex flex-wrap items-center gap-6 mt-4 lg:mt-0">
+                  <div className="text-left">
+                    <p className="text-xs text-slate-400">Position</p>
+                    <p className="text-sm font-bold text-indigo-750">#{item.queuePosition || 1}</p>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs text-slate-400">Slot Time</p>
+                    <p className="text-sm font-semibold text-slate-700">{item.appointment?.time || "—"}</p>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs text-slate-400">Check-In Time</p>
                     <p className="text-sm font-semibold text-slate-700">{arrivalTime}</p>
                   </div>
-                  <div className="text-left md:text-right">
+                  <div className="text-left">
                     <p className="text-xs text-slate-400">Waiting Time</p>
                     <p className="text-sm font-semibold text-slate-700">{waitingTimeMins > 0 ? `${waitingTimeMins} mins` : "Just arrived"}</p>
                   </div>

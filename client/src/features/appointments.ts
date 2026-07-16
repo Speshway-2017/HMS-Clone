@@ -67,3 +67,17 @@ export function useDeleteAppointment() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["appointments"] }),
   });
 }
+
+export function useCheckInAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.post(`/reception/appointments/${id}/check-in`);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["reception", "queue-details"] });
+    },
+  });
+}

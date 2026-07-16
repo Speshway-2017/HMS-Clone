@@ -21,7 +21,11 @@ import {
   Building,
   Activity,
   History,
-  Info
+  Info,
+  FlaskConical,
+  Scan,
+  Pill,
+  Receipt
 } from "lucide-react";
 import {
   useRegisterPatient,
@@ -31,8 +35,11 @@ import {
   useTodayRegistrations,
   useAdmitPatient,
   useRoomsAvailability,
-  useDoctorsAvailability
+  useDoctorsAvailability,
+  useAdmissions
 } from "../../features/receptionist";
+import { usePrescriptions } from "../../features/doctorDashboard";
+import { useInvoices } from "../../features/invoices";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -113,6 +120,18 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
   const { data: listData, isLoading: listLoading } = usePatientsList({ page, limit: 10 });
   const { data: todayData, isLoading: todayLoading } = useTodayRegistrations();
   const { data: patient, isLoading: patientLoading, error: patientError } = usePatientDetails(id);
+
+  // Redesigned right panel tabs state
+  const [profileTab, setProfileTab] = useState<"history" | "prescriptions" | "billing" | "reports">("history");
+
+  // Inpatient details and previous admissions modals
+  const [isAdmissionDetailsOpen, setIsAdmissionDetailsOpen] = useState(false);
+  const [isPreviousAdmissionsOpen, setIsPreviousAdmissionsOpen] = useState(false);
+
+  // Hook calls for prescriptions, bills, and admissions histories
+  const { data: prescriptions } = usePrescriptions(patient?._id ? { patient: patient._id } : undefined);
+  const { data: billsData } = useInvoices(patient?._id ? { patient: patient._id } : {});
+  const { data: previousAdmissions } = useAdmissions(patient?._id ? { status: "discharged", patientId: patient._id } : undefined);
 
   // Convert OP to IP specific hooks
   const { data: rooms } = useRoomsAvailability();
@@ -342,201 +361,6 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
       );
     }
 
-    if (successData) {
-      return (
-        <div className="space-y-6">
-          {/* Success Banner */}
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-6 text-center space-y-2 print:hidden">
-            <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-600 animate-bounce" />
-            <h2 className="text-xl font-bold text-slate-800">OP Patient Converted to Inpatient</h2>
-            <p className="text-sm text-slate-550 max-w-lg mx-auto">
-              Patient <b>{successData.wristBand?.patientName}</b> has been admitted under verbal instruction of doctor. Bed allocation and real-time dashboard notifications have been completed.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            
-            {/* 1. Admission Slip Card */}
-            <Card className="space-y-4 border border-slate-200 shadow-md p-6 bg-white relative">
-              <div className="absolute top-4 right-4 bg-navy-50 text-navy-700 font-bold font-mono text-xs px-2 py-0.5 rounded border border-navy-100">
-                ADMISSION SLIP
-              </div>
-              
-              {/* Header */}
-              <div className="text-center pb-4 border-b border-dashed border-slate-200">
-                <h3 className="text-base font-bold text-slate-800 uppercase tracking-wide">{successData.admissionSlip?.hospitalName}</h3>
-                <p className="text-[10px] text-slate-450 mt-0.5">INPATIENT DEPT (IPD) RECORD</p>
-              </div>
-
-              {/* Metadata fields */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-                <div>
-                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Admission No</span>
-                  <span className="font-bold text-indigo-700 font-mono">{successData.admissionSlip?.admissionNumber}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">UHID / Patient ID</span>
-                  <span className="font-semibold text-slate-700 font-mono">{successData.admissionSlip?.uhid}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Patient Name</span>
-                  <span className="font-bold text-slate-800">{successData.admissionSlip?.patientName}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Age / Gender</span>
-                  <span className="font-semibold text-slate-700">{successData.admissionSlip?.age} Yrs / {successData.admissionSlip?.gender}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Ward & Room</span>
-                  <span className="font-semibold text-slate-700">{successData.admissionSlip?.ward} (Room {successData.admissionSlip?.roomNumber})</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Allocated Bed</span>
-                  <span className="font-semibold text-slate-700">Bed {successData.admissionSlip?.bedNumber}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Admitting Doctor</span>
-                  <span className="font-semibold text-slate-700">Dr. {successData.admissionSlip?.admittingDoctorName}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Attender Name</span>
-                  <span className="font-semibold text-slate-700">{successData.admissionSlip?.attenderName}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Attender Phone</span>
-                  <span className="font-semibold text-slate-700">{successData.admissionSlip?.attenderPhone}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Admission Date & Time</span>
-                  <span className="font-semibold text-slate-700">{successData.admissionSlip?.admissionDate} @ {successData.admissionSlip?.admissionTime}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Insurance Provider</span>
-                  <span className="font-semibold text-slate-700">{successData.admissionSlip?.insuranceProvider}</span>
-                </div>
-              </div>
-
-              {/* OP consultation references */}
-              <div className="mt-4 pt-4 border-t border-slate-100 space-y-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-150">
-                <span className="font-bold text-slate-500 uppercase tracking-wider text-[8px] block">Previous Consultation Details</span>
-                <div className="grid grid-cols-2 gap-2 text-[10px]">
-                  <div>
-                    <span className="text-slate-400 block">Consulting Doctor:</span>
-                    <span className="font-semibold text-slate-750">{successData.admissionSlip?.lastConsultingDoctor}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">Consulting Dept:</span>
-                    <span className="font-semibold text-slate-750">{successData.admissionSlip?.lastConsultingDepartment}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">Consultation Date:</span>
-                    <span className="font-semibold text-slate-755">{successData.admissionSlip?.lastOpVisitDate}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block">Consultation Diagnosis:</span>
-                    <span className="font-semibold text-slate-755 italic">{successData.admissionSlip?.diagnosis}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment block */}
-              <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-                <div>
-                  <span className="text-slate-455 block uppercase tracking-wider text-[9px] font-bold">Advance Deposit Paid</span>
-                  <span className="font-bold text-slate-800">{formatINR(successData.admissionSlip?.advancePaid)}</span>
-                </div>
-                {successData.admissionSlip?.advancePaid > 0 && (
-                  <div className="text-right">
-                    <span className="text-slate-455 block uppercase tracking-wider text-[9px] font-bold">Receipt Number</span>
-                    <span className="font-semibold text-slate-700 font-mono">{successData.admissionSlip?.receiptNumber}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-2 print:hidden">
-                <Button onClick={() => window.print()} className="w-full flex items-center justify-center gap-1.5 text-xs py-2">
-                  <Printer className="h-4 w-4" /> Print Admission Slip
-                </Button>
-              </div>
-            </Card>
-
-            {/* 2. Wrist Band Card */}
-            <Card className="space-y-6 border border-slate-200 shadow-md p-6 bg-white flex flex-col justify-between">
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-sm font-bold text-slate-800">Patient Identification Wristband</h3>
-                  <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200">
-                    IPD BAND
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500">
-                  Generate and print the secure identification band to be strapped onto the patient's wrist immediately upon check-in.
-                </p>
-
-                {/* Band Preview Render */}
-                <div className="rounded-xl border border-sky-200 bg-sky-50/20 p-5 space-y-4 relative overflow-hidden ring-1 ring-sky-100">
-                  {/* Medical alert line */}
-                  <div className="absolute left-0 top-0 bottom-0 w-2.5 bg-sky-500" />
-                  
-                  <div className="pl-2 space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="text-[10px] font-bold text-sky-700 tracking-wider uppercase block">HMS SECURE ID BAND</span>
-                        <h4 className="text-base font-bold text-slate-900 mt-0.5">{successData.wristBand?.patientName}</h4>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[10px] font-bold text-slate-400 block">IP NUM</span>
-                        <span className="text-xs font-bold font-mono text-indigo-700">{successData.wristBand?.admissionNumber}</span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-[11px] border-t border-slate-100 pt-2 text-slate-600">
-                      <div>
-                        <span className="font-semibold text-slate-400">UHID:</span> <span className="font-medium font-mono">{successData.wristBand?.uhid}</span>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-slate-400">Gender/Age:</span> <span className="font-medium">{successData.wristBand?.gender} / {successData.wristBand?.age} Yrs</span>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-slate-400">Ward/Room/Bed:</span> <span className="font-medium">{successData.wristBand?.ward} - R{successData.wristBand?.roomNumber}/B{successData.wristBand?.bedNumber}</span>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-red-500">Allergies:</span> <span className="font-bold text-red-600">{successData.wristBand?.allergies}</span>
-                      </div>
-                    </div>
-
-                    {/* Simulated barcode representation */}
-                    <div className="pt-2 text-center select-none font-mono tracking-widest text-slate-455 text-xs border-t border-dashed border-slate-200">
-                      <div className="h-6 w-full bg-slate-800 rounded opacity-90 mb-1 flex items-center justify-center text-white text-[9px] font-bold uppercase tracking-wider">
-                        |||||| | |||| ||| | ||||| | |||
-                      </div>
-                      {successData.wristBand?.admissionNumber}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3 pt-4 print:hidden">
-                <Button onClick={() => window.print()} className="w-full flex items-center justify-center gap-1.5 text-xs py-2 bg-sky-700 hover:bg-sky-800">
-                  <Printer className="h-4 w-4" /> Print Patient Wristband
-                </Button>
-                
-                <div className="flex gap-2">
-                  <Button onClick={() => { setSuccessData(null); }} variant="secondary" className="flex-1 text-xs py-1.5">
-                    Back to Profile
-                  </Button>
-                  <Button onClick={() => navigate("/receptionist/patients")} variant="secondary" className="flex-1 text-xs py-1.5">
-                    Registry list
-                  </Button>
-                </div>
-              </div>
-            </Card>
-
-          </div>
-        </div>
-      );
-    }
-
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between print:hidden">
@@ -544,31 +368,55 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
             <h1 className="text-2xl font-bold text-slate-900">Patient Profile Console</h1>
             <p className="text-sm text-slate-500">Clinical ledger overview, basic health cards, and hospital records.</p>
           </div>
+          
           <div className="flex gap-2 items-center">
-            {patient.status !== "admitted" ? (
-              <Button
-                onClick={() => {
-                  setAttenderName(patient.emergencyContact?.name || "");
-                  setAttenderPhone(patient.emergencyContact?.phone || "");
-                  setInsuranceProvider(patient.insuranceProvider || "");
-                  setInsurancePolicyNumber(patient.insurancePolicyNumber || "");
-                  setIsConvertOpen(true);
-                }}
-                className="flex items-center gap-1 text-xs bg-indigo-700 hover:bg-indigo-800"
-              >
-                <Building className="h-4 w-4" /> Convert OP to IP
-              </Button>
-            ) : (
-              <span className="inline-flex items-center rounded-md bg-red-50 border border-red-200 text-red-700 px-3 py-1 text-xs font-bold uppercase tracking-wider">
-                ADMITTED INPATIENT
-              </span>
+            {/* INPATIENT buttons */}
+            {patient.status === "admitted" && (
+              <>
+                <Button
+                  onClick={() => setIsAdmissionDetailsOpen(true)}
+                  className="flex items-center gap-1 text-xs bg-indigo-700 hover:bg-indigo-800"
+                >
+                  <Building className="h-4 w-4" /> View Admission Details
+                </Button>
+                <Button
+                  onClick={() => navigate(`/receptionist/ip?tab=transfer&admissionId=${patient.activeAdmission?._id}`)}
+                  className="flex items-center gap-1 text-xs bg-sky-700 hover:bg-sky-800"
+                  disabled={!patient.activeAdmission?._id}
+                >
+                  <Building className="h-4 w-4" /> Transfer Patient
+                </Button>
+                <Button
+                  onClick={() => navigate(`/receptionist/ip?tab=admissions&dischargeAdmissionId=${patient.activeAdmission?._id}`)}
+                  className="flex items-center gap-1 text-xs bg-red-700 hover:bg-red-800"
+                  disabled={!patient.activeAdmission?._id}
+                >
+                  <Building className="h-4 w-4" /> Discharge Request
+                </Button>
+              </>
             )}
-            <Button variant="secondary" onClick={() => window.print()} className="flex items-center gap-1 text-xs">
-              <Printer className="h-4 w-4" /> Print Card
-            </Button>
-            <Button onClick={() => navigate(`/receptionist/appointments/new?patientId=${patient._id}`)} className="flex items-center gap-1 text-xs">
-              <Calendar className="h-4 w-4" /> Book Appointment
-            </Button>
+
+            {/* OUTPATIENT / DISCHARGED buttons */}
+            {patient.status !== "admitted" && (
+              <>
+                <Button variant="secondary" onClick={() => window.print()} className="flex items-center gap-1 text-xs">
+                  <Printer className="h-4 w-4" /> Print Card
+                </Button>
+                <Button onClick={() => navigate(`/receptionist/appointments/new?patientId=${patient._id}`)} className="flex items-center gap-1 text-xs bg-indigo-700 hover:bg-indigo-800">
+                  <Calendar className="h-4 w-4" /> Book Appointment
+                </Button>
+              </>
+            )}
+
+            {/* DISCHARGED specific extra button */}
+            {patient.status === "discharged" && (
+              <Button
+                onClick={() => setIsPreviousAdmissionsOpen(true)}
+                className="flex items-center gap-1 text-xs bg-emerald-700 hover:bg-emerald-800"
+              >
+                <History className="h-4 w-4" /> View Previous Admissions
+              </Button>
+            )}
           </div>
         </div>
 
@@ -604,7 +452,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                 </div>
                 <div>
                   <span className="block text-[8px] uppercase tracking-wider font-bold text-slate-400">Blood Group</span>
-                  <span className="font-bold text-slate-850">{patient.bloodGroup || "N/A"}</span>
+                  <span className="font-bold text-slate-855">{patient.bloodGroup || "N/A"}</span>
                 </div>
               </div>
               <div>
@@ -676,6 +524,37 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
               </div>
             </Card>
 
+            {patient.status === "admitted" && patient.activeAdmission && (
+              <Card className="bg-rose-50/40 border border-rose-100 space-y-3 p-4">
+                <div className="flex justify-between items-center border-b border-rose-100 pb-2">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-rose-800 flex items-center gap-1.5">
+                    <Building className="h-4 w-4" /> Active Admission Details
+                  </h3>
+                  <span className="text-[10px] font-mono font-bold bg-rose-100 text-rose-700 px-2 py-0.5 rounded">
+                    {patient.activeAdmission.admissionNumber}
+                  </span>
+                </div>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-450 font-medium">Current Ward:</span>
+                    <span className="font-bold text-slate-800">{patient.activeAdmission.ward}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-450 font-medium">Room Number:</span>
+                    <span className="font-bold text-slate-800">Room {patient.activeAdmission.roomNumber}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-450 font-medium">Bed Number:</span>
+                    <span className="font-bold text-slate-800">Bed {patient.activeAdmission.bedNumber}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-450 font-medium">Admitting Doctor:</span>
+                    <span className="font-bold text-slate-800">Dr. {patient.activeAdmission.admittingDoctor}</span>
+                  </div>
+                </div>
+              </Card>
+            )}
+
             <Card className="space-y-4">
               <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500">
                 Insurance Details
@@ -700,24 +579,139 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
           {/* Right panel: History and logs */}
           <div className="md:col-span-2 space-y-6">
             <Card className="space-y-4">
-              <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                <History className="h-4.5 w-4.5" /> Medical History Ledger
-              </h3>
-              {patient.medicalHistory && patient.medicalHistory.length > 0 ? (
-                <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
-                  {patient.medicalHistory.map((item: any, i: number) => (
-                    <div key={i} className="border border-slate-100 rounded-xl p-3 bg-slate-50 relative">
-                      <div className="flex justify-between items-start">
-                        <div className="font-semibold text-slate-800 text-xs">{item.visitType}</div>
-                        <span className="text-[10px] text-slate-400">{new Date(item.date).toLocaleDateString()}</span>
-                      </div>
-                      <p className="text-xs text-slate-600 mt-1.5"><span className="font-semibold">Diagnosis:</span> {item.diagnosis}</p>
-                      <p className="text-[10px] text-slate-450 mt-1"><span className="font-medium text-slate-500">Doctor:</span> {item.doctorName} ({item.department})</p>
+              {/* Tab Navigation Headers */}
+              <div className="flex bg-slate-100 p-1 rounded-lg w-full overflow-x-auto gap-1">
+                {([
+                  { key: "history",       label: "Medical History",     icon: <History className="h-3.5 w-3.5" /> },
+                  { key: "prescriptions", label: "Prescriptions",       icon: <Pill className="h-3.5 w-3.5" /> },
+                  { key: "billing",       label: "Billing History",     icon: <Receipt className="h-3.5 w-3.5" /> },
+                  { key: "reports",       label: "Reports",             icon: <Activity className="h-3.5 w-3.5" /> }
+                ] as const).map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setProfileTab(t.key)}
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors ${
+                      profileTab === t.key ? "bg-navy-700 text-white shadow-sm" : "text-slate-650 hover:bg-slate-50"
+                    }`}
+                  >
+                    {t.icon}
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* TAB 1: MEDICAL HISTORY */}
+              {profileTab === "history" && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 pb-2 border-b border-slate-100">
+                    <History className="h-4.5 w-4.5 text-navy-700" /> Medical History Ledger
+                  </h3>
+                  {patient.medicalHistory && patient.medicalHistory.length > 0 ? (
+                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+                      {patient.medicalHistory.map((item: any, i: number) => (
+                        <div key={i} className="border border-slate-100 rounded-xl p-3 bg-slate-50 relative">
+                          <div className="flex justify-between items-start">
+                            <div className="font-semibold text-slate-800 text-xs">{item.visitType}</div>
+                            <span className="text-[10px] text-slate-400">{new Date(item.date).toLocaleDateString()}</span>
+                          </div>
+                          <p className="text-xs text-slate-600 mt-1.5"><span className="font-semibold">Diagnosis:</span> {item.diagnosis}</p>
+                          <p className="text-[10px] text-slate-455 mt-1"><span className="font-medium text-slate-500">Doctor:</span> {item.doctorName} ({item.department})</p>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  ) : (
+                    <p className="text-xs text-slate-400 italic py-4">No medical history logged for this patient file.</p>
+                  )}
                 </div>
-              ) : (
-                <p className="text-xs text-slate-400 italic py-4">No medical history logged for this patient file.</p>
+              )}
+
+              {/* TAB 2: PRESCRIPTIONS */}
+              {profileTab === "prescriptions" && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 pb-2 border-b border-slate-100">
+                    <Pill className="h-4.5 w-4.5 text-navy-700" /> Prescription History
+                  </h3>
+                  {prescriptions && prescriptions.length > 0 ? (
+                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+                      {prescriptions.map((rx: any) => (
+                        <div key={rx._id} className="border border-slate-100 rounded-xl p-3 bg-slate-50 space-y-2">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="font-semibold text-slate-800 text-xs">Rx Code: {rx.prescriptionNumber || rx._id.substring(18)}</span>
+                              <span className="text-[10px] text-slate-400 block">Doctor: Dr. {rx.doctor?.name || "Attending Doctor"}</span>
+                            </div>
+                            <span className="text-[10px] text-slate-400">{new Date(rx.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          <div className="bg-white p-2 rounded border border-slate-100">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">Medicines</span>
+                            <ul className="list-disc pl-4 space-y-0.5 text-xs text-slate-700 mt-1">
+                              {rx.medicines?.map((m: any, idx: number) => (
+                                <li key={idx}>
+                                  <span className="font-semibold">{m.name}</span> {m.strength && `(${m.strength})`} — {m.dosage} ({m.frequency} for {m.duration})
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 italic py-4">No prescriptions issued for this patient.</p>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 3: BILLING */}
+              {profileTab === "billing" && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 pb-2 border-b border-slate-100">
+                    <Receipt className="h-4.5 w-4.5 text-navy-700" /> Billing ledger
+                  </h3>
+                  {billsData && billsData.data && billsData.data.length > 0 ? (
+                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+                      {billsData.data.map((inv: any) => (
+                        <div key={inv._id} className="border border-slate-100 rounded-xl p-3 bg-slate-50 flex items-center justify-between">
+                          <div>
+                            <span className="font-mono text-xs font-semibold text-indigo-700 block">Inv No: {inv.invoiceNumber || inv._id.substring(18)}</span>
+                            <span className="text-[10px] text-slate-455 block mt-0.5">Date: {new Date(inv.issuedAt).toLocaleDateString()} · Type: {inv.billingType}</span>
+                          </div>
+                          <div className="text-right space-y-1">
+                            <span className="font-bold text-slate-900 text-xs block">{formatINR(inv.totals?.total)}</span>
+                            <span className={`inline-flex rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${
+                              inv.status === "paid" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                            }`}>
+                              {inv.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 italic py-4">No billing transactions recorded.</p>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 4: REPORTS */}
+              {profileTab === "reports" && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 pb-2 border-b border-slate-100">
+                    <Activity className="h-4.5 w-4.5 text-navy-700" /> Diagnostic Reports
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="border border-slate-100 rounded-xl p-4 bg-slate-50 space-y-2 text-center">
+                      <FlaskConical className="h-8 w-8 text-indigo-650 mx-auto" />
+                      <h4 className="font-bold text-xs text-slate-800">Laboratory Reports</h4>
+                      <p className="text-[10px] text-slate-400">Detailed lab results are logged inside the Laboratory module.</p>
+                    </div>
+                    <div className="border border-slate-100 rounded-xl p-4 bg-slate-50 space-y-2 text-center">
+                      <Scan className="h-8 w-8 text-indigo-650 mx-auto" />
+                      <h4 className="font-bold text-xs text-slate-800">Radiology Studies</h4>
+                      <p className="text-[10px] text-slate-400">Imaging scan files and diagnostic reports are logged inside the Radiology module.</p>
+                    </div>
+                  </div>
+                </div>
               )}
             </Card>
 
@@ -753,294 +747,106 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
           </div>
         </div>
 
-        {/* Convert OP to IP Inpatient Dialog Modal */}
-        {isConvertOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 overflow-y-auto">
-            <div className="w-full max-w-4xl rounded-xl bg-white p-6 shadow-xl space-y-6 my-8 max-h-[90vh] overflow-y-auto">
-              
-              {/* Modal Header */}
+        {/* Admission Details Modal (Inpatient) */}
+        {isAdmissionDetailsOpen && patient.activeAdmission && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+            <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl space-y-6 animate-in fade-in zoom-in duration-200">
               <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <Building className="h-5 w-5 text-indigo-700" /> Convert OP to Inpatient (IP) Admission
-                  </h2>
-                  <p className="text-xs text-slate-550 mt-0.5 font-medium">Receptionist-initiated admission record conversion based on Doctor verbal instructions.</p>
-                </div>
-                <button onClick={() => setIsConvertOpen(false)} className="text-slate-400 hover:text-slate-600 font-semibold text-lg">
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Building className="h-5 w-5 text-indigo-700" /> Active Admission Details
+                </h2>
+                <button onClick={() => setIsAdmissionDetailsOpen(false)} className="text-slate-400 hover:text-slate-650 font-semibold text-lg">
                   &times;
                 </button>
               </div>
 
-              <form onSubmit={handleConvertSubmit} className="space-y-6">
-                
-                {/* 1. Read-Only Patient Metadata Grid */}
-                <div className="bg-slate-50 rounded-xl border border-slate-150 p-4 space-y-3">
-                  <h3 className="text-xs font-bold text-slate-450 uppercase tracking-wider">Auto-filled Patient Details (Readonly)</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                    <div>
-                      <span className="text-slate-400 block font-semibold">Universal ID (UHID)</span>
-                      <span className="font-mono font-bold text-slate-800 text-sm">{patient.uhid}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block font-semibold">Patient Name</span>
-                      <span className="font-bold text-slate-800">{patient.name}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block font-semibold">Age / Gender</span>
-                      <span className="font-semibold text-slate-800">{patient.age} Yrs / {patient.gender}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block font-semibold">Phone Number</span>
-                      <span className="font-semibold text-slate-800 font-mono">{patient.phone}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block font-semibold">Blood Group</span>
-                      <span className="font-semibold text-slate-850">{patient.bloodGroup || "N/A"}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block font-semibold">Last Consulting Doctor</span>
-                      <span className="font-semibold text-slate-800">
-                        {patient.medicalHistory && patient.medicalHistory.length > 0
-                          ? patient.medicalHistory[0].doctorName
-                          : "N/A"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block font-semibold">Last Visit Date</span>
-                      <span className="font-semibold text-slate-800">
-                        {patient.medicalHistory && patient.medicalHistory.length > 0
-                          ? new Date(patient.medicalHistory[0].date).toLocaleDateString("en-IN")
-                          : "N/A"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block font-semibold">Diagnosis (if available)</span>
-                      <span className="font-semibold text-slate-800 italic truncate max-w-[150px]" title={patient.medicalHistory && patient.medicalHistory.length > 0 ? patient.medicalHistory[0].diagnosis : ""}>
-                        {patient.medicalHistory && patient.medicalHistory.length > 0
-                          ? patient.medicalHistory[0].diagnosis
-                          : "N/A"}
-                      </span>
-                    </div>
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div>
+                  <span className="text-slate-400 block font-semibold">Admission Number</span>
+                  <span className="font-bold text-slate-800 font-mono text-sm">{patient.activeAdmission.admissionNumber}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block font-semibold">Admission Date</span>
+                  <span className="font-semibold text-slate-800">{new Date(patient.activeAdmission.admissionDate).toLocaleDateString()}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block font-semibold">Current Ward</span>
+                  <span className="font-bold text-slate-800">{patient.activeAdmission.ward}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block font-semibold">Room & Bed Number</span>
+                  <span className="font-bold text-slate-800">Room {patient.activeAdmission.roomNumber} / Bed {patient.activeAdmission.bedNumber}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-slate-400 block font-semibold">Admitting Doctor</span>
+                  <span className="font-bold text-slate-800">Dr. {patient.activeAdmission.admittingDoctor}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <Button onClick={() => setIsAdmissionDetailsOpen(false)} variant="secondary" className="text-xs">
+                  Close Details
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Previous Admissions Modal (Discharged) */}
+        {isPreviousAdmissionsOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+            <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl space-y-6 animate-in fade-in zoom-in duration-200">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <History className="h-5 w-5 text-emerald-700" /> Patient Previous Admissions Ledger
+                </h2>
+                <button onClick={() => setIsPreviousAdmissionsOpen(false)} className="text-slate-400 hover:text-slate-655 font-semibold text-lg">
+                  &times;
+                </button>
+              </div>
+
+              <div className="max-h-[350px] overflow-y-auto pr-1">
+                {previousAdmissions && previousAdmissions.length > 0 ? (
+                  <div className="space-y-4">
+                    {previousAdmissions.map((adm: any) => (
+                      <div key={adm._id} className="border border-slate-100 rounded-xl p-3 bg-slate-50 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                        <div>
+                          <span className="text-slate-400 block">Admission Number</span>
+                          <span className="font-mono font-bold text-slate-800">{adm.admissionNumber}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block">Admission Date</span>
+                          <span className="font-semibold text-slate-700">{new Date(adm.admissionDate).toLocaleDateString()}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block">Discharge Date</span>
+                          <span className="font-semibold text-slate-700">{adm.dischargeDate ? new Date(adm.dischargeDate).toLocaleDateString() : "N/A"}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block">Ward & Room</span>
+                          <span className="font-semibold text-slate-750">{adm.ward} (R{adm.room?.roomNumber})</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block">Doctor</span>
+                          <span className="font-semibold text-slate-755">Dr. {adm.admittingDoctor?.name || "—"}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block">Discharge Reason</span>
+                          <span className="font-bold text-slate-700 italic truncate max-w-[150px] block" title={adm.dischargeNotes}>{adm.dischargeNotes || "N/A"}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
+                ) : (
+                  <p className="text-xs text-slate-400 italic text-center py-8">No previous admissions records found on file.</p>
+                )}
+              </div>
 
-                {/* 2. Admission Parameters */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  
-                  {/* Left Column: Admission Reason & Admitting Doctor */}
-                  <Card className="space-y-4">
-                    <h3 className="border-b border-slate-100 pb-2 text-xs font-bold uppercase tracking-wider text-slate-450">
-                      Admission Details
-                    </h3>
-                    
-                    <InputField
-                      label="Admission Reason / Clinical Indication *"
-                      required
-                      placeholder="e.g. High fever with severe dehydration, verbal orders from physician"
-                      value={admissionReason}
-                      onChange={(e) => setAdmissionReason(e.target.value)}
-                    />
-
-                    <SelectField
-                      label="Select Admitting Doctor *"
-                      required
-                      value={selectedDocId}
-                      onChange={(e: any) => setSelectedDocId(e.target.value)}
-                    >
-                      <option value="">Choose Admitting Physician</option>
-                      {doctors?.map((doc: any) => (
-                        <option key={doc._id} value={doc._id}>
-                          Dr. {doc.name} ({doc.specialization})
-                        </option>
-                      ))}
-                    </SelectField>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <SelectField
-                        label="Priority Level"
-                        required
-                        value={priority}
-                        onChange={(e: any) => setPriority(e.target.value)}
-                      >
-                        <option value="Routine">Routine</option>
-                        <option value="Urgent">Urgent</option>
-                        <option value="Emergency">Emergency</option>
-                      </SelectField>
-
-                      <InputField
-                        label="Admission Date"
-                        type="date"
-                        required
-                        value={admissionDate}
-                        onChange={(e) => setAdmissionDate(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <InputField
-                        label="Admission Time"
-                        type="time"
-                        required
-                        value={admissionTime}
-                        onChange={(e) => setAdmissionTime(e.target.value)}
-                      />
-                    </div>
-                  </Card>
-
-                  {/* Right Column: Ward Bed Room Selector */}
-                  <Card className="space-y-4">
-                    <h3 className="border-b border-slate-100 pb-2 text-xs font-bold uppercase tracking-wider text-slate-450">
-                      Bed Grid & Ward Assignment
-                    </h3>
-
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                      <SelectField
-                        label="Ward"
-                        required
-                        value={ward}
-                        onChange={(e) => {
-                          setWard(e.target.value);
-                          setSelectedRoomId("");
-                          setSelectedBedId("");
-                        }}
-                      >
-                        <option value="">Select Ward</option>
-                        {uniqueWards.map((w: string) => (
-                          <option key={w} value={w}>{w}</option>
-                        ))}
-                      </SelectField>
-
-                      <SelectField
-                        label="Room"
-                        required
-                        value={selectedRoomId}
-                        onChange={(e) => {
-                          setSelectedRoomId(e.target.value);
-                          setSelectedBedId("");
-                        }}
-                      >
-                        <option value="">Room</option>
-                        {rooms
-                          ?.filter((r: any) => !ward || r.wardName === ward)
-                          .map((r: any) => (
-                            <option key={r._id} value={r._id}>Room {r.roomNumber} ({r.roomType})</option>
-                          ))}
-                      </SelectField>
-
-                      <SelectField
-                        label="Bed"
-                        required
-                        value={selectedBedId}
-                        onChange={(e) => setSelectedBedId(e.target.value)}
-                      >
-                        <option value="">Bed</option>
-                        {rooms
-                          ?.find((r: any) => r._id === selectedRoomId)
-                          ?.beds.filter((b: any) => !b.isOccupied)
-                          .map((b: any) => (
-                            <option key={b._id} value={b._id}>Bed {b.bedNumber}</option>
-                          ))}
-                      </SelectField>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <InputField
-                        label="Attender Name"
-                        required
-                        value={attenderName}
-                        onChange={(e) => setAttenderName(e.target.value)}
-                      />
-                      <InputField
-                        label="Attender Phone"
-                        required
-                        value={attenderPhone}
-                        onChange={(e) => setAttenderPhone(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <InputField
-                        label="Insurance"
-                        value={insuranceProvider}
-                        onChange={(e) => setInsuranceProvider(e.target.value)}
-                      />
-                      <InputField
-                        label="Policy No"
-                        value={insurancePolicyNumber}
-                        onChange={(e) => setInsurancePolicyNumber(e.target.value)}
-                      />
-                    </div>
-                  </Card>
-
-                </div>
-
-                {/* 3. Financial Breakdown */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Card className="space-y-4">
-                    <h3 className="border-b border-slate-100 pb-2 text-xs font-bold uppercase tracking-wider text-slate-455">
-                      Advance Deposition (INR)
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <InputField
-                        label="Advance Deposit (₹) *"
-                        type="number"
-                        required
-                        value={advanceAmount}
-                        onChange={(e) => setAdvanceAmount(e.target.value)}
-                      />
-                      <SelectField
-                        label="Payment Method"
-                        required
-                        value={paymentMethod}
-                        onChange={(e: any) => setPaymentMethod(e.target.value)}
-                      >
-                        <option value="Cash">Cash</option>
-                        <option value="UPI">UPI</option>
-                        <option value="Card">Card Swipe</option>
-                      </SelectField>
-                    </div>
-                  </Card>
-
-                  <Card className="space-y-4">
-                    <h3 className="border-b border-slate-100 pb-2 text-xs font-bold uppercase tracking-wider text-slate-455">
-                      Audit Checks & Signoff
-                    </h3>
-                    
-                    <TextareaField
-                      label="Remarks / Notes"
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                      rows={1}
-                    />
-
-                    <div className="flex items-center gap-2 pt-2">
-                      <input
-                        type="checkbox"
-                        id="verbalCheck"
-                        required
-                        checked={verbalApproval}
-                        onChange={(e) => setVerbalApproval(e.target.checked)}
-                        className="rounded border-slate-300 text-indigo-600 h-4 w-4"
-                      />
-                      <label htmlFor="verbalCheck" className="text-xs text-indigo-900 font-bold select-none cursor-pointer">
-                        Doctor Verbal Order verified & confirmed *
-                      </label>
-                    </div>
-                  </Card>
-                </div>
-
-                {/* Submit Controls */}
-                <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
-                  <Button type="button" variant="secondary" onClick={() => setIsConvertOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={admitMutation.isPending}>
-                    {admitMutation.isPending ? "Admitting..." : "Confirm & Admit Patient"}
-                  </Button>
-                </div>
-
-              </form>
-
+              <div className="flex justify-end pt-2">
+                <Button onClick={() => setIsPreviousAdmissionsOpen(false)} variant="secondary" className="text-xs">
+                  Close Ledger
+                </Button>
+              </div>
             </div>
           </div>
         )}
