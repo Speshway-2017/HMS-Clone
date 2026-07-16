@@ -32,7 +32,9 @@ import {
   checkDuplicateAppointment,
   getPatientDetail,
   rejectAdmissionRequest,
-  getBookedSlots
+  getBookedSlots,
+  checkInAppointment,
+  getQueueDetails
 } from "../controllers/receptionController";
 
 const router = Router();
@@ -56,6 +58,8 @@ router.get("/appointments/check-duplicate", checkDuplicateAppointment);
 router.post("/appointments", bookAppointment);
 router.post("/appointments/:id/cancel", cancelAppointment);
 router.post("/appointments/:id/reschedule", rescheduleAppointment);
+router.post("/appointments/:id/check-in", checkInAppointment);
+router.get("/dashboard/queue-details", getQueueDetails);
 
 // Billing — data-consistent endpoints (SAME query as dashboard stats)
 router.post("/billing/pay", processBillingPayment);

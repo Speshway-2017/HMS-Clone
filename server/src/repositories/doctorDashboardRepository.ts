@@ -32,7 +32,6 @@ export class DoctorDashboardRepository {
       .sort({ time: 1 });
   }
 
-  // 2. Waiting Patients (Queue)
   static async getWaitingPatients(hospitalId: Types.ObjectId, doctorId: string) {
     const { start, end } = this.getTodayRange();
     return await Queue.find({
@@ -44,6 +43,7 @@ export class DoctorDashboardRepository {
       .populate("patient", "name uhid age gender phone")
       .populate("doctor", "name")
       .populate("department", "name")
+      .populate("appointment")
       .sort({ createdAt: 1 });
   }
 

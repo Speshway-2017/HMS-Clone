@@ -30,7 +30,7 @@ router.get("/patient", protect, getPatientPrescriptions);
 router.use(protect, scopeToHospital);
 
 router.route("/")
-  .get(restrictTo("doctor", "pharmacist", "hospital_admin"), listPrescriptions)
+  .get(restrictTo("doctor", "pharmacist", "hospital_admin", "receptionist"), listPrescriptions)
   .post(restrictTo("doctor"), savePrescription);
 
 router.patch("/:id/dispense", restrictTo("pharmacist"), dispensePrescription);

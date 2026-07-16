@@ -1,10 +1,15 @@
-import { createServer } from "http";
+
+import { createServer, Server as HTTPServer } from "http";
 import app from "./app";
-import { connectDB } from "./config/db";
+import { connectDB, disconnectDB } from "./config/db";
 import { env } from "./config/env";
 import { ensureSuperAdmin } from "./utils/ensureSuperAdmin";
-import { initSocket } from "./config/socket";
+import { initSocket, closeSocket } from "./config/socket";
 import { Invoice } from "./models/Invoice";
+import { startNotificationWorker, stopNotificationWorker } from "./utils/notificationWorker";
+
+let httpServer: HTTPServer | null = null;
+let isShuttingDown = false;
 
 async function migrateInvoices() {
   console.log("Running Invoices billingType migration...");
@@ -68,28 +73,122 @@ async function migrateInvoices() {
     inv.billingType = type as any;
     await inv.save();
   }
-  console.log("Invoices billingType migration completed successfully.");
+  console.log("✓ Invoices billingType migration completed successfully.");
 }
 
-import { startNotificationWorker } from "./utils/notificationWorker";
+async function gracefulShutdown(signal: string) {
+  if (isShuttingDown) {
+    console.log(`Already shutting down (received ${signal})`);
+    return;
+  }
+  isShuttingDown = true;
+  console.log(`\nReceived ${signal}, shutting down gracefully...`);
+
+  try {
+    // Stop notification worker first
+    stopNotificationWorker();
+
+    // Close Socket.IO
+    await closeSocket();
+
+    // Close HTTP server
+    if (httpServer) {
+      await new Promise<void>((resolve, reject) => {
+        httpServer!.close((err) => {
+          if (err) reject(err);
+          else {
+            console.log("✓ HTTP server closed");
+            resolve();
+          }
+        });
+      });
+    }
+
+    // Disconnect MongoDB
+    await disconnectDB();
+
+    console.log("✓ All resources closed, exiting now.");
+    process.exit(0);
+  } catch (error) {
+    console.error("Error during graceful shutdown:", error);
+    process.exit(1);
+  }
+}
 
 async function main() {
-  await connectDB();
-  await ensureSuperAdmin();
-  await migrateInvoices();
+  console.log("Starting Hospital Management System Backend...\n");
 
-  const httpServer = createServer(app);
-  initSocket(httpServer, env.clientUrl);
+  try {
+    // Step 1: Environment already loaded via env.ts (dotenv.config() called there)
+    console.log("✓ Environment variables loaded");
 
-  // Start background notification queue worker for SMS, WhatsApp, Email retries
-  startNotificationWorker();
+    // Step 2: Connect to MongoDB
+    await connectDB();
 
-  httpServer.listen(env.port, () => {
-    console.log(`Server listening on http://localhost:${env.port}`);
-  });
+    // Step 3: Ensure super admin exists
+    await ensureSuperAdmin();
+    console.log("✓ Super admin ensured");
+
+    // Step 4: Run migrations
+    await migrateInvoices();
+
+    // Step 5: Create HTTP server & register Express routes (app already has routes)
+    httpServer = createServer(app);
+    console.log("✓ Express routes registered");
+
+    // Step 6: Initialize Socket.IO
+    initSocket(httpServer, env.clientUrl);
+
+    // Step 7: Start background workers
+    startNotificationWorker();
+    console.log("✓ Notification worker started");
+
+    // Step 8: Start listening
+    httpServer.listen(env.port, () => {
+      console.log(`\n✓ Server listening on http://localhost:${env.port}`);
+      console.log(`✓ Health check available at http://localhost:${env.port}/api/v1/health`);
+    });
+
+    // Handle server errors (like EADDRINUSE, EACCES)
+    httpServer.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "EADDRINUSE") {
+        console.error("\n-------------------------------------");
+        console.error(`Port ${env.port} is already in use.`);
+        console.error("\nPossible reasons:");
+        console.error("• Another HMS backend instance is already running.");
+        console.error("• Another application is using this port.");
+        console.error("\nSolutions:");
+        console.error("1. Stop the existing process.");
+        console.error("2. Change PORT in .env.");
+        console.error("3. Restart the backend.");
+        console.error("-------------------------------------\n");
+      } else if (err.code === "EACCES") {
+        console.error(`❌ Port ${env.port} requires elevated privileges!`);
+      } else {
+        console.error("❌ Server error:", err);
+      }
+      process.exit(1);
+    });
+
+  } catch (error) {
+    console.error("\n❌ Failed to start server:", error);
+    await gracefulShutdown("STARTUP_ERROR");
+  }
 }
 
-main().catch((err) => {
-  console.error("Failed to start server:", err);
-  process.exit(1);
+// Register graceful shutdown handlers
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+
+// Handle uncaught exceptions and unhandled rejections
+process.on("uncaughtException", (err) => {
+  console.error("❌ Uncaught Exception:", err);
+  gracefulShutdown("UNCAUGHT_EXCEPTION");
 });
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("❌ Unhandled Rejection at:", promise, "reason:", reason);
+  gracefulShutdown("UNHANDLED_REJECTION");
+});
+
+main();

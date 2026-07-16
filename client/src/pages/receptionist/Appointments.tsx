@@ -18,6 +18,7 @@ import {
 } from "../../features/receptionist";
 import { useDepartments } from "../../features/departments";
 import { useMyHospital } from "../../features/hospitals";
+import { useCheckInAppointment } from "../../features/appointments";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -35,7 +36,7 @@ const appointmentSchema = z.object({
   departmentId: z.string().min(1, "Department is required"),
   date: z.string().min(1, "Date is required"),
   time: z.string().min(1, "Time slot is required"),
-  type: z.enum(["Consultation", "Walk-in", "Emergency"]).default("Consultation"),
+  type: z.enum(["Appointment", "Walk-in", "Emergency"]).default("Appointment"),
   notes: z.string().optional().default("")
 });
 
@@ -60,6 +61,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const bookMutation = useBookAppointment();
   const cancelMutation = useCancelAppointment();
   const rescheduleMutation = useRescheduleAppointment();
+  const checkInMutation = useCheckInAppointment();
   const { data: doctors } = useDoctorsAvailability();
   const { data: departmentsResponse } = useDepartments();
   const { data: searchPatients } = usePatientsSearch(patientQuery);
@@ -309,7 +311,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
       departmentId: "",
       date: new Date().toISOString().split("T")[0],
       time: "",
-      type: "Consultation",
+      type: "Appointment",
       notes: ""
     }
   });
@@ -439,16 +441,28 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   };
 
   const statusColors: Record<string, string> = {
+    scheduled: "bg-blue-50 text-blue-700 border-blue-200",
+    checked_in: "bg-indigo-50 text-indigo-700 border-indigo-200",
     waiting: "bg-amber-50 text-amber-700 border-amber-200",
-    called: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    called: "bg-orange-50 text-orange-700 border-orange-200",
+    in_consultation: "bg-yellow-50 text-yellow-700 border-yellow-200",
     completed: "bg-green-50 text-green-700 border-green-200",
-    skipped: "bg-rose-50 text-rose-700 border-rose-200"
+    cancelled: "bg-red-50 text-red-700 border-red-200",
+    no_show: "bg-purple-50 text-purple-700 border-purple-200",
+    missed: "bg-purple-50 text-purple-700 border-purple-200"
+  };
+
+  const getFriendlyStatus = (status: string) => {
+    if (status === "scheduled") return "Booked";
+    if (status === "checked_in") return "Checked-In";
+    if (status === "no_show") return "Missed";
+    return status.replace(/_/g, " ");
   };
 
   const columns = [
     {
       header: "Token #",
-      render: (row: any) => <span className="font-mono text-xs font-semibold text-slate-800">{row.tokenNumber || "N/A"}</span>
+      render: (row: any) => <span className="font-mono text-xs font-semibold text-slate-800">{row.tokenNumber || "—"}</span>
     },
     {
       header: "Patient",
@@ -458,6 +472,41 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
           <div className="text-[10px] text-slate-400 font-mono">{row.patient?.uhid}</div>
         </div>
       )
+    },
+    {
+      header: "Visit Type",
+      render: (row: any) => {
+        // Map old types for backward compatibility
+        const mapOldType = (t: string) => {
+          switch(t) {
+            case "Consultation":
+            case "Regular Consult":
+            case "Scheduled Appointment":
+            case "Follow-up":
+            case "Follow-up Appointment":
+              return "Appointment";
+            case "Walk-in":
+            case "Walk-in Visit":
+              return "Walk-in";
+            case "Emergency":
+            case "Emergency Visit":
+              return "Emergency";
+            default:
+              return t || "Appointment";
+          }
+        };
+        const type = mapOldType(row.type);
+        const tones: Record<string, string> = {
+          "Emergency": "bg-red-50 text-red-700 border-red-200",
+          "Walk-in": "bg-amber-50 text-amber-700 border-amber-200",
+          "Appointment": "bg-emerald-50 text-emerald-700 border-emerald-200"
+        };
+        return (
+          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${tones[type] || "bg-slate-50 text-slate-600 border-slate-200"}`}>
+            {type}
+          </span>
+        );
+      }
     },
     {
       header: "Doctor / Specialization",
@@ -476,23 +525,139 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
       header: "Status",
       render: (row: any) => (
         <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${statusColors[row.status] || "bg-slate-50 text-slate-600 border-slate-200"}`}>
-          {row.status}
+          {getFriendlyStatus(row.status)}
         </span>
       )
     },
     {
       header: "Actions",
       render: (row: any) => {
-        const canAct = row.status !== "called" && row.status !== "completed" && row.status !== "skipped";
-        return canAct ? (
-          <button
-            type="button"
-            onClick={() => openDialog(row)}
-            className="rounded bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100 transition-colors"
-          >
-            Cancel / Reschedule
-          </button>
-        ) : null;
+        const isBooked = row.status === "scheduled";
+        const canAct = row.status !== "completed" && row.status !== "cancelled" && row.status !== "no_show" && row.status !== "missed";
+        return (
+          <div className="flex gap-2">
+            {isBooked && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await checkInMutation.mutateAsync(row._id);
+                    toast.success("Patient checked in successfully!");
+                  } catch (err: any) {
+                    toast.error(err.response?.data?.message || err.message || "Failed to check in");
+                  }
+                }}
+                disabled={checkInMutation.isPending}
+                className="rounded bg-indigo-600 hover:bg-indigo-750 px-2.5 py-1 text-xs font-semibold text-white transition-colors"
+              >
+                Check-In
+              </button>
+            )}
+            {canAct && (
+              <button
+                type="button"
+                onClick={() => openDialog(row)}
+                className="rounded bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100 transition-colors"
+              >
+                Cancel / Reschedule
+              </button>
+            )}
+          </div>
+        );
+      }
+    }
+  ];
+
+  const handlePayClick = async (apptId: string) => {
+    try {
+      const res = await api.get(`/appointments/${apptId}/invoice`);
+      const invoiceId = res.data?.data?.invoice?._id;
+      if (invoiceId) {
+        navigate(`/receptionist/billing/consultation?invoiceId=${invoiceId}`);
+      } else {
+        toast.error("Invoice not found for this appointment.");
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to find invoice.");
+    }
+  };
+
+  const scheduledColumns = [
+    {
+      header: "Reference ID",
+      render: (row: any) => <span className="font-mono text-xs font-semibold text-slate-800">{row.referenceId || "N/A"}</span>
+    },
+    {
+      header: "Date & Time",
+      render: (row: any) => (
+        <div>
+          <div className="font-medium text-slate-900">
+            {new Date(row.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+          </div>
+          <div className="text-[10px] text-slate-400 font-mono">{row.time}</div>
+        </div>
+      )
+    },
+    {
+      header: "Patient",
+      render: (row: any) => (
+        <div>
+          <div className="font-medium text-slate-900">{row.patient?.name}</div>
+          <div className="text-[10px] text-slate-400 font-mono">{row.patient?.uhid}</div>
+        </div>
+      )
+    },
+    {
+      header: "Doctor",
+      render: (row: any) => (
+        <div>
+          <div className="font-medium text-slate-900">{row.doctor?.name}</div>
+        </div>
+      )
+    },
+    {
+      header: "Department",
+      render: (row: any) => <span className="text-xs">{row.department?.name || "N/A"}</span>
+    },
+    {
+      header: "Status",
+      render: (row: any) => (
+        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+          row.status === "pending_payment" 
+            ? "bg-rose-50 text-rose-700 border-rose-200" 
+            : row.status === "scheduled"
+            ? "bg-blue-50 text-blue-700 border-blue-200"
+            : statusColors[row.status] || "bg-slate-50 text-slate-600 border-slate-200"
+        }`}>
+          {row.status.replace("_", " ")}
+        </span>
+      )
+    },
+    {
+      header: "Actions",
+      render: (row: any) => {
+        return (
+          <div className="flex gap-2">
+            {row.status === "pending_payment" && (
+              <button
+                type="button"
+                onClick={() => handlePayClick(row._id)}
+                className="rounded bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-600 hover:bg-emerald-100 transition-colors"
+              >
+                Pay / Check In
+              </button>
+            )}
+            {row.status !== "cancelled" && row.status !== "completed" && row.status !== "skipped" && (
+              <button
+                type="button"
+                onClick={() => openDialog({ ...row, appointment: row._id })}
+                className="rounded bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100 transition-colors"
+              >
+                Cancel / Reschedule
+              </button>
+            )}
+          </div>
+        );
       }
     }
   ];
@@ -977,9 +1142,9 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                 <InputField label="Appointment Date" type="date" required min={new Date().toISOString().split("T")[0]} {...register("date")} hint={errors.date?.message as any} />
                 
                 <SelectField label="Appointment Type" required {...register("type")} hint={errors.type?.message as any}>
-                  <option value="Consultation">Regular Consult</option>
-                  <option value="Walk-in">Walk-in Visit</option>
-                  <option value="Emergency">Emergency Visit</option>
+                  <option value="Appointment">Appointment</option>
+                  <option value="Walk-in">Walk-in</option>
+                  <option value="Emergency">Emergency</option>
                 </SelectField>
 
                 <div className="sm:col-span-3 space-y-2">

@@ -107,6 +107,27 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const confirmDischargeMutation = useConfirmDischarge();
   const markReadMutation = useMarkNotificationRead();
 
+  // Handle URL query parameters at startup
+  useEffect(() => {
+    const queryParams = new URLSearchParams(window.location.search);
+    const urlTab = queryParams.get("tab") as "new" | "admissions" | "rooms" | "transfer" | "discharges" | null;
+    const urlAdmissionId = queryParams.get("admissionId") || "";
+    const urlDischargeId = queryParams.get("dischargeAdmissionId") || "";
+
+    if (urlTab) {
+      setTab(urlTab);
+    }
+    if (urlAdmissionId) {
+      setTransferAdmissionId(urlAdmissionId);
+    }
+    if (urlDischargeId) {
+      setTab("admissions");
+      setDischargeAdmissionId(urlDischargeId);
+      setDischargeNotes("");
+      setIsDischargeOpen(true);
+    }
+  }, [window.location.search]);
+
   // Discharge requests from doctors
   const { data: dischargeRequests, refetch: refetchDischargeRequests } = useDischargeRequests();
   useEffect(() => {
@@ -252,7 +273,16 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       refetchRooms();
       refetchAdmissions();
     } catch (err: any) {
-      alert(err.response?.data?.message || err.message || "Failed to admit patient");
+      const errMsg = err.response?.data?.message || err.message || "";
+      if (errMsg.includes("already has an active inpatient admission") || errMsg.includes("already admitted")) {
+        toast.error("This patient is already admitted.");
+        const finalPatientId = subTab === "requests" ? (selectedReq?.patient?._id || selectedReq?.data?.patientId) : selectedPatientId;
+        if (finalPatientId) {
+          navigate(`/receptionist/patients/${finalPatientId}`);
+        }
+      } else {
+        alert(errMsg || "Failed to admit patient");
+      }
     }
   };
 
@@ -690,7 +720,8 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                             type="button"
                             onClick={() => {
                               if (anyP.status === "admitted") {
-                                alert("This patient is already admitted to the hospital.");
+                                toast.error("This patient is already admitted.");
+                                navigate(`/receptionist/patients/${p._id}`);
                                 return;
                               }
                               setSelectedPatientId(p._id);

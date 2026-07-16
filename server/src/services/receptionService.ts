@@ -289,8 +289,33 @@ export class ReceptionService {
   }
 
   static async bookAppointment(hospitalId: Types.ObjectId, appointmentData: any, userId: Types.ObjectId) {
+    // Map old type values to new ones for backward compatibility
+    const mapOldType = (oldType: string | undefined) => {
+      if (!oldType) return "Appointment";
+      switch(oldType) {
+        case "Consultation":
+        case "Regular Consult":
+        case "Scheduled Appointment":
+        case "Follow-up":
+        case "Follow-up Appointment":
+          return "Appointment";
+        case "Walk-in":
+        case "Walk-in Visit":
+          return "Walk-in";
+        case "Emergency":
+        case "Emergency Visit":
+          return "Emergency";
+        default:
+          // If it's already a new type, use it; else default
+          if (["Appointment", "Walk-in", "Emergency"].includes(oldType)) {
+            return oldType;
+          }
+          return "Appointment";
+      }
+    };
 
-    const { patientId, doctorId, departmentId, date, time, type, notes, followUp, parentAppointmentId, followUpReason } = appointmentData;
+    let { patientId, doctorId, departmentId, date, time, type, notes, followUp, parentAppointmentId, followUpReason } = appointmentData;
+    type = mapOldType(type);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -369,16 +394,15 @@ export class ReceptionService {
         throw new AppError("Valid completed parent appointment not found for this follow-up booking.", 404);
       }
     }
-
     // 5. Doctor slot occupancy check (other patients in same time slot)
     const overlap = await ReceptionRepository.checkDoctorSlotOverlap(hospitalId, doctorId, bookingDate, time);
     if (overlap) {
       throw new AppError("Doctor is already booked for this time slot. Please choose a different slot.", 400);
     }
 
-    // 6. Generate unique auto-incremented appointment reference ID: APT<year><6-digit serial>
-    const year = bookingDate.getFullYear();
-    const aptPrefix = `APT${year}`;
+    // 6. Generate unique auto-incremented appointment reference ID: APT-YYYYMMDD-XXXXXX
+    const bookingDateNoHyphens = bookingDate.toISOString().split("T")[0].replace(/-/g, "");
+    const aptPrefix = `APT-${bookingDateNoHyphens}-`;
     const latestAppt = await Appointment.findOne({
       hospital: hospitalId,
       referenceId: new RegExp(`^${aptPrefix}`)
@@ -447,8 +471,8 @@ export class ReceptionService {
       },
       { 
         description: isWithinExpiry 
-          ? `${type || "General"} Doctor Consultation (Revisit - Free)` 
-          : `${type || "General"} Doctor Consultation`, 
+          ? `${type} (Free Follow-up)` 
+          : `${type}`, 
         category: "consultation", 
         quantity: 1, 
         amount: consultationFee 
@@ -486,8 +510,11 @@ export class ReceptionService {
 
     const newAppointment = await ReceptionRepository.createAppointment(appointmentPayload);
 
-    const newInvoice = await ReceptionRepository.createInvoice({
+    const appointmentStatus = isFree ? (isToday ? "checked_in" : "scheduled") : "pending_payment";
+
+    const appointmentPayload: Record<string, unknown> = {
       hospital: hospitalId,
+      referenceId,
       patient: patientId,
       appointment: newAppointment._id,
       billingType: "OP",
@@ -574,8 +601,17 @@ export class ReceptionService {
       hospital: hospitalId,
       user: userId,
       action: "APPOINTMENT_BOOK",
-      details: `Booked ${followUp ? "follow-up " : ""}appointment ${referenceId} for patient ID ${patientId} with Dr. ${doctor.name}${followUp ? ` (Parent: ${parentAppointmentId})` : ""}. Invoice ID ${newInvoice._id}. Status: ${appointmentStatus}`
+      details: `Booked ${followUp ? "follow-up " : ""}appointment ${referenceId} for patient ID ${patientId} with Dr. ${doctor.name}${followUp ? ` (Parent: ${parentAppointmentId})` : ""}.${newInvoice ? ` Invoice ID ${newInvoice._id}. Status: ${appointmentStatus}` : " No invoice created (free visit). Status: ${appointmentStatus}"}`
     });
+
+    let checkInResult = null;
+    if (type === "Walk-in" || type === "Emergency") {
+      try {
+        checkInResult = await this.checkInAppointment(hospitalId, newAppointment._id.toString(), userId);
+      } catch (err) {
+        console.error("Immediate check-in failed for walk-in/emergency:", err);
+      }
+    }
 
     return {
       appointment: newAppointment,
@@ -583,15 +619,14 @@ export class ReceptionService {
       billing: {
         registrationFee,
         consultationFee,
-        gst: 0,
-        discount: 0,
+        gst,
+        discount,
         total
-      }
+      },
+      token: checkInResult ? { tokenNumber: checkInResult.tokenNumber } : null
     };
   }
 
-
-  // ── Billing Payments ──
   static async processPayment(hospitalId: Types.ObjectId, paymentData: any, userId: Types.ObjectId) {
     const { invoiceId, amount, paymentMethod, mixedDetails } = paymentData;
 
@@ -730,7 +765,6 @@ export class ReceptionService {
         await appointment.save();
       }
     }
-
     // Generate Receipt Number: RCP + year + 5-digit serial
     const rcpYear = new Date().getFullYear();
     const rcpPrefix = `RCP${rcpYear}`;
@@ -1974,5 +2008,232 @@ export class ReceptionService {
       session.endSession();
     }
   }
-}
 
+  static async checkInAppointment(hospitalId: Types.ObjectId, appointmentId: string, userId: Types.ObjectId) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const appointment = await Appointment.findOne({
+        _id: appointmentId,
+        hospital: hospitalId
+      }).session(session).populate("doctor department patient");
+
+      if (!appointment) {
+        throw new AppError("Appointment not found.", 404);
+      }
+
+      if (["checked_in", "waiting", "in_consultation"].includes(appointment.status)) {
+        throw new AppError("This patient is already checked in.", 400);
+      }
+      if (appointment.status === "cancelled") {
+        throw new AppError("Cannot check in a cancelled appointment.", 400);
+      }
+
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const endOfToday = new Date();
+      endOfToday.setHours(23, 59, 59, 999);
+
+      const activeQueueItem = await Queue.findOne({
+        hospital: hospitalId,
+        patient: appointment.patient._id,
+        status: { $in: ["waiting", "called"] },
+        createdAt: { $gte: startOfToday, $lte: endOfToday }
+      }).session(session);
+
+      if (activeQueueItem) {
+        throw new AppError("Patient already has an active queue entry today.", 400);
+      }
+
+      const existingToken = await Queue.findOne({
+        hospital: hospitalId,
+        appointment: appointment._id
+      }).session(session);
+
+      if (existingToken) {
+        throw new AppError("Token has already been generated for this appointment.", 400);
+      }
+
+      const doctor = appointment.doctor as any;
+      let deptCode = "GEN";
+      if (appointment.department) {
+        const dept = appointment.department as any;
+        if (dept.code) {
+          deptCode = dept.code.substring(0, 3).toUpperCase();
+        } else if (dept.name) {
+          deptCode = dept.name.substring(0, 3).toUpperCase();
+        }
+      } else if (doctor.department) {
+        const dept = await Department.findById(doctor.department).session(session);
+        if (dept && dept.code) {
+          deptCode = dept.code.substring(0, 3).toUpperCase();
+        } else if (dept) {
+          deptCode = dept.name.substring(0, 3).toUpperCase();
+        }
+      }
+
+      const doctorsInDept = await Doctor.find({
+        hospital: hospitalId,
+        department: doctor.department
+      }).session(session).sort({ createdAt: 1, _id: 1 });
+
+      const docIndex = doctorsInDept.findIndex(d => d._id.toString() === doctor._id.toString());
+      const docNum = docIndex >= 0 ? docIndex + 1 : 1;
+      const docNumStr = String(docNum).padStart(2, "0");
+      const doctorCode = `${deptCode}${docNumStr}`;
+
+      const count = await Queue.countDocuments({
+        hospital: hospitalId,
+        doctor: doctor._id,
+        createdAt: { $gte: startOfToday, $lte: endOfToday }
+      }).session(session);
+
+      const nextNum = count + 1;
+      const tokenNumber = `${doctorCode}-${String(nextNum).padStart(3, "0")}`;
+
+      const [queueRecord] = await Queue.create([{
+        hospital: hospitalId,
+        tokenNumber,
+        type: appointment.type === "Emergency" ? "emergency" : "regular",
+        status: "waiting",
+        patient: appointment.patient._id,
+        doctor: doctor._id,
+        department: appointment.department?._id || doctor.department,
+        appointment: appointment._id,
+        date: new Date()
+      }], { session });
+
+      appointment.status = "checked_in";
+      await appointment.save({ session });
+
+      const [slotHourStr, slotMinStr] = appointment.time.split(":");
+      const slotHour = parseInt(slotHourStr, 10);
+      const slotMin = parseInt(slotMinStr, 10);
+      const slotTime = new Date(appointment.date);
+      slotTime.setHours(slotHour, slotMin, 0, 0);
+
+      const diffMinutes = (slotTime.getTime() - Date.now()) / (60 * 1000);
+      const isLate = diffMinutes < -15;
+
+      const title = isLate ? "Late arrival" : "Patient has arrived";
+      const message = isLate
+        ? `Patient ${appointment.patient.name} checked in late for Dr. ${doctor.name} (Slot: ${appointment.time}).`
+        : `Patient ${appointment.patient.name} has arrived and checked in for Dr. ${doctor.name} (Token: ${tokenNumber}).`;
+
+      await DbNotification.create([{
+        hospital: hospitalId,
+        title,
+        message,
+        type: "appointment",
+        severity: isLate ? "warning" : "info",
+        recipientRole: "receptionist",
+        data: { appointmentId: appointment._id.toString(), tokenNumber }
+      }], { session });
+
+      await DbNotification.create([{
+        hospital: hospitalId,
+        title: "Patient Checked In",
+        message: `Patient ${appointment.patient.name} is checked in and waiting in your queue (Token: ${tokenNumber}).`,
+        type: "appointment",
+        severity: "info",
+        recipientRole: "doctor",
+        recipientDoctor: doctor._id,
+        link: `/doctor/op-management`,
+        data: { appointmentId: appointment._id.toString(), tokenNumber }
+      }], { session });
+
+      await ReceptionRepository.createAuditLog({
+        hospital: hospitalId,
+        user: userId,
+        action: "CHECK_IN",
+        details: `Checked in patient ${appointment.patient.name} for Dr. ${doctor.name}. Token: ${tokenNumber}.`
+      });
+
+      await session.commitTransaction();
+      session.endSession();
+
+      emitToHospital(hospitalId.toString(), "dashboard_update", {
+        type: "CHECK_IN",
+        appointmentId: appointment._id.toString(),
+        tokenNumber,
+        timestamp: new Date()
+      });
+
+      return {
+        success: true,
+        tokenNumber,
+        appointment
+      };
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      throw error;
+    }
+  }
+
+  static async generateScheduledAlerts(hospitalId: Types.ObjectId) {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const appointments = await Appointment.find({
+      hospital: hospitalId,
+      status: "scheduled",
+      date: { $gte: startOfToday, $lte: endOfToday }
+    }).populate("patient doctor");
+
+    const now = new Date();
+
+    for (const appt of appointments) {
+      if (!appt.time) continue;
+      const [hours, minutes] = appt.time.split(":").map(Number);
+      const slotTime = new Date();
+      slotTime.setHours(hours, minutes, 0, 0);
+
+      const diffMins = (slotTime.getTime() - now.getTime()) / (60 * 1000);
+
+      if (diffMins <= 15 && diffMins > 0) {
+        const exists = await DbNotification.exists({
+          hospital: hospitalId,
+          title: "Upcoming Appointment in 15 Minutes",
+          "data.appointmentId": appt._id.toString()
+        });
+        if (!exists) {
+          await DbNotification.create({
+            hospital: hospitalId,
+            title: "Upcoming Appointment in 15 Minutes",
+            message: `Upcoming appointment for ${appt.patient?.name} with Dr. ${appt.doctor?.name} at ${appt.time} Slot.`,
+            type: "appointment",
+            severity: "info",
+            recipientRole: "receptionist",
+            data: { appointmentId: appt._id.toString() }
+          });
+        }
+      }
+
+      if (diffMins < -15) {
+        const exists = await DbNotification.exists({
+          hospital: hospitalId,
+          title: "Appointment missed",
+          "data.appointmentId": appt._id.toString()
+        });
+        if (!exists) {
+          await DbNotification.create({
+            hospital: hospitalId,
+            title: "Appointment missed",
+            message: `${appt.patient?.name} missed the appointment with Dr. ${appt.doctor?.name} at ${appt.time} Slot.`,
+            type: "appointment",
+            severity: "critical",
+            recipientRole: "receptionist",
+            data: { appointmentId: appt._id.toString() }
+          });
+
+          appt.status = "no_show";
+          await appt.save();
+        }
+      }
+    }
+  }
+}
