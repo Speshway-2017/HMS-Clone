@@ -24,6 +24,7 @@ export class DoctorDashboardRepository {
       hospital: hospitalId,
       doctor: doctorId,
       date: { $gte: start, $lte: end },
+      status: { $ne: "pending_payment" },
     })
       .populate("patient", "name uhid age gender phone")
       .populate("doctor", "name")
@@ -122,6 +123,7 @@ export class DoctorDashboardRepository {
       doctor: doctorId,
       type: "Surgery",
       date: { $gte: start, $lte: end },
+      status: { $ne: "pending_payment" },
     })
       .populate("patient", "name uhid age gender phone")
       .populate("doctor", "name")
@@ -142,6 +144,7 @@ export class DoctorDashboardRepository {
     return await Appointment.find({
       hospital: hospitalId,
       doctor: doctorId,
+      status: { $ne: "pending_payment" },
     })
       .populate("patient", "name uhid age gender phone")
       .populate("doctor", "name")

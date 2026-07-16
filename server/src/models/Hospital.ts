@@ -11,6 +11,8 @@ const hospitalSchema = new Schema(
     licenseUrl: { type: String, default: "" },
     bedCapacity: { type: Number, default: 0 },
     opExpiryLimit: { type: Number, default: 10 },
+    availableLabTests: { type: [String], default: [] },
+    availableRadiologyTests: { type: [String], default: [] },
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },
   },

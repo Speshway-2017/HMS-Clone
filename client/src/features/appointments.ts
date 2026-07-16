@@ -8,6 +8,7 @@ interface AppointmentListParams {
   doctor?: string;
   from?: string;
   to?: string;
+  dateMode?: string;
 }
 
 interface AppointmentListResponse extends Paginated<Appointment> {

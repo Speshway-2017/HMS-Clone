@@ -315,15 +315,35 @@ export class ReceptionRepository {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    return await Queue.find({
+    const appointments = await Appointment.find({
       hospital: hospitalId,
-      createdAt: { $gte: startOfDay, $lte: endOfDay }
+      date: { $gte: startOfDay, $lte: endOfDay },
+      status: { $nin: ["completed", "cancelled", "no_show"] }
     })
       .populate("patient", "name uhid phone age gender")
       .populate("doctor", "name specialization")
       .populate("department", "name")
-      .populate("appointment", "rescheduleCount isRescheduled rescheduleHistory referenceId status")
-      .sort({ createdAt: 1 });
+      .sort({ time: 1 });
+
+    const enrichedAppointments = await Promise.all(
+      appointments.map(async (appt) => {
+        const queueObj = await Queue.findOne({
+          hospital: hospitalId,
+          appointment: appt._id
+        });
+
+        if (queueObj) {
+          return {
+            ...appt.toObject(),
+            tokenNumber: queueObj.tokenNumber,
+            status: queueObj.status
+          };
+        }
+        return appt.toObject();
+      })
+    );
+
+    return enrichedAppointments;
   }
 
   static async getDoctorQueueByDate(hospitalId: Types.ObjectId, doctorId: string, date: Date) {
