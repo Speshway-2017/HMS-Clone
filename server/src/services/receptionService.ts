@@ -507,11 +507,6 @@ export class ReceptionService {
         total,
         patientBalance: isFree ? 0 : total
       },
-      // New fields for proper partial payment tracking
-      totalAmount: total,
-      amountPaid: isFree ? total : 0,
-      amountDue: isFree ? 0 : total,
-      lastPaymentDate: isFree ? new Date() : null,
       // Store provisional appointment data in the invoice for later use
       provisionalData: {
         doctorId,
@@ -675,7 +670,7 @@ export class ReceptionService {
     session.startTransaction();
 
     try {
-      const invoice = await ReceptionRepository.findInvoiceById(hospitalId, invoiceId, session);
+      const invoice = await ReceptionRepository.findInvoiceById(hospitalId, invoiceId);
       if (!invoice) {
         throw new AppError("Invoice not found.", 404);
       }
@@ -705,7 +700,7 @@ export class ReceptionService {
         mixedDetails: paymentMethod === "Mixed" ? mixedDetails : { upiAmount: 0, cashAmount: 0, cardAmount: 0 },
         transactionId,
         paidAt: new Date()
-      }, session);
+      });
 
       // Fetch all payments for this invoice (including new one)
       const allPayments = await Payment.find({ invoice: invoiceId, hospital: hospitalId }).session(session);
@@ -718,11 +713,7 @@ export class ReceptionService {
         { _id: invoiceId, hospital: hospitalId },
         { 
           status: newStatus, 
-          "totals.patientBalance": remainingBalance,
-          totalAmount: invoiceTotal,
-          amountPaid: totalPaid,
-          amountDue: remainingBalance,
-          lastPaymentDate: new Date()
+          "totals.patientBalance": remainingBalance 
         },
         { new: true, session }
       );
@@ -851,13 +842,13 @@ export class ReceptionService {
           appointmentPayload.followUpReason = provisionalData.followUpReason;
         }
 
-        appointment = await ReceptionRepository.createAppointment(appointmentPayload, session);
+        appointment = await ReceptionRepository.createAppointment(appointmentPayload);
 
-        // Update invoice with appointment ID without overwriting other fields
+        // Update invoice with appointment ID
         await Invoice.findOneAndUpdate(
           { _id: invoiceId, hospital: hospitalId },
-          { $set: { appointment: appointment._id } },
-          { new: true, session }
+          { appointment: appointment._id },
+          { session }
         );
 
         // If it's today, generate token
@@ -890,7 +881,7 @@ export class ReceptionService {
             department: provisionalData.departmentId,
             appointment: appointment._id,
             date: new Date(provisionalData.date)
-          }, session);
+          });
         }
       } else if (invoice.appointment) {
         // Existing appointment (for free visits or already created appointments)

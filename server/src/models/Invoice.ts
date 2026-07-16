@@ -64,11 +64,7 @@ const invoiceSchema = new Schema(
       followUp: { type: Boolean, default: false },
       parentAppointmentId: { type: Schema.Types.ObjectId, ref: "Appointment", default: null },
       followUpReason: { type: String, default: "" }
-    },
-    totalAmount: { type: Number, default: 0 },
-    amountPaid: { type: Number, default: 0 },
-    amountDue: { type: Number, default: 0 },
-    lastPaymentDate: { type: Date, default: null },
+    }
   },
   { timestamps: true },
 );
