@@ -54,6 +54,17 @@ const invoiceSchema = new Schema(
     status: { type: String, enum: INVOICE_STATUSES, default: "pending" },
     issuedAt: { type: Date, default: Date.now },
     dueDate: { type: Date, default: null },
+    provisionalData: {
+      doctorId: { type: Schema.Types.ObjectId, ref: "Doctor", default: null },
+      departmentId: { type: Schema.Types.ObjectId, ref: "Department", default: null },
+      date: { type: Date, default: null },
+      time: { type: String, default: null },
+      type: { type: String, default: null },
+      notes: { type: String, default: "" },
+      followUp: { type: Boolean, default: false },
+      parentAppointmentId: { type: Schema.Types.ObjectId, ref: "Appointment", default: null },
+      followUpReason: { type: String, default: "" }
+    }
   },
   { timestamps: true },
 );
