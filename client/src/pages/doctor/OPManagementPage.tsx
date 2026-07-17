@@ -24,7 +24,7 @@ type View = "queue" | "consultation" | "prescription";
 export function OPManagementPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("today");
   const [activeView, setActiveView] = useState<View>("queue");
   const [notes, setNotes] = useState("");
   const [diagnosis, setDiagnosis] = useState("");
@@ -38,14 +38,43 @@ export function OPManagementPage() {
   const appointments = appointmentsData?.data || [];
   const [selectedApptId, setSelectedApptId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (appointments.length > 0 && !selectedApptId) {
-      setSelectedApptId(appointments[0]._id);
-      setNotes(appointments[0].notes || "");
-    }
-  }, [appointments, selectedApptId]);
+  const mapStatus = (status: string) => {
+    if (status === "completed") return "completed";
+    if (status === "in_consultation") return "in_progress";
+    if (status === "checked_in") return "waiting";
+    if (status === "scheduled") return "scheduled";
+    return "cancelled"; // fallback for cancelled/no_show
+  };
 
-  const selectedAppt = appointments.find((a) => a._id === selectedApptId) || appointments[0];
+  const filtered = appointments.filter((appt) => {
+    const p = appt.patient as any;
+    const name = p?.name || "Unknown Patient";
+    const token = appt.referenceId || appt._id.slice(-6);
+    const matchSearch = name.toLowerCase().includes(search.toLowerCase()) || token.toLowerCase().includes(search.toLowerCase());
+    
+    const mapped = mapStatus(appt.status);
+    const matchStatus = statusFilter === "today"
+      ? new Date(appt.date).toDateString() === new Date().toDateString()
+      : mapped === statusFilter;
+    
+    return matchSearch && matchStatus;
+  });
+
+  const selectedAppt = filtered.find((a) => a._id === selectedApptId) || filtered[0];
+
+  useEffect(() => {
+    if (filtered.length > 0) {
+      const exists = filtered.some((a) => a._id === selectedApptId);
+      if (!exists) {
+        setSelectedApptId(filtered[0]._id);
+        setNotes(filtered[0].notes || "");
+      }
+    } else {
+      setSelectedApptId(null);
+      setNotes("");
+    }
+  }, [filtered, selectedApptId]);
+
   const updateAppointment = useUpdateAppointment(selectedAppt?._id || "");
 
   const handleSelect = (a: any) => {
@@ -87,26 +116,6 @@ export function OPManagementPage() {
 
     navigate(`/doctor/consultation/${selectedAppt._id}`, { state: { activeTab } });
   };
-
-  const mapStatus = (status: string) => {
-    if (status === "completed") return "completed";
-    if (status === "in_consultation") return "in_progress";
-    if (status === "checked_in") return "waiting";
-    if (status === "scheduled") return "scheduled";
-    return "cancelled"; // fallback for cancelled/no_show
-  };
-
-  const filtered = appointments.filter((appt) => {
-    const p = appt.patient as any;
-    const name = p?.name || "Unknown Patient";
-    const token = appt.referenceId || appt._id.slice(-6);
-    const matchSearch = name.toLowerCase().includes(search.toLowerCase()) || token.toLowerCase().includes(search.toLowerCase());
-    
-    const mapped = mapStatus(appt.status);
-    const matchStatus = statusFilter === "all" || mapped === statusFilter;
-    
-    return matchSearch && matchStatus;
-  });
 
   if (isLoading) {
     return (
@@ -158,7 +167,7 @@ export function OPManagementPage() {
       ) : (
         <>
           {/* OP Queue View */}
-          {activeView === "queue" && selectedAppt && (
+          {activeView === "queue" && (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               {/* Queue List */}
               <div className="lg:col-span-2 space-y-4">
@@ -175,7 +184,7 @@ export function OPManagementPage() {
                       />
                     </div>
                     <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
-                      {["all", "waiting", "in_progress", "scheduled", "completed", "cancelled"].map((s) => (
+                      {["today", "waiting", "in_progress", "scheduled", "completed", "cancelled"].map((s) => (
                         <button
                           key={s}
                           onClick={() => setStatusFilter(s)}
@@ -183,7 +192,7 @@ export function OPManagementPage() {
                             statusFilter === s ? "bg-white text-navy-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
                           }`}
                         >
-                          {s === "all" ? "All" : s.replace("_", " ")}
+                          {s === "today" ? "Today" : s.replace("_", " ")}
                         </button>
                       ))}
                     </div>
@@ -192,108 +201,124 @@ export function OPManagementPage() {
 
                 {/* Queue Items */}
                 <div className="space-y-2">
-                  {filtered.map((appt) => {
-                    const p = appt.patient as any;
-                    const token = appt.referenceId || appt._id.slice(-6);
-                    const isSelected = selectedAppt._id === appt._id;
+                  {filtered.length === 0 ? (
+                    <Card className="flex h-40 flex-col items-center justify-center p-6 text-center border-dashed border-slate-200 bg-slate-50">
+                      <CalendarClock className="mb-2 h-8 w-8 text-slate-400" />
+                      <h3 className="text-xs font-semibold text-slate-600">No Appointments Found</h3>
+                      <p className="text-xs text-slate-400">There are no outpatient consultations scheduled on your list matching this filter.</p>
+                    </Card>
+                  ) : (
+                    filtered.map((appt) => {
+                      const p = appt.patient as any;
+                      const token = appt.referenceId || appt._id.slice(-6);
+                      const isSelected = selectedAppt?._id === appt._id;
 
-                    return (
-                      <div
-                        key={appt._id}
-                        onClick={() => handleSelect(appt)}
-                        className={`flex items-center gap-4 rounded-xl border px-4 py-3.5 cursor-pointer transition-all hover:shadow-sm ${
-                          isSelected
-                            ? "border-navy-300 bg-navy-50 shadow-sm"
-                            : appt.status === "in_consultation"
-                            ? "border-amber-200 bg-amber-50"
-                            : "border-slate-100 bg-white hover:bg-slate-50"
-                        }`}
-                      >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-navy-100 text-sm font-bold text-navy-700">
-                          {token.slice(-3)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold text-slate-800">{p?.name || "Unknown Patient"}</p>
-                            <span className="text-xs text-slate-400">{p?.age || 35}y · {p?.gender || "—"}</span>
+                      return (
+                        <div
+                          key={appt._id}
+                          onClick={() => handleSelect(appt)}
+                          className={`flex items-center gap-4 rounded-xl border px-4 py-3.5 cursor-pointer transition-all hover:shadow-sm ${
+                            isSelected
+                              ? "border-navy-300 bg-navy-50 shadow-sm"
+                              : appt.status === "in_consultation"
+                              ? "border-amber-200 bg-amber-50"
+                              : "border-slate-100 bg-white hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-navy-100 text-sm font-bold text-navy-700">
+                            {token.slice(-3)}
                           </div>
-                          <p className="text-xs text-slate-500 mt-0.5 truncate">{appt.notes || "No pre-visit notes"}</p>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold text-slate-800">{p?.name || "Unknown Patient"}</p>
+                              <span className="text-xs text-slate-400">{p?.age || 35}y · {p?.gender || "—"}</span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-0.5 truncate">{appt.notes || "No pre-visit notes"}</p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <Badge tone={STATUS_BADGE[appt.status]?.tone || "neutral"}>
+                              {STATUS_BADGE[appt.status]?.label || appt.status}
+                            </Badge>
+                            <p className="mt-1 text-xs text-slate-400 flex items-center justify-end gap-1">
+                              <Clock className="h-3 w-3" /> {new Date(appt.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {appt.time}
+                            </p>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-slate-300" />
                         </div>
-                        <div className="shrink-0 text-right">
-                          <Badge tone={STATUS_BADGE[appt.status]?.tone || "neutral"}>
-                            {STATUS_BADGE[appt.status]?.label || appt.status}
-                          </Badge>
-                          <p className="mt-1 text-xs text-slate-400 flex items-center justify-end gap-1">
-                            <Clock className="h-3 w-3" /> {new Date(appt.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {appt.time}
-                          </p>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-slate-300" />
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
               {/* Patient Quick View Panel */}
               <div className="space-y-4">
-                <Card>
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-base font-semibold text-slate-800">{selectedPatient?.name || "Unknown Patient"}</h3>
-                      <p className="text-xs text-slate-500">{selectedPatient?.age || 35} yrs · {selectedPatient?.gender || "—"} · {selectedAppt.referenceId || selectedAppt._id.slice(-6)}</p>
+                {selectedAppt ? (
+                  <Card>
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="text-base font-semibold text-slate-800">{selectedPatient?.name || "Unknown Patient"}</h3>
+                        <p className="text-xs text-slate-500">{selectedPatient?.age || 35} yrs · {selectedPatient?.gender || "—"} · {selectedAppt.referenceId || selectedAppt._id.slice(-6)}</p>
+                      </div>
+                      <Badge tone={STATUS_BADGE[selectedAppt.status]?.tone || "neutral"}>
+                        {STATUS_BADGE[selectedAppt.status]?.label || selectedAppt.status}
+                      </Badge>
                     </div>
-                    <Badge tone={STATUS_BADGE[selectedAppt.status]?.tone || "neutral"}>
-                      {STATUS_BADGE[selectedAppt.status]?.label || selectedAppt.status}
-                    </Badge>
-                  </div>
 
-                  <div className="space-y-3 mb-4">
-                    <div className="rounded-lg bg-slate-50 p-3">
-                      <p className="text-xs font-semibold uppercase text-slate-400 mb-1">Chief Complaint / Notes</p>
-                      <p className="text-sm text-slate-700">{selectedAppt.notes || "Routine consultation check-up."}</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="rounded-lg bg-slate-50 p-2">
-                        <p className="text-xs text-slate-400">Scheduled Time</p>
-                        <p className="text-sm font-semibold text-slate-700">{selectedAppt.time}</p>
+                    <div className="space-y-3 mb-4">
+                      <div className="rounded-lg bg-slate-50 p-3">
+                        <p className="text-xs font-semibold uppercase text-slate-400 mb-1">Chief Complaint / Notes</p>
+                        <p className="text-sm text-slate-700">{selectedAppt.notes || "Routine consultation check-up."}</p>
                       </div>
-                      <div className="rounded-lg bg-slate-50 p-2">
-                        <p className="text-xs text-slate-400">Consultation Type</p>
-                        <p className="text-sm font-semibold text-slate-700">{selectedAppt.type || "General"}</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded-lg bg-slate-50 p-2">
+                          <p className="text-xs text-slate-400">Scheduled Time</p>
+                          <p className="text-sm font-semibold text-slate-700">{selectedAppt.time}</p>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 p-2">
+                          <p className="text-xs text-slate-400">Consultation Type</p>
+                          <p className="text-sm font-semibold text-slate-700">{selectedAppt.type || "General"}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {selectedAppt.status === "completed" ? (
-                    <div className="flex flex-col gap-2">
-                      <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 mb-2 text-emerald-800">
-                        <p className="text-xs font-semibold uppercase text-emerald-600 mb-1">Consultation Completed</p>
-                        <p className="text-sm text-xs">This consultation has been successfully finalized. You can view the full record and past history logs below.</p>
+                    {selectedAppt.status === "completed" ? (
+                      <div className="flex flex-col gap-2">
+                        <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 mb-2 text-emerald-800">
+                          <p className="text-xs font-semibold uppercase text-emerald-600 mb-1">Consultation Completed</p>
+                          <p className="text-sm text-xs">This consultation has been successfully finalized. You can view the full record and past history logs below.</p>
+                        </div>
+                        <button
+                          onClick={() => handleRedirectToWorkspace("overview")}
+                          className="flex items-center justify-center gap-2 w-full rounded-lg bg-navy-700 px-3 py-2 text-sm font-medium text-white hover:bg-navy-800 transition-colors"
+                        >
+                          <FileText className="h-4 w-4" /> View Consultation Record
+                        </button>
                       </div>
-                      <button
-                        onClick={() => handleRedirectToWorkspace("overview")}
-                        className="flex items-center justify-center gap-2 w-full rounded-lg bg-navy-700 px-3 py-2 text-sm font-medium text-white hover:bg-navy-800 transition-colors"
-                      >
-                        <FileText className="h-4 w-4" /> View Consultation Record
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      <button
-                        onClick={() => handleRedirectToWorkspace("overview", true)}
-                        className="flex items-center justify-center gap-2 w-full rounded-lg bg-navy-700 px-3 py-2 text-sm font-medium text-white hover:bg-navy-800 transition-colors"
-                      >
-                        <Stethoscope className="h-4 w-4" /> Start Consultation
-                      </button>
-                      <button
-                        onClick={() => handleRedirectToWorkspace("prescription")}
-                        className="flex items-center justify-center gap-2 w-full rounded-lg border border-navy-200 px-3 py-2 text-sm font-medium text-navy-700 hover:bg-navy-50 transition-colors"
-                      >
-                        <Pill className="h-4 w-4" /> Write Prescription
-                      </button>
-                    </div>
-                  )}
-                </Card>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={() => handleRedirectToWorkspace("overview", true)}
+                          className="flex items-center justify-center gap-2 w-full rounded-lg bg-navy-700 px-3 py-2 text-sm font-medium text-white hover:bg-navy-800 transition-colors"
+                        >
+                          <Stethoscope className="h-4 w-4" /> Start Consultation
+                        </button>
+                        <button
+                          onClick={() => handleRedirectToWorkspace("prescription")}
+                          className="flex items-center justify-center gap-2 w-full rounded-lg border border-navy-200 px-3 py-2 text-sm font-medium text-navy-700 hover:bg-navy-50 transition-colors"
+                        >
+                          <Pill className="h-4 w-4" /> Write Prescription
+                        </button>
+                      </div>
+                    )}
+                  </Card>
+                ) : (
+                  <Card className="flex h-48 flex-col items-center justify-center p-6 text-center border-dashed border-slate-200 bg-slate-50">
+                    <User className="mb-2 h-8 w-8 text-slate-400" />
+                    <p className="text-sm font-semibold text-slate-600">No Patient Selected</p>
+                    <p className="text-xs text-slate-400">Select a patient from the queue to view details.</p>
+                  </Card>
+                )}
               </div>
             </div>
           )}

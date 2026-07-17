@@ -173,12 +173,12 @@ export function ReceptionistDashboard() {
                   return (
                     <div
                       key={appt._id}
-                      className={`flex flex-col sm:flex-row sm:items-center justify-between border rounded-xl p-3.5 transition-all ${borderColors[color]}`}
+                      className={`flex flex-col sm:flex-row sm:items-center justify-between border rounded-xl p-3.5 transition-all ${(borderColors as any)[color]}`}
                     >
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-slate-900 text-sm">{appt.patient?.name}</span>
-                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${badgeColors[color]}`}>
+                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${(badgeColors as any)[color]}`}>
                             {appt.alertLabel}
                           </span>
                         </div>

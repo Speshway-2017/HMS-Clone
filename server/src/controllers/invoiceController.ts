@@ -27,12 +27,15 @@ const invoiceSchema = z.object({
   dueDate: z.coerce.date().optional().nullable(),
 });
 
-function computeTotals(invoice: { items: { quantity: number; amount: number }[]; taxRate: number; serviceFee: number; insuranceCoveragePercent: number }) {
+function computeTotals(
+  invoice: { items: { quantity: number; amount: number }[]; taxRate: number; serviceFee: number; insuranceCoveragePercent: number },
+  totalPaid: number = 0
+) {
   const subtotal = invoice.items.reduce((sum, i) => sum + i.quantity * i.amount, 0);
   const taxAmount = subtotal * (invoice.taxRate / 100);
   const total = subtotal + taxAmount + invoice.serviceFee;
   const insuranceCovered = total * (invoice.insuranceCoveragePercent / 100);
-  const patientBalance = total - insuranceCovered;
+  const patientBalance = Math.max(0, total - insuranceCovered - totalPaid);
   return { subtotal, taxAmount, total, insuranceCovered, patientBalance };
 }
 
@@ -112,11 +115,23 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
     };
   });
 
+  // Group payments by invoice
+  const paymentsMap: Record<string, number> = {};
+  allPayments.forEach((p: any) => {
+    if (p.invoice) {
+      const invId = p.invoice.toString();
+      paymentsMap[invId] = (paymentsMap[invId] || 0) + (p.amount || 0);
+    }
+  });
+
   // Map OP invoices
-  const mappedOpInvoices = opInvoices.map((inv: any) => ({
-    ...inv.toObject(),
-    totals: computeTotals(inv)
-  }));
+  const mappedOpInvoices = opInvoices.map((inv: any) => {
+    const totalPaid = paymentsMap[inv._id.toString()] || 0;
+    return {
+      ...inv.toObject(),
+      totals: computeTotals(inv, totalPaid)
+    };
+  });
 
   // Combine and sort
   const combined = [...mappedOpInvoices, ...mappedIpInvoices];
@@ -176,7 +191,9 @@ export const getInvoice = catchAsync(async (req: Request, res: Response) => {
   if (!invoice) {
     throw new AppError("Invoice not found.", 404);
   }
-  res.json({ status: "success", data: { invoice: { ...invoice.toObject(), totals: computeTotals(invoice) } } });
+  const payments = await Payment.find({ invoice: invoice._id, hospital: invoice.hospital });
+  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+  res.json({ status: "success", data: { invoice: { ...invoice.toObject(), totals: computeTotals(invoice, totalPaid) } } });
 });
 
 export const updateInvoice = catchAsync(async (req: Request, res: Response) => {
@@ -189,6 +206,8 @@ export const updateInvoice = catchAsync(async (req: Request, res: Response) => {
   if (!invoice) {
     throw new AppError("Invoice not found.", 404);
   }
+  const payments = await Payment.find({ invoice: invoice._id, hospital: hospitalId });
+  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
 
   emitToHospital(hospitalId.toString(), "dashboard_update", {
     type: "INVOICE_UPDATE",
@@ -198,7 +217,7 @@ export const updateInvoice = catchAsync(async (req: Request, res: Response) => {
     timestamp: new Date()
   });
 
-  res.json({ status: "success", data: { invoice: { ...invoice.toObject(), totals: computeTotals(invoice) } } });
+  res.json({ status: "success", data: { invoice: { ...invoice.toObject(), totals: computeTotals(invoice, totalPaid) } } });
 });
 
 export const deleteInvoice = catchAsync(async (req: Request, res: Response) => {

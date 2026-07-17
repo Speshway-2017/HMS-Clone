@@ -101,7 +101,7 @@ export function QueuePage() {
             const patientName = patient?.name || "Unknown Patient";
             const arrivalTime = new Date(item.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
             const waitingTimeMins = Math.floor((new Date().getTime() - new Date(item.createdAt).getTime()) / (60 * 1000));
-            const visitType = item.appointment?.type || (item.type === "emergency" ? "Emergency" : "Walk-in");
+            const visitType = (item as any).appointment?.type || (item.type === "emergency" ? "Emergency" : "Walk-in");
             const visitTypeColors = {
               "Emergency": "bg-red-50 text-red-700 border-red-200",
               "Walk-in": "bg-amber-50 text-amber-700 border-amber-200",
@@ -135,11 +135,11 @@ export function QueuePage() {
                 <div className="flex flex-wrap items-center gap-6 mt-4 lg:mt-0">
                   <div className="text-left">
                     <p className="text-xs text-slate-400">Position</p>
-                    <p className="text-sm font-bold text-indigo-750">#{item.queuePosition || 1}</p>
+                    <p className="text-sm font-bold text-indigo-750">#{(item as any).queuePosition || 1}</p>
                   </div>
                   <div className="text-left">
                     <p className="text-xs text-slate-400">Slot Time</p>
-                    <p className="text-sm font-semibold text-slate-700">{item.appointment?.time || "—"}</p>
+                    <p className="text-sm font-semibold text-slate-700">{(item as any).appointment?.time || "—"}</p>
                   </div>
                   <div className="text-left">
                     <p className="text-xs text-slate-400">Check-In Time</p>
