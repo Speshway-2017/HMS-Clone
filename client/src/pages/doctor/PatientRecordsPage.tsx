@@ -6,11 +6,13 @@ import {
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { KpiCard } from "../../components/ui/KpiCard";
+import { Modal } from "../../components/ui/Modal";
 // ── SECURITY FIX: use doctor-scoped hook, NOT usePatients() ──────────────────
 // usePatients() calls /api/v1/patients which returns ALL hospital patients.
 // useDoctorPatients() calls /doctors/dashboard/my-patients — the server
 // enforces doctor ownership at the MongoDB level (no cross-doctor leakage).
 import { useDoctorPatients, usePrescriptions } from "../../features/doctorDashboard";
+import { usePatientReports } from "../../features/laboratory";
 import type { Patient } from "../../types/domain";
 import { usePatients } from "../../features/patients";
 
@@ -27,6 +29,7 @@ export function PatientRecordsPage() {
   const { data: myPatientsData, isLoading, isError } = useDoctorPatients({ search });
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
 
   const patients: Patient[] = myPatientsData?.patients ?? [];
   const counts = myPatientsData?.counts;
@@ -42,6 +45,12 @@ export function PatientRecordsPage() {
   const { data: realPrescriptions, isLoading: loadingPresc } = usePrescriptions(
     selectedPatient?._id ? { patient: selectedPatient._id } : undefined
   );
+
+  const { data: reports = [], isLoading: reportsLoading } = usePatientReports(
+    selectedPatient?._id
+  );
+
+  const selectedReport = reports?.find((r: any) => r._id === selectedReportId) || null;
 
   if (isLoading) {
     return (
@@ -321,26 +330,120 @@ export function PatientRecordsPage() {
                 {/* Lab Reports Tab */}
                 {activeTab === 4 && (
                   <Card>
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between mb-4 border-b pb-2">
                       <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
                         <FlaskConical className="h-4 w-4 text-navy-700" /> Lab Reports
                       </h3>
                     </div>
-                    <p className="text-sm text-slate-400 text-center py-6">
-                      View detailed lab results in the Laboratory module.
-                    </p>
+                    {reportsLoading ? (
+                      <div className="py-6 text-center text-slate-400">Loading laboratory reports...</div>
+                    ) : reports.filter(r => r.requestType === "Laboratory").length === 0 ? (
+                      <p className="text-sm text-slate-450 text-center py-6">
+                        No laboratory reports published for this patient.
+                      </p>
+                    ) : (
+                      <div className="space-y-4">
+                        {reports.filter(r => r.requestType === "Laboratory").map(r => (
+                          <div key={r._id} className="border border-slate-100 rounded-xl p-4 bg-slate-50/50 space-y-2 text-xs">
+                            <div className="flex justify-between items-center border-b border-slate-100 pb-1.5 mb-1.5">
+                              <span className="font-bold text-slate-800 text-sm">{r.testName}</span>
+                              <span className="text-xs text-slate-400">Date: {new Date(r.uploadedAt).toLocaleDateString()}</span>
+                            </div>
+                            <p className="text-slate-650"><span className="font-semibold text-slate-700">Uploaded By:</span> {r.uploadedBy?.name || "Technician"}</p>
+                            {r.observations && (
+                              <p className="text-slate-600"><span className="font-semibold text-slate-700">Observations:</span> {r.observations}</p>
+                            )}
+                            {r.remarks && (
+                              <p className="text-slate-500 italic"><span className="font-semibold text-slate-600">Remarks:</span> {r.remarks}</p>
+                            )}
+                            <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-slate-100/60">
+                              <a
+                                href={r.files?.[0]?.secure_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-blue-700 hover:underline font-bold"
+                              >
+                                <Eye className="h-3.5 w-3.5" /> View Report
+                              </a>
+                              <a
+                                href={`/api/v1/diagnostic-reports/${r._id}/download?token=${sessionStorage.getItem("hms_token") || ""}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-green-700 hover:underline font-bold ml-2"
+                              >
+                                <Download className="h-3.5 w-3.5" /> Download Report
+                              </a>
+                              <button
+                                onClick={() => setSelectedReportId(r._id)}
+                                className="inline-flex items-center gap-1 text-navy-700 hover:underline font-bold ml-auto bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded px-2 py-1"
+                              >
+                                View Detailed Report
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </Card>
                 )}
 
                 {/* Radiology Tab */}
                 {activeTab === 5 && (
                   <Card>
-                    <h3 className="mb-4 text-base font-semibold text-slate-800 flex items-center gap-2">
-                      <ScanLine className="h-4 w-4 text-navy-700" /> Radiology Reports
-                    </h3>
-                    <p className="text-sm text-slate-400 text-center py-6">
-                      View detailed radiology results in the Radiology module.
-                    </p>
+                    <div className="flex items-center justify-between mb-4 border-b pb-2">
+                      <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                        <ScanLine className="h-4 w-4 text-navy-700" /> Radiology Reports
+                      </h3>
+                    </div>
+                    {reportsLoading ? (
+                      <div className="py-6 text-center text-slate-400">Loading radiology reports...</div>
+                    ) : reports.filter(r => r.requestType === "Radiology").length === 0 ? (
+                      <p className="text-sm text-slate-450 text-center py-6">
+                        No radiology reports published for this patient.
+                      </p>
+                    ) : (
+                      <div className="space-y-4">
+                        {reports.filter(r => r.requestType === "Radiology").map(r => (
+                          <div key={r._id} className="border border-slate-100 rounded-xl p-4 bg-slate-50/50 space-y-2 text-xs">
+                            <div className="flex justify-between items-center border-b border-slate-100 pb-1.5 mb-1.5">
+                              <span className="font-bold text-slate-800 text-sm">{r.testName}</span>
+                              <span className="text-xs text-slate-400">Date: {new Date(r.uploadedAt).toLocaleDateString()}</span>
+                            </div>
+                            <p className="text-slate-650"><span className="font-semibold text-slate-700">Uploaded By:</span> {r.uploadedBy?.name || "Radiologist"}</p>
+                            {r.observations && (
+                              <p className="text-slate-600"><span className="font-semibold text-slate-700">Findings:</span> {r.observations}</p>
+                            )}
+                            {r.remarks && (
+                              <p className="text-slate-500 italic"><span className="font-semibold text-slate-600">Remarks:</span> {r.remarks}</p>
+                            )}
+                            <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-slate-100/60">
+                              <a
+                                href={r.files?.[0]?.secure_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-blue-700 hover:underline font-bold"
+                              >
+                                <Eye className="h-3.5 w-3.5" /> View Report
+                              </a>
+                              <a
+                                href={`/api/v1/diagnostic-reports/${r._id}/download?token=${sessionStorage.getItem("hms_token") || ""}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-green-700 hover:underline font-bold ml-2"
+                              >
+                                <Download className="h-3.5 w-3.5" /> Download Report
+                              </a>
+                              <button
+                                onClick={() => setSelectedReportId(r._id)}
+                                className="inline-flex items-center gap-1 text-navy-700 hover:underline font-bold ml-auto bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded px-2 py-1"
+                              >
+                                View Detailed Report
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </Card>
                 )}
 
@@ -363,6 +466,98 @@ export function PatientRecordsPage() {
             )}
           </div>
         </>
+      )}
+
+      {selectedReport && (
+        <Modal
+          title={`${selectedReport.requestType} Investigation Report`}
+          isOpen={!!selectedReportId}
+          onClose={() => setSelectedReportId(null)}
+        >
+          <div className="space-y-4">
+            {/* Patient Info */}
+            <div className="grid grid-cols-2 gap-4 rounded-xl bg-slate-50 p-4 text-xs border border-slate-200">
+              <div>
+                <p className="font-semibold text-slate-450 uppercase">Patient Name</p>
+                <p className="text-sm font-bold text-slate-800 mt-0.5">{selectedPatient?.name || "—"}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-slate-455 uppercase">UHID</p>
+                <p className="text-sm font-mono text-slate-800 mt-0.5">{selectedPatient?.uhid || "—"}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-slate-450 uppercase">Age / Gender</p>
+                <p className="text-sm font-medium text-slate-800 mt-0.5">
+                  {selectedPatient?.age ? `${selectedPatient.age} Yrs` : "—"} / {selectedPatient?.gender || "—"}
+                </p>
+              </div>
+              <div>
+                <p className="font-semibold text-slate-450 uppercase">Ordering Doctor</p>
+                <p className="text-sm font-medium text-slate-800 mt-0.5">Dr. {selectedReport.doctor?.name || "Attending Doctor"}</p>
+              </div>
+            </div>
+
+            {/* Investigation Details */}
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Investigation Details</p>
+              <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-150 text-xs space-y-1.5">
+                <div>
+                  <span className="text-slate-400 font-semibold">Test Name:</span> <span className="font-bold text-slate-800">{selectedReport.testName}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-semibold">Status:</span> <Badge tone="success">{selectedReport.status.toUpperCase()}</Badge>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-semibold">Date:</span> <span className="font-medium text-slate-700">{new Date(selectedReport.uploadedAt).toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Findings & Remarks */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-150 space-y-1">
+                <span className="font-bold text-slate-450 uppercase">Findings / Observations</span>
+                <p className="text-slate-700 font-medium whitespace-pre-wrap">{selectedReport.observations || "No findings recorded."}</p>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-150 space-y-1">
+                <span className="font-bold text-slate-450 uppercase">Technical Remarks</span>
+                <p className="text-slate-650 italic whitespace-pre-wrap">{selectedReport.remarks || "No technical remarks."}</p>
+              </div>
+            </div>
+
+            {/* Attachments */}
+            {selectedReport.files && selectedReport.files.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Attached Files ({selectedReport.files.length})</p>
+                <div className="flex flex-col gap-2">
+                  {selectedReport.files.map((file: any, index: number) => (
+                    <div key={index} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-2.5 text-xs">
+                      <span className="font-semibold text-slate-700 truncate max-w-[250px]">{file.original_filename}</span>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={file.secure_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 hover:underline text-blue-700 font-bold"
+                        >
+                          <Eye className="h-3.5 w-3.5" /> View Report
+                        </a>
+                        <a
+                          href={`/api/v1/diagnostic-reports/${selectedReport._id}/download?token=${sessionStorage.getItem("hms_token") || ""}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 hover:underline text-green-700 font-bold ml-2"
+                        >
+                          <Download className="h-3.5 w-3.5" /> Download
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </Modal>
       )}
     </div>
   );

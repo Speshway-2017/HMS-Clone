@@ -19,6 +19,7 @@ const hospitalSchema = z.object({
   opExpiryLimit: z.coerce.number().min(0).optional().default(10),
   availableLabTests: z.array(z.string()).optional(),
   availableRadiologyTests: z.array(z.string()).optional(),
+  investigationPrices: z.record(z.coerce.number()).optional(),
   primaryAdminId: z.string().optional(),
 });
 

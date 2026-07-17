@@ -111,10 +111,13 @@ import { LaboratoryDashboard } from "./pages/laboratory/Dashboard";
 import { LaboratoryTestRequestManagement } from "./pages/laboratory/TestRequestManagement";
 import { LaboratorySampleCollection } from "./pages/laboratory/SampleCollection";
 import { LaboratoryTestProcessing } from "./pages/laboratory/TestProcessing";
-import { LaboratoryQualityControl } from "./pages/laboratory/QualityControl";
 import { LaboratoryInventory } from "./pages/laboratory/LabInventory";
 import { LaboratoryReportDelivery } from "./pages/laboratory/ReportDelivery";
 import { LaboratorySettings } from "./pages/laboratory/Settings";
+import { LaboratoryBilling } from "./pages/laboratory/Billing";
+import { NewLabBillPage } from "./pages/laboratory/NewLabBill";
+import { UploadReportPage } from "./pages/laboratory/UploadReportPage";
+import { TestRequestDetailsPage } from "./pages/laboratory/TestRequestDetailsPage";
 
 export const router = createBrowserRouter([
   {
@@ -336,11 +339,14 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <LaboratoryDashboard /> },
           { path: "requests", element: <LaboratoryTestRequestManagement /> },
+          { path: "requests/:requestId", element: <TestRequestDetailsPage /> },
           { path: "samples", element: <LaboratorySampleCollection /> },
           { path: "processing", element: <LaboratoryTestProcessing /> },
-          { path: "qc", element: <LaboratoryQualityControl /> },
+          { path: "processing/upload", element: <UploadReportPage /> },
           { path: "inventory", element: <LaboratoryInventory /> },
           { path: "reports", element: <LaboratoryReportDelivery /> },
+          { path: "billing", element: <LaboratoryBilling /> },
+          { path: "billing/new", element: <NewLabBillPage /> },
           { path: "settings", element: <LaboratorySettings /> },
         ],
       },

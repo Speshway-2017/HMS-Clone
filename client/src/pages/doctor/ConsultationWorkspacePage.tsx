@@ -131,15 +131,15 @@ export function ConsultationWorkspacePage() {
   const [labPriority, setLabPriority] = useState("Routine");
 
   // Radiology form state
-  const [radioType, setRadioType] = useState("X-ray");
+  const [selectedRadiologyStudies, setSelectedRadiologyStudies] = useState<string[]>([]);
   const [radioPriority, setRadioPriority] = useState("Routine");
   const [radioNotes, setRadioNotes] = useState("");
 
-  useEffect(() => {
-    if (radiologyTests && radiologyTests.length > 0 && !radiologyTests.includes(radioType)) {
-      setRadioType(radiologyTests[0]);
-    }
-  }, [hospitalData, radioType, radiologyTests]);
+  const toggleRadiologyStudy = (study: string) => {
+    setSelectedRadiologyStudies((prev) =>
+      prev.includes(study) ? prev.filter((s) => s !== study) : [...prev, study]
+    );
+  };
 
   // Admission form state
   const [admitWard, setAdmitWard] = useState("General");
@@ -157,82 +157,85 @@ export function ConsultationWorkspacePage() {
 
   // Populate form states once loaded from draft (or fallback to appointment)
   const hasPopulated = useRef(false);
-  if (workspaceData && !hasPopulated.current) {
-    const draft = workspaceData.draftSession;
-    const appt = workspaceData.appointment;
-    
-    if (draft) {
-      setTemperature(draft.vitals?.temperature || "");
-      setBloodPressure(draft.vitals?.bloodPressure || "");
-      setPulseRate(draft.vitals?.pulseRate || "");
-      setRespiratoryRate(draft.vitals?.respiratoryRate || "");
-      setOxygenSaturation(draft.vitals?.oxygenSaturation || "");
-      setWeight(draft.vitals?.weight || "");
-      setChiefComplaint(draft.chiefComplaint || "");
+  useEffect(() => {
+    if (workspaceData && !hasPopulated.current) {
+      const draft = workspaceData.draftSession;
+      const appt = workspaceData.appointment;
       
-      setDiagnosis(draft.diagnosis || "");
-      setSymptoms(draft.symptoms || "");
-      setClinicalNotes(draft.clinicalNotes || "");
-      setTreatmentPlan(draft.treatmentPlan || "");
-      setAdvice(draft.advice || "");
+      if (draft) {
+        setTemperature(draft.vitals?.temperature || "");
+        setBloodPressure(draft.vitals?.bloodPressure || "");
+        setPulseRate(draft.vitals?.pulseRate || "");
+        setRespiratoryRate(draft.vitals?.respiratoryRate || "");
+        setOxygenSaturation(draft.vitals?.oxygenSaturation || "");
+        setWeight(draft.vitals?.weight || "");
+        setChiefComplaint(draft.chiefComplaint || "");
+        
+        setDiagnosis(draft.diagnosis || "");
+        setSymptoms(draft.symptoms || "");
+        setClinicalNotes(draft.clinicalNotes || "");
+        setTreatmentPlan(draft.treatmentPlan || "");
+        setAdvice(draft.advice || "");
 
-      if (draft.prescriptions && draft.prescriptions.length > 0) {
-        setPrescriptionMeds(draft.prescriptions.map((p: any, idx: number) => ({
-          key: p._id || p.key || `draft-med-${idx}`,
-          name: p.name || "",
-          strength: p.strength || "",
-          dosage: p.dosage || "",
-          frequency: p.frequency || "",
-          duration: p.duration || "",
-          instructions: p.instructions || "",
-          morning: !!p.morning,
-          afternoon: !!p.afternoon,
-          night: !!p.night,
-        })));
+        if (draft.prescriptions && draft.prescriptions.length > 0) {
+          setPrescriptionMeds(draft.prescriptions.map((p: any, idx: number) => ({
+            key: p._id || p.key || `draft-med-${idx}`,
+            name: p.name || "",
+            strength: p.strength || "",
+            dosage: p.dosage || "",
+            frequency: p.frequency || "",
+            duration: p.duration || "",
+            instructions: p.instructions || "",
+            morning: !!p.morning,
+            afternoon: !!p.afternoon,
+            night: !!p.night,
+          })));
+        }
+
+        if (draft.labOrders && draft.labOrders.length > 0) {
+          setSelectedLabTests(draft.labOrders);
+        }
+
+        if (draft.radiologyOrders && draft.radiologyOrders.length > 0) {
+          const restoredStudies = draft.radiologyOrders.map((r: any) => r.type).filter(Boolean);
+          setSelectedRadiologyStudies(restoredStudies);
+          const lastRad = draft.radiologyOrders[draft.radiologyOrders.length - 1];
+          setRadioNotes(lastRad.notes || "");
+          setRadioPriority(lastRad.priority || "Routine");
+        }
+
+        if (draft.admissionRecommendation) {
+          const rec = draft.admissionRecommendation;
+          setAdmitWard(rec.preferredWard || "General");
+          setAdmitBedType(rec.preferredBedType || "General");
+          setAdmitExpectedStay(rec.expectedStay || "");
+          setAdmitDiagnosis(rec.primaryDiagnosis || "");
+          setAdmitNotes(rec.clinicalNotes || "");
+          setAdmitReason(rec.admissionReason || "");
+          setAdmitSpecialInstructions(rec.specialInstructions || "");
+        }
+      } else {
+        setTemperature(appt.vitals?.temperature || "");
+        setBloodPressure(appt.vitals?.bloodPressure || "");
+        setPulseRate(appt.vitals?.pulseRate || "");
+        setRespiratoryRate(appt.vitals?.respiratoryRate || "");
+        setOxygenSaturation(appt.vitals?.oxygenSaturation || "");
+        setWeight(appt.vitals?.weight || "");
+        setChiefComplaint(appt.chiefComplaint || "");
+
+        setDiagnosis(appt.diagnosis || "");
+        setSymptoms(appt.symptoms || "");
+        setClinicalNotes(appt.clinicalNotes || "");
+        setTreatmentPlan(appt.treatmentPlan || "");
+        setAdvice(appt.advice || "");
       }
-
-      if (draft.labOrders && draft.labOrders.length > 0) {
-        setSelectedLabTests(draft.labOrders);
-      }
-
-      if (draft.radiologyOrders && draft.radiologyOrders.length > 0) {
-        const lastRad = draft.radiologyOrders[draft.radiologyOrders.length - 1];
-        setRadioType(lastRad.type || "X-ray");
-        setRadioNotes(lastRad.notes || "");
-        setRadioPriority(lastRad.priority || "Routine");
-      }
-
-      if (draft.admissionRecommendation) {
-        const rec = draft.admissionRecommendation;
-        setAdmitWard(rec.preferredWard || "General");
-        setAdmitBedType(rec.preferredBedType || "General");
-        setAdmitExpectedStay(rec.expectedStay || "");
-        setAdmitDiagnosis(rec.primaryDiagnosis || "");
-        setAdmitNotes(rec.clinicalNotes || "");
-        setAdmitReason(rec.admissionReason || "");
-        setAdmitSpecialInstructions(rec.specialInstructions || "");
-      }
-    } else {
-      setTemperature(appt.vitals?.temperature || "");
-      setBloodPressure(appt.vitals?.bloodPressure || "");
-      setPulseRate(appt.vitals?.pulseRate || "");
-      setRespiratoryRate(appt.vitals?.respiratoryRate || "");
-      setOxygenSaturation(appt.vitals?.oxygenSaturation || "");
-      setWeight(appt.vitals?.weight || "");
-      setChiefComplaint(appt.chiefComplaint || "");
-
-      setDiagnosis(appt.diagnosis || "");
-      setSymptoms(appt.symptoms || "");
-      setClinicalNotes(appt.clinicalNotes || "");
-      setTreatmentPlan(appt.treatmentPlan || "");
-      setAdvice(appt.advice || "");
+      hasPopulated.current = true;
     }
-    hasPopulated.current = true;
-  }
+  }, [workspaceData]);
 
   // Auto-save logic
   useEffect(() => {
-    if (!workspaceData?.draftSession?._id) return;
+    if (!hasPopulated.current || !workspaceData?.draftSession?._id) return;
     
     const draftId = workspaceData.draftSession._id;
     
@@ -264,13 +267,11 @@ export function ConsultationWorkspacePage() {
         night: !!p.night,
       })),
       labOrders: selectedLabTests,
-      radiologyOrders: [
-        {
-          type: radioType,
-          notes: radioNotes,
-          priority: radioPriority,
-        }
-      ],
+      radiologyOrders: selectedRadiologyStudies.map((study) => ({
+        type: study,
+        notes: radioNotes,
+        priority: radioPriority,
+      })),
       admissionRecommendation: {
         priority: admitPriority as any,
         preferredWard: admitWard,
@@ -316,7 +317,7 @@ export function ConsultationWorkspacePage() {
     advice,
     prescriptionMeds,
     selectedLabTests,
-    radioType,
+    selectedRadiologyStudies,
     radioNotes,
     radioPriority,
     admitWard,
@@ -444,13 +445,11 @@ export function ConsultationWorkspacePage() {
           night: !!p.night,
         })),
         labOrders: selectedLabTests,
-        radiologyOrders: [
-          {
-            type: radioType,
-            notes: radioNotes,
-            priority: radioPriority,
-          }
-        ],
+        radiologyOrders: selectedRadiologyStudies.map((study) => ({
+          type: study,
+          notes: radioNotes,
+          priority: radioPriority,
+        })),
         admissionRecommendation: {
           priority: admitPriority as any,
           preferredWard: admitWard,
@@ -504,7 +503,7 @@ export function ConsultationWorkspacePage() {
       }
 
       // 4. Propagate completed radiology orders to radiology/lab dashboard
-      if (radioNotes || radioType) {
+      if (selectedRadiologyStudies.length > 0) {
         try {
           const savedRequests = localStorage.getItem("hms_laboratory_requests") || "[]";
           const requests = JSON.parse(savedRequests);
@@ -515,7 +514,7 @@ export function ConsultationWorkspacePage() {
             patientAge: patient.age || 30,
             patientGender: patient.gender || "Male",
             orderedBy: (appointment.doctor as any)?.name || "Dr. Attending Physician",
-            tests: [radioType],
+            tests: selectedRadiologyStudies,
             priority: radioPriority,
             date: new Date().toISOString().split("T")[0],
             status: "Pending Request",
@@ -647,21 +646,23 @@ export function ConsultationWorkspacePage() {
       toast.error("No active draft session. Please start consultation.");
       return;
     }
+    if (selectedRadiologyStudies.length === 0) {
+      toast.error("Please select at least one radiology study.");
+      return;
+    }
     try {
       await updateDraftMutation.mutateAsync({
         consultationId: workspaceData.draftSession._id,
         updateData: {
-          radiologyOrders: [
-            {
-              type: radioType,
-              notes: radioNotes,
-              priority: radioPriority,
-            }
-          ]
+          radiologyOrders: selectedRadiologyStudies.map((study) => ({
+            type: study,
+            notes: radioNotes,
+            priority: radioPriority,
+          }))
         },
         appointmentId: appointment._id,
       });
-      toast.success("Radiology request added to draft!");
+      toast.success(`${selectedRadiologyStudies.length} radiology study/studies added to draft!`);
     } catch {
       toast.error("Failed to save radiology request");
     }
@@ -1104,10 +1105,28 @@ export function ConsultationWorkspacePage() {
               <div className="md:col-span-2">
                 <Card className="p-4 space-y-4">
                   <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Today's Lab Orders</h3>
-                  {labOrders.length === 0 ? (
+                  {labOrders.length === 0 && (!workspaceData.draftSession?.labOrders || workspaceData.draftSession.labOrders.length === 0) ? (
                     <p className="text-xs text-slate-400 py-4 text-center">No lab requests submitted for this patient session.</p>
                   ) : (
                     <div className="space-y-3">
+                      {/* Render Draft Labs Order */}
+                      {workspaceData.draftSession?.labOrders && workspaceData.draftSession.labOrders.length > 0 && (
+                        <div className="border border-amber-200 bg-amber-50/30 rounded-xl p-3 flex justify-between items-center text-xs">
+                          <div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {workspaceData.draftSession.labOrders.map((t, i) => (
+                                <span key={i} className="px-2 py-0.5 bg-amber-100/70 rounded text-amber-800 font-medium">
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                            <span className="text-[10px] text-slate-400 block mt-1">Status: Added to Draft</span>
+                          </div>
+                          <Badge tone="warning">DRAFT</Badge>
+                        </div>
+                      )}
+
+                      {/* Render Finalized Lab Orders */}
                       {labOrders.map((o) => (
                         <div key={o._id} className="border border-slate-100 rounded-xl p-3 flex justify-between items-center text-xs">
                           <div>
@@ -1137,14 +1156,42 @@ export function ConsultationWorkspacePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <form onSubmit={handleOrderRadiology} className="md:col-span-1">
                 <Card className="p-4 space-y-4">
-                  <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Order Radiology Study</h3>
-                  <SelectField label="Modality Type" value={radioType} onChange={(e) => setRadioType(e.target.value)}>
-                    {radiologyTests.map((t: string) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </SelectField>
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <h3 className="text-sm font-bold text-slate-800">Order Imaging Studies</h3>
+                    {selectedRadiologyStudies.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold bg-blue-600 text-white rounded-full px-2 py-0.5">
+                          {selectedRadiologyStudies.length} selected
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRadiologyStudies([])}
+                          className="text-[10px] text-red-500 hover:underline"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Multi-select checkboxes — mirroring the Labs tab */}
+                  <div className="space-y-2">
+                    {radiologyTests.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic">No radiology studies configured.</p>
+                    ) : (
+                      radiologyTests.map((study: string) => (
+                        <label key={study} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={selectedRadiologyStudies.includes(study)}
+                            onChange={() => toggleRadiologyStudy(study)}
+                            className="rounded border-slate-350 text-navy-700 focus:ring-navy-500"
+                          />
+                          {study}
+                        </label>
+                      ))
+                    )}
+                  </div>
 
                   <SelectField label="Priority" value={radioPriority} onChange={(e) => setRadioPriority(e.target.value)}>
                     <option value="Routine">Routine</option>
@@ -1154,7 +1201,7 @@ export function ConsultationWorkspacePage() {
 
                   <TextareaField label="Clinical Notes / Indications" value={radioNotes} onChange={(e) => setRadioNotes(e.target.value)} placeholder="e.g. Suspected fracture right forearm" rows={2} />
 
-                  <Button type="submit" variant="primary" disabled={radiologyMutation.isPending}>
+                  <Button type="submit" variant="primary" disabled={radiologyMutation.isPending || selectedRadiologyStudies.length === 0}>
                     Submit Request
                   </Button>
                 </Card>
@@ -1163,10 +1210,24 @@ export function ConsultationWorkspacePage() {
               <div className="md:col-span-2">
                 <Card className="p-4 space-y-4">
                   <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Requested Imaging Studies</h3>
-                  {radiologyOrders.length === 0 ? (
+                  {radiologyOrders.length === 0 && (!workspaceData.draftSession?.radiologyOrders || workspaceData.draftSession.radiologyOrders.length === 0) ? (
                     <p className="text-xs text-slate-400 py-4 text-center">No radiology orders requested during this session.</p>
                   ) : (
                     <div className="space-y-3">
+                      {/* Render Draft Radiology Orders */}
+                      {workspaceData.draftSession?.radiologyOrders && workspaceData.draftSession.radiologyOrders.length > 0 && (
+                        workspaceData.draftSession.radiologyOrders.map((o, idx) => (
+                          <div key={`draft-rad-${idx}`} className="border border-amber-250 bg-amber-50/30 rounded-xl p-3 flex justify-between items-center text-xs">
+                            <div>
+                              <span className="font-semibold text-slate-800 text-sm">{o.type}</span>
+                              <span className="text-[10px] text-slate-400 block mt-0.5">Indications: {o.notes || "—"}</span>
+                            </div>
+                            <Badge tone="warning">DRAFT</Badge>
+                          </div>
+                        ))
+                      )}
+
+                      {/* Render Finalized Radiology Orders */}
                       {radiologyOrders.map((o) => (
                         <div key={o._id} className="border border-slate-100 rounded-xl p-3 flex justify-between items-center text-xs">
                           <div>

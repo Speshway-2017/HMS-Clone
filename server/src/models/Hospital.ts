@@ -13,6 +13,7 @@ const hospitalSchema = new Schema(
     opExpiryLimit: { type: Number, default: 10 },
     availableLabTests: { type: [String], default: [] },
     availableRadiologyTests: { type: [String], default: [] },
+    investigationPrices: { type: Map, of: Number, default: {} },
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },
   },

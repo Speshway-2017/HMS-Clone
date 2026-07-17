@@ -14,7 +14,7 @@ import {
 const router = Router();
 
 router.get("/me", protect, getMyHospital);
-router.patch("/me", protect, restrictTo("hospital_admin"), updateMyHospital);
+router.patch("/me", protect, restrictTo("hospital_admin", "laboratory"), updateMyHospital);
 
 router.use(protect, restrictTo("super_admin"));
 

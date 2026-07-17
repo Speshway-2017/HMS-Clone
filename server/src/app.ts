@@ -30,6 +30,9 @@ import roomRoutes from "./routes/roomRoutes";
 import bedRoutes from "./routes/bedRoutes";
 import admissionRequestRoutes from "./routes/admissionRequestRoutes";
 import prescriptionRoutes from "./routes/prescriptionRoutes";
+import laboratoryRoutes from "./routes/laboratoryRoutes";
+import consultationRoutes from "./routes/consultationRoutes";
+import diagnosticReportRoutes from "./routes/diagnosticReportRoutes";
 import { getPatientPrescriptions } from "./controllers/prescriptionController";
 import { protect } from "./middleware/auth";
 import { getMongoStatus } from "./config/db";
@@ -92,6 +95,11 @@ app.use("/api/v1/admission-requests", admissionRequestRoutes);
 // Register Prescription Delivery endpoints
 app.use("/api/v1/prescriptions", prescriptionRoutes);
 app.use("/api/patient/prescriptions", protect, getPatientPrescriptions);
+
+// Register Diagnostic Report & Laboratory endpoints
+app.use("/api/v1/laboratory", laboratoryRoutes);
+app.use("/api/v1/consultations", consultationRoutes);
+app.use("/api/v1/diagnostic-reports", diagnosticReportRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

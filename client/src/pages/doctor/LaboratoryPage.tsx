@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FlaskConical, Plus, CheckCircle2, Clock, AlertTriangle, Search, User, ShieldAlert, X } from "lucide-react";
+import { FlaskConical, Plus, CheckCircle2, Clock, AlertTriangle, Search, User, ShieldAlert, X, Eye, Download } from "lucide-react";
 import toast from "react-hot-toast";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
@@ -30,8 +30,12 @@ const RESULT_TONE: Record<string, "success" | "warning" | "danger" | "neutral" |
 };
 
 const STATUS_TONE: Record<string, "success" | "warning" | "danger" | "neutral" | "info"> = {
-  completed: "success",
   pending: "neutral",
+  accepted: "info",
+  processing: "warning",
+  report_uploaded: "warning",
+  verified: "info",
+  completed: "success",
   rejected: "danger",
 };
 
@@ -451,9 +455,12 @@ interface ReportDetailModalProps {
 
 function ReportDetailModal({ orderId, onClose }: ReportDetailModalProps) {
   // Triggers API request which enforces ownership and writes an audit log in controller
-  const { data: order, isLoading, isError } = useDoctorLabOrderById(orderId);
+  const { data: detailData, isLoading, isError } = useDoctorLabOrderById(orderId);
 
   if (!orderId) return null;
+
+  const order = detailData?.order;
+  const report = detailData?.report;
 
   const patient = order?.patient as any;
   const doctor = order?.doctor as any;
@@ -517,7 +524,7 @@ function ReportDetailModal({ orderId, onClose }: ReportDetailModalProps) {
               {/* Status information */}
               <div className="flex items-center justify-between text-xs border-b border-slate-100 pb-3">
                 <span className="text-slate-400 font-semibold">Priority: <Badge tone="info">{order.priority}</Badge></span>
-                <span className="text-slate-400 font-semibold">Sample Status: <Badge tone="neutral">{order.sampleStatus}</Badge></span>
+                <span className="text-slate-400 font-semibold">Sample Status: <Badge tone="neutral">{order.status.toUpperCase()}</Badge></span>
               </div>
 
               {/* Tests and Results */}
@@ -551,10 +558,14 @@ function ReportDetailModal({ orderId, onClose }: ReportDetailModalProps) {
                         order.tests.map((t: string, idx: number) => (
                           <tr key={idx}>
                             <td className="p-3 font-medium text-slate-800">{t}</td>
-                            <td className="p-3 text-slate-400 italic font-medium">Pending...</td>
+                            <td className={`p-3 ${report ? "text-blue-700 font-semibold" : "text-slate-400 italic font-medium"}`}>
+                              {report ? "Report Document Uploaded" : "Pending..."}
+                            </td>
                             <td className="p-3 text-slate-400">—</td>
                             <td className="p-3">
-                              <Badge tone="neutral">pending</Badge>
+                              <Badge tone={report ? "info" : "neutral"}>
+                                {report ? "uploaded" : "pending"}
+                              </Badge>
                             </td>
                           </tr>
                         ))
@@ -563,6 +574,60 @@ function ReportDetailModal({ orderId, onClose }: ReportDetailModalProps) {
                   </table>
                 </div>
               </div>
+
+              {/* Technician Observations & Files */}
+              {report && (
+                <div className="mt-4 border-t border-slate-100 pt-4 space-y-3">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Technician Observations & Documents</p>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 text-xs">
+                    {report.observations && (
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-semibold uppercase">Findings / Observations</div>
+                        <div className="text-xs font-medium text-slate-800 mt-0.5 whitespace-pre-wrap">{report.observations}</div>
+                      </div>
+                    )}
+                    {report.remarks && (
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-semibold uppercase">Remarks</div>
+                        <div className="text-xs text-slate-500 italic mt-0.5 whitespace-pre-wrap">{report.remarks}</div>
+                      </div>
+                    )}
+                    {report.files && report.files.length > 0 && (
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-semibold uppercase mb-1.5">Attached Files ({report.files.length})</div>
+                        <div className="flex flex-col gap-2">
+                          {report.files.map((file: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-2 text-xs">
+                              <span className="font-semibold text-slate-700 truncate max-w-[220px]">{file.original_filename}</span>
+                              <div className="flex items-center gap-2">
+                                <a
+                                  href={file.secure_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 hover:underline text-blue-700 font-bold"
+                                >
+                                  <Eye className="h-3.5 w-3.5" /> View
+                                </a>
+                                <a
+                                  href={`/api/v1/diagnostic-reports/${report._id}/download?token=${sessionStorage.getItem("hms_token") || ""}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 hover:underline text-green-700 font-bold ml-2"
+                                >
+                                  <Download className="h-3.5 w-3.5" /> Download
+                                </a>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="text-[10px] text-slate-400 border-t border-slate-200/60 pt-2">
+                      Uploaded By: <span className="font-bold text-slate-650">{report.uploadedBy?.name || "Technician"}</span> on {new Date(report.uploadedAt).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Security confirmation */}
               <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-3 text-xs text-emerald-800 flex items-center gap-2">
