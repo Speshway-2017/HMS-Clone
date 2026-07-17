@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useDoctorCalendar } from "../../features/doctorDashboard";
 import { Card } from "../../components/ui/Card";
 import { CalendarClock, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import { mapAppointmentTypeForDisplay } from "../../features/appointments";
 
 export function CalendarPage() {
   const { data: appointments, isLoading, isError, refetch } = useDoctorCalendar();
@@ -122,7 +123,7 @@ export function CalendarPage() {
                       <div>
                         <h4 className="text-sm font-bold text-slate-800">{patientName}</h4>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          {appt.type || "Consultation"} · {appt.notes || "Routine Visit"}
+                          {mapAppointmentTypeForDisplay(appt.type)} · {appt.notes || "Routine Visit"}
                         </p>
                       </div>
                     </div>

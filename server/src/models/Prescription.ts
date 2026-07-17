@@ -27,7 +27,7 @@ const prescriptionSchema = new Schema(
     followUpDate: { type: Date, default: null },
     status: {
       type: String,
-      enum: ["Pending", "Dispensed", "Completed", "Cancelled"],
+      enum: ["Pending", "Partially Dispensed", "Dispensed", "Completed", "Cancelled"],
       default: "Pending",
     },
     deliveryStatus: {

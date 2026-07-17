@@ -7,6 +7,7 @@ interface InvoiceListParams {
   status?: string;
   patient?: string;
   billingType?: string;
+  limit?: number;
 }
 
 interface InvoiceListResponse extends Paginated<Invoice> {
@@ -14,6 +15,15 @@ interface InvoiceListResponse extends Paginated<Invoice> {
     totalBilling: number;
     netRevenue: number;
     pendingCount: number;
+    completedCount?: number;
+    outstandingAmount?: number;
+    todayCollection?: number;
+    todayPharmacyRevenue?: number;
+    cashCollection?: number;
+    upiCollection?: number;
+    cardCollection?: number;
+    currentMonthRevenue?: number;
+    monthlySeries?: { month: string; revenue: number; payments: number }[];
     all?: number;
     op?: number;
     ip?: number;

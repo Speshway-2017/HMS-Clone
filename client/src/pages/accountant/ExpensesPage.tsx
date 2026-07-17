@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
-import { 
-  ClipboardList, 
-  Plus, 
-  Search, 
-  Trash2, 
-  TrendingUp, 
+import {
+  ClipboardList,
+  Plus,
+  Search,
+  Trash2,
+  TrendingUp,
   CreditCard,
   Building2,
   Calendar,
   AlertCircle,
-  Eye
+  Eye,
+  RefreshCw,
+  User,
 } from "lucide-react";
 import { Card } from "../../components/ui/Card";
 import { KpiCard } from "../../components/ui/KpiCard";
@@ -17,6 +19,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Modal } from "../../components/ui/Modal";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
+import { api } from "../../lib/api";
 
 interface Expense {
   _id: string;
@@ -27,6 +30,10 @@ interface Expense {
   description: string;
   paymentMethod: "UPI" | "Bank Transfer" | "Cash" | "Card";
   status: "Paid" | "Pending Approval";
+  createdBy?: {
+    _id: string;
+    name: string;
+  };
 }
 
 const CAT_COLORS: Record<string, string> = {
@@ -43,6 +50,8 @@ export function AccountantExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
 
   // Modals state
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
@@ -57,107 +66,75 @@ export function AccountantExpensesPage() {
   const [description, setDescription] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<Expense["paymentMethod"]>("UPI");
   const [status, setStatus] = useState<Expense["status"]>("Paid");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    const saved = localStorage.getItem("hms_expenses");
-    if (saved) {
-      setExpenses(JSON.parse(saved));
-    } else {
-      const defaultExpenses: Expense[] = [
-        {
-          _id: "EXP-10920",
-          category: "Medical Supplies",
-          amount: 45000,
-          recipient: "Apollo Med Distributors",
-          date: new Date(Date.now() - 86400000).toISOString().split("T")[0],
-          description: "Purchase of disposable surgical gloves and masks.",
-          paymentMethod: "Bank Transfer",
-          status: "Paid"
-        },
-        {
-          _id: "EXP-10921",
-          category: "Utilities",
-          amount: 28400,
-          recipient: "State Electricity Board",
-          date: new Date(Date.now() - 3 * 86400000).toISOString().split("T")[0],
-          description: "Main block electricity utility bill payment.",
-          paymentMethod: "UPI",
-          status: "Paid"
-        },
-        {
-          _id: "EXP-10922",
-          category: "Rent/Lease",
-          amount: 55000,
-          recipient: "Paramount Properties",
-          date: new Date(Date.now() - 5 * 86400000).toISOString().split("T")[0],
-          description: "OPD extension block monthly rental lease.",
-          paymentMethod: "Bank Transfer",
-          status: "Paid"
-        },
-        {
-          _id: "EXP-10923",
-          category: "Equipment Maintenance",
-          amount: 18000,
-          recipient: "Siemens Medical Care",
-          date: new Date().toISOString().split("T")[0],
-          description: "CT scanner routine laser calibration & check.",
-          paymentMethod: "Card",
-          status: "Pending Approval"
-        }
-      ];
-      setExpenses(defaultExpenses);
-      localStorage.setItem("hms_expenses", JSON.stringify(defaultExpenses));
+  const fetchExpenses = async () => {
+    setIsLoading(true);
+    setErrorMsg("");
+    try {
+      const res = await api.get<{ status: string; data: Expense[] }>("/accountant/expenses");
+      setExpenses(res.data.data);
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.message ?? err.message ?? "Failed to fetch expenses.");
+    } finally {
+      setIsLoading(false);
     }
-  }, []);
-
-  const saveExpenses = (newExpenses: Expense[]) => {
-    setExpenses(newExpenses);
-    localStorage.setItem("hms_expenses", JSON.stringify(newExpenses));
   };
 
-  const handleAddSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    fetchExpenses();
+  }, []);
+
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (amount <= 0 || !recipient || !date) return;
 
-    const newExpense: Expense = {
-      _id: `EXP-${Math.floor(10000 + Math.random() * 90000)}`,
-      category,
-      amount,
-      recipient,
-      date,
-      description,
-      paymentMethod,
-      status
-    };
+    setIsSubmitting(true);
+    try {
+      await api.post("/accountant/expenses", {
+        category,
+        amount,
+        recipient,
+        date,
+        description,
+        paymentMethod,
+        status
+      });
+      setIsAddExpenseOpen(false);
+      fetchExpenses();
 
-    const updated = [newExpense, ...expenses];
-    saveExpenses(updated);
-    setIsAddExpenseOpen(false);
-
-    // Reset inputs
-    setCategory("Utilities");
-    setAmount(0);
-    setRecipient("");
-    setDate("");
-    setDescription("");
-    setPaymentMethod("UPI");
-    setStatus("Paid");
+      // Reset inputs
+      setCategory("Utilities");
+      setAmount(0);
+      setRecipient("");
+      setDate("");
+      setDescription("");
+      setPaymentMethod("UPI");
+      setStatus("Paid");
+    } catch (err: any) {
+      alert(err.response?.data?.message ?? err.message ?? "Failed to save expense.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this expense record?")) return;
-    const updated = expenses.filter((exp) => exp._id !== id);
-    saveExpenses(updated);
+    try {
+      await api.delete(`/accountant/expenses/${id}`);
+      fetchExpenses();
+    } catch (err: any) {
+      alert(err.response?.data?.message ?? err.message ?? "Failed to delete expense.");
+    }
   };
 
-  const handleApprove = (id: string) => {
-    const updated = expenses.map((exp) => {
-      if (exp._id === id) {
-        return { ...exp, status: "Paid" as const };
-      }
-      return exp;
-    });
-    saveExpenses(updated);
+  const handleApprove = async (id: string) => {
+    try {
+      await api.patch(`/accountant/expenses/${id}/approve`);
+      fetchExpenses();
+    } catch (err: any) {
+      alert(err.response?.data?.message ?? err.message ?? "Failed to approve expense.");
+    }
   };
 
   // Calculations
@@ -181,42 +158,53 @@ export function AccountantExpensesPage() {
           <h1 className="text-2xl font-bold text-slate-900">Hospital Expense Tracking</h1>
           <p className="text-sm text-slate-500">Record administrative spend, vendors liabilities, and operational expenses.</p>
         </div>
-        <button
-          onClick={() => setIsAddExpenseOpen(true)}
-          className="flex items-center gap-1.5 rounded-lg bg-navy-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-800 transition self-start sm:self-auto"
-        >
-          <Plus className="h-4 w-4" /> Add Expense
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={fetchExpenses}
+            disabled={isLoading}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-650 hover:bg-slate-50 transition"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+          <button
+            onClick={() => setIsAddExpenseOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg bg-navy-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-800 transition"
+          >
+            <Plus className="h-4 w-4" /> Add Expense
+          </button>
+        </div>
       </div>
 
       {/* Expense Stats grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <KpiCard 
           label="Total Logged Expense (Paid)" 
-          value={`₹${totalSpend.toLocaleString("en-IN")}`} 
+          value={`₹${totalSpend.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`} 
           icon={<ClipboardList className="h-5 w-5" />} 
           emphasis 
         />
         <KpiCard 
-          label="Pending Assessor Approval" 
-          value={`${pendingApprovalsCount} payments`} 
-          icon={<AlertCircle className="h-5 w-5" />} 
+          label="Pending Approvals" 
+          value={`${pendingApprovalsCount} Requests`} 
+          icon={<CreditCard className="h-5 w-5" />} 
+          trend={{ direction: "up", text: `Value: ₹${pendingApprovalsAmount.toLocaleString("en-IN")}` }}
         />
         <KpiCard 
-          label="Locked Approval Volume" 
-          value={`₹${pendingApprovalsAmount.toLocaleString("en-IN")}`} 
+          label="Average Expense/Transaction" 
+          value={`₹${(expenses.length ? totalSpend / expenses.length : 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`} 
           icon={<Building2 className="h-5 w-5" />} 
         />
       </div>
 
-      {/* Filter panel */}
+      {/* Filters & categories */}
       <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
         {["All", "Utilities", "Rent/Lease", "Medical Supplies", "Equipment Maintenance", "Salaries", "Admin Expenses", "Vendor Payments"].map((cat) => (
           <button
             key={cat}
             onClick={() => setFilterCategory(cat)}
             className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
-              filterCategory === cat ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:bg-slate-50"
+              filterCategory === cat ? "bg-navy-55 text-navy-700 font-bold" : "text-slate-500 hover:bg-slate-50"
             }`}
           >
             {cat}
@@ -224,7 +212,7 @@ export function AccountantExpensesPage() {
         ))}
       </div>
 
-      {/* Expense History Table */}
+      {/* Expenses Table */}
       <Card>
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full max-w-sm">
@@ -233,7 +221,7 @@ export function AccountantExpensesPage() {
             </span>
             <input
               type="text"
-              placeholder="Search expenses, recipents..."
+              placeholder="Search expenses, recipients, descriptions..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-4 text-sm text-slate-700 outline-none focus:border-navy-500"
@@ -241,13 +229,21 @@ export function AccountantExpensesPage() {
           </div>
         </div>
 
+        {errorMsg && (
+          <div className="bg-red-50 text-red-700 p-3 rounded-lg flex items-center gap-2 mb-4 text-sm">
+            <AlertCircle className="h-5 w-5" />
+            {errorMsg}
+          </div>
+        )}
+
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm min-w-[800px]">
+          <table className="w-full text-left text-sm min-w-[900px]">
             <thead className="bg-slate-50">
               <tr className="text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">
                 <th className="px-4 py-3">Expense ID</th>
                 <th className="px-4 py-3">Category</th>
                 <th className="px-4 py-3">Recipient/Vendor</th>
+                <th className="px-4 py-3">Logged By</th>
                 <th className="px-4 py-3">Date logged</th>
                 <th className="px-4 py-3">Amount</th>
                 <th className="px-4 py-3">Status</th>
@@ -255,9 +251,16 @@ export function AccountantExpensesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredExpenses.length === 0 ? (
+              {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
+                    <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-navy-550" />
+                    Loading expense records...
+                  </td>
+                </tr>
+              ) : filteredExpenses.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
                     No expense records found.
                   </td>
                 </tr>
@@ -265,7 +268,7 @@ export function AccountantExpensesPage() {
                 filteredExpenses.map((exp) => (
                   <tr key={exp._id} className="hover:bg-slate-50 text-slate-700">
                     <td className="px-4 py-3 font-mono text-xs text-slate-500 whitespace-nowrap">
-                      {exp._id}
+                      #{exp._id.slice(-8).toUpperCase()}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`rounded-lg px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap ${CAT_COLORS[exp.category]}`}>
@@ -276,13 +279,19 @@ export function AccountantExpensesPage() {
                       <div className="font-semibold text-slate-800">{exp.recipient}</div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="flex items-center gap-1 text-slate-500 text-xs">
+                        <User className="h-3.5 w-3.5" />
+                        {exp.createdBy?.name || "System"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <span className="flex items-center gap-1">
                         <Calendar className="h-3.5 w-3.5 text-slate-450" />
-                        {new Date(exp.date).toLocaleDateString()}
+                        {new Date(exp.date).toLocaleDateString("en-IN")}
                       </span>
                     </td>
                     <td className="px-4 py-3 font-bold text-slate-850 whitespace-nowrap">
-                      ₹{exp.amount.toLocaleString("en-IN")}
+                      ₹{exp.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <Badge tone={exp.status === "Paid" ? "success" : "warning"} className="w-36">
@@ -348,73 +357,74 @@ export function AccountantExpensesPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <InputField
-              label="Expense Amount (₹)"
+              label="Amount (₹)"
               type="number"
               value={amount}
-              onChange={(e) => setAmount(Number(e.target.value))}
-              min="1"
+              onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
               required
+              min={1}
             />
             <InputField
-              label="Date of Payment"
+              label="Recipient/Vendor"
+              type="text"
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value)}
+              required
+              placeholder="e.g. Apollo Distributors"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <InputField
+              label="Date"
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
               required
             />
+            <SelectField
+              label="Payment Method"
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value as any)}
+              required
+            >
+              <option value="UPI">UPI (Unified Payments Interface)</option>
+              <option value="Bank Transfer">Bank Transfer (IMPS/NEFT)</option>
+              <option value="Cash">Cash</option>
+              <option value="Card">Credit/Debit Card</option>
+            </SelectField>
           </div>
 
-          <InputField
-            label="Recipient / Vendor Name"
-            type="text"
-            value={recipient}
-            onChange={(e) => setRecipient(e.target.value)}
-            placeholder="E.g., Siemens Healthcare Ltd"
-            required
-          />
-
           <SelectField
-            label="Payment Method"
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value as any)}
-            required
-          >
-            <option value="UPI">UPI</option>
-            <option value="Bank Transfer">Bank Transfer</option>
-            <option value="Cash">Cash</option>
-            <option value="Card">Credit/Debit Card</option>
-          </SelectField>
-
-          <SelectField
-            label="Payment Status"
+            label="Initial Status"
             value={status}
             onChange={(e) => setStatus(e.target.value as any)}
             required
           >
-            <option value="Paid">Disbursed (Paid)</option>
-            <option value="Pending Approval">Requires approval first</option>
+            <option value="Paid">Paid (Immediately settled)</option>
+            <option value="Pending Approval">Pending Approval (Needs validation)</option>
           </SelectField>
 
           <TextareaField
-            label="Brief description / notes"
+            label="Description/Notes"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="E.g., CT scanner annual maintenance contract payment."
-            required
+            rows={3}
+            placeholder="Add invoice numbers, purchase descriptions..."
           />
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" type="button" onClick={() => setIsAddExpenseOpen(false)}>
+            <Button variant="ghost" onClick={() => setIsAddExpenseOpen(false)}>
               Cancel
             </Button>
-            <Button variant="primary" type="submit">
+            <Button type="submit" variant="primary" loading={isSubmitting}>
               Save Expense
             </Button>
           </div>
         </form>
       </Modal>
 
-      {/* Modal: Expense Details */}
+      {/* Modal: View Details */}
       <Modal
         title="Expense Details"
         isOpen={isDetailsOpen}
@@ -424,43 +434,52 @@ export function AccountantExpensesPage() {
         }}
       >
         {selectedExpense && (
-          <div className="space-y-4">
-            <div className="rounded-xl bg-slate-50 p-4 border space-y-3">
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-slate-500 text-xs font-semibold">Expense ID</span>
-                <span className="font-mono text-slate-800 text-xs">{selectedExpense._id}</span>
-              </div>
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-slate-500 text-xs font-semibold">Category</span>
-                <span className="font-semibold text-slate-800 text-xs">{selectedExpense.category}</span>
-              </div>
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-slate-500 text-xs font-semibold">Recipient / Vendor</span>
-                <span className="font-semibold text-slate-800 text-xs">{selectedExpense.recipient}</span>
-              </div>
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-slate-500 text-xs font-semibold">Date Logged</span>
-                <span className="text-slate-800 text-xs">{new Date(selectedExpense.date).toLocaleDateString()}</span>
-              </div>
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-slate-500 text-xs font-semibold">Payment Method</span>
-                <span className="text-slate-800 text-xs font-medium uppercase">{selectedExpense.paymentMethod}</span>
-              </div>
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-slate-500 text-xs font-semibold">Status</span>
-                <span className="text-slate-800 text-xs"><Badge tone={selectedExpense.status === "Paid" ? "success" : "warning"}>{selectedExpense.status}</Badge></span>
-              </div>
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-slate-500 text-xs font-semibold">Description</span>
-                <span className="text-slate-800 text-xs">{selectedExpense.description}</span>
-              </div>
-              <div className="flex justify-between font-bold text-sm pt-2">
-                <span className="text-slate-800">Total Amount</span>
-                <span className="text-navy-700">₹{selectedExpense.amount.toLocaleString("en-IN")}</span>
-              </div>
+          <div className="space-y-4 text-slate-700">
+            <div className="flex justify-between border-b pb-2">
+              <span className="font-semibold text-slate-500 text-xs uppercase">Expense ID</span>
+              <span className="font-mono text-sm">#{selectedExpense._id.toUpperCase()}</span>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="secondary" onClick={() => setIsDetailsOpen(false)}>
+            <div className="flex justify-between border-b pb-2">
+              <span className="font-semibold text-slate-500 text-xs uppercase">Category</span>
+              <span className={`rounded px-2.5 py-0.5 text-xs font-semibold ${CAT_COLORS[selectedExpense.category]}`}>
+                {selectedExpense.category}
+              </span>
+            </div>
+            <div className="flex justify-between border-b pb-2">
+              <span className="font-semibold text-slate-500 text-xs uppercase">Recipient/Vendor</span>
+              <span className="font-bold text-slate-800">{selectedExpense.recipient}</span>
+            </div>
+            <div className="flex justify-between border-b pb-2">
+              <span className="font-semibold text-slate-500 text-xs uppercase">Logged By</span>
+              <span className="text-slate-800">{selectedExpense.createdBy?.name || "System"}</span>
+            </div>
+            <div className="flex justify-between border-b pb-2">
+              <span className="font-semibold text-slate-500 text-xs uppercase">Date Logged</span>
+              <span>{new Date(selectedExpense.date).toLocaleDateString("en-IN", { dateStyle: "long" })}</span>
+            </div>
+            <div className="flex justify-between border-b pb-2">
+              <span className="font-semibold text-slate-500 text-xs uppercase">Amount Paid</span>
+              <span className="font-bold text-slate-900 text-lg">₹{selectedExpense.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between border-b pb-2">
+              <span className="font-semibold text-slate-500 text-xs uppercase">Payment Method</span>
+              <span>{selectedExpense.paymentMethod}</span>
+            </div>
+            <div className="flex justify-between border-b pb-2">
+              <span className="font-semibold text-slate-500 text-xs uppercase">Status</span>
+              <Badge tone={selectedExpense.status === "Paid" ? "success" : "warning"}>
+                {selectedExpense.status}
+              </Badge>
+            </div>
+            <div className="space-y-1">
+              <span className="font-semibold text-slate-500 text-xs uppercase block">Description/Notes</span>
+              <p className="bg-slate-50 border p-2.5 rounded text-sm text-slate-600 italic">
+                {selectedExpense.description || "No description provided."}
+              </p>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button variant="ghost" onClick={() => setIsDetailsOpen(false)}>
                 Close
               </Button>
             </div>

@@ -6,7 +6,7 @@ const paymentSchema = new Schema(
     invoice: { type: Schema.Types.ObjectId, ref: "Invoice", required: true },
     patient: { type: Schema.Types.ObjectId, ref: "Patient", required: true },
     amount: { type: Number, required: true },
-    paymentMethod: { type: String, enum: ["UPI", "Cash", "Card", "Mixed"], required: true },
+    paymentMethod: { type: String, enum: ["UPI", "Cash", "Card", "Net Banking", "Cheque", "Mixed"], required: true },
     mixedDetails: {
       upiAmount: { type: Number, default: 0 },
       cashAmount: { type: Number, default: 0 },

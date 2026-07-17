@@ -1,6 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
-import { useAppointment, useUpdateAppointment } from "../../features/appointments";
+import { useAppointment, useUpdateAppointment, mapAppointmentTypeForDisplay } from "../../features/appointments";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { Appointment } from "../../types/domain";
@@ -70,7 +70,7 @@ export function AppointmentDetailsPage() {
             </div>
             <div>
               <div className="text-xs uppercase text-slate-400">Type</div>
-              <div className="font-semibold text-slate-800">{appointment.type}</div>
+              <div className="font-semibold text-slate-800">{mapAppointmentTypeForDisplay(appointment.type)}</div>
             </div>
             <div>
               <div className="text-xs uppercase text-slate-400">Status</div>

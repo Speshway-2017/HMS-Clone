@@ -8,7 +8,7 @@ import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { useDoctorProfileMe } from "../../features/doctors";
-import { useAppointments, useUpdateAppointment } from "../../features/appointments";
+import { useAppointments, useUpdateAppointment, mapAppointmentTypeForDisplay } from "../../features/appointments";
 
 const STATUS_BADGE: Record<string, { tone: "success" | "warning" | "info" | "neutral" | "danger"; label: string }> = {
   completed:       { tone: "success",  label: "Completed"       },
@@ -277,7 +277,7 @@ export function OPManagementPage() {
                         </div>
                         <div className="rounded-lg bg-slate-50 p-2">
                           <p className="text-xs text-slate-400">Consultation Type</p>
-                          <p className="text-sm font-semibold text-slate-700">{selectedAppt.type || "General"}</p>
+                          <p className="text-sm font-semibold text-slate-700">{mapAppointmentTypeForDisplay(selectedAppt.type)}</p>
                         </div>
                       </div>
                     </div>
@@ -334,7 +334,7 @@ export function OPManagementPage() {
                   </div>
                   <div className="flex-1">
                     <p className="font-semibold text-slate-800">{selectedPatient?.name || "Unknown Patient"}</p>
-                    <p className="text-xs text-slate-500">{selectedPatient?.age || 35} yrs · {selectedPatient?.gender || "—"} · {selectedAppt.type || "General"}</p>
+                    <p className="text-xs text-slate-500">{selectedPatient?.age || 35} yrs · {selectedPatient?.gender || "—"} · {mapAppointmentTypeForDisplay(selectedAppt.type)}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-center">
                     <div><p className="text-xs text-slate-400">BP</p><p className="text-sm font-semibold text-slate-700">120/80</p></div>

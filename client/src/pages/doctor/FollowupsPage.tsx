@@ -2,6 +2,7 @@ import { useDoctorFollowups } from "../../features/doctorDashboard";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { CalendarClock, AlertTriangle } from "lucide-react";
+import { mapAppointmentTypeForDisplay } from "../../features/appointments";
 
 export function FollowupsPage() {
   const { data: appointments, isLoading, isError, refetch } = useDoctorFollowups();
@@ -76,7 +77,7 @@ export function FollowupsPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-medium">{dateStr}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-medium">{appt.time}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge tone="info">{appt.type || "Follow-up"}</Badge>
+                      <Badge tone="info">{mapAppointmentTypeForDisplay(appt.type)}</Badge>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">{appt.notes || "No follow-up notes."}</td>
                   </tr>

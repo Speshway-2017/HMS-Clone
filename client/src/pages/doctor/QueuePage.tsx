@@ -3,6 +3,7 @@ import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { User, Phone, Play, RefreshCw, EyeOff, AlertTriangle } from "lucide-react";
 import toast from "react-hot-toast";
+import { mapAppointmentTypeForDisplay } from "../../features/appointments";
 
 const PRIORITY_TONES: Record<string, "success" | "warning" | "danger" | "neutral" | "info"> = {
   regular: "info",
@@ -101,11 +102,11 @@ export function QueuePage() {
             const patientName = patient?.name || "Unknown Patient";
             const arrivalTime = new Date(item.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
             const waitingTimeMins = Math.floor((new Date().getTime() - new Date(item.createdAt).getTime()) / (60 * 1000));
-            const visitType = (item as any).appointment?.type || (item.type === "emergency" ? "Emergency" : "Walk-in");
+            const visitType = mapAppointmentTypeForDisplay((item as any).appointment?.type || (item.type === "emergency" ? "Emergency" : "Walk-in"));
             const visitTypeColors = {
               "Emergency": "bg-red-50 text-red-700 border-red-200",
               "Walk-in": "bg-amber-50 text-amber-700 border-amber-200",
-              "Consultation": "bg-emerald-50 text-emerald-700 border-emerald-200"
+              "Appointment": "bg-emerald-50 text-emerald-700 border-emerald-200"
             } as any;
 
             return (

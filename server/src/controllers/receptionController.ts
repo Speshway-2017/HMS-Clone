@@ -53,7 +53,7 @@ const appointmentBookingSchema = z.object({
 const paymentSchema = z.object({
   invoiceId: z.string().min(1, "Invoice ID is required"),
   amount: z.coerce.number().positive("Amount must be positive"),
-  paymentMethod: z.enum(["UPI", "Cash", "Card", "Mixed"]),
+  paymentMethod: z.enum(["UPI", "Cash", "Card", "Net Banking", "Cheque", "Mixed"]),
   mixedDetails: z.object({
     upiAmount: z.coerce.number().default(0),
     cashAmount: z.coerce.number().default(0),
@@ -195,6 +195,22 @@ export const checkDuplicateAppointment = catchAsync(async (req: Request, res: Re
 
 export const processBillingPayment = catchAsync(async (req: Request, res: Response) => {
   const paymentData = paymentSchema.parse(req.body);
+  
+  const invoice = await Invoice.findOne({ _id: paymentData.invoiceId, hospital: req.hospitalFilter!.hospital });
+  if (!invoice) {
+    throw new AppError("Invoice not found.", 404);
+  }
+
+  // 1. Receptionists are NOT authorized to collect pharmacy bills
+  if (invoice.billingType === "PHARMACY" && req.user!.role === "receptionist") {
+    throw new AppError("Receptionists are not authorized to collect pharmacy bills. Please collect at the pharmacy counter.", 403);
+  }
+
+  // 2. Pharmacists are ONLY authorized to collect pharmacy bills
+  if (invoice.billingType !== "PHARMACY" && req.user!.role === "pharmacist") {
+    throw new AppError("Pharmacists are not authorized to collect non-pharmacy bills.", 403);
+  }
+
   const result = await ReceptionService.processPayment(
     req.hospitalFilter!.hospital as any,
     paymentData,

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, CalendarClock, CalendarCheck2 } from "lucide-react";
-import { useAppointments } from "../../features/appointments";
+import { useAppointments, mapAppointmentTypeForDisplay } from "../../features/appointments";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { KpiCard } from "../../components/ui/KpiCard";
@@ -44,7 +44,7 @@ export function AppointmentsPage() {
           <div className="text-slate-700">
             {new Date(a.date).toLocaleDateString()} · {a.time}
           </div>
-          <div className="text-xs text-slate-400">{a.type}</div>
+          <div className="text-xs text-slate-400">{mapAppointmentTypeForDisplay(a.type)}</div>
         </div>
       ),
     },

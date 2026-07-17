@@ -30,6 +30,7 @@ import roomRoutes from "./routes/roomRoutes";
 import bedRoutes from "./routes/bedRoutes";
 import admissionRequestRoutes from "./routes/admissionRequestRoutes";
 import prescriptionRoutes from "./routes/prescriptionRoutes";
+import accountantRoutes from "./routes/accountantRoutes";
 import laboratoryRoutes from "./routes/laboratoryRoutes";
 import consultationRoutes from "./routes/consultationRoutes";
 import diagnosticReportRoutes from "./routes/diagnosticReportRoutes";
@@ -95,6 +96,7 @@ app.use("/api/v1/admission-requests", admissionRequestRoutes);
 // Register Prescription Delivery endpoints
 app.use("/api/v1/prescriptions", prescriptionRoutes);
 app.use("/api/patient/prescriptions", protect, getPatientPrescriptions);
+app.use("/api/v1/accountant", accountantRoutes);
 
 // Register Diagnostic Report & Laboratory endpoints
 app.use("/api/v1/laboratory", laboratoryRoutes);
