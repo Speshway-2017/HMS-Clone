@@ -707,12 +707,13 @@ export function usePrescriptions(params?: { status?: string; patient?: string })
 export function useDispensePrescription() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const res = await api.patch<{ status: string; data: any }>(`/prescriptions/${id}/dispense`);
+    mutationFn: async ({ id, payload }: { id: string; payload: any }) => {
+      const res = await api.patch<{ status: string; data: any }>(`/prescriptions/${id}/dispense`, payload);
       return res.data.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["prescriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
     },
   });
 }

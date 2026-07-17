@@ -31,6 +31,7 @@ const invoiceSchema = new Schema(
     patient: { type: Schema.Types.ObjectId, ref: "Patient", required: true },
     appointment: { type: Schema.Types.ObjectId, ref: "Appointment", default: null },
     admission: { type: Schema.Types.ObjectId, ref: "Admission", default: null },
+    prescription: { type: Schema.Types.ObjectId, ref: "Prescription", default: null },
     items: { type: [invoiceItemSchema], default: [] },
     taxRate: { type: Number, default: 0 },
     serviceFee: { type: Number, default: 0 },

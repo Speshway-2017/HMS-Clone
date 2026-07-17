@@ -18,6 +18,9 @@ import { AppError } from "../utils/AppError";
 import { env } from "../config/env";
 import { cloudinary } from "../config/cloudinary";
 import { InventoryItem } from "../models/InventoryItem";
+import { Invoice } from "../models/Invoice";
+import { AuditLog } from "../models/AuditLog";
+import { DbNotification } from "../models/DbNotification";
 
 async function getLoggedDoctor(req: Request) {
   const doctor = await Doctor.findOne({ email: req.user!.email, isActive: { $ne: false } });
@@ -540,51 +543,211 @@ export const dispensePrescription = catchAsync(async (req: Request, res: Respons
   session.startTransaction();
 
   try {
-    const prescription = await Prescription.findOneAndUpdate(
-      { _id: prescriptionId, hospital: hospitalId },
-      { status: "Dispensed" },
-      { new: true, session }
-    );
+    const prescription = await Prescription.findOne({
+      _id: prescriptionId,
+      hospital: hospitalId
+    }).populate("patient doctor department").session(session);
 
     if (!prescription) {
       throw new AppError("Prescription not found.", 404);
     }
 
-    // Deduct stock from inventory
-    for (const med of prescription.medications) {
-      const durationNum = parseInt(med.duration);
-      const qty = !isNaN(durationNum) ? durationNum * 2 : 10;
+    if (prescription.status === "Completed" || prescription.status === "Dispensed") {
+      throw new AppError("Prescription has already been fully dispensed and completed.", 400);
+    }
 
+    // One Prescription = One Pharmacy Invoice validation check
+    const existingInvoice = await Invoice.findOne({
+      hospital: hospitalId,
+      billingType: "PHARMACY",
+      prescription: prescription._id
+    }).session(session);
+
+    if (existingInvoice) {
+      throw new AppError("This prescription has already been dispensed and an invoice generated.", 400);
+    }
+
+    // Safety check: verify patient
+    if (req.body.patientId && prescription.patient._id.toString() !== req.body.patientId.toString()) {
+      throw new AppError("Safety Alert: Patient identification mismatch! Medicines of Patient A cannot be dispensed to Patient B.", 400);
+    }
+
+    const items = req.body.items;
+    if (!items || items.length === 0) {
+      throw new AppError("Cannot submit empty medicines.", 400);
+    }
+
+    const names = items.map((i: any) => i.name.trim().toLowerCase());
+    const uniqueNames = new Set(names);
+    if (names.length !== uniqueNames.size) {
+      throw new AppError("Cannot submit duplicate medicines in dispensing list.", 400);
+    }
+
+    // Deduct stock and validate
+    for (const item of items) {
+      if (item.quantity <= 0) {
+        throw new AppError(`Cannot dispense zero or negative quantity for medicine: ${item.name}`, 400);
+      }
       const invItem = await InventoryItem.findOne({
         hospital: hospitalId,
-        name: new RegExp(`^${med.name.trim()}$`, "i"),
+        name: new RegExp(`^${item.name.trim()}$`, "i"),
         category: "medicines"
       }).session(session);
 
-      if (invItem) {
-        invItem.stockQty = Math.max(0, invItem.stockQty - qty);
-        await invItem.save({ session });
+      if (!invItem) {
+        throw new AppError(`Medicine ${item.name} not found in inventory.`, 404);
       }
+
+      if (invItem.stockQty < item.quantity) {
+        throw new AppError(`Insufficient stock for ${item.name}. Available: ${invItem.stockQty}, Requested: ${item.quantity}.`, 400);
+      }
+
+      // Check expiry date
+      const descParts = invItem.description ? invItem.description.split(" | ") : [];
+      const expiryDateStr = descParts[1] ? descParts[1].trim() : "";
+      if (expiryDateStr) {
+        const expiryDate = new Date(expiryDateStr);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (expiryDate < today) {
+          throw new AppError(`Cannot dispense expired medicine: ${item.name} (Expired on ${expiryDateStr}).`, 400);
+        }
+      }
+
+      invItem.stockQty -= item.quantity;
+      await invItem.save({ session });
     }
 
-    // Update audit log
+    // Determine status (Partial vs Complete)
+    const isPartial = req.body.isPartial || false;
+    prescription.status = isPartial ? "Partially Dispensed" : "Completed";
+    await prescription.save({ session });
+
+    // Generate Invoice Items and totals
+    const roundToTwo = (num: number): number => Math.round((num + Number.EPSILON) * 100) / 100;
+
+    let subtotal = 0;
+    const invoiceItems = items.map((item: any) => {
+      const amt = roundToTwo(Number(item.price) || 0);
+      const qty = Number(item.quantity) || 1;
+      subtotal = roundToTwo(subtotal + roundToTwo(amt * qty));
+      return {
+        description: `${item.name} (Batch: ${item.batchNo || "N/A"})`,
+        category: "Pharmacy",
+        quantity: qty,
+        amount: amt
+      };
+    });
+
+    const taxRate = Number(req.body.taxRate) || 0;
+    const discount = roundToTwo(Number(req.body.discount) || 0);
+    const taxAmount = roundToTwo(subtotal * (taxRate / 100));
+    const total = Math.max(0, roundToTwo(subtotal + taxAmount - discount));
+
+    const newInvoiceDoc = new Invoice({
+      hospital: hospitalId,
+      patient: prescription.patient._id,
+      appointment: prescription.appointment,
+      prescription: prescription._id,
+      items: invoiceItems,
+      taxRate,
+      discount: roundToTwo(discount),
+      discountType: "fixed",
+      totals: {
+        subtotal: roundToTwo(subtotal),
+        taxAmount: roundToTwo(taxAmount),
+        total: roundToTwo(total),
+        patientBalance: roundToTwo(total),
+        insuranceCovered: 0,
+        serviceFee: 0,
+        discount: roundToTwo(discount)
+      },
+      billingType: "PHARMACY",
+      status: "pending",
+      issuedAt: new Date(),
+      provisionalData: {
+        doctorId: prescription.doctor._id,
+        departmentId: prescription.department?._id || null,
+        date: new Date(),
+        notes: `Prescription Ref: ${prescription.prescriptionNumber || prescription._id}`
+      }
+    });
+    const newInvoice = await newInvoiceDoc.save({ session });
+
+    // Update audit logs
     await PrescriptionAuditLog.findOneAndUpdate(
       { prescription: prescription._id },
       { $set: { dispensedTime: new Date() } },
       { session }
     );
 
+    const auditLogDoc = new AuditLog({
+      hospital: hospitalId,
+      user: req.user!._id,
+      action: "MEDICINE_DISPENSE",
+      details: `Dispensed medicines for Prescription Ref: ${prescription.prescriptionNumber || prescription._id}. Generated Invoice ID: ${newInvoice._id}`,
+      resource: "Prescription",
+      resourceId: prescription._id
+    });
+    await auditLogDoc.save({ session });
+
+    // Create notifications — use insertMany with ordered:true for multi-doc session safety
+    await DbNotification.insertMany([
+      {
+        hospital: hospitalId,
+        title: "Prescription Dispensed",
+        message: `Prescription ${prescription.prescriptionNumber || prescription._id} for patient ${(prescription.patient as any).name} has been dispensed.`,
+        type: "general",
+        recipientRole: "doctor",
+        recipientDoctor: prescription.doctor._id
+      },
+      {
+        hospital: hospitalId,
+        title: "Payment Pending",
+        message: `Pharmacy invoice for patient ${(prescription.patient as any).name} is pending payment.`,
+        type: "invoice",
+        recipientRole: "receptionist"
+      },
+      {
+        hospital: hospitalId,
+        title: "New Pharmacy Payment Pending",
+        message: `Pharmacy invoice for patient ${(prescription.patient as any).name} is pending payment.`,
+        type: "invoice",
+        recipientRole: "accountant"
+      }
+    ], { session, ordered: true });
+
     await session.commitTransaction();
     session.endSession();
 
-    // Emit Socket update events
+    // Emit Socket updates
     emitToHospital(hospitalId.toString(), "prescription:dispensed", prescription);
     emitToHospital(hospitalId.toString(), "prescription:updated", prescription);
+    emitToHospital(hospitalId.toString(), "dashboard_update", {
+      type: "NEW_INVOICE",
+      invoiceId: newInvoice._id,
+      billingType: newInvoice.billingType,
+      total: total,
+      timestamp: new Date()
+    });
 
-    res.json({ status: "success", data: prescription });
+    res.json({
+      status: "success",
+      data: {
+        prescription,
+        invoice: newInvoice
+      }
+    });
   } catch (err) {
-    await session.abortTransaction();
+    try {
+      if (session.inTransaction()) {
+        await session.abortTransaction();
+      }
+    } catch (abortErr: any) {
+      console.error("Failed to abort transaction:", abortErr.message);
+    }
     session.endSession();
+    console.error("Pharmacy Dispensing error:", err);
     throw err;
   }
 });

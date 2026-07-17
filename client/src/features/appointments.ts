@@ -82,3 +82,25 @@ export function useCheckInAppointment() {
     },
   });
 }
+
+export function mapAppointmentTypeForDisplay(type?: string): string {
+  if (!type) return "Appointment";
+  const t = type.toLowerCase().trim();
+  switch (t) {
+    case "consultation":
+    case "regular consult":
+    case "scheduled appointment":
+    case "follow-up":
+    case "follow-up appointment":
+      return "Appointment";
+    case "walk-in":
+    case "walk-in visit":
+      return "Walk-in";
+    case "emergency":
+    case "emergency visit":
+      return "Emergency";
+    default:
+      return type.charAt(0).toUpperCase() + type.slice(1);
+  }
+}
+

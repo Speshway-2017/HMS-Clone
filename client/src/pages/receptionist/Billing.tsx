@@ -42,7 +42,7 @@ import {
 import { api } from "../../lib/api";
 import { socket } from "../../lib/socket";
 import { InputField, SelectField } from "../../components/ui/Field";
-import { formatINR } from "../../lib/currency";
+import { formatINR, roundCurrency, toPaise } from "../../lib/currency";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
@@ -139,10 +139,11 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
 
   useEffect(() => {
     if (invoice) {
-      const initialAmt = invoice.totals?.patientBalance !== undefined 
+      const rawBalance = invoice.totals?.patientBalance !== undefined 
         ? invoice.totals.patientBalance 
         : invoice.totals?.total || 0;
-      setPayAmount(initialAmt.toString());
+      // Preload with exact 2-decimal string so browser doesn't see 201.59999999998
+      setPayAmount(roundCurrency(rawBalance).toFixed(2));
       setUpiAmount("0");
       setCashAmount("0");
       setCardAmount("0");
@@ -161,8 +162,8 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
   const { data: completedData, isLoading: completedLoading } = useCompletedInvoices();
   const { data: collectionsData, isLoading: collectionsLoading } = usePaymentHistory("today");
 
-  const pendingInvoices = pendingData?.invoices ?? [];
-  const completedInvoices = completedData?.invoices ?? [];
+  const pendingInvoices = (pendingData?.invoices ?? []).filter((inv: any) => inv.billingType !== "PHARMACY");
+  const completedInvoices = (completedData?.invoices ?? []).filter((inv: any) => inv.billingType !== "PHARMACY");
   const todayPayments = collectionsData?.payments ?? [];
   const todayTotal = collectionsData?.totalAmount ?? 0;
 
@@ -315,7 +316,13 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
     setInvoiceLoading(true);
     try {
       const res = await api.get<any>(`/invoices/${id}`);
-      setInvoice(res.data?.data?.invoice || res.data);
+      const inv = res.data?.data?.invoice || res.data;
+      if (inv && inv.billingType === "PHARMACY") {
+        alert("Pharmacy invoices must be paid at the pharmacy counter only.");
+        setInvoice(null);
+        return;
+      }
+      setInvoice(inv);
       setReceiptData(null);
     } catch {
       alert("Failed to fetch invoice details");
@@ -328,7 +335,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
     e.preventDefault();
     if (!invoice) return;
 
-    const maxDue = invoice.totals?.patientBalance !== undefined 
+    const rawBalance = invoice.totals?.patientBalance !== undefined 
       ? invoice.totals.patientBalance 
       : invoice.totals?.total || 0;
 
@@ -342,19 +349,26 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
       return;
     }
 
-    if (amt > maxDue + 0.01) {
-      alert(`Payment amount (${formatINR(amt)}) cannot exceed the remaining due amount (${formatINR(maxDue)})`);
+    // Integer paise comparison — eliminates floating-point mismatches permanently
+    const enteredPaise = toPaise(amt);
+    const remainingPaise = toPaise(rawBalance);
+
+    if (enteredPaise > remainingPaise) {
+      alert(
+        `Entered Amount:\n₹${(enteredPaise / 100).toFixed(2)}\n\nRemaining Balance:\n₹${(remainingPaise / 100).toFixed(2)}\n\nPlease enter an amount less than or equal to the remaining balance.`
+      );
       return;
     }
 
+    const roundedAmt = roundCurrency(amt);
     const payload = {
       invoiceId: invoice._id,
-      amount: amt,
+      amount: roundedAmt,
       paymentMethod,
       mixedDetails: paymentMethod === "Mixed" ? {
-        upiAmount: parseFloat(upiAmount || "0"),
-        cashAmount: parseFloat(cashAmount || "0"),
-        cardAmount: parseFloat(cardAmount || "0"),
+        upiAmount: roundCurrency(parseFloat(upiAmount || "0")),
+        cashAmount: roundCurrency(parseFloat(cashAmount || "0")),
+        cardAmount: roundCurrency(parseFloat(cardAmount || "0")),
       } : undefined
     };
 

@@ -40,7 +40,7 @@ import {
 const router = Router();
 
 // Secure all receptionist routes
-router.use(protect, restrictTo("receptionist", "hospital_admin", "accountant"), scopeToHospital);
+router.use(protect, restrictTo("receptionist", "hospital_admin", "accountant", "pharmacist"), scopeToHospital);
 
 // Dashboard
 router.get("/dashboard/stats", getDashboardStats);

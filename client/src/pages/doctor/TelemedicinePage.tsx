@@ -8,7 +8,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { useDoctorProfileMe } from "../../features/doctors";
-import { useAppointments, useUpdateAppointment } from "../../features/appointments";
+import { useAppointments, useUpdateAppointment, mapAppointmentTypeForDisplay } from "../../features/appointments";
 
 const STATUS_BADGE: Record<string, { tone: "success" | "warning" | "info" | "neutral" | "danger"; label: string }> = {
   in_call:   { tone: "success",  label: "In Call"   },
@@ -39,7 +39,7 @@ export function TelemedicinePage() {
       gender: p?.gender || "—",
       waitTime: isFirst ? "Now" : `${index * 15} min`,
       status: isFirst ? "in_call" : "waiting",
-      type: a.type || "Consultation",
+      type: mapAppointmentTypeForDisplay(a.type),
       chief: a.notes || "Tele-consultation check-up",
       location: p?.address ? p.address.split(",").slice(-1)[0].trim() : "Local",
       scheduled: a.time,

@@ -6,6 +6,7 @@ interface InventoryListParams {
   page?: number;
   category?: string;
   search?: string;
+  limit?: number;
 }
 
 interface InventoryListResponse extends Paginated<InventoryItem> {

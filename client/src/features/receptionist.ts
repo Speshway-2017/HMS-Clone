@@ -197,7 +197,11 @@ export function useBookAppointment() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (payload: any) => {
-      const res = await api.post("/reception/appointments", payload);
+      const mappedPayload = {
+        ...payload,
+        type: payload.type === "Appointment" ? "Consultation" : payload.type,
+      };
+      const res = await api.post("/reception/appointments", mappedPayload);
       return res.data.data; // returns appointment & invoice
     },
     onSuccess: () => {

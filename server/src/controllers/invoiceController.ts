@@ -28,12 +28,13 @@ const invoiceSchema = z.object({
 });
 
 function computeTotals(
-  invoice: { items: { quantity: number; amount: number }[]; taxRate: number; serviceFee: number; insuranceCoveragePercent: number },
+  invoice: { items: { quantity: number; amount: number }[]; taxRate: number; serviceFee: number; insuranceCoveragePercent: number; discount?: number },
   totalPaid: number = 0
 ) {
   const subtotal = invoice.items.reduce((sum, i) => sum + i.quantity * i.amount, 0);
   const taxAmount = subtotal * (invoice.taxRate / 100);
-  const total = subtotal + taxAmount + invoice.serviceFee;
+  const discount = invoice.discount || 0;
+  const total = Math.max(0, subtotal + taxAmount + invoice.serviceFee - discount);
   const insuranceCovered = total * (invoice.insuranceCoveragePercent / 100);
   const patientBalance = Math.max(0, total - insuranceCovered - totalPaid);
   return { subtotal, taxAmount, total, insuranceCovered, patientBalance };
@@ -50,7 +51,7 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
 
   // Query OP invoices
   const opInvoicesPromise = Invoice.find(filter)
-    .populate("patient", "name")
+    .populate("patient", "name uhid phone age gender")
     .sort({ createdAt: -1 });
 
   // Determine IP Bill filters
@@ -127,9 +128,18 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
   // Map OP invoices
   const mappedOpInvoices = opInvoices.map((inv: any) => {
     const totalPaid = paymentsMap[inv._id.toString()] || 0;
+    const computedTotals = computeTotals(inv, totalPaid);
+    // Derive a real-time status from actual payments (guards against stale DB status after partial->full payment)
+    let derivedStatus = inv.status;
+    if (computedTotals.patientBalance === 0 && inv.status !== "paid") {
+      derivedStatus = "paid";
+    } else if (computedTotals.patientBalance > 0 && computedTotals.patientBalance < computedTotals.total && inv.status === "pending") {
+      derivedStatus = "partially_paid";
+    }
     return {
       ...inv.toObject(),
-      totals: computeTotals(inv, totalPaid)
+      status: derivedStatus,
+      totals: computedTotals
     };
   });
 
@@ -141,17 +151,145 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
   const paginatedData = combined.slice(skip, skip + limit);
   const total = combined.length;
 
-  const totalBilling = 
-    allForHospital.reduce((sum: number, inv: any) => sum + computeTotals(inv).total, 0) +
-    allIPBillsForHospital.reduce((sum: number, bill: any) => sum + (bill.grandTotal || 0), 0);
+  const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-  const netRevenue = 
+  // ── Outstanding & pending count (payment-aware, not stale DB status) ──────
+  let opOutstanding = 0;
+  let opPending = 0;
+  let opCompleted = 0;
+
+  allForHospital.forEach((inv: any) => {
+    const paid = paymentsMap[inv._id.toString()] || 0;
+    const t = computeTotals(inv, paid);
+    opOutstanding += t.patientBalance;
+    if (t.patientBalance === 0) {
+      opCompleted += 1;
+    } else {
+      opPending += 1;
+    }
+  });
+
+  const ipOutstanding = allIPBillsForHospital.reduce(
+    (sum: number, bill: any) => sum + (bill.outstanding || 0), 0
+  );
+  const ipPending = allIPBillsForHospital.filter(
+    (bill: any) => bill.status !== "Paid"
+  ).length;
+  const ipCompleted = allIPBillsForHospital.filter(
+    (bill: any) => bill.status === "Paid"
+  ).length;
+
+  const outstandingAmount = r2(opOutstanding + ipOutstanding);
+  const pendingCount = opPending + ipPending;
+  const completedCount = opCompleted + ipCompleted;
+
+  // ── Billing totals ────────────────────────────────────────────────────────
+  const totalBilling = r2(
+    allForHospital.reduce(
+      (sum: number, inv: any) =>
+        sum + computeTotals(inv, paymentsMap[inv._id.toString()] || 0).total,
+      0
+    ) +
+      allIPBillsForHospital.reduce(
+        (sum: number, bill: any) => sum + (bill.grandTotal || 0),
+        0
+      )
+  );
+
+  const netRevenue = r2(
     allPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) +
-    allIPPaymentsForHospital.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+      allIPPaymentsForHospital.reduce(
+        (sum: number, p: any) => sum + (p.amount || 0),
+        0
+      )
+  );
 
-  const pendingCount = 
-    allForHospital.filter((inv: any) => inv.status === "pending" || inv.status === "overdue" || inv.status === "partially_paid").length +
-    allIPBillsForHospital.filter((bill: any) => bill.status === "Generated" && bill.outstanding > 0).length;
+  // ── Date helpers ──────────────────────────────────────────────────────────
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+
+  const todayPayments = allPayments.filter((p: any) => {
+    const d = new Date(p.paidAt || p.createdAt);
+    return d >= startOfToday && d <= endOfToday;
+  });
+  const todayIPPayments = allIPPaymentsForHospital.filter((p: any) => {
+    const d = new Date(p.paidAt || p.createdAt);
+    return d >= startOfToday && d <= endOfToday;
+  });
+
+  const todayCollection = r2(
+    todayPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) +
+      todayIPPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+  );
+
+  // ── Pharmacy revenue today ────────────────────────────────────────────────
+  const invoiceBillingTypeMap: Record<string, string> = {};
+  allForHospital.forEach((inv: any) => {
+    invoiceBillingTypeMap[inv._id.toString()] = inv.billingType;
+  });
+  const todayPharmacyRevenue = r2(
+    todayPayments
+      .filter(
+        (p: any) =>
+          invoiceBillingTypeMap[p.invoice?.toString()] === "PHARMACY"
+      )
+      .reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+  );
+
+  // ── Payment method breakdown — TODAY only (matches todayCollection) ───────
+  let cashCollection = 0;
+  let upiCollection = 0;
+  let cardCollection = 0;
+
+  const allTodayPayments = [...todayPayments, ...todayIPPayments];
+  allTodayPayments.forEach((p: any) => {
+    const method = p.paymentMethod || p.paymentMode || "Cash";
+    if (method === "Cash") {
+      cashCollection += p.amount || 0;
+    } else if (method === "UPI") {
+      upiCollection += p.amount || 0;
+    } else if (method === "Card") {
+      cardCollection += p.amount || 0;
+    } else if (method === "Mixed" && p.mixedDetails) {
+      cashCollection += p.mixedDetails.cashAmount || 0;
+      upiCollection += p.mixedDetails.upiAmount || 0;
+      cardCollection += p.mixedDetails.cardAmount || 0;
+    }
+  });
+  cashCollection = r2(cashCollection);
+  upiCollection = r2(upiCollection);
+  cardCollection = r2(cardCollection);
+
+  // ── Monthly series for Revenue vs Expenses chart (last 7 months) ─────────
+  const now = new Date();
+  const monthlySeries: { month: string; revenue: number; payments: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const monthStart = new Date(d.getFullYear(), d.getMonth(), 1);
+    const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+    const label = d.toLocaleString("en-IN", { month: "short", year: "2-digit" });
+
+    const monthRevenue = r2(
+      allPayments
+        .filter((p: any) => {
+          const pd = new Date(p.paidAt || p.createdAt);
+          return pd >= monthStart && pd <= monthEnd;
+        })
+        .reduce((sum: number, p: any) => sum + (p.amount || 0), 0) +
+        allIPPaymentsForHospital
+          .filter((p: any) => {
+            const pd = new Date(p.paidAt || p.createdAt);
+            return pd >= monthStart && pd <= monthEnd;
+          })
+          .reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+    );
+
+    monthlySeries.push({ month: label, revenue: monthRevenue, payments: monthRevenue });
+  }
+
+  const currentMonthRevenue = monthlySeries[monthlySeries.length - 1]?.revenue ?? 0;
 
   res.json({
     status: "success",
@@ -161,11 +299,20 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
       totalBilling,
       netRevenue,
       pendingCount,
+      completedCount,
+      outstandingAmount,
+      todayCollection,
+      todayPharmacyRevenue,
+      cashCollection,
+      upiCollection,
+      cardCollection,
+      currentMonthRevenue,
+      monthlySeries,
       all: allForHospital.length + allIPBillsForHospital.length,
       op: opCount,
       ip: allIPBillsForHospital.length,
       pharmacy: pharmacyCount,
-      laboratory: labCount
+      laboratory: labCount,
     },
   });
 });

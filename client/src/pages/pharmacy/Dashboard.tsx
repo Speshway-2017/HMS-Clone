@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
   TrendingUp, 
-  DollarSign, 
+  IndianRupee, 
   AlertTriangle, 
   Calendar, 
   FileText, 
@@ -51,8 +51,8 @@ export function PharmacyDashboard() {
   const navigate = useNavigate();
 
   // Queries
-  const { data: inventoryData, isLoading: isInventoryLoading } = useInventory({ category: "medicines" });
-  const { data: invoiceData, isLoading: isInvoicesLoading } = useInvoices({});
+  const { data: inventoryData, isLoading: isInventoryLoading } = useInventory({ category: "medicines", limit: 100 });
+  const { data: invoiceData, isLoading: isInvoicesLoading } = useInvoices({ billingType: "PHARMACY", limit: 100 });
   const { data: patientData, isLoading: isPatientsLoading } = usePatients({});
   const { data: realPrescriptions, isLoading: isPrescriptionsLoading } = usePrescriptions();
 
@@ -157,12 +157,14 @@ export function PharmacyDashboard() {
           icon={<Receipt className="h-4 w-4" />} 
           trend={{ direction: "up", text: "from yesterday" }}
           emphasis
+          to="/pharmacy/billing"
           size="sm"
         />
         <KpiCard 
           label="Today's Revenue" 
           value={`₹${todayRevenue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} 
-          icon={<DollarSign className="h-4 w-4" />} 
+          icon={<IndianRupee className="h-4 w-4" />} 
+          to="/pharmacy/analytics"
           size="sm"
         />
         <KpiCard 
@@ -170,6 +172,7 @@ export function PharmacyDashboard() {
           value={pendingPrescriptionsCount} 
           icon={<FileText className="h-4 w-4" />} 
           trend={pendingPrescriptionsCount > 0 ? { direction: "up", text: "Action required" } : undefined}
+          to="/pharmacy/prescriptions"
           size="sm"
         />
         <KpiCard 
@@ -177,12 +180,14 @@ export function PharmacyDashboard() {
           value={lowStockCount} 
           icon={<AlertTriangle className="h-4 w-4 text-red-500" />} 
           trend={lowStockCount > 0 ? { direction: "up", text: "Restock limit" } : undefined}
+          to="/pharmacy/inventory"
           size="sm"
         />
         <KpiCard 
           label="Expiring (3 Months)" 
           value={expiringCount} 
           icon={<Calendar className="h-4 w-4" />} 
+          to="/pharmacy/inventory"
           size="sm"
         />
       </div>

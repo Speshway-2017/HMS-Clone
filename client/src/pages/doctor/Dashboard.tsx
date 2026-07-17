@@ -18,6 +18,7 @@ import {
   FileText,
 } from "lucide-react";
 import { KpiCard } from "../../components/ui/KpiCard";
+import { mapAppointmentTypeForDisplay } from "../../features/appointments";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { useAuth } from "../../context/AuthContext";
@@ -208,7 +209,7 @@ export function DoctorDashboard() {
                 const patientName = p?.name || "Unknown Patient";
                 const initials = patientName.split(" ").map((n: string) => n[0]).join("").slice(0, 2);
                 const time = appt.time;
-                const type = appt.type || "Consultation";
+                const type = mapAppointmentTypeForDisplay(appt.type);
                 const token = appt.referenceId || appt._id.slice(-6);
 
                 return (

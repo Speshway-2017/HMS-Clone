@@ -678,40 +678,59 @@ export class ReceptionService {
         throw new AppError("Invoice is already paid.", 400);
       }
 
+      const { roundCurrency, toPaise } = await import("../utils/currency");
+
       // Calculate current outstanding before this payment
       const existingPayments = await Payment.find({ invoice: invoiceId, hospital: hospitalId }).session(session);
-      const currentPaid = existingPayments.reduce((sum, p) => sum + p.amount, 0);
-      const invoiceTotal = invoice.totals.total;
-      const currentOutstanding = invoiceTotal - currentPaid;
 
-      // Validate payment amount doesn't exceed outstanding
-      if (amount > currentOutstanding) {
-        throw new AppError(`Payment amount cannot exceed outstanding balance of ₹${currentOutstanding}`, 400);
+      // Aggregate using paise to prevent float accumulation across multiple partial payments
+      const currentPaidPaise = existingPayments.reduce((sum, p) => sum + toPaise(p.amount), 0);
+      const invoiceTotalPaise = toPaise(invoice.totals.total);
+      const currentOutstandingPaise = Math.max(0, invoiceTotalPaise - currentPaidPaise);
+
+      const enteredPaise = toPaise(amount);
+
+      // Validate using integer paise — eliminates ALL floating-point edge cases.
+      // e.g. ₹201.60 entered == 20160 paise; ₹201.59999999998 stored == 20160 paise → equal → valid.
+      if (enteredPaise > currentOutstandingPaise) {
+        const enteredDisplay = (enteredPaise / 100).toFixed(2);
+        const remainingDisplay = (currentOutstandingPaise / 100).toFixed(2);
+        throw new AppError(
+          `Entered Amount:\n₹${enteredDisplay}\n\nRemaining Balance:\n₹${remainingDisplay}\n\nPlease enter an amount less than or equal to the remaining balance.`,
+          400
+        );
       }
 
+      const roundedAmount = roundCurrency(amount);
       const transactionId = `TXN-${generateDigits(10)}`;
 
       const newPayment = await ReceptionRepository.createPayment({
         hospital: hospitalId,
         invoice: invoiceId,
         patient: invoice.patient._id,
-        amount,
+        amount: roundedAmount,
         paymentMethod,
-        mixedDetails: paymentMethod === "Mixed" ? mixedDetails : { upiAmount: 0, cashAmount: 0, cardAmount: 0 },
+        mixedDetails: paymentMethod === "Mixed" ? {
+          upiAmount: roundCurrency(mixedDetails?.upiAmount || 0),
+          cashAmount: roundCurrency(mixedDetails?.cashAmount || 0),
+          cardAmount: roundCurrency(mixedDetails?.cardAmount || 0)
+        } : { upiAmount: 0, cashAmount: 0, cardAmount: 0 },
         transactionId,
         paidAt: new Date()
       });
 
-      // Fetch all payments for this invoice (including new one)
+      // Fetch all payments for this invoice (including new one) and sum in paise
       const allPayments = await Payment.find({ invoice: invoiceId, hospital: hospitalId }).session(session);
-      const totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
+      const totalPaidPaise = allPayments.reduce((sum, p) => sum + toPaise(p.amount), 0);
 
-      const remainingBalance = Math.max(0, invoiceTotal - totalPaid);
-      const newStatus = remainingBalance === 0 ? "paid" : "partially_paid";
+      const remainingBalancePaise = Math.max(0, invoiceTotalPaise - totalPaidPaise);
+      const remainingBalance = remainingBalancePaise / 100;
+      const newStatus = remainingBalancePaise === 0 ? "paid" : "partially_paid";
 
       invoice.status = newStatus;
       if (invoice.totals) {
-        invoice.totals.patientBalance = remainingBalance;
+        // Store with exactly 2 decimal places to prevent future DB residuals
+        invoice.totals.patientBalance = roundCurrency(remainingBalance);
       }
       let updatedInvoice = invoice;
 
@@ -759,7 +778,7 @@ export class ReceptionService {
             consultationFee: consultationItem?.amount ?? 0,
             gst: 0,
             discount: 0,
-            total: invoiceTotal
+            total: invoiceTotalPaise / 100
           };
 
           return {
@@ -968,12 +987,13 @@ export class ReceptionService {
       // Compute billing breakdown from invoice items
       const registrationItem = (invoice as any).items?.find((i: any) => i.category === "registration");
       const consultationItem = (invoice as any).items?.find((i: any) => i.category === "consultation");
+      const invoiceTotalRupees = invoiceTotalPaise / 100;
       const billingBreakdown = {
         registrationFee: registrationItem?.amount ?? 0,
         consultationFee: consultationItem?.amount ?? 0,
         gst: 0,
         discount: 0,
-        total: invoiceTotal
+        total: invoiceTotalRupees
       };
 
       updatedInvoice = await invoice.save({ session });
