@@ -73,6 +73,38 @@ const getRadiologyRate = (scanType: string): number => {
 const getIPBillItemsSummary = async (bill: any, admission: any, hospitalId: any) => {
   const patientId = admission.patient._id || admission.patient;
 
+  // Load hospital to retrieve lab/radiology prices
+  const hospitalDoc = await mongoose.model("Hospital").findById(hospitalId).lean();
+  const prices = (hospitalDoc as any)?.investigationPrices || {};
+
+  const getLabTestRate = (testName: string): number => {
+    if (prices && prices[testName] !== undefined) return prices[testName];
+    const matchedKey = Object.keys(prices).find(k => k.toLowerCase() === testName.toLowerCase());
+    if (matchedKey) return prices[matchedKey];
+    
+    const name = testName.toLowerCase();
+    if (name.includes("cbc") || name.includes("complete blood count")) return 300;
+    if (name.includes("lipid")) return 600;
+    if (name.includes("liver") || name.includes("lft")) return 800;
+    if (name.includes("kidney") || name.includes("kft") || name.includes("renal")) return 700;
+    if (name.includes("sugar") || name.includes("glucose")) return 150;
+    if (name.includes("thyroid") || name.includes("tsh")) return 500;
+    return 400;
+  };
+
+  const getRadiologyRate = (scanType: string): number => {
+    if (prices && prices[scanType] !== undefined) return prices[scanType];
+    const matchedKey = Object.keys(prices).find(k => k.toLowerCase() === scanType.toLowerCase());
+    if (matchedKey) return prices[matchedKey];
+
+    const type = scanType.toLowerCase();
+    if (type.includes("x-ray") || type.includes("xray")) return 500;
+    if (type.includes("ct")) return 3000;
+    if (type.includes("mri")) return 6000;
+    if (type.includes("ultrasound") || type.includes("usg")) return 1200;
+    return 800;
+  };
+
   // 1. Fetch manually posted bill items
   const manualItems = await IPBillItem.find({ bill: bill._id, hospital: hospitalId }).lean();
   const allItems: any[] = [];

@@ -39,6 +39,9 @@ import {
 
 const router = Router();
 
+// Specific billing pay override to allow laboratory and pharmacy roles as well
+router.post("/billing/pay", protect, restrictTo("receptionist", "hospital_admin", "accountant", "pharmacist", "laboratory"), scopeToHospital, processBillingPayment);
+
 // Secure all receptionist routes
 router.use(protect, restrictTo("receptionist", "hospital_admin", "accountant", "pharmacist"), scopeToHospital);
 
@@ -62,7 +65,6 @@ router.post("/appointments/:id/check-in", checkInAppointment);
 router.get("/dashboard/queue-details", getQueueDetails);
 
 // Billing — data-consistent endpoints (SAME query as dashboard stats)
-router.post("/billing/pay", processBillingPayment);
 router.get("/billing/pending-invoices", getPendingInvoices);
 router.get("/billing/payment-history", getPaymentHistory);
 router.get("/billing/completed-invoices", getCompletedInvoices);

@@ -12,6 +12,7 @@ export interface Hospital {
   opExpiryLimit?: number;
   availableLabTests?: string[];
   availableRadiologyTests?: string[];
+  investigationPrices?: Record<string, number>;
   createdAt: string;
   primaryAdminName?: string | null;
 }
