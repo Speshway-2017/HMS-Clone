@@ -343,7 +343,7 @@ export interface RadiologyOrder {
   hospital: string;
   patient: any;
   doctor: string;
-  type: "X-ray" | "CT" | "MRI" | "Ultrasound";
+  type: string;
   notes?: string;
   priority: "Routine" | "Urgent" | "STAT";
   status: "pending" | "completed" | "cancelled";
@@ -351,6 +351,65 @@ export interface RadiologyOrder {
   findings?: string;
   date: string;
   createdAt: string;
+}
+
+export interface DraftMedication {
+  name: string;
+  strength: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions: string;
+  morning?: boolean;
+  afternoon?: boolean;
+  night?: boolean;
+}
+
+export interface DraftRadiologyOrder {
+  type: string;
+  notes: string;
+  priority: string;
+}
+
+export interface DraftAdmissionRecommendation {
+  priority: "Routine" | "Urgent" | "Emergency";
+  preferredWard: string;
+  preferredBedType: string;
+  expectedStay: string;
+  primaryDiagnosis: string;
+  clinicalNotes: string;
+  admissionReason: string;
+  specialInstructions: string;
+  recommended: boolean;
+}
+
+export interface ConsultationSession {
+  _id: string;
+  hospital: string;
+  patient: string;
+  appointment: string;
+  doctor: string;
+  status: "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+  vitals: {
+    temperature: string;
+    bloodPressure: string;
+    pulseRate: string;
+    respiratoryRate: string;
+    oxygenSaturation: string;
+    weight: string;
+  };
+  chiefComplaint: string;
+  diagnosis: string;
+  symptoms: string;
+  clinicalNotes: string;
+  treatmentPlan: string;
+  advice: string;
+  prescriptions: DraftMedication[];
+  labOrders: string[];
+  radiologyOrders: DraftRadiologyOrder[];
+  admissionRecommendation: DraftAdmissionRecommendation;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ConsultationWorkspaceResponse {
@@ -361,13 +420,90 @@ export interface ConsultationWorkspaceResponse {
   radiologyOrders: RadiologyOrder[];
   admissions: any[];
   admissionRequests?: any[];
+  draftSession?: ConsultationSession | null;
 }
 
 export function useStartConsultation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (appointmentId: string) => {
-      const res = await api.post(`/doctors/dashboard/appointments/${appointmentId}/start`);
+      const res = await api.post(`/doctors/dashboard/consultations/start`, { appointmentId });
+      return res.data.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
+      if (data?.appointment) {
+        queryClient.invalidateQueries({ queryKey: ["doctorDashboard", "workspace", data.appointment] });
+      }
+    },
+  });
+}
+
+export function useConsultationDraft(appointmentId: string) {
+  return useQuery({
+    queryKey: ["doctorDashboard", "consultation", "draft", appointmentId],
+    queryFn: async () => {
+      const res = await api.get<{ status: string; data: ConsultationSession | null }>(
+        `/doctors/dashboard/consultations/${appointmentId}/draft`
+      );
+      return res.data.data;
+    },
+    enabled: !!appointmentId,
+  });
+}
+
+export function useUpdateConsultationDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      consultationId,
+      updateData,
+      appointmentId,
+    }: {
+      consultationId: string;
+      updateData: Partial<ConsultationSession>;
+      appointmentId: string;
+    }) => {
+      const res = await api.put<{ status: string; data: ConsultationSession }>(
+        `/doctors/dashboard/consultations/${consultationId}/draft`,
+        updateData
+      );
+      return res.data.data;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard", "workspace", variables.appointmentId] });
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard", "consultation", "draft", variables.appointmentId] });
+    },
+  });
+}
+
+export function useCompleteConsultationSession() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      consultationId,
+      followUpDate,
+    }: {
+      consultationId: string;
+      followUpDate?: Date | string | null;
+    }) => {
+      const res = await api.post(
+        `/doctors/dashboard/consultations/${consultationId}/complete`,
+        { followUpDate }
+      );
+      return res.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
+    },
+  });
+}
+
+export function useCancelConsultationSession() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (consultationId: string) => {
+      const res = await api.post(`/doctors/dashboard/consultations/${consultationId}/cancel`);
       return res.data.data;
     },
     onSuccess: () => {

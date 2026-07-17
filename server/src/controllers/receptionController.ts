@@ -402,9 +402,30 @@ export const getPendingInvoices = catchAsync(async (req: Request, res: Response)
   const hospitalId = req.hospitalFilter!.hospital as any;
 
   // 1. Fetch pending OP invoices
-  const invoices = await Invoice.find({ hospital: hospitalId, status: { $in: ["pending", "partially_paid"] } })
+  const rawInvoices = await Invoice.find({ hospital: hospitalId, status: { $in: ["pending", "partially_paid"] } })
     .populate("patient", "name uhid phone")
     .sort({ createdAt: -1 });
+
+  const invoices: any[] = [];
+  for (const inv of rawInvoices) {
+    const payments = await Payment.find({ invoice: inv._id, hospital: hospitalId });
+    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+    const remainingBalance = Math.max(0, inv.totals.total - totalPaid);
+
+    if (inv.totals.patientBalance !== remainingBalance || (remainingBalance === 0 && inv.status !== "paid") || (remainingBalance > 0 && inv.status === "pending" && totalPaid > 0)) {
+      inv.totals.patientBalance = remainingBalance;
+      if (remainingBalance === 0) {
+        inv.status = "paid";
+      } else if (totalPaid > 0) {
+        inv.status = "partially_paid";
+      }
+      await inv.save();
+    }
+
+    if (remainingBalance > 0) {
+      invoices.push(inv);
+    }
+  }
 
   // 2. Fetch pending IP bills
   const ipBills = await IPBill.find({ hospital: hospitalId, status: "Generated", outstanding: { $gt: 0 } })
@@ -503,9 +524,30 @@ export const getCompletedInvoices = catchAsync(async (req: Request, res: Respons
   const hospitalId = req.hospitalFilter!.hospital as any;
 
   // 1. Fetch completed OP invoices
-  const invoices = await Invoice.find({ hospital: hospitalId, status: "paid" })
+  const rawInvoices = await Invoice.find({ hospital: hospitalId, status: "paid" })
     .populate("patient", "name uhid phone")
     .sort({ updatedAt: -1 });
+
+  const invoices: any[] = [];
+  for (const inv of rawInvoices) {
+    const payments = await Payment.find({ invoice: inv._id, hospital: hospitalId });
+    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+    const remainingBalance = Math.max(0, inv.totals.total - totalPaid);
+
+    if (inv.totals.patientBalance !== remainingBalance || (remainingBalance > 0 && inv.status === "paid")) {
+      inv.totals.patientBalance = remainingBalance;
+      if (remainingBalance === 0) {
+        inv.status = "paid";
+      } else {
+        inv.status = "partially_paid";
+      }
+      await inv.save();
+    }
+
+    if (remainingBalance === 0) {
+      invoices.push(inv);
+    }
+  }
 
   // 2. Fetch completed IP bills (Paid status means fully paid)
   const completedIpBills = await IPBill.find({ hospital: hospitalId, status: "Paid" })
@@ -710,7 +752,7 @@ export const getQueueDetails = catchAsync(async (req: Request, res: Response) =>
   const currentlyConsulting = queueItems.filter(q => q.status === "called");
   const completedVisits = appointments.filter(a => a.status === "completed");
   const checkedInPatients = queueItems.filter(q => q.status === "waiting" || q.status === "called");
-  const currentWalkInQueue = queueItems.filter(q => q.status === "waiting" && q.appointment?.type === "Walk-in");
+  const currentWalkInQueue = queueItems.filter(q => q.status === "waiting" && (q.appointment as any)?.type === "Walk-in");
   const missedAppointments = appointments.filter(a => a.status === "no_show" || a.status === "missed");
 
   res.json({

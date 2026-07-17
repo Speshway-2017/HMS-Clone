@@ -9,6 +9,7 @@ import { Certificate } from "../models/Certificate";
 import { Patient } from "../models/Patient";
 import { RadiologyOrder } from "../models/RadiologyOrder";
 import { DbNotification } from "../models/DbNotification";
+import { ConsultationSession } from "../models/ConsultationSession";
 import { Admission } from "../models/Admission";
 import { AdmissionRequest } from "../models/AdmissionRequest";
 import { AuditLog } from "../models/AuditLog";
@@ -646,6 +647,24 @@ export const getWorkspace = catchAsync(async (req: Request, res: Response) => {
     AdmissionRequest.find({ patient: patientId, hospital: hospitalId }).sort({ createdAt: -1 }),
   ]);
 
+  let draftSession = await ConsultationSession.findOne({ appointment: appointmentId, hospital: hospitalId, status: "IN_PROGRESS" });
+  if (!draftSession && appointment.status === "in_consultation") {
+    draftSession = await ConsultationSession.create({
+      hospital: hospitalId,
+      patient: appointment.patient._id,
+      appointment: appointmentId,
+      doctor: doctor._id,
+      status: "IN_PROGRESS",
+      vitals: appointment.vitals || {},
+      chiefComplaint: appointment.chiefComplaint || "",
+      diagnosis: appointment.diagnosis || "",
+      symptoms: appointment.symptoms || "",
+      clinicalNotes: appointment.clinicalNotes || "",
+      treatmentPlan: appointment.treatmentPlan || "",
+      advice: appointment.advice || "",
+    });
+  }
+
   res.json({
     status: "success",
     data: {
@@ -656,6 +675,7 @@ export const getWorkspace = catchAsync(async (req: Request, res: Response) => {
       radiologyOrders,
       admissions,
       admissionRequests,
+      draftSession,
     },
   });
 });
@@ -1376,5 +1396,459 @@ export const finalizeDischarge = catchAsync(async (req: Request, res: Response) 
     message: "Discharge request submitted successfully. The receptionist will confirm shortly.",
     data: { admission },
   });
+});
+
+// Draft Consultation Session Controllers
+export const startConsultationSession = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const { appointmentId } = req.body;
+  const doctor = await getLoggedDoctor(req);
+
+  const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: doctor._id })
+    .populate("patient");
+  if (!appointment) {
+    throw new AppError("Appointment not found.", 404);
+  }
+
+  let session = await ConsultationSession.findOne({
+    appointment: appointmentId,
+    hospital: hospitalId,
+    doctor: doctor._id,
+    status: "IN_PROGRESS"
+  });
+
+  if (!session) {
+    session = await ConsultationSession.create({
+      hospital: hospitalId,
+      patient: appointment.patient._id,
+      appointment: appointmentId,
+      doctor: doctor._id,
+      status: "IN_PROGRESS",
+      vitals: appointment.vitals || {},
+      chiefComplaint: appointment.chiefComplaint || "",
+      diagnosis: appointment.diagnosis || "",
+      symptoms: appointment.symptoms || "",
+      clinicalNotes: appointment.clinicalNotes || "",
+      treatmentPlan: appointment.treatmentPlan || "",
+      advice: appointment.advice || "",
+    });
+  }
+
+  // Update appointment status to 'in_consultation'
+  appointment.status = "in_consultation";
+  await appointment.save();
+
+  // Update queue item
+  await Queue.findOneAndUpdate(
+    { appointment: appointmentId, hospital: hospitalId, doctor: doctor._id },
+    { status: "called" }
+  );
+
+  res.json({ status: "success", data: session });
+});
+
+export const getConsultationDraft = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const { appointmentId } = req.params;
+  const doctor = await getLoggedDoctor(req);
+
+  let session = await ConsultationSession.findOne({
+    appointment: appointmentId,
+    hospital: hospitalId,
+    doctor: doctor._id,
+    status: "IN_PROGRESS"
+  });
+
+  if (!session) {
+    const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: doctor._id });
+    if (appointment && appointment.status === "in_consultation") {
+      session = await ConsultationSession.create({
+        hospital: hospitalId,
+        patient: appointment.patient,
+        appointment: appointmentId,
+        doctor: doctor._id,
+        status: "IN_PROGRESS",
+        vitals: appointment.vitals || {},
+        chiefComplaint: appointment.chiefComplaint || "",
+        diagnosis: appointment.diagnosis || "",
+        symptoms: appointment.symptoms || "",
+        clinicalNotes: appointment.clinicalNotes || "",
+        treatmentPlan: appointment.treatmentPlan || "",
+        advice: appointment.advice || "",
+      });
+    }
+  }
+
+  res.json({ status: "success", data: session || null });
+});
+
+export const updateConsultationDraft = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const { consultationId } = req.params;
+  const doctor = await getLoggedDoctor(req);
+
+  const updateData = req.body;
+
+  const session = await ConsultationSession.findOneAndUpdate(
+    { _id: consultationId, hospital: hospitalId, doctor: doctor._id, status: "IN_PROGRESS" },
+    { $set: updateData },
+    { new: true }
+  );
+
+  if (!session) {
+    throw new AppError("Draft consultation session not found or not in progress.", 404);
+  }
+
+  res.json({ status: "success", data: session });
+});
+
+export const cancelConsultationSession = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const { consultationId } = req.params;
+  const doctor = await getLoggedDoctor(req);
+
+  const dbSession = await mongoose.startSession();
+  dbSession.startTransaction();
+
+  try {
+    const session = await ConsultationSession.findOneAndUpdate(
+      { _id: consultationId, hospital: hospitalId, doctor: doctor._id, status: "IN_PROGRESS" },
+      { status: "CANCELLED" },
+      { new: true, session: dbSession }
+    );
+
+    if (!session) {
+      throw new AppError("Draft consultation session not found or not in progress.", 404);
+    }
+
+    // Revert appointment status
+    await Appointment.findOneAndUpdate(
+      { _id: session.appointment, hospital: hospitalId },
+      { status: "checked_in" },
+      { session: dbSession }
+    );
+
+    // Revert queue status
+    await Queue.findOneAndUpdate(
+      { appointment: session.appointment, hospital: hospitalId, doctor: doctor._id },
+      { status: "waiting" },
+      { session: dbSession }
+    );
+
+    await dbSession.commitTransaction();
+    res.json({ status: "success", data: session });
+  } catch (err) {
+    await dbSession.abortTransaction();
+    throw err;
+  } finally {
+    dbSession.endSession();
+  }
+});
+
+export const completeConsultationSession = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const { consultationId } = req.params;
+  const { followUpDate } = req.body;
+  const doctor = await getLoggedDoctor(req);
+
+  const draft = await ConsultationSession.findOne({
+    _id: consultationId,
+    hospital: hospitalId,
+    doctor: doctor._id,
+    status: "IN_PROGRESS"
+  });
+
+  if (!draft) {
+    throw new AppError("Draft consultation session not found or not in progress.", 404);
+  }
+
+  if (!draft.diagnosis || !draft.diagnosis.trim()) {
+    throw new AppError("Diagnosis is mandatory to complete the consultation.", 400);
+  }
+
+  const appointment = await Appointment.findOne({ _id: draft.appointment, hospital: hospitalId })
+    .populate("patient")
+    .populate("doctor")
+    .populate("department");
+
+  if (!appointment) {
+    throw new AppError("Associated appointment not found.", 404);
+  }
+
+  const dbSession = await mongoose.startSession();
+  dbSession.startTransaction();
+
+  try {
+    // 1. Mark consultation draft as COMPLETED
+    draft.status = "COMPLETED";
+    await draft.save({ session: dbSession });
+
+    // 2. Update appointment status and clinical notes
+    appointment.status = "completed";
+    appointment.vitals = draft.vitals as any;
+    appointment.chiefComplaint = draft.chiefComplaint;
+    appointment.diagnosis = draft.diagnosis;
+    appointment.symptoms = draft.symptoms;
+    appointment.clinicalNotes = draft.clinicalNotes;
+    appointment.treatmentPlan = draft.treatmentPlan;
+    appointment.advice = draft.advice;
+    if (followUpDate) {
+      appointment.followUpDate = new Date(followUpDate);
+    }
+    await appointment.save({ session: dbSession });
+
+    // 3. Update queue status
+    await Queue.findOneAndUpdate(
+      { appointment: appointment._id, hospital: hospitalId, doctor: doctor._id },
+      { status: "completed" },
+      { session: dbSession }
+    );
+
+    // 4. Create final Prescription if medicines are present
+    let prescription = null;
+    if (draft.prescriptions && draft.prescriptions.length > 0) {
+      const reqHostUrl = `${req.protocol}://${req.get("host")}`;
+      const medications = draft.prescriptions.map(p => ({
+        name: p.name,
+        strength: p.strength,
+        dosage: p.dosage,
+        frequency: p.frequency,
+        duration: p.duration,
+        instructions: p.instructions,
+      }));
+      
+      prescription = await createOrUpdatePrescriptionCore(
+        dbSession,
+        hospitalId,
+        doctor,
+        appointment._id.toString(),
+        {
+          medications,
+          diagnosis: draft.diagnosis,
+          chiefComplaint: draft.chiefComplaint,
+          clinicalNotes: draft.clinicalNotes,
+          advice: draft.advice,
+          followUpDate: followUpDate ? new Date(followUpDate) : null,
+        },
+        reqHostUrl
+      );
+    }
+
+    // 5. Create final LabOrders if present
+    if (draft.labOrders && draft.labOrders.length > 0) {
+      await LabOrder.create(
+        [
+          {
+            hospital: hospitalId,
+            patient: appointment.patient._id,
+            doctor: doctor._id,
+            tests: draft.labOrders,
+            priority: "Routine",
+            sampleStatus: "Pending",
+            status: "pending",
+            date: new Date(),
+          },
+        ],
+        { session: dbSession }
+      );
+
+      // Add to Patient medical history as lab requested
+      await Patient.findOneAndUpdate(
+        { _id: appointment.patient._id, hospital: hospitalId },
+        {
+          $push: {
+            medicalHistory: {
+              $each: [
+                {
+                  date: new Date(),
+                  visitType: "Lab Investigation Ordered",
+                  doctorName: doctor.name,
+                  diagnosis: "Investigation",
+                  notes: `Tests ordered: ${draft.labOrders.join(", ")}`,
+                  status: "Completed",
+                },
+              ],
+              $position: 0,
+            },
+          },
+        },
+        { session: dbSession }
+      );
+    }
+
+    // 6. Create final RadiologyOrders if present
+    if (draft.radiologyOrders && draft.radiologyOrders.length > 0) {
+      for (const rad of draft.radiologyOrders) {
+        await RadiologyOrder.create(
+          [
+            {
+              hospital: hospitalId,
+              patient: appointment.patient._id,
+              doctor: doctor._id,
+              type: rad.type,
+              notes: rad.notes || "",
+              priority: rad.priority || "Routine",
+              status: "pending",
+              date: new Date(),
+            },
+          ],
+          { session: dbSession }
+        );
+
+        // Add to Patient medical history as radiology requested
+        await Patient.findOneAndUpdate(
+          { _id: appointment.patient._id, hospital: hospitalId },
+          {
+            $push: {
+              medicalHistory: {
+                $each: [
+                  {
+                    date: new Date(),
+                    visitType: "Radiology Ordered",
+                    doctorName: doctor.name,
+                    diagnosis: `${rad.type} Request`,
+                    notes: `Priority: ${rad.priority || "Routine"}. Notes: ${rad.notes || "None"}`,
+                    status: "Pending",
+                  },
+                ],
+                $position: 0,
+              },
+            },
+          },
+          { session: dbSession }
+        );
+      }
+    }
+
+    // 7. Create final AdmissionRequest if recommended
+    if (draft.admissionRecommendation && draft.admissionRecommendation.recommended) {
+      const patient = appointment.patient as any;
+      const docProfile = appointment.doctor as any;
+      const department = appointment.department as any;
+      const rec = draft.admissionRecommendation;
+
+      // Check active admissions and existing requests
+      const activeAdm = await Admission.findOne({
+        hospital: hospitalId,
+        patient: patient._id,
+        status: {
+          $in: [
+            "admitted", "Admitted", "Bed Allocated", "Under Observation",
+            "Waiting for Bed", "In Ward", "ICU", "Operation Scheduled",
+            "Under Treatment", "Transferred"
+          ]
+        }
+      }).session(dbSession);
+
+      if (!activeAdm) {
+        const existingRequest = await AdmissionRequest.findOne({
+          hospital: hospitalId,
+          patient: patient._id,
+          status: "Admission Requested"
+        }).session(dbSession);
+
+        if (!existingRequest) {
+          const currentYear = new Date().getFullYear();
+          const prefix = `AR${currentYear}`;
+          
+          const latestReq = await AdmissionRequest.findOne({
+            hospital: hospitalId,
+            requestNumber: new RegExp(`^${prefix}`)
+          }).sort({ createdAt: -1 }).session(dbSession);
+
+          let nextSerial = 1;
+          if (latestReq) {
+            const serialPart = latestReq.requestNumber.replace(prefix, "");
+            const lastSerial = parseInt(serialPart, 10);
+            if (!isNaN(lastSerial)) {
+              nextSerial = lastSerial + 1;
+            }
+          }
+          const requestNumber = `${prefix}${String(nextSerial).padStart(6, "0")}`;
+
+          await AdmissionRequest.create(
+            [
+              {
+                hospital: hospitalId,
+                requestNumber,
+                patient: patient._id,
+                doctor: doctor._id,
+                department: department ? department._id : null,
+                priority: rec.priority || "Routine",
+                preferredWard: rec.preferredWard || "General",
+                preferredBedType: rec.preferredBedType || "General",
+                expectedStay: rec.expectedStay || "",
+                primaryDiagnosis: rec.primaryDiagnosis || draft.diagnosis,
+                clinicalNotes: rec.clinicalNotes || draft.clinicalNotes,
+                admissionReason: rec.admissionReason || rec.primaryDiagnosis || draft.diagnosis,
+                specialInstructions: rec.specialInstructions || "",
+                status: "Admission Requested"
+              }
+            ],
+            { session: dbSession }
+          );
+
+          // Create Notification for receptionist
+          await DbNotification.create(
+            [
+              {
+                hospital: hospitalId,
+                title: "New Admission Request",
+                message: `Dr. ${docProfile.name} requested IP admission for ${patient.name} (${patient.uhid}) due to: ${rec.primaryDiagnosis || draft.diagnosis}`,
+                type: "admission_request",
+                recipientRole: "receptionist",
+                severity: rec.priority === "Emergency" ? "critical" : "warning",
+                link: `/receptionist/ip/new`,
+                data: {
+                  patientId: patient._id.toString(),
+                  opVisitId: appointment._id.toString(),
+                  diagnosis: rec.primaryDiagnosis || draft.diagnosis,
+                  suggestedWard: rec.preferredWard || "General Ward",
+                  notes: rec.clinicalNotes || "",
+                }
+              }
+            ],
+            { session: dbSession }
+          );
+        }
+      }
+    }
+
+    // 8. Push OPD Consultation to Patient's medicalHistory array
+    const departmentName = (appointment.department as any)?.name || "General OPD";
+    const diagnosisVal = draft.diagnosis || "Consultation";
+    const notesVal = `Chief Complaint: ${draft.chiefComplaint || "None"}. Vitals: BP: ${draft.vitals?.bloodPressure || "—"}, Temp: ${draft.vitals?.temperature || "—"}. Notes: ${draft.clinicalNotes || "None"}. Plan: ${draft.treatmentPlan || "None"}.`;
+
+    await Patient.findOneAndUpdate(
+      { _id: appointment.patient._id, hospital: hospitalId },
+      {
+        $push: {
+          medicalHistory: {
+            $each: [
+              {
+                date: new Date(),
+                visitType: "OPD Consultation",
+                doctorName: (appointment.doctor as any).name,
+                department: departmentName,
+                diagnosis: diagnosisVal,
+                notes: notesVal,
+                status: "Completed",
+              },
+            ],
+            $position: 0,
+          },
+        },
+      },
+      { session: dbSession }
+    );
+
+    await dbSession.commitTransaction();
+    res.json({ status: "success", data: appointment, prescription });
+  } catch (err) {
+    await dbSession.abortTransaction();
+    throw err;
+  } finally {
+    dbSession.endSession();
+  }
 });
 

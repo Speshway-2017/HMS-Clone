@@ -10,6 +10,10 @@ import {
   useCreatePrescription,
   useCreateLabOrder,
   useStartConsultation,
+  useUpdateConsultationDraft,
+  useCompleteConsultationSession,
+  useCancelConsultationSession,
+  useConsultationDraft,
 } from "../../features/doctorDashboard";
 import { useInventory } from "../../features/inventory";
 import { useMyHospital } from "../../features/hospitals";
@@ -63,6 +67,9 @@ export function ConsultationWorkspacePage() {
   const prescriptionMutation = useCreatePrescription();
   const labMutation = useCreateLabOrder();
   const startConsultationMutation = useStartConsultation();
+  const updateDraftMutation = useUpdateConsultationDraft();
+  const completeDraftMutation = useCompleteConsultationSession();
+  const cancelDraftMutation = useCancelConsultationSession();
   const { data: inventoryData } = useInventory({ category: "medicines" });
   const rawMeds = inventoryData?.data || [];
 
@@ -144,25 +151,182 @@ export function ConsultationWorkspacePage() {
   const [admitReason, setAdmitReason] = useState("");
   const [admitSpecialInstructions, setAdmitSpecialInstructions] = useState("");
 
-  // Populate form states once loaded
+  // Auto-save states
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+
+  // Populate form states once loaded from draft (or fallback to appointment)
   const hasPopulated = useRef(false);
   if (workspaceData && !hasPopulated.current) {
+    const draft = workspaceData.draftSession;
     const appt = workspaceData.appointment;
-    setTemperature(appt.vitals?.temperature || "");
-    setBloodPressure(appt.vitals?.bloodPressure || "");
-    setPulseRate(appt.vitals?.pulseRate || "");
-    setRespiratoryRate(appt.vitals?.respiratoryRate || "");
-    setOxygenSaturation(appt.vitals?.oxygenSaturation || "");
-    setWeight(appt.vitals?.weight || "");
-    setChiefComplaint(appt.chiefComplaint || "");
+    
+    if (draft) {
+      setTemperature(draft.vitals?.temperature || "");
+      setBloodPressure(draft.vitals?.bloodPressure || "");
+      setPulseRate(draft.vitals?.pulseRate || "");
+      setRespiratoryRate(draft.vitals?.respiratoryRate || "");
+      setOxygenSaturation(draft.vitals?.oxygenSaturation || "");
+      setWeight(draft.vitals?.weight || "");
+      setChiefComplaint(draft.chiefComplaint || "");
+      
+      setDiagnosis(draft.diagnosis || "");
+      setSymptoms(draft.symptoms || "");
+      setClinicalNotes(draft.clinicalNotes || "");
+      setTreatmentPlan(draft.treatmentPlan || "");
+      setAdvice(draft.advice || "");
 
-    setDiagnosis(appt.diagnosis || "");
-    setSymptoms(appt.symptoms || "");
-    setClinicalNotes(appt.clinicalNotes || "");
-    setTreatmentPlan(appt.treatmentPlan || "");
-    setAdvice(appt.advice || "");
+      if (draft.prescriptions && draft.prescriptions.length > 0) {
+        setPrescriptionMeds(draft.prescriptions.map((p: any, idx: number) => ({
+          key: p._id || p.key || `draft-med-${idx}`,
+          name: p.name || "",
+          strength: p.strength || "",
+          dosage: p.dosage || "",
+          frequency: p.frequency || "",
+          duration: p.duration || "",
+          instructions: p.instructions || "",
+          morning: !!p.morning,
+          afternoon: !!p.afternoon,
+          night: !!p.night,
+        })));
+      }
+
+      if (draft.labOrders && draft.labOrders.length > 0) {
+        setSelectedLabTests(draft.labOrders);
+      }
+
+      if (draft.radiologyOrders && draft.radiologyOrders.length > 0) {
+        const lastRad = draft.radiologyOrders[draft.radiologyOrders.length - 1];
+        setRadioType(lastRad.type || "X-ray");
+        setRadioNotes(lastRad.notes || "");
+        setRadioPriority(lastRad.priority || "Routine");
+      }
+
+      if (draft.admissionRecommendation) {
+        const rec = draft.admissionRecommendation;
+        setAdmitWard(rec.preferredWard || "General");
+        setAdmitBedType(rec.preferredBedType || "General");
+        setAdmitExpectedStay(rec.expectedStay || "");
+        setAdmitDiagnosis(rec.primaryDiagnosis || "");
+        setAdmitNotes(rec.clinicalNotes || "");
+        setAdmitReason(rec.admissionReason || "");
+        setAdmitSpecialInstructions(rec.specialInstructions || "");
+      }
+    } else {
+      setTemperature(appt.vitals?.temperature || "");
+      setBloodPressure(appt.vitals?.bloodPressure || "");
+      setPulseRate(appt.vitals?.pulseRate || "");
+      setRespiratoryRate(appt.vitals?.respiratoryRate || "");
+      setOxygenSaturation(appt.vitals?.oxygenSaturation || "");
+      setWeight(appt.vitals?.weight || "");
+      setChiefComplaint(appt.chiefComplaint || "");
+
+      setDiagnosis(appt.diagnosis || "");
+      setSymptoms(appt.symptoms || "");
+      setClinicalNotes(appt.clinicalNotes || "");
+      setTreatmentPlan(appt.treatmentPlan || "");
+      setAdvice(appt.advice || "");
+    }
     hasPopulated.current = true;
   }
+
+  // Auto-save logic
+  useEffect(() => {
+    if (!workspaceData?.draftSession?._id) return;
+    
+    const draftId = workspaceData.draftSession._id;
+    
+    // Construct update payload
+    const updateData = {
+      vitals: {
+        temperature,
+        bloodPressure,
+        pulseRate,
+        respiratoryRate,
+        oxygenSaturation,
+        weight,
+      },
+      chiefComplaint,
+      diagnosis,
+      symptoms,
+      clinicalNotes,
+      treatmentPlan,
+      advice,
+      prescriptions: prescriptionMeds.map(p => ({
+        name: p.name,
+        strength: p.strength,
+        dosage: p.dosage,
+        frequency: p.frequency,
+        duration: p.duration,
+        instructions: p.instructions,
+        morning: !!p.morning,
+        afternoon: !!p.afternoon,
+        night: !!p.night,
+      })),
+      labOrders: selectedLabTests,
+      radiologyOrders: [
+        {
+          type: radioType,
+          notes: radioNotes,
+          priority: radioPriority,
+        }
+      ],
+      admissionRecommendation: {
+        priority: admitPriority as any,
+        preferredWard: admitWard,
+        preferredBedType: admitBedType,
+        expectedStay: admitExpectedStay,
+        primaryDiagnosis: admitDiagnosis,
+        clinicalNotes: admitNotes,
+        admissionReason: admitReason,
+        specialInstructions: admitSpecialInstructions,
+        recommended: !!(admitDiagnosis || admitWard !== "General" || admitReason),
+      }
+    };
+
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        setIsSavingDraft(true);
+        await updateDraftMutation.mutateAsync({
+          consultationId: draftId,
+          updateData,
+          appointmentId: appointmentId || "",
+        });
+        setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      } catch (err) {
+        console.error("Auto-save failed", err);
+      } finally {
+        setIsSavingDraft(false);
+      }
+    }, 2000);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [
+    temperature,
+    bloodPressure,
+    pulseRate,
+    respiratoryRate,
+    oxygenSaturation,
+    weight,
+    chiefComplaint,
+    diagnosis,
+    symptoms,
+    clinicalNotes,
+    treatmentPlan,
+    advice,
+    prescriptionMeds,
+    selectedLabTests,
+    radioType,
+    radioNotes,
+    radioPriority,
+    admitWard,
+    admitBedType,
+    admitExpectedStay,
+    admitDiagnosis,
+    admitNotes,
+    admitReason,
+    admitSpecialInstructions,
+  ]);
 
   if (isLoading) {
     return (
@@ -199,13 +363,20 @@ export function ConsultationWorkspacePage() {
 
   const handleSaveVitals = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!workspaceData?.draftSession) {
+      toast.error("No active draft session. Please start consultation.");
+      return;
+    }
     try {
-      await saveVitalsMutation.mutateAsync({
+      await updateDraftMutation.mutateAsync({
+        consultationId: workspaceData.draftSession._id,
+        updateData: {
+          vitals: { temperature, bloodPressure, pulseRate, respiratoryRate, oxygenSaturation, weight },
+          chiefComplaint,
+        },
         appointmentId: appointment._id,
-        vitals: { temperature, bloodPressure, pulseRate, respiratoryRate, oxygenSaturation, weight },
-        chiefComplaint,
       });
-      toast.success("Vitals saved successfully");
+      toast.success("Vitals saved to draft successfully");
     } catch {
       toast.error("Failed to save vitals");
     }
@@ -213,16 +384,23 @@ export function ConsultationWorkspacePage() {
 
   const handleSaveClinicalNotes = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!workspaceData?.draftSession) {
+      toast.error("No active draft session. Please start consultation.");
+      return;
+    }
     try {
-      await saveNotesMutation.mutateAsync({
+      await updateDraftMutation.mutateAsync({
+        consultationId: workspaceData.draftSession._id,
+        updateData: {
+          diagnosis,
+          symptoms,
+          clinicalNotes,
+          treatmentPlan,
+          advice,
+        },
         appointmentId: appointment._id,
-        diagnosis,
-        symptoms,
-        clinicalNotes,
-        treatmentPlan,
-        advice,
       });
-      toast.success("Clinical notes updated successfully");
+      toast.success("Clinical notes saved to draft successfully");
     } catch {
       toast.error("Failed to update clinical notes");
     }
@@ -233,18 +411,124 @@ export function ConsultationWorkspacePage() {
       toast.error("Please enter a diagnosis before completing consultation");
       return;
     }
+    if (!workspaceData?.draftSession) {
+      toast.error("No active draft session. Please start consultation.");
+      return;
+    }
     try {
-      const res = await completeMutation.mutateAsync({
-        appointmentId: appointment._id,
-        medications: prescriptionMeds,
-        labOrders: selectedLabTests,
-        radiologyOrders: radioNotes ? [radioType] : [],
-        diagnosis,
+      // 1. Bulk-save all active states
+      const updateData = {
+        vitals: {
+          temperature,
+          bloodPressure,
+          pulseRate,
+          respiratoryRate,
+          oxygenSaturation,
+          weight,
+        },
         chiefComplaint,
+        diagnosis,
+        symptoms,
         clinicalNotes,
+        treatmentPlan,
         advice,
+        prescriptions: prescriptionMeds.map(p => ({
+          name: p.name,
+          strength: p.strength,
+          dosage: p.dosage,
+          frequency: p.frequency,
+          duration: p.duration,
+          instructions: p.instructions,
+          morning: !!p.morning,
+          afternoon: !!p.afternoon,
+          night: !!p.night,
+        })),
+        labOrders: selectedLabTests,
+        radiologyOrders: [
+          {
+            type: radioType,
+            notes: radioNotes,
+            priority: radioPriority,
+          }
+        ],
+        admissionRecommendation: {
+          priority: admitPriority as any,
+          preferredWard: admitWard,
+          preferredBedType: admitBedType,
+          expectedStay: admitExpectedStay,
+          primaryDiagnosis: admitDiagnosis,
+          clinicalNotes: admitNotes,
+          admissionReason: admitReason,
+          specialInstructions: admitSpecialInstructions,
+          recommended: !!(admitDiagnosis || admitWard !== "General" || admitReason),
+        }
+      };
+
+      await updateDraftMutation.mutateAsync({
+        consultationId: workspaceData.draftSession._id,
+        updateData,
+        appointmentId: appointment._id,
+      });
+
+      // 2. Complete consultation via transaction-backed backend action
+      const res = await completeDraftMutation.mutateAsync({
+        consultationId: workspaceData.draftSession._id,
         followUpDate: (appointment as any).followUpDate || null,
       });
+
+      // 3. Propagate completed lab orders to lab dashboard
+      if (selectedLabTests.length > 0) {
+        try {
+          const savedRequests = localStorage.getItem("hms_laboratory_requests") || "[]";
+          const requests = JSON.parse(savedRequests);
+          const newRequest = {
+            _id: `LAB-${patient._id.slice(-4)}-${Date.now().toString().slice(-4)}`,
+            patientId: patient._id,
+            patientName: patient.name,
+            patientAge: patient.age || 30,
+            patientGender: patient.gender || "Male",
+            orderedBy: (appointment.doctor as any)?.name || "Dr. Attending Physician",
+            tests: selectedLabTests,
+            priority: labPriority,
+            date: new Date().toISOString().split("T")[0],
+            status: "Pending Request",
+            sampleId: "",
+            sampleType: "Blood",
+            results: []
+          };
+          requests.unshift(newRequest);
+          localStorage.setItem("hms_laboratory_requests", JSON.stringify(requests));
+        } catch (storageErr) {
+          console.error("Failed to sync lab request to local storage", storageErr);
+        }
+      }
+
+      // 4. Propagate completed radiology orders to radiology/lab dashboard
+      if (radioNotes || radioType) {
+        try {
+          const savedRequests = localStorage.getItem("hms_laboratory_requests") || "[]";
+          const requests = JSON.parse(savedRequests);
+          const newRequest = {
+            _id: `RAD-${patient._id.slice(-4)}-${Date.now().toString().slice(-4)}`,
+            patientId: patient._id,
+            patientName: patient.name,
+            patientAge: patient.age || 30,
+            patientGender: patient.gender || "Male",
+            orderedBy: (appointment.doctor as any)?.name || "Dr. Attending Physician",
+            tests: [radioType],
+            priority: radioPriority,
+            date: new Date().toISOString().split("T")[0],
+            status: "Pending Request",
+            sampleId: "",
+            sampleType: "Imaging",
+            results: []
+          };
+          requests.unshift(newRequest);
+          localStorage.setItem("hms_laboratory_requests", JSON.stringify(requests));
+        } catch (storageErr) {
+          console.error("Failed to sync radiology request to local storage", storageErr);
+        }
+      }
 
       const rx = res.prescription as any;
       setSuccessInfo({
@@ -253,7 +537,8 @@ export function ConsultationWorkspacePage() {
         pdfUrl: rx?.pdfUrl || "",
         downloadUrl: rx?.downloadUrl || "",
       });
-      toast.success("Consultation completed successfully!");
+      toast.success("Consultation completed and finalized successfully!");
+      refetch();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to complete consultation");
     }
@@ -306,29 +591,21 @@ export function ConsultationWorkspacePage() {
       toast.error("Please enter medicine names");
       return;
     }
+    if (!workspaceData?.draftSession) {
+      toast.error("No active draft session. Please start consultation.");
+      return;
+    }
     try {
-      const rx = (await prescriptionMutation.mutateAsync({
+      await updateDraftMutation.mutateAsync({
+        consultationId: workspaceData.draftSession._id,
+        updateData: {
+          prescriptions: prescriptionMeds,
+        },
         appointmentId: appointment._id,
-        patientId: patient._id,
-        diagnosis: diagnosis || "Consultation visit",
-        medicines: prescriptionMeds,
-        notes: clinicalNotes || "",
-        advice: advice || "",
-        followUpDate: (appointment as any).followUpDate || null,
-        labOrders: selectedLabTests,
-        radiologyOrders: radioNotes ? [radioType] : [],
-      })) as any;
-      
-      setSuccessInfo({
-        show: true,
-        isCompleted: false,
-        pdfUrl: rx?.pdfUrl || "",
-        downloadUrl: rx?.downloadUrl || "",
       });
-      toast.success("Prescription generated successfully!");
-      refetch();
+      toast.success("Prescription draft saved successfully!");
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to generate prescription");
+      toast.error(err.response?.data?.message || "Failed to save prescription draft");
     }
   };
 
@@ -346,57 +623,75 @@ export function ConsultationWorkspacePage() {
       toast.error("Please select at least one lab test");
       return;
     }
+    if (!workspaceData?.draftSession) {
+      toast.error("No active draft session. Please start consultation.");
+      return;
+    }
     try {
-      await labMutation.mutateAsync({
-        patientId: patient._id,
-        tests: selectedLabTests,
-        priority: labPriority,
+      await updateDraftMutation.mutateAsync({
+        consultationId: workspaceData.draftSession._id,
+        updateData: {
+          labOrders: selectedLabTests,
+        },
+        appointmentId: appointment._id,
       });
-      toast.success("Laboratory test orders submitted!");
-      setSelectedLabTests([]);
-      refetch();
+      toast.success("Laboratory test orders added to draft!");
     } catch {
-      toast.error("Failed to submit laboratory tests");
+      toast.error("Failed to save laboratory tests");
     }
   };
 
   const handleOrderRadiology = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!workspaceData?.draftSession) {
+      toast.error("No active draft session. Please start consultation.");
+      return;
+    }
     try {
-      await radiologyMutation.mutateAsync({
+      await updateDraftMutation.mutateAsync({
+        consultationId: workspaceData.draftSession._id,
+        updateData: {
+          radiologyOrders: [
+            {
+              type: radioType,
+              notes: radioNotes,
+              priority: radioPriority,
+            }
+          ]
+        },
         appointmentId: appointment._id,
-        patientId: patient._id,
-        type: radioType,
-        priority: radioPriority,
-        notes: radioNotes,
       });
-      toast.success("Radiology imaging request submitted!");
-      setRadioNotes("");
-      refetch();
+      toast.success("Radiology request added to draft!");
     } catch {
-      toast.error("Failed to request radiology");
+      toast.error("Failed to save radiology request");
     }
   };
 
   const handleRecommendAdmission = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!workspaceData?.draftSession) {
+      toast.error("No active draft session. Please start consultation.");
+      return;
+    }
     try {
-      await admitMutation.mutateAsync({
+      await updateDraftMutation.mutateAsync({
+        consultationId: workspaceData.draftSession._id,
+        updateData: {
+          admissionRecommendation: {
+            priority: admitPriority as any,
+            preferredWard: admitWard,
+            preferredBedType: admitBedType,
+            expectedStay: admitExpectedStay,
+            primaryDiagnosis: admitDiagnosis || diagnosis || "",
+            clinicalNotes: admitNotes,
+            admissionReason: admitReason || admitDiagnosis || diagnosis || "",
+            specialInstructions: admitSpecialInstructions,
+            recommended: true,
+          }
+        },
         appointmentId: appointment._id,
-        priority: admitPriority as any,
-        preferredWard: admitWard,
-        preferredBedType: admitBedType,
-        expectedStay: admitExpectedStay,
-        primaryDiagnosis: admitDiagnosis || diagnosis || "",
-        clinicalNotes: admitNotes,
-        admissionReason: admitReason || admitDiagnosis || diagnosis || "",
-        specialInstructions: admitSpecialInstructions
       });
-      toast.success("Admission Request Sent");
-      setAdmitNotes("");
-      setAdmitReason("");
-      setAdmitSpecialInstructions("");
-      refetch();
+      toast.success("Admission recommendation saved to draft!");
     } catch (err: any) {
       const errMsg = err.response?.data?.message || err.message || "Failed to recommend admission";
       toast.error(errMsg);
@@ -422,8 +717,14 @@ export function ConsultationWorkspacePage() {
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold text-slate-900">Consultation Workspace</h1>
             <Badge tone={appointment.status === "completed" ? "success" : appointment.status === "in_consultation" ? "warning" : "info"}>
-              {appointment.status.toUpperCase()}
+              {appointment.status === "in_consultation" ? "In Progress" : appointment.status === "completed" ? "Completed" : appointment.status.toUpperCase()}
             </Badge>
+            {appointment.status === "in_consultation" && workspaceData?.draftSession && (
+              <span className="text-xs text-emerald-600 font-medium flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                {isSavingDraft ? "Saving..." : lastSavedTime ? `Draft saved at ${lastSavedTime}` : "Draft saved automatically"}
+              </span>
+            )}
           </div>
           <p className="text-sm text-slate-500 mt-1">
             Attending Patient: <span className="font-semibold text-slate-700">{patient.name}</span> (UHID: {patient.uhid})
@@ -438,7 +739,7 @@ export function ConsultationWorkspacePage() {
           )}
 
           {appointment.status === "in_consultation" && (
-            <Button variant="primary" onClick={handleCompleteConsultation} disabled={completeMutation.isPending}>
+            <Button variant="primary" onClick={handleCompleteConsultation} disabled={completeDraftMutation.isPending}>
               Complete Consultation
             </Button>
           )}
@@ -449,9 +750,9 @@ export function ConsultationWorkspacePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         {/* Left column: Patient quick details */}
-        <div className="lg:col-span-1 space-y-6">
+        <div className="xl:col-span-1 space-y-6">
           <Card className="p-4 space-y-4">
             <h3 className="text-sm font-bold text-slate-800 border-b pb-2 flex items-center gap-1.5">
               <User className="h-4 w-4 text-navy-700" /> Patient Details
@@ -507,7 +808,7 @@ export function ConsultationWorkspacePage() {
         </div>
 
         {/* Right column: Workspace Tabs & Details */}
-        <div className="lg:col-span-3 space-y-6">
+        <div className="xl:col-span-3 space-y-6">
           {/* Tabs navigation */}
           <div className="flex bg-slate-100 p-1 rounded-lg w-full overflow-x-auto gap-1">
             {([
@@ -886,137 +1187,178 @@ export function ConsultationWorkspacePage() {
 
           {/* TAB 7: RECOMMEND ADMISSION */}
           {activeTab === "documents" && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <form onSubmit={handleRecommendAdmission} className="md:col-span-1">
-                <Card className="p-4 space-y-4">
-                  <h3 className="text-sm font-bold text-slate-800 border-b pb-2 flex items-center gap-1">
-                    <FileText className="h-4 w-4" /> Recommend IP Admission
-                  </h3>
-
-                  {/* Auto-filled Read-Only Patient Metadata */}
-                  <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2 text-xs">
-                    <h4 className="font-bold text-slate-700">Patient Consultation Info</h4>
-                    <div className="grid grid-cols-2 gap-2 text-slate-650">
-                      <div>
-                        <span className="block font-medium text-slate-400">Patient Name:</span>
-                        <span className="font-semibold text-slate-800">{(appointment.patient as any)?.name}</span>
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              {/* Form on Left (spans 2 columns on xl screens) */}
+              <form onSubmit={handleRecommendAdmission} className="xl:col-span-2">
+                <Card className="p-6 space-y-6">
+                  {/* Title & Accent */}
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy-50 text-navy-700">
+                        <FileText className="h-5 w-5" />
                       </div>
                       <div>
-                        <span className="block font-medium text-slate-400">UHID:</span>
-                        <span className="font-semibold text-slate-800 font-mono">{(appointment.patient as any)?.uhid}</span>
-                      </div>
-                      <div>
-                        <span className="block font-medium text-slate-400">Age / Gender:</span>
-                        <span className="font-semibold text-slate-800">{(appointment.patient as any)?.age} yrs / {(appointment.patient as any)?.gender}</span>
-                      </div>
-                      <div>
-                        <span className="block font-medium text-slate-400">Phone:</span>
-                        <span className="font-semibold text-slate-800">{(appointment.patient as any)?.phone || "N/A"}</span>
-                      </div>
-                      <div>
-                        <span className="block font-medium text-slate-400">OP Code:</span>
-                        <span className="font-semibold text-slate-800 font-mono">{appointment.referenceId}</span>
-                      </div>
-                      <div>
-                        <span className="block font-medium text-slate-400">Token Number:</span>
-                        <span className="font-semibold text-slate-800 font-mono">{queueItem?.tokenNumber || "N/A"}</span>
+                        <h3 className="text-base font-bold text-slate-900">Recommend IP Admission</h3>
+                        <p className="text-xs text-slate-500">Initiate inpatient ward transfer and bed allocation request</p>
                       </div>
                     </div>
                   </div>
 
-                  <InputField
-                    label="Primary Diagnosis (Mandatory)"
-                    value={admitDiagnosis}
-                    onChange={(e) => setAdmitDiagnosis(e.target.value)}
-                    placeholder="Enter diagnostic confirmation..."
-                    required
-                  />
+                  {/* Modern Patient Info Card */}
+                  <div className="bg-gradient-to-r from-navy-50/50 to-blue-50/20 rounded-xl p-4 border border-navy-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-navy-700 font-bold text-white text-sm shadow-sm">
+                        {((appointment.patient as any)?.name || "P").split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-slate-800 text-sm">{(appointment.patient as any)?.name}</h4>
+                        <p className="text-[10px] text-slate-500 mt-0.5">UHID: <span className="font-mono font-semibold text-slate-700">{(appointment.patient as any)?.uhid}</span></p>
+                      </div>
+                    </div>
+                    
+                    <div className="hidden md:block h-8 w-px bg-slate-200"></div>
+                    
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 text-slate-650 flex-1 md:justify-end md:flex md:flex-row md:gap-x-8">
+                      <div>
+                        <span className="block text-[9px] text-slate-400 font-medium uppercase tracking-wider">Age / Gender</span>
+                        <span className="font-semibold text-slate-700">{(appointment.patient as any)?.age} yrs / {(appointment.patient as any)?.gender}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] text-slate-400 font-medium uppercase tracking-wider">OP Code</span>
+                        <span className="font-semibold text-slate-750 font-mono">{appointment.referenceId}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] text-slate-400 font-medium uppercase tracking-wider">Token Number</span>
+                        <span className="font-semibold text-slate-750 font-mono">{queueItem?.tokenNumber || "N/A"}</span>
+                      </div>
+                    </div>
+                  </div>
 
-                  <SelectField
-                    label="Admission Priority"
-                    value={admitPriority}
-                    onChange={(e) => setAdmitPriority(e.target.value)}
-                  >
-                    <option value="Routine">Routine</option>
-                    <option value="Urgent">Urgent</option>
-                    <option value="Emergency">Emergency</option>
-                  </SelectField>
+                  {/* Form Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <InputField
+                        label="Primary Diagnosis (Mandatory)"
+                        value={admitDiagnosis}
+                        onChange={(e) => setAdmitDiagnosis(e.target.value)}
+                        placeholder="Enter diagnostic confirmation..."
+                        required
+                      />
+                    </div>
 
-                  <SelectField
-                    label="Preferred Ward"
-                    value={admitWard}
-                    onChange={(e) => setAdmitWard(e.target.value)}
-                  >
-                    <option value="General">General</option>
-                    <option value="Semi Private">Semi Private</option>
-                    <option value="Private">Private</option>
-                    <option value="ICU">ICU</option>
-                  </SelectField>
+                    <div>
+                      <SelectField
+                        label="Admission Priority"
+                        value={admitPriority}
+                        onChange={(e) => setAdmitPriority(e.target.value)}
+                      >
+                        <option value="Routine">Routine</option>
+                        <option value="Urgent">Urgent</option>
+                        <option value="Emergency">Emergency</option>
+                      </SelectField>
+                    </div>
 
-                  <SelectField
-                    label="Preferred Bed Type"
-                    value={admitBedType}
-                    onChange={(e) => setAdmitBedType(e.target.value)}
-                  >
-                    <option value="General">General</option>
-                    <option value="Semi-Private">Semi-Private</option>
-                    <option value="Private">Private</option>
-                    <option value="ICU">ICU</option>
-                  </SelectField>
+                    <div>
+                      <InputField
+                        label="Expected Stay Duration"
+                        value={admitExpectedStay}
+                        onChange={(e) => setAdmitExpectedStay(e.target.value)}
+                        placeholder="e.g. 3 Days, 1 Week"
+                      />
+                    </div>
 
-                  <InputField
-                    label="Expected Stay Duration"
-                    value={admitExpectedStay}
-                    onChange={(e) => setAdmitExpectedStay(e.target.value)}
-                    placeholder="e.g. 3 Days, 1 Week"
-                  />
+                    <div>
+                      <SelectField
+                        label="Preferred Ward"
+                        value={admitWard}
+                        onChange={(e) => setAdmitWard(e.target.value)}
+                      >
+                        <option value="General">General</option>
+                        <option value="Semi Private">Semi Private</option>
+                        <option value="Private">Private</option>
+                        <option value="ICU">ICU</option>
+                      </SelectField>
+                    </div>
 
-                  <InputField
-                    label="Admission Reason"
-                    value={admitReason}
-                    onChange={(e) => setAdmitReason(e.target.value)}
-                    placeholder="Clinical reason for ward admission"
-                  />
+                    <div>
+                      <SelectField
+                        label="Preferred Bed Type"
+                        value={admitBedType}
+                        onChange={(e) => setAdmitBedType(e.target.value)}
+                      >
+                        <option value="General">General</option>
+                        <option value="Semi-Private">Semi-Private</option>
+                        <option value="Private">Private</option>
+                        <option value="ICU">ICU</option>
+                      </SelectField>
+                    </div>
 
-                  <TextareaField
-                    label="Clinical Notes / Diagnosis Remarks"
-                    value={admitNotes}
-                    onChange={(e) => setAdmitNotes(e.target.value)}
-                    placeholder="Describe clinical symptoms and observations..."
-                    rows={3}
-                  />
+                    <div className="md:col-span-2">
+                      <InputField
+                        label="Admission Reason"
+                        value={admitReason}
+                        onChange={(e) => setAdmitReason(e.target.value)}
+                        placeholder="Clinical reason for ward admission"
+                      />
+                    </div>
 
-                  <TextareaField
-                    label="Special Instructions"
-                    value={admitSpecialInstructions}
-                    onChange={(e) => setAdmitSpecialInstructions(e.target.value)}
-                    placeholder="Nursing guidance, diet directives..."
-                    rows={2}
-                  />
+                    <div>
+                      <TextareaField
+                        label="Clinical Notes / Diagnosis Remarks"
+                        value={admitNotes}
+                        onChange={(e) => setAdmitNotes(e.target.value)}
+                        placeholder="Describe clinical symptoms and observations..."
+                        rows={3}
+                      />
+                    </div>
 
-                  <Button type="submit" variant="primary" className="w-full justify-center" disabled={admitMutation.isPending}>
-                    {admitMutation.isPending ? "Submitting..." : "Send Admission Request"}
-                  </Button>
+                    <div>
+                      <TextareaField
+                        label="Special Instructions"
+                        value={admitSpecialInstructions}
+                        onChange={(e) => setAdmitSpecialInstructions(e.target.value)}
+                        placeholder="Nursing guidance, diet directives..."
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end border-t border-slate-100 pt-4">
+                    <Button type="submit" variant="primary" className="px-6 py-2.5 shadow-md font-semibold" disabled={admitMutation.isPending}>
+                      {admitMutation.isPending ? "Submitting..." : "Send Admission Request"}
+                    </Button>
+                  </div>
                 </Card>
               </form>
 
-              <div className="md:col-span-2 space-y-6">
+              {/* Status Trackers on Right */}
+              <div className="xl:col-span-1 space-y-6">
                 {/* Admission Request Tracker */}
-                <Card className="p-4 space-y-4">
-                  <h3 className="text-sm font-bold text-slate-800 border-b pb-2 flex items-center justify-between">
-                    <span>Admission Request Status Tracker</span>
-                    <span className="text-[10px] text-slate-400 font-mono">Current IP workflow</span>
-                  </h3>
+                <Card className="p-5 space-y-4">
+                  <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-800">Admission Request Tracker</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Track request status from department desks</p>
+                    </div>
+                    <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-[9px] font-semibold text-indigo-700 border border-indigo-150 shrink-0 w-fit">
+                      Current IP workflow
+                    </span>
+                  </div>
+                  
                   {admissionRequests.length === 0 ? (
-                    <div className="p-4 bg-slate-50 border border-dashed rounded-xl text-center text-xs text-slate-400">
-                      No admission requests created for this patient.
+                    <div className="p-6 bg-slate-50 border border-dashed rounded-xl text-center text-xs text-slate-400 flex flex-col items-center justify-center gap-2">
+                      <FolderOpen className="h-7 w-7 text-slate-350" />
+                      <div>
+                        <p className="font-semibold text-slate-500">No Admission Requests</p>
+                        <p className="text-[10px] mt-0.5">Submit the form on the left to start a request.</p>
+                      </div>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
                       {admissionRequests.map((req: any) => (
-                        <div key={req._id} className="border border-slate-200 rounded-xl p-4 space-y-3 text-xs bg-white shadow-sm">
-                          <div className="flex justify-between items-center border-b pb-2">
-                            <span className="font-bold text-indigo-700 font-mono">Req: {req.requestNumber}</span>
+                        <div key={req._id} className="border border-slate-100 hover:border-slate-200 rounded-xl p-3.5 space-y-3 text-xs bg-slate-50/50 hover:bg-slate-50 transition-colors shadow-sm">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-indigo-700 font-mono tracking-wider">Req: {req.requestNumber}</span>
                             <Badge tone={
                               req.status === "Admitted" ? "success" :
                               req.status === "Approved" ? "success" :
@@ -1026,15 +1368,32 @@ export function ConsultationWorkspacePage() {
                               {req.status}
                             </Badge>
                           </div>
-                          <div className="grid grid-cols-2 gap-2 text-slate-600">
-                            <p><span className="font-medium text-slate-800">Priority:</span> {req.priority}</p>
-                            <p><span className="font-medium text-slate-800">Preferred Ward:</span> {req.preferredWard || "General"}</p>
-                            <p><span className="font-medium text-slate-800">Stay Estimate:</span> {req.expectedStay || "N/A"}</p>
-                            <p><span className="font-medium text-slate-800">Diagnosis:</span> {req.primaryDiagnosis}</p>
+                          
+                          <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-slate-600 border-t border-slate-100 pt-2.5">
+                            <div>
+                              <span className="block text-[9px] text-slate-400 uppercase tracking-wider">Priority</span>
+                              <span className={`font-semibold ${req.priority === "Emergency" ? "text-red-600" : req.priority === "Urgent" ? "text-amber-600" : "text-slate-700"}`}>
+                                {req.priority}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="block text-[9px] text-slate-400 uppercase tracking-wider">Preferred Ward</span>
+                              <span className="font-semibold text-slate-750">{req.preferredWard || "General"}</span>
+                            </div>
+                            <div>
+                              <span className="block text-[9px] text-slate-400 uppercase tracking-wider">Stay Estimate</span>
+                              <span className="font-semibold text-slate-750">{req.expectedStay || "N/A"}</span>
+                            </div>
+                            <div>
+                              <span className="block text-[9px] text-slate-400 uppercase tracking-wider">Diagnosis</span>
+                              <span className="font-semibold text-slate-750 truncate max-w-28 block">{req.primaryDiagnosis}</span>
+                            </div>
                           </div>
+
                           {req.clinicalNotes && (
-                            <div className="bg-slate-50 rounded p-2 border border-slate-100 text-slate-650 text-[11px] italic">
-                              Notes: {req.clinicalNotes}
+                            <div className="bg-white rounded-lg p-2.5 border border-slate-100 text-slate-600 text-[11px] italic leading-relaxed">
+                              <span className="font-semibold not-italic block text-[9px] text-slate-400 uppercase tracking-wider mb-1">Clinical Remarks</span>
+                              {req.clinicalNotes}
                             </div>
                           )}
                         </div>
@@ -1044,26 +1403,51 @@ export function ConsultationWorkspacePage() {
                 </Card>
 
                 {/* Admission Registry */}
-                <Card className="p-4 space-y-4">
-                  <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Inpatient Registry Record</h3>
+                <Card className="p-5 space-y-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800">Inpatient Registry Record</h3>
+                    <p className="text-xs text-slate-500 mt-1">Confirmed bed allocations and ward assignments</p>
+                  </div>
                   {admissions.length === 0 ? (
-                    <div className="p-6 bg-slate-50 border border-dashed rounded-xl text-center text-xs text-slate-400">
-                      Patient is currently treated as an outpatient (OP). No IP admission records.
+                    <div className="p-6 bg-slate-50 border border-dashed rounded-xl text-center text-xs text-slate-400 flex flex-col items-center justify-center gap-2">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+                        <CheckCircle className="h-4.5 w-4.5" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-500">Outpatient Treatment (OP)</p>
+                        <p className="text-[10px] mt-0.5 font-medium">Patient has no active inpatient registry record.</p>
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-3">
                       {admissions.map((adm) => (
-                        <div key={adm._id} className="border border-slate-200 rounded-xl p-4 space-y-2 text-xs bg-slate-50">
-                          <div className="flex justify-between items-center border-b pb-2">
-                            <span className="font-bold text-navy-700">IP No: {adm.admissionNumber}</span>
+                        <div key={adm._id} className="border border-indigo-100 rounded-xl p-3.5 space-y-3 text-xs bg-indigo-50/10 shadow-sm">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-navy-700 tracking-wider font-mono">IP No: {adm.admissionNumber}</span>
                             <Badge tone={adm.status === "admitted" ? "warning" : "success"}>
                               {adm.status.toUpperCase()}
                             </Badge>
                           </div>
-                          <div className="grid grid-cols-2 gap-2 text-slate-600">
-                            <p><span className="font-medium text-slate-800">Ward:</span> {adm.ward}</p>
-                            <p><span className="font-medium text-slate-800">Room / Bed:</span> Room {adm.room?.roomNumber || "Allocated"} / Bed {adm.bed?.bedNumber || "Allocated"}</p>
-                            <p><span className="font-medium text-slate-800">Date:</span> {new Date(adm.admissionDate).toLocaleDateString("en-IN")}</p>
+                          
+                          <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-slate-600 border-t border-slate-100 pt-2.5">
+                            <div>
+                              <span className="block text-[9px] text-slate-400 uppercase tracking-wider">Allocated Ward</span>
+                              <span className="font-semibold text-slate-850">{adm.ward}</span>
+                            </div>
+                            <div>
+                              <span className="block text-[9px] text-slate-400 uppercase tracking-wider">Room / Bed</span>
+                              <span className="font-semibold text-slate-850">Room {adm.room?.roomNumber || "N/A"} / Bed {adm.bed?.bedNumber || "N/A"}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="block text-[9px] text-slate-400 uppercase tracking-wider">Admission Date</span>
+                              <span className="font-semibold text-slate-850">
+                                {new Date(adm.admissionDate).toLocaleDateString("en-IN", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       ))}

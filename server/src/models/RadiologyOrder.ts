@@ -5,7 +5,7 @@ const radiologyOrderSchema = new Schema(
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
     patient: { type: Schema.Types.ObjectId, ref: "Patient", required: true },
     doctor: { type: Schema.Types.ObjectId, ref: "Doctor", required: true },
-    type: { type: String, enum: ["X-ray", "CT", "MRI", "Ultrasound"], required: true },
+    type: { type: String, required: true },
     notes: { type: String, default: "" },
     priority: { type: String, enum: ["Routine", "Urgent", "STAT"], default: "Routine" },
     status: { type: String, enum: ["pending", "completed", "cancelled"], default: "pending" },

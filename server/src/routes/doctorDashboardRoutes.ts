@@ -31,6 +31,11 @@ import {
   createRadiologyOrder,
   completeConsultation,
   getRadiologyOrders,
+  startConsultationSession,
+  getConsultationDraft,
+  updateConsultationDraft,
+  completeConsultationSession,
+  cancelConsultationSession,
   // Doctor-scoped laboratory endpoints
   getMyLabOrders,
   getMyLabOrderById,
@@ -87,6 +92,13 @@ router.post("/appointments/:id/complete", completeConsultation);
 router.post("/appointments/:id/admission", recommendAdmission);
 router.post("/appointments/:id/radiology", createRadiologyOrder);
 router.get("/radiology/list", getRadiologyOrders);
+
+// Draft Consultation Lifecycle Routes
+router.post("/consultations/start", startConsultationSession);
+router.get("/consultations/:appointmentId/draft", getConsultationDraft);
+router.put("/consultations/:consultationId/draft", updateConsultationDraft);
+router.post("/consultations/:consultationId/complete", completeConsultationSession);
+router.post("/consultations/:consultationId/cancel", cancelConsultationSession);
 
 // ── Doctor-scoped lab order records (security-enforced, audit-logged) ─────────
 router.get("/my-lab-orders", getMyLabOrders);

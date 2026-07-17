@@ -709,14 +709,11 @@ export class ReceptionService {
       const remainingBalance = Math.max(0, invoiceTotal - totalPaid);
       const newStatus = remainingBalance === 0 ? "paid" : "partially_paid";
 
-      const updatedInvoice = await Invoice.findOneAndUpdate(
-        { _id: invoiceId, hospital: hospitalId },
-        { 
-          status: newStatus, 
-          "totals.patientBalance": remainingBalance 
-        },
-        { new: true, session }
-      );
+      invoice.status = newStatus;
+      if (invoice.totals) {
+        invoice.totals.patientBalance = remainingBalance;
+      }
+      let updatedInvoice = invoice;
 
       let appointment: any = null;
       let tokenNumber = "N/A";
@@ -845,11 +842,7 @@ export class ReceptionService {
         appointment = await ReceptionRepository.createAppointment(appointmentPayload);
 
         // Update invoice with appointment ID
-        await Invoice.findOneAndUpdate(
-          { _id: invoiceId, hospital: hospitalId },
-          { appointment: appointment._id },
-          { session }
-        );
+        invoice.appointment = appointment._id;
 
         // If it's today, generate token
         const startOfToday = new Date();
@@ -982,6 +975,8 @@ export class ReceptionService {
         discount: 0,
         total: invoiceTotal
       };
+
+      updatedInvoice = await invoice.save({ session });
 
       await session.commitTransaction();
       session.endSession();
@@ -2320,8 +2315,8 @@ export class ReceptionService {
 
       const title = isLate ? "Late arrival" : "Patient has arrived";
       const message = isLate
-        ? `Patient ${appointment.patient.name} checked in late for Dr. ${doctor.name} (Slot: ${appointment.time}).`
-        : `Patient ${appointment.patient.name} has arrived and checked in for Dr. ${doctor.name} (Token: ${tokenNumber}).`;
+        ? `Patient ${(appointment.patient as any).name} checked in late for Dr. ${doctor.name} (Slot: ${appointment.time}).`
+        : `Patient ${(appointment.patient as any).name} has arrived and checked in for Dr. ${doctor.name} (Token: ${tokenNumber}).`;
 
       await DbNotification.create([{
         hospital: hospitalId,
@@ -2336,7 +2331,7 @@ export class ReceptionService {
       await DbNotification.create([{
         hospital: hospitalId,
         title: "Patient Checked In",
-        message: `Patient ${appointment.patient.name} is checked in and waiting in your queue (Token: ${tokenNumber}).`,
+        message: `Patient ${(appointment.patient as any).name} is checked in and waiting in your queue (Token: ${tokenNumber}).`,
         type: "appointment",
         severity: "info",
         recipientRole: "doctor",
@@ -2349,7 +2344,7 @@ export class ReceptionService {
         hospital: hospitalId,
         user: userId,
         action: "CHECK_IN",
-        details: `Checked in patient ${appointment.patient.name} for Dr. ${doctor.name}. Token: ${tokenNumber}.`
+        details: `Checked in patient ${(appointment.patient as any).name} for Dr. ${doctor.name}. Token: ${tokenNumber}.`
       });
 
       await session.commitTransaction();
@@ -2406,7 +2401,7 @@ export class ReceptionService {
           await DbNotification.create({
             hospital: hospitalId,
             title: "Upcoming Appointment in 15 Minutes",
-            message: `Upcoming appointment for ${appt.patient?.name} with Dr. ${appt.doctor?.name} at ${appt.time} Slot.`,
+            message: `Upcoming appointment for ${(appt.patient as any)?.name} with Dr. ${(appt.doctor as any)?.name} at ${appt.time} Slot.`,
             type: "appointment",
             severity: "info",
             recipientRole: "receptionist",
@@ -2425,7 +2420,7 @@ export class ReceptionService {
           await DbNotification.create({
             hospital: hospitalId,
             title: "Appointment missed",
-            message: `${appt.patient?.name} missed the appointment with Dr. ${appt.doctor?.name} at ${appt.time} Slot.`,
+            message: `${(appt.patient as any)?.name} missed the appointment with Dr. ${(appt.doctor as any)?.name} at ${appt.time} Slot.`,
             type: "appointment",
             severity: "critical",
             recipientRole: "receptionist",
