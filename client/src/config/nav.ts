@@ -180,11 +180,10 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   laboratory: [
     { label: "Dashboard", path: "/laboratory", icon: LayoutDashboard },
     { label: "Test Requests", path: "/laboratory/requests", icon: ClipboardList },
-    { label: "Sample Collection", path: "/laboratory/samples", icon: FlaskConical },
     { label: "Test Processing", path: "/laboratory/processing", icon: Activity },
-    { label: "Quality Control", path: "/laboratory/qc", icon: ShieldCheck },
     { label: "Lab Inventory", path: "/laboratory/inventory", icon: Boxes },
     { label: "Report Delivery", path: "/laboratory/reports", icon: FileText },
+    { label: "Billing", path: "/laboratory/billing", icon: Receipt },
     { label: "Settings", path: "/laboratory/settings", icon: Settings },
   ],
 };

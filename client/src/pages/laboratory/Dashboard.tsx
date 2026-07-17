@@ -16,9 +16,11 @@ import { KpiCard } from "../../components/ui/KpiCard";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar } from "recharts";
 import { usePatients } from "../../features/patients";
 
+import { useLaboratoryRequests } from "../../features/laboratory";
+
 export function LaboratoryDashboard() {
   const navigate = useNavigate();
-  const { data: patientData, isLoading } = usePatients({});
+  const { data: dbRequests = [], isLoading: isRequestsLoading } = useLaboratoryRequests();
 
   const [stats, setStats] = useState({
     pendingRequests: 0,
@@ -31,52 +33,15 @@ export function LaboratoryDashboard() {
   const [criticalAlerts, setCriticalAlerts] = useState<any[]>([]);
 
   useEffect(() => {
-    // Read local storage logs for lab module state
-    const savedRequests = localStorage.getItem("hms_laboratory_requests") || "[]";
-    const requests = JSON.parse(savedRequests);
-
     const savedInventory = localStorage.getItem("hms_laboratory_inventory") || "[]";
     const inventory = JSON.parse(savedInventory);
 
-    // Initial mock seed for laboratory requests if empty (constructed from patients list)
-    let labReqs = requests;
-    if (requests.length === 0 && patientData?.data) {
-      const patientList = patientData.data;
-      labReqs = patientList.map((p: any, idx: number) => {
-        const tests = idx % 2 === 0 ? ["CBC (Complete Blood Count)", "HbA1c"] : ["Lipid Profile", "LFT"];
-        const status = idx % 3 === 0 ? "Pending Request" : idx % 2 === 0 ? "Awaiting Verification" : "Completed";
-        const priority = idx % 4 === 0 ? "STAT" : idx % 3 === 0 ? "Urgent" : "Routine";
-        return {
-          _id: `LAB-REQ-${p._id.slice(-4)}-${idx}`,
-          patientId: p._id,
-          patientName: p.name,
-          patientAge: p.age || 30,
-          patientGender: p.gender || "Male",
-          orderedBy: "Dr. Attending Physician",
-          tests,
-          priority,
-          date: new Date(p.createdAt).toISOString().split("T")[0],
-          status, // Pending Request, Sample Collected, In Progress, Awaiting Verification, Completed, Rejected
-          sampleId: status !== "Pending Request" ? `SMP-${p._id.slice(-4)}-${idx}` : "",
-          sampleType: "Blood",
-          results: status === "Completed" || status === "Awaiting Verification" ? [
-            { parameter: "Hemoglobin", value: idx % 2 === 0 ? "11.2" : "14.5", refRange: "12.0 - 16.0 g/dL", status: idx % 2 === 0 ? "low" : "normal" }
-          ] : []
-        };
-      });
-      localStorage.setItem("hms_laboratory_requests", JSON.stringify(labReqs));
-    }
-
     // Set statistics
-    const pending = labReqs.filter((r: any) => r.status === "Pending Request" || r.status === "Pending Approval").length;
-    const samples = labReqs.filter((r: any) => r.status === "Sample Collected").length;
-    const inProgress = labReqs.filter((r: any) => r.status === "In Progress").length;
-    const completed = labReqs.filter((r: any) => r.status === "Completed").length;
-    
-    // Critical reports (results out of normal range)
-    const critical = labReqs.filter((r: any) => 
-      r.results?.some((res: any) => res.status === "high" || res.status === "low" || res.status === "critical")
-    ).length;
+    const pending = dbRequests.filter((r: any) => r.status === "pending").length;
+    const samples = dbRequests.filter((r: any) => r.status === "accepted").length;
+    const inProgress = dbRequests.filter((r: any) => r.status === "processing").length;
+    const completed = dbRequests.filter((r: any) => r.status === "completed").length;
+    const critical = dbRequests.filter((r: any) => r.status === "report_uploaded" || r.status === "verified").length;
 
     setStats({
       pendingRequests: pending,
@@ -89,7 +54,7 @@ export function LaboratoryDashboard() {
     // Check inventory alerts
     const lowStock = inventory.filter((item: any) => item.quantity <= item.reorderLevel);
     setCriticalAlerts(lowStock.slice(0, 3));
-  }, [patientData]);
+  }, [dbRequests]);
 
   const weeklyTrendData = [
     { name: "Mon", CBC: 12, Lipid: 8, LFT: 6, HbA1c: 15 },
@@ -109,7 +74,7 @@ export function LaboratoryDashboard() {
     { name: "Pathology", volume: 22 }
   ];
 
-  if (isLoading) {
+  if (isRequestsLoading) {
     return (
       <div className="flex h-[400px] items-center justify-center">
         <div className="text-slate-500 font-medium">Loading laboratory dashboard...</div>

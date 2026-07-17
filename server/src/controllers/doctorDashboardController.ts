@@ -10,6 +10,7 @@ import { Patient } from "../models/Patient";
 import { RadiologyOrder } from "../models/RadiologyOrder";
 import { DbNotification } from "../models/DbNotification";
 import { ConsultationSession } from "../models/ConsultationSession";
+import { DiagnosticReport } from "../models/DiagnosticReport";
 import { Admission } from "../models/Admission";
 import { AdmissionRequest } from "../models/AdmissionRequest";
 import { AuditLog } from "../models/AuditLog";
@@ -414,12 +415,13 @@ export const getLabOrders = catchAsync(async (req: Request, res: Response) => {
 export const createLabOrder = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
-  const { patientId, tests, priority } = req.body;
+  const { patientId, tests, priority, appointmentId } = req.body;
 
   const labOrder = await LabOrder.create({
     hospital: hospitalId,
     patient: patientId,
     doctor: doctor._id,
+    appointment: appointmentId || null,
     tests,
     priority: priority || "Routine",
     sampleStatus: "Pending",
@@ -872,6 +874,7 @@ export const createRadiologyOrder = catchAsync(async (req: Request, res: Respons
     hospital: hospitalId,
     patient: patientId,
     doctor: doctor._id,
+    appointment: req.params.id || null,
     type,
     notes: notes || "",
     priority: priority || "Routine",
@@ -997,7 +1000,23 @@ export const getRadiologyOrders = catchAsync(async (req: Request, res: Response)
     .populate("doctor")
     .sort({ createdAt: -1 });
 
-  res.json({ status: "success", data: orders });
+  // For each order, find its DiagnosticReport and attach it
+  const ordersWithReports = await Promise.all(
+    orders.map(async (o) => {
+      const report = await DiagnosticReport.findOne({
+        requestId: o._id,
+        hospital: hospitalId
+      }).populate("uploadedBy", "name");
+
+      const orderObj = o.toObject();
+      return {
+        ...orderObj,
+        report
+      };
+    })
+  );
+
+  res.json({ status: "success", data: ordersWithReports });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1030,7 +1049,7 @@ export const getMyLabOrders = catchAsync(async (req: Request, res: Response) => 
     doctor: doctorObjId,
   };
 
-  if (status && ["pending", "completed", "rejected"].includes(status)) {
+  if (status) {
     filter.status = status;
   }
 
@@ -1071,7 +1090,7 @@ export const getMyLabOrders = catchAsync(async (req: Request, res: Response) => 
       orders: result,
       counts: {
         total: result.length,
-        pending: result.filter((o) => o.status === "pending").length,
+        pending: result.filter((o) => o.status !== "completed" && o.status !== "rejected").length,
         completed: result.filter((o) => o.status === "completed").length,
         rejected: result.filter((o) => o.status === "rejected").length,
       },
@@ -1118,6 +1137,12 @@ export const getMyLabOrderById = catchAsync(async (req: Request, res: Response) 
     throw new AppError("You do not have access to this laboratory order.", 403);
   }
 
+  // Find the associated DiagnosticReport if one exists
+  const report = await DiagnosticReport.findOne({
+    requestId: order._id,
+    hospital: hospitalId
+  }).populate("uploadedBy", "name");
+
   // Audit log — authorised access to individual lab report
   if (req.user) {
     const patient = order.patient as { _id?: Types.ObjectId; name?: string };
@@ -1138,7 +1163,7 @@ export const getMyLabOrderById = catchAsync(async (req: Request, res: Response) 
     });
   }
 
-  res.json({ status: "success", data: { order } });
+  res.json({ status: "success", data: { order, report } });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1642,6 +1667,7 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
             hospital: hospitalId,
             patient: appointment.patient._id,
             doctor: doctor._id,
+            appointment: appointment._id,
             tests: draft.labOrders,
             priority: "Routine",
             sampleStatus: "Pending",
@@ -1685,6 +1711,7 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
               hospital: hospitalId,
               patient: appointment.patient._id,
               doctor: doctor._id,
+              appointment: appointment._id,
               type: rad.type,
               notes: rad.notes || "",
               priority: rad.priority || "Routine",

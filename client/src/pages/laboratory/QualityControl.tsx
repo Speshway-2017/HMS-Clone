@@ -1,111 +1,75 @@
-import { useState, useEffect } from "react";
-import { ShieldCheck, Search, Eye, Check, X, AlertTriangle } from "lucide-react";
+import { useState } from "react";
+import { ShieldCheck, Search, Eye, Check, X } from "lucide-react";
+import toast from "react-hot-toast";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
 import { TextareaField } from "../../components/ui/Field";
-
-interface TestResultRow {
-  parameter: string;
-  value: string;
-  refRange: string;
-  status: "normal" | "low" | "high" | "critical";
-}
-
-interface TestRequest {
-  _id: string;
-  patientId: string;
-  patientName: string;
-  patientAge: number;
-  patientGender: string;
-  orderedBy: string;
-  tests: string[];
-  priority: string;
-  date: string;
-  status: string;
-  sampleId?: string;
-  sampleType?: string;
-  collectionTime?: string;
-  results?: TestResultRow[];
-  comments?: string;
-  rejectionReason?: string;
-  verifiedBy?: string;
-  verificationTime?: string;
-}
+import { useLaboratoryRequests, useVerifyReport, useRejectRequest, UnifiedRequest } from "../../features/laboratory";
 
 export function LaboratoryQualityControl() {
-  const [requests, setRequests] = useState<TestRequest[]>([]);
+  const { data: requests = [], isLoading, isError } = useLaboratoryRequests();
+  const verifyReport = useVerifyReport();
+  const rejectRequest = useRejectRequest();
+
   const [search, setSearch] = useState("");
-  const [selectedReq, setSelectedReq] = useState<TestRequest | null>(null);
+  const [selectedReq, setSelectedReq] = useState<UnifiedRequest | null>(null);
   const [isVerifyOpen, setIsVerifyOpen] = useState(false);
   const [isRejectOpen, setIsRejectOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
 
-  useEffect(() => {
-    const saved = localStorage.getItem("hms_laboratory_requests");
-    if (saved) {
-      setRequests(JSON.parse(saved));
+  const handleVerify = async (id: string) => {
+    try {
+      await verifyReport.mutateAsync(id);
+      toast.success("Report successfully verified!");
+      setIsVerifyOpen(false);
+      setSelectedReq(null);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to verify report.");
     }
-  }, []);
-
-  const saveRequests = (updated: TestRequest[]) => {
-    setRequests(updated);
-    localStorage.setItem("hms_laboratory_requests", JSON.stringify(updated));
   };
 
-  const handleApprove = (id: string) => {
-    const updated = requests.map(r => 
-      r._id === id 
-        ? { 
-            ...r, 
-            status: "Completed",
-            verifiedBy: "Dr. Alex Carter (Lab Director)",
-            verificationTime: new Date().toLocaleString()
-          } 
-        : r
-    );
-    saveRequests(updated);
-    setIsVerifyOpen(false);
-    setSelectedReq(null);
-  };
-
-  const handleRejectSubmit = () => {
+  const handleRejectSubmit = async () => {
     if (!selectedReq || !rejectionReason.trim()) return;
-    const updated = requests.map(r => 
-      r._id === selectedReq._id 
-        ? { 
-            ...r, 
-            status: "Sample Collected", // send back to collection or processing
-            rejectionReason 
-          } 
-        : r
-    );
-    saveRequests(updated);
-    setRejectionReason("");
-    setIsRejectOpen(false);
-    setIsVerifyOpen(false);
-    setSelectedReq(null);
+    try {
+      await rejectRequest.mutateAsync({ requestId: selectedReq._id, rejectionReason });
+      toast.success("Report rejected back to processing queue.");
+      setRejectionReason("");
+      setIsRejectOpen(false);
+      setIsVerifyOpen(false);
+      setSelectedReq(null);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to reject report.");
+    }
   };
 
-  // Filter requests that are Awaiting Verification
-  const qcQueue = requests.filter(r => r.status === "Awaiting Verification");
+  // Filter requests awaiting verification
+  const qcQueue = requests.filter(r => r.status === "report_uploaded");
   
   // Filter recently verified logs
-  const auditLogs = requests.filter(r => r.status === "Completed" && r.verifiedBy);
+  const auditLogs = requests.filter(r => r.status === "verified" || r.status === "completed");
 
   const filteredLogs = auditLogs.filter(r => 
     r.patientName.toLowerCase().includes(search.toLowerCase()) || 
-    r.sampleId?.toLowerCase().includes(search.toLowerCase())
+    r._id.toLowerCase().includes(search.toLowerCase())
   );
+
+  if (isLoading) {
+    return (
+      <div className="flex h-48 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-navy-700 border-t-transparent"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Quality Control (QC)</h1>
-        <p className="text-sm text-slate-500">Perform secondary clinical verification of test assay results before report publishing.</p>
+        <h1 className="text-2xl font-bold text-slate-900">Quality Control (QC) Verification</h1>
+        <p className="text-sm text-slate-500">Perform secondary clinical verification of test observations and uploaded documents before publication.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -125,12 +89,13 @@ export function LaboratoryQualityControl() {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-sm text-slate-800">{req.patientName}</span>
-                      <Badge tone={req.results?.some(res => res.status === "critical" || res.status === "high") ? "danger" : "neutral"}>
-                        {req.results?.some(res => res.status === "critical" || res.status === "high") ? "ABNORMAL VALUE" : "NORMAL VALUE"}
+                      <Badge tone={req.requestType === "Laboratory" ? "info" : "warning"}>{req.requestType}</Badge>
+                      <Badge tone={req.priority === "STAT" ? "danger" : req.priority === "Urgent" ? "warning" : "neutral"}>
+                        {req.priority}
                       </Badge>
                     </div>
                     <div className="text-xs text-slate-500 mt-1">
-                      Assays: {req.tests.join(", ")} | Sample ID: {req.sampleId}
+                      Assays/Modality: {req.tests.join(", ")} | Req ID: {req._id.toUpperCase()}
                     </div>
                   </div>
                   <Button 
@@ -151,10 +116,10 @@ export function LaboratoryQualityControl() {
         {/* Right: Quality Policies */}
         <Card>
           <h3 className="mb-3 text-sm font-semibold text-slate-700">QC Guidelines</h3>
-          <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
-            <p>• **Critical Value Check:** Call the ordering physician immediately for any values marked **CRITICAL** (e.g. Hemoglobin &lt; 7.0 g/dL).</p>
+          <div className="space-y-3 text-xs text-slate-650 leading-relaxed">
+            <p>• **Verify Report Files:** Pathologist or supervisor reviews technical observations and uploaded documents for accuracy.</p>
             <p>• **Repeat Criteria:** If values are biochemically implausible compared to prior results, reject and request a test repeat.</p>
-            <p>• **Approval Sign-off:** Only certified Lab Directors and senior pathologists may authorize report verification.</p>
+            <p>• **Release Protocol:** Verified reports remain in the `VERIFIED` state and are queued for publishing to patients and doctors.</p>
           </div>
         </Card>
       </div>
@@ -167,7 +132,7 @@ export function LaboratoryQualityControl() {
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search patient, sample ID..."
+              placeholder="Search patient, request ID..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-lg border border-slate-350 bg-slate-50 pl-9 pr-4 py-2 text-xs outline-none focus:border-blue-500 focus:bg-white"
@@ -182,20 +147,24 @@ export function LaboratoryQualityControl() {
             emptyMessage="No audit logs recorded."
             columns={[
               {
-                header: "Sample ID",
-                render: (r) => <span className="font-mono text-xs font-bold text-slate-700">{r.sampleId}</span>
+                header: "Request ID",
+                render: (r) => <span className="font-mono text-xs font-bold text-slate-700">{r._id.toUpperCase()}</span>
+              },
+              {
+                header: "Request Type",
+                render: (r) => (
+                  <Badge tone={r.requestType === "Laboratory" ? "info" : "warning"}>
+                    {r.requestType}
+                  </Badge>
+                )
               },
               {
                 header: "Patient",
                 render: (r) => <span className="font-semibold text-slate-800">{r.patientName}</span>
               },
               {
-                header: "Verified By",
-                render: (r) => <span className="text-xs font-medium text-slate-700">{r.verifiedBy}</span>
-              },
-              {
-                header: "Verification Time",
-                render: (r) => <span className="text-xs text-slate-500">{r.verificationTime}</span>
+                header: "Date",
+                render: (r) => <span className="text-xs text-slate-500">{new Date(r.date).toLocaleDateString()}</span>
               },
               {
                 header: "Tests",
@@ -204,8 +173,8 @@ export function LaboratoryQualityControl() {
               {
                 header: "Status",
                 render: (r) => (
-                  <Badge tone="success">
-                    RELEASED
+                  <Badge tone={r.status === "completed" ? "success" : "info"}>
+                    {r.status.toUpperCase()}
                   </Badge>
                 )
               }
@@ -222,48 +191,24 @@ export function LaboratoryQualityControl() {
           onClose={() => setIsVerifyOpen(false)}
         >
           <div className="space-y-4">
-            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 grid grid-cols-2 gap-2 text-xs">
               <div>
                 <span className="block text-slate-400">Patient:</span>
                 <span className="font-bold text-slate-800">{selectedReq.patientName} ({selectedReq.patientAge}Y / {selectedReq.patientGender})</span>
               </div>
               <div>
-                <span className="block text-slate-400">Sample ID:</span>
-                <span className="font-mono font-bold text-slate-800">{selectedReq.sampleId}</span>
+                <span className="block text-slate-400">Request ID:</span>
+                <span className="font-mono font-bold text-slate-800">{selectedReq._id.toUpperCase()}</span>
               </div>
               <div>
-                <span className="block text-slate-400">Collector Remarks:</span>
-                <span className="text-slate-600">{selectedReq.comments || "None"}</span>
+                <span className="block text-slate-400">Request Type:</span>
+                <span className="font-semibold text-slate-800">{selectedReq.requestType}</span>
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-400 text-xs uppercase">
-                    <th className="pb-2 text-left font-semibold">Parameter</th>
-                    <th className="pb-2 text-left font-semibold">Value</th>
-                    <th className="pb-2 text-left font-semibold">Reference Range</th>
-                    <th className="pb-2 text-left font-semibold">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedReq.results?.map((res, i) => (
-                    <tr key={i} className={`border-b border-slate-100 hover:bg-slate-50 ${res.status === "high" || res.status === "critical" ? "bg-red-50/40" : ""}`}>
-                      <td className="py-2.5 font-medium text-slate-800">{res.parameter}</td>
-                      <td className={`py-2.5 font-bold ${res.status === "high" || res.status === "critical" ? "text-red-600" : "text-slate-800"}`}>
-                        {res.value}
-                      </td>
-                      <td className="py-2.5 text-slate-500 text-xs">{res.refRange}</td>
-                      <td className="py-2.5">
-                        <Badge tone={res.status === "normal" ? "success" : res.status === "critical" ? "danger" : "warning"}>
-                          {res.status.toUpperCase()}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-150 text-xs">
+              <span className="block text-slate-400 font-bold uppercase mb-1">Observations:</span>
+              <p className="text-slate-800 font-medium whitespace-pre-wrap">Pending observations query (Review report files below)</p>
             </div>
 
             <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
@@ -277,10 +222,10 @@ export function LaboratoryQualityControl() {
                 Reject & Repeat
               </Button>
               <Button 
-                onClick={() => handleApprove(selectedReq._id)} 
+                onClick={() => handleVerify(selectedReq._id)} 
                 className="bg-green-600 hover:bg-green-700 flex items-center gap-1"
               >
-                <Check className="h-4 w-4" /> Approve & Release Report
+                <Check className="h-4 w-4" /> Approve & Verify Report
               </Button>
             </div>
           </div>

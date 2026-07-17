@@ -10,6 +10,7 @@ const dbNotificationSchema = new Schema(
     severity: { type: String, enum: ["info", "warning", "critical"], default: "info" },
     recipientRole: { type: String, required: true },
     recipientDoctor: { type: Schema.Types.ObjectId, ref: "Doctor", default: null },
+    recipientPatient: { type: Schema.Types.ObjectId, ref: "Patient", default: null },
     isRead: { type: Boolean, default: false },
     data: { type: Schema.Types.Mixed, default: null },
   },

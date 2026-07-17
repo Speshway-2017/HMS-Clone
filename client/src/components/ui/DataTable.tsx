@@ -11,16 +11,20 @@ interface DataTableProps<T> {
   rows: T[];
   rowKey: (row: T) => string;
   emptyMessage?: string;
+  dense?: boolean;
 }
 
-export function DataTable<T>({ columns, rows, rowKey, emptyMessage = "No records found." }: DataTableProps<T>) {
+export function DataTable<T>({ columns, rows, rowKey, emptyMessage = "No records found.", dense }: DataTableProps<T>) {
+  const paddingClass = dense ? "px-3 py-1.5" : "px-4 py-3";
+  const headerPaddingClass = dense ? "px-3 py-2" : "px-4 py-3";
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
             {columns.map((col) => (
-              <th key={col.header} className="px-4 py-3">
+              <th key={col.header} className={`${headerPaddingClass} ${col.className ?? ""}`}>
                 {col.header}
               </th>
             ))}
@@ -37,7 +41,7 @@ export function DataTable<T>({ columns, rows, rowKey, emptyMessage = "No records
             rows.map((row) => (
               <tr key={rowKey(row)} className="hover:bg-slate-50">
                 {columns.map((col) => (
-                  <td key={col.header} className={`px-4 py-3 ${col.className ?? ""}`}>
+                  <td key={col.header} className={`${paddingClass} ${col.className ?? ""}`}>
                     {col.render(row)}
                   </td>
                 ))}

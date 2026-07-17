@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ScanLine, AlertTriangle, CheckCircle2, Clock, ZoomIn } from "lucide-react";
+import { ScanLine, AlertTriangle, CheckCircle2, Clock, ZoomIn, Eye, Download } from "lucide-react";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { KpiCard } from "../../components/ui/KpiCard";
@@ -9,7 +9,13 @@ import { useRadiologyOrders } from "../../features/doctorDashboard";
 const MODALITIES = ["All", "X-Ray", "MRI", "CT Scan", "Ultrasound", "ECG", "Echocardiography"];
 
 const STATUS_TONE: Record<string, "success" | "danger" | "warning" | "neutral" | "info"> = {
-  normal: "success", abnormal: "danger", pending: "neutral",
+  pending: "neutral",
+  accepted: "info",
+  processing: "warning",
+  report_uploaded: "warning",
+  verified: "info",
+  completed: "success",
+  rejected: "danger",
 };
 
 const MODALITY_COLOR: Record<string, string> = {
@@ -32,6 +38,7 @@ export function RadiologyPage() {
   // Construct dynamic radiology reports from database patient orders
   const radiologyReports = orders.map((o: any) => {
     const isCompleted = o.status === "completed";
+    const reportUploaded = o.status === "report_uploaded" || o.status === "verified" || o.status === "completed";
     const type = o.type === "CT" ? "CT Scan" : o.type === "X-ray" ? "X-Ray" : o.type;
 
     return {
@@ -41,12 +48,14 @@ export function RadiologyPage() {
       age: o.patient?.age || 35,
       date: new Date(o.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
       region: o.notes || "Standard view",
-      status: isCompleted ? "normal" : "pending",
+      status: o.status,
       priority: o.priority?.toLowerCase() || "routine",
-      finding: o.findings || "Pending review by radiologist.",
-      impression: isCompleted ? "Normal imaging studies." : "Pending.",
-      radiologist: "Dr. K. Nair",
-      approved: isCompleted,
+      finding: o.report?.observations || (reportUploaded ? "Report uploaded. Review documents below." : "Pending review by radiologist."),
+      impression: o.report?.remarks || (reportUploaded ? "Report uploaded. Review remarks." : "Pending."),
+      radiologist: o.report?.uploadedBy?.name || "Dr. K. Nair",
+      approved: isCompleted || o.status === "verified",
+      files: o.report?.files || [],
+      reportId: o.report?._id || "",
     };
   });
 
@@ -191,6 +200,37 @@ export function RadiologyPage() {
                   <p className="text-xs font-semibold uppercase text-slate-400 mb-2">Impression</p>
                   <p className="text-sm text-slate-700 font-medium">{selectedReport.impression}</p>
                 </div>
+
+                {selectedReport.files && selectedReport.files.length > 0 && (
+                  <div className="mt-2 rounded-lg bg-slate-50 p-3 col-span-2 space-y-2">
+                    <p className="text-xs font-semibold uppercase text-slate-400">Attached Reports & Scans ({selectedReport.files.length})</p>
+                    <div className="flex flex-col gap-2">
+                      {selectedReport.files.map((file: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-2.5 text-xs">
+                          <span className="font-semibold text-slate-700 truncate max-w-[250px]">{file.original_filename}</span>
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={file.secure_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 hover:underline text-blue-700 font-bold"
+                            >
+                              <Eye className="h-3.5 w-3.5" /> View Scan
+                            </a>
+                            <a
+                              href={`/api/v1/diagnostic-reports/${selectedReport.reportId}/download?token=${sessionStorage.getItem("hms_token") || ""}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 hover:underline text-green-700 font-bold ml-2"
+                            >
+                              <Download className="h-3.5 w-3.5" /> Download
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {!selectedReport.approved && (
