@@ -680,13 +680,22 @@ export const getPatientReports = catchAsync(async (req: Request, res: Response) 
     hospital: hospitalId,
     patient: patientId,
     status: { $in: ["report_uploaded", "verified", "completed"] }
-  }).populate("uploadedBy", "name");
+  })
+    .sort({ uploadedAt: -1 })
+    .populate("uploadedBy", "name")
+    .populate("doctor", "name title")
+    .populate("appointment", "referenceId date time type chiefComplaint diagnosis");
 
   if (req.user!.role === "doctor") {
     const doctor = await Doctor.findOne({ email: req.user!.email });
     if (!doctor) throw new AppError("Doctor profile not found.", 404);
 
-    const authorizedReports = reports.filter(r => r.doctor.toString() === doctor._id.toString());
+    const docIdStr = doctor._id.toString();
+    const authorizedReports = reports.filter(r => {
+      if (!r.doctor) return false;
+      const repDocId = (r.doctor as any)._id ? (r.doctor as any)._id.toString() : r.doctor.toString();
+      return repDocId === docIdStr;
+    });
     return res.json({ status: "success", data: authorizedReports });
   }
 

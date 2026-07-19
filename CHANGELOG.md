@@ -5,6 +5,20 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 ### Added
+- **Consultation-Based Grouping & Last Consultation Distinction across Doctor & Receptionist Consoles:**
+  - **Doctor Patient Records (`pages/doctor/PatientRecordsPage.tsx`)**:
+    - Grouped Lab Reports and Radiology Reports by consultation appointment/session in reverse-chronological order.
+    - Prominently highlighted the most recent consultation with an emerald **`LAST CONSULTATION`** badge, green gradient ring accent, appointment reference ID, doctor name, and complaint notes, while tagging older consultations with **`PREVIOUS CONSULTATION`** badges.
+    - Updated backend `getPatientReports` in `controllers/laboratoryController.ts` to populate `appointment` (`referenceId`, `date`, `time`, `chiefComplaint`, `diagnosis`) and `doctor` details.
+  - **Receptionist Patient Profile Console (`pages/receptionist/PatientManagement.tsx`)**:
+    - Grouped **Medical History Ledger** entries by consultation session (`groupHistoryByConsultation`) in reverse-chronological order, featuring a **`LAST CONSULTATION`** badge on top and **`PREVIOUS CONSULTATION`** badges below.
+    - Grouped **Prescription History** entries by consultation session (`groupPrescriptionsByConsultation`) in reverse-chronological order, featuring a **`LAST CONSULTATION`** badge on top and **`PREVIOUS CONSULTATION`** badges below.
+    - Replaced static Reports Tab placeholder text with live query fetching (`usePatientReports`), categorized by Laboratory and Radiology, grouped by consultation with **`LAST CONSULTATION`** highlights, and added an interactive Detailed Investigation Report modal.
+
+### Fixed
+- **Revisit Expiry Limitation Guard (`pages/receptionist/Appointments.tsx`)**: Fixed the OP consultation fee calculation on the frontend (`isWithinRevisitWindow`) to compute the expiry cutoff relative to the **selected appointment date** being booked rather than today's date. This ensures consultation fees (e.g. for revisits past the 10-day limit) are correctly populated in the Booking Summary.
+- **Interactive Calendar Booking View (`pages/receptionist/Appointments.tsx`)**: Replaced the static calendar mock placeholder in the Calendar View tab with a fully dynamic calendar. Added month navigation (prev/next month), aligned first days of the week, loaded real month-scoped appointments, and added a detailed appointments list modal with check-in/action options for clicked days.
+
 - **Accountant Dashboard module, all 20 screens/views implemented end-to-end:**
   - Added new pages: `Dashboard.tsx`, `BillingPage.tsx`, `PaymentsPage.tsx`, `ClaimsPage.tsx`, `PayrollPage.tsx`, `ExpensesPage.tsx`, `AnalyticsPage.tsx`, `AuditLogsPage.tsx`, and a custom `SettingsPage.tsx` under `client/src/pages/accountant/`.
   - Expanded frontend routes under `/accountant` inside `client/src/router.tsx` to mount all 9 pages.

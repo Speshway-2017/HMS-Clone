@@ -25,7 +25,9 @@ import {
   FlaskConical,
   Scan,
   Pill,
-  Receipt
+  Receipt,
+  Eye,
+  Download
 } from "lucide-react";
 import {
   useRegisterPatient,
@@ -40,12 +42,169 @@ import {
 } from "../../features/receptionist";
 import { usePrescriptions } from "../../features/doctorDashboard";
 import { useInvoices } from "../../features/invoices";
+import { usePatientReports } from "../../features/laboratory";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
 import { Pagination } from "../../components/ui/Pagination";
+import { Modal } from "../../components/ui/Modal";
 import { formatINR } from "../../lib/currency";
+
+interface HistoryGroup {
+  id: string;
+  date: Date;
+  dateFormatted: string;
+  doctorName?: string;
+  department?: string;
+  entries: any[];
+}
+
+function groupHistoryByConsultation(historyList: any[]): HistoryGroup[] {
+  if (!historyList || historyList.length === 0) return [];
+
+  const map = new Map<string, HistoryGroup>();
+
+  historyList.forEach((item) => {
+    const dateVal = item.date ? new Date(item.date) : new Date();
+    const dateStr = dateVal.toLocaleDateString("en-IN");
+    const docName = item.doctorName || "Attending Doctor";
+    const key = `hist-${dateStr}-${docName}`;
+
+    if (!map.has(key)) {
+      map.set(key, {
+        id: key,
+        date: dateVal,
+        dateFormatted: dateVal.toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        }),
+        doctorName: item.doctorName,
+        department: item.department,
+        entries: [],
+      });
+    }
+
+    const group = map.get(key)!;
+    group.entries.push(item);
+    if (!group.doctorName && item.doctorName) group.doctorName = item.doctorName;
+    if (!group.department && item.department) group.department = item.department;
+  });
+
+  return Array.from(map.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
+}
+
+interface PrescriptionGroup {
+  id: string;
+  date: Date;
+  dateFormatted: string;
+  doctorName?: string;
+  prescriptions: any[];
+}
+
+function groupPrescriptionsByConsultation(rxList: any[]): PrescriptionGroup[] {
+  if (!rxList || rxList.length === 0) return [];
+
+  const map = new Map<string, PrescriptionGroup>();
+
+  rxList.forEach((rx) => {
+    let key = "";
+    let dateVal: Date;
+    let docName: string | undefined = rx.doctor?.name;
+
+    if (rx.appointment && typeof rx.appointment === "object" && rx.appointment._id) {
+      key = `rx-app-${rx.appointment._id}`;
+      dateVal = new Date(rx.appointment.date || rx.createdAt);
+      if (rx.appointment.doctor?.name) docName = rx.appointment.doctor.name;
+    } else {
+      dateVal = rx.createdAt ? new Date(rx.createdAt) : new Date();
+      const dateStr = dateVal.toLocaleDateString("en-IN");
+      key = `rx-date-${dateStr}-${docName || ""}`;
+    }
+
+    if (!map.has(key)) {
+      map.set(key, {
+        id: key,
+        date: dateVal,
+        dateFormatted: dateVal.toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        }),
+        doctorName: docName,
+        prescriptions: [],
+      });
+    }
+
+    const group = map.get(key)!;
+    group.prescriptions.push(rx);
+    if (!group.doctorName && docName) group.doctorName = docName;
+  });
+
+  return Array.from(map.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
+}
+
+interface ReportConsultationGroup {
+  id: string;
+  date: Date;
+  dateFormatted: string;
+  appointmentRef?: string;
+  chiefComplaint?: string;
+  doctorName?: string;
+  reports: any[];
+}
+
+function groupReportsByConsultation(reportsList: any[]): ReportConsultationGroup[] {
+  if (!reportsList || reportsList.length === 0) return [];
+
+  const map = new Map<string, ReportConsultationGroup>();
+
+  reportsList.forEach((r) => {
+    let key = "";
+    let dateObj: Date;
+    let ref: string | undefined;
+    let complaint: string | undefined;
+    let docName: string | undefined;
+
+    if (r.appointment && typeof r.appointment === "object" && (r.appointment._id || r.appointment.referenceId)) {
+      key = r.appointment._id ? r.appointment._id.toString() : r.appointment.referenceId;
+      dateObj = new Date(r.appointment.date || r.uploadedAt || r.createdAt);
+      ref = r.appointment.referenceId;
+      complaint = r.appointment.chiefComplaint || r.appointment.diagnosis;
+      docName = r.appointment.doctor?.name || (r.doctor && typeof r.doctor === "object" ? r.doctor.name : undefined);
+    } else {
+      const dateVal = r.uploadedAt || r.createdAt;
+      const uploadDateStr = dateVal ? new Date(dateVal).toLocaleDateString("en-IN") : "Unknown Date";
+      key = `date-${uploadDateStr}`;
+      dateObj = dateVal ? new Date(dateVal) : new Date();
+      docName = r.doctor && typeof r.doctor === "object" ? r.doctor.name : r.uploadedBy?.name;
+    }
+
+    if (!map.has(key)) {
+      map.set(key, {
+        id: key,
+        date: dateObj,
+        dateFormatted: dateObj.toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric"
+        }),
+        appointmentRef: ref,
+        chiefComplaint: complaint,
+        doctorName: docName,
+        reports: [],
+      });
+    }
+
+    const group = map.get(key)!;
+    group.reports.push(r);
+    if (!group.doctorName && docName) group.doctorName = docName;
+    if (!group.chiefComplaint && complaint) group.chiefComplaint = complaint;
+  });
+
+  return Array.from(map.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
+}
 
 // Zod Validation Schema with Preprocess to convert age safely and avoid NaN errors
 const registerSchema = z.object({
@@ -132,6 +291,9 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
   const { data: prescriptions } = usePrescriptions(patient?._id ? { patient: patient._id } : undefined);
   const { data: billsData } = useInvoices(patient?._id ? { patient: patient._id } : {});
   const { data: previousAdmissions } = useAdmissions(patient?._id ? { status: "discharged", patientId: patient._id } : undefined);
+  const { data: reports = [], isLoading: reportsLoading } = usePatientReports(patient?._id);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const selectedReport = reports?.find((r: any) => r._id === selectedReportId) || null;
 
   // Convert OP to IP specific hooks
   const { data: rooms } = useRoomsAvailability();
@@ -733,65 +895,175 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
               </div>
 
               {/* TAB 1: MEDICAL HISTORY */}
-              {profileTab === "history" && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 pb-2 border-b border-slate-100">
-                    <History className="h-4.5 w-4.5 text-navy-700" /> Medical History Ledger
-                  </h3>
-                  {patient.medicalHistory && patient.medicalHistory.length > 0 ? (
-                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
-                      {patient.medicalHistory.map((item: any, i: number) => (
-                        <div key={i} className="border border-slate-100 rounded-xl p-3 bg-slate-50 relative">
-                          <div className="flex justify-between items-start">
-                            <div className="font-semibold text-slate-800 text-xs">{item.visitType}</div>
-                            <span className="text-[10px] text-slate-400">{new Date(item.date).toLocaleDateString()}</span>
-                          </div>
-                          <p className="text-xs text-slate-600 mt-1.5"><span className="font-semibold">Diagnosis:</span> {item.diagnosis}</p>
-                          <p className="text-[10px] text-slate-455 mt-1"><span className="font-medium text-slate-500">Doctor:</span> {item.doctorName} ({item.department})</p>
-                        </div>
-                      ))}
+              {profileTab === "history" && (() => {
+                const historyGroups = groupHistoryByConsultation(patient.medicalHistory || []);
+
+                return (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                      <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                        <History className="h-4.5 w-4.5 text-navy-700" /> Medical History Ledger
+                      </h3>
+                      <span className="text-xs text-slate-400">
+                        {(patient.medicalHistory || []).length} records across {historyGroups.length} consultations
+                      </span>
                     </div>
-                  ) : (
-                    <p className="text-xs text-slate-400 italic py-4">No medical history logged for this patient file.</p>
-                  )}
-                </div>
-              )}
+
+                    {historyGroups.length > 0 ? (
+                      <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
+                        {historyGroups.map((group, groupIdx) => {
+                          const isLatest = groupIdx === 0;
+                          return (
+                            <div
+                              key={group.id}
+                              className={`rounded-xl border p-3.5 transition-all ${
+                                isLatest
+                                  ? "border-emerald-300/80 bg-gradient-to-r from-emerald-50/40 via-slate-50 to-white shadow-sm ring-1 ring-emerald-200/50"
+                                  : "border-slate-200 bg-slate-50/30"
+                              }`}
+                            >
+                              {/* Consultation Header */}
+                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2 mb-2.5">
+                                <div className="flex items-center gap-2">
+                                  {isLatest ? (
+                                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-sm">
+                                      <Activity className="h-3 w-3" /> Last Consultation
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 rounded-md bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-700">
+                                      Previous Consultation
+                                    </span>
+                                  )}
+                                  <span className="text-xs font-bold text-slate-800">
+                                    {group.dateFormatted}
+                                  </span>
+                                </div>
+                                {group.doctorName && (
+                                  <span className="text-[11px] text-slate-500">
+                                    Doctor: <strong className="text-slate-700">Dr. {group.doctorName}</strong> {group.department && `(${group.department})`}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Consultation Records/Entries */}
+                              <div className="space-y-2">
+                                {group.entries.map((item: any, i: number) => (
+                                  <div key={i} className="border border-slate-100 rounded-lg p-2.5 bg-white space-y-1 text-xs">
+                                    <div className="flex justify-between items-center">
+                                      <span className="font-semibold text-slate-800 text-xs flex items-center gap-1.5">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-navy-600"></span>
+                                        {item.visitType || "Medical Record"}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400">{new Date(item.date).toLocaleDateString()}</span>
+                                    </div>
+                                    {item.diagnosis && (
+                                      <p className="text-xs text-slate-600"><span className="font-semibold text-slate-700">Diagnosis:</span> {item.diagnosis}</p>
+                                    )}
+                                    {item.notes && (
+                                      <p className="text-xs text-slate-500 italic"><span className="font-semibold text-slate-600">Notes:</span> {item.notes}</p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic py-4">No medical history logged for this patient file.</p>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* TAB 2: PRESCRIPTIONS */}
-              {profileTab === "prescriptions" && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 pb-2 border-b border-slate-100">
-                    <Pill className="h-4.5 w-4.5 text-navy-700" /> Prescription History
-                  </h3>
-                  {prescriptions && prescriptions.length > 0 ? (
-                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
-                      {prescriptions.map((rx: any) => (
-                        <div key={rx._id} className="border border-slate-100 rounded-xl p-3 bg-slate-50 space-y-2">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <span className="font-semibold text-slate-800 text-xs">Rx Code: {rx.prescriptionNumber || rx._id.substring(18)}</span>
-                              <span className="text-[10px] text-slate-400 block">Doctor: Dr. {rx.doctor?.name || "Attending Doctor"}</span>
-                            </div>
-                            <span className="text-[10px] text-slate-400">{new Date(rx.createdAt).toLocaleDateString()}</span>
-                          </div>
-                          <div className="bg-white p-2 rounded border border-slate-100">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase">Medicines</span>
-                            <ul className="list-disc pl-4 space-y-0.5 text-xs text-slate-700 mt-1">
-                              {rx.medicines?.map((m: any, idx: number) => (
-                                <li key={idx}>
-                                  <span className="font-semibold">{m.name}</span> {m.strength && `(${m.strength})`} — {m.dosage} ({m.frequency} for {m.duration})
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-                      ))}
+              {profileTab === "prescriptions" && (() => {
+                const rxGroups = groupPrescriptionsByConsultation(prescriptions || []);
+
+                return (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                      <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                        <Pill className="h-4.5 w-4.5 text-navy-700" /> Prescription History
+                      </h3>
+                      <span className="text-xs text-slate-400">
+                        {(prescriptions || []).length} rx across {rxGroups.length} consultations
+                      </span>
                     </div>
-                  ) : (
-                    <p className="text-xs text-slate-400 italic py-4">No prescriptions issued for this patient.</p>
-                  )}
-                </div>
-              )}
+
+                    {rxGroups.length > 0 ? (
+                      <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
+                        {rxGroups.map((group, groupIdx) => {
+                          const isLatest = groupIdx === 0;
+                          return (
+                            <div
+                              key={group.id}
+                              className={`rounded-xl border p-3.5 transition-all ${
+                                isLatest
+                                  ? "border-emerald-300/80 bg-gradient-to-r from-emerald-50/40 via-blue-50/20 to-white shadow-sm ring-1 ring-emerald-200/50"
+                                  : "border-slate-200 bg-slate-50/30"
+                              }`}
+                            >
+                              {/* Consultation Header */}
+                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2 mb-2.5">
+                                <div className="flex items-center gap-2">
+                                  {isLatest ? (
+                                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-sm">
+                                      <Pill className="h-3 w-3" /> Last Consultation
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 rounded-md bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-700">
+                                      Previous Consultation
+                                    </span>
+                                  )}
+                                  <span className="text-xs font-bold text-slate-800">
+                                    {group.dateFormatted}
+                                  </span>
+                                </div>
+                                {group.doctorName && (
+                                  <span className="text-[11px] text-slate-500">
+                                    Doctor: <strong className="text-slate-700">Dr. {group.doctorName}</strong>
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Prescriptions in this consultation */}
+                              <div className="space-y-3">
+                                {group.prescriptions.map((rx: any) => (
+                                  <div key={rx._id} className="border border-slate-200/80 rounded-xl p-3 bg-white space-y-2">
+                                    <div className="flex justify-between items-start">
+                                      <div>
+                                        <span className="font-semibold text-slate-800 text-xs">Rx Code: {rx.prescriptionNumber || rx._id.substring(18)}</span>
+                                        <span className="text-[10px] text-slate-400 block">Doctor: Dr. {rx.doctor?.name || group.doctorName || "Attending Doctor"}</span>
+                                      </div>
+                                      <span className="text-[10px] text-slate-400">{new Date(rx.createdAt).toLocaleDateString("en-IN")}</span>
+                                    </div>
+                                    {rx.diagnosis && (
+                                      <p className="text-xs text-slate-600"><span className="font-semibold text-slate-700">Diagnosis:</span> {rx.diagnosis}</p>
+                                    )}
+                                    <div className="bg-slate-50 p-2 rounded border border-slate-100">
+                                      <span className="text-[10px] font-bold text-slate-400 uppercase">Prescribed Medicines</span>
+                                      <ul className="list-disc pl-4 space-y-0.5 text-xs text-slate-700 mt-1">
+                                        {(rx.medicines || rx.medications)?.map((m: any, idx: number) => (
+                                          <li key={idx}>
+                                            <span className="font-semibold">{m.name}</span> {m.strength && `(${m.strength})`} — {m.dosage} ({m.frequency} for {m.duration})
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic py-4">No prescriptions issued for this patient.</p>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* TAB 3: BILLING */}
               {profileTab === "billing" && (
@@ -825,26 +1097,344 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
               )}
 
               {/* TAB 4: REPORTS */}
-              {profileTab === "reports" && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 pb-2 border-b border-slate-100">
-                    <Activity className="h-4.5 w-4.5 text-navy-700" /> Diagnostic Reports
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="border border-slate-100 rounded-xl p-4 bg-slate-50 space-y-2 text-center">
-                      <FlaskConical className="h-8 w-8 text-indigo-650 mx-auto" />
-                      <h4 className="font-bold text-xs text-slate-800">Laboratory Reports</h4>
-                      <p className="text-[10px] text-slate-400">Detailed lab results are logged inside the Laboratory module.</p>
+              {profileTab === "reports" && (() => {
+                const labReports = reports.filter((r: any) => r.requestType === "Laboratory");
+                const radReports = reports.filter((r: any) => r.requestType === "Radiology" || r.requestType === "Combined");
+
+                const labGroups = groupReportsByConsultation(labReports);
+                const radGroups = groupReportsByConsultation(radReports);
+
+                return (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                      <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                        <Activity className="h-4.5 w-4.5 text-navy-700" /> Diagnostic Reports
+                      </h3>
+                      <span className="text-xs text-slate-400">
+                        {reports.length} total report(s)
+                      </span>
                     </div>
-                    <div className="border border-slate-100 rounded-xl p-4 bg-slate-50 space-y-2 text-center">
-                      <Scan className="h-8 w-8 text-indigo-650 mx-auto" />
-                      <h4 className="font-bold text-xs text-slate-800">Radiology Studies</h4>
-                      <p className="text-[10px] text-slate-400">Imaging scan files and diagnostic reports are logged inside the Radiology module.</p>
+
+                    {reportsLoading ? (
+                      <div className="py-8 text-center text-slate-400">Loading diagnostic reports...</div>
+                    ) : reports.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic py-4">No diagnostic reports published for this patient.</p>
+                    ) : (
+                      <div className="space-y-6 max-h-[420px] overflow-y-auto pr-1">
+                        {/* Section 1: Laboratory Reports */}
+                        <div className="space-y-3">
+                          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5 border-b pb-1">
+                            <FlaskConical className="h-4 w-4 text-navy-700" /> Laboratory Reports ({labReports.length})
+                          </h4>
+                          {labGroups.length === 0 ? (
+                            <p className="text-xs text-slate-400 italic py-2">No laboratory reports on file.</p>
+                          ) : (
+                            labGroups.map((group, groupIdx) => {
+                              const isLatest = groupIdx === 0;
+                              return (
+                                <div
+                                  key={group.id}
+                                  className={`rounded-xl border p-3.5 transition-all ${
+                                    isLatest
+                                      ? "border-emerald-300/80 bg-gradient-to-r from-emerald-50/40 via-slate-50 to-white shadow-sm ring-1 ring-emerald-200/50"
+                                      : "border-slate-200 bg-slate-50/30"
+                                  }`}
+                                >
+                                  {/* Consultation Header */}
+                                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2 mb-2.5">
+                                    <div className="flex items-center gap-2">
+                                      {isLatest ? (
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-sm">
+                                          <Activity className="h-3 w-3" /> Last Consultation
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-700">
+                                          Previous Consultation
+                                        </span>
+                                      )}
+                                      <span className="text-xs font-bold text-slate-800">
+                                        {group.dateFormatted}
+                                      </span>
+                                      {group.appointmentRef && (
+                                        <span className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[10px] text-slate-600">
+                                          Ref: #{group.appointmentRef}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                                      {group.doctorName && (
+                                        <span>Doctor: <strong className="text-slate-700">Dr. {group.doctorName}</strong></span>
+                                      )}
+                                      <span className="rounded-full bg-navy-100 px-2 py-0.5 text-[10px] font-semibold text-navy-800">
+                                        {group.reports.length} {group.reports.length === 1 ? "Report" : "Reports"}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {group.chiefComplaint && (
+                                    <div className="mb-2.5 rounded-lg border border-slate-200/60 bg-white p-2 text-xs text-slate-600">
+                                      <span className="font-semibold text-slate-700">Chief Complaint / Notes:</span> {group.chiefComplaint}
+                                    </div>
+                                  )}
+
+                                  {/* Reports list */}
+                                  <div className="space-y-2.5">
+                                    {group.reports.map((r: any) => (
+                                      <div key={r._id} className="rounded-xl border border-slate-200/80 bg-white p-3 space-y-1.5 text-xs">
+                                        <div className="flex justify-between items-center border-b border-slate-100 pb-1 mb-1">
+                                          <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                            <FlaskConical className="h-3.5 w-3.5 text-navy-600" /> {r.testName}
+                                          </span>
+                                          <span className="text-[10px] text-slate-400">{new Date(r.uploadedAt || r.createdAt).toLocaleDateString("en-IN")}</span>
+                                        </div>
+                                        <p className="text-slate-600 text-[11px]"><span className="font-semibold text-slate-700">Uploaded By:</span> {r.uploadedBy?.name || "Technician"}</p>
+                                        {r.observations && (
+                                          <p className="text-slate-600 text-[11px]"><span className="font-semibold text-slate-700">Observations:</span> {r.observations}</p>
+                                        )}
+                                        {r.remarks && (
+                                          <p className="text-slate-500 italic text-[11px]"><span className="font-semibold text-slate-600">Remarks:</span> {r.remarks}</p>
+                                        )}
+                                        <div className="flex flex-wrap items-center gap-2 mt-1.5 pt-1.5 border-t border-slate-100 text-[11px]">
+                                          {r.files?.[0]?.secure_url && (
+                                            <a
+                                              href={r.files[0].secure_url}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className="inline-flex items-center gap-1 text-blue-700 hover:underline font-bold"
+                                            >
+                                              <Eye className="h-3 w-3" /> View Report
+                                            </a>
+                                          )}
+                                          <a
+                                            href={`/api/v1/diagnostic-reports/${r._id}/download?token=${sessionStorage.getItem("hms_token") || ""}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="inline-flex items-center gap-1 text-green-700 hover:underline font-bold ml-1"
+                                          >
+                                            <Download className="h-3 w-3" /> Download
+                                          </a>
+                                          <button
+                                            onClick={() => setSelectedReportId(r._id)}
+                                            className="inline-flex items-center gap-1 text-navy-700 hover:underline font-bold ml-auto bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded px-2 py-0.5 text-[10px]"
+                                          >
+                                            Details
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+
+                        {/* Section 2: Radiology Reports */}
+                        <div className="space-y-3 pt-2">
+                          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5 border-b pb-1">
+                            <Scan className="h-4 w-4 text-navy-700" /> Radiology Studies ({radReports.length})
+                          </h4>
+                          {radGroups.length === 0 ? (
+                            <p className="text-xs text-slate-400 italic py-2">No radiology reports on file.</p>
+                          ) : (
+                            radGroups.map((group, groupIdx) => {
+                              const isLatest = groupIdx === 0;
+                              return (
+                                <div
+                                  key={group.id}
+                                  className={`rounded-xl border p-3.5 transition-all ${
+                                    isLatest
+                                      ? "border-emerald-300/80 bg-gradient-to-r from-emerald-50/40 via-purple-50/20 to-white shadow-sm ring-1 ring-emerald-200/50"
+                                      : "border-slate-200 bg-slate-50/30"
+                                  }`}
+                                >
+                                  {/* Consultation Header */}
+                                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2 mb-2.5">
+                                    <div className="flex items-center gap-2">
+                                      {isLatest ? (
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-sm">
+                                          <Activity className="h-3 w-3" /> Last Consultation
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-700">
+                                          Previous Consultation
+                                        </span>
+                                      )}
+                                      <span className="text-xs font-bold text-slate-800">
+                                        {group.dateFormatted}
+                                      </span>
+                                      {group.appointmentRef && (
+                                        <span className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[10px] text-slate-600">
+                                          Ref: #{group.appointmentRef}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                                      {group.doctorName && (
+                                        <span>Doctor: <strong className="text-slate-700">Dr. {group.doctorName}</strong></span>
+                                      )}
+                                      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-800">
+                                        {group.reports.length} {group.reports.length === 1 ? "Report" : "Reports"}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {group.chiefComplaint && (
+                                    <div className="mb-2.5 rounded-lg border border-slate-200/60 bg-white p-2 text-xs text-slate-600">
+                                      <span className="font-semibold text-slate-700">Chief Complaint / Notes:</span> {group.chiefComplaint}
+                                    </div>
+                                  )}
+
+                                  {/* Reports list */}
+                                  <div className="space-y-2.5">
+                                    {group.reports.map((r: any) => (
+                                      <div key={r._id} className="rounded-xl border border-slate-200/80 bg-white p-3 space-y-1.5 text-xs">
+                                        <div className="flex justify-between items-center border-b border-slate-100 pb-1 mb-1">
+                                          <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                                            <Scan className="h-3.5 w-3.5 text-navy-600" /> {r.testName}
+                                          </span>
+                                          <span className="text-[10px] text-slate-400">{new Date(r.uploadedAt || r.createdAt).toLocaleDateString("en-IN")}</span>
+                                        </div>
+                                        <p className="text-slate-650 text-[11px]"><span className="font-semibold text-slate-700">Uploaded By:</span> {r.uploadedBy?.name || "Radiologist"}</p>
+                                        {r.observations && (
+                                          <p className="text-slate-600 text-[11px]"><span className="font-semibold text-slate-700">Findings:</span> {r.observations}</p>
+                                        )}
+                                        {r.remarks && (
+                                          <p className="text-slate-500 italic text-[11px]"><span className="font-semibold text-slate-600">Remarks:</span> {r.remarks}</p>
+                                        )}
+                                        <div className="flex flex-wrap items-center gap-2 mt-1.5 pt-1.5 border-t border-slate-100 text-[11px]">
+                                          {r.files?.[0]?.secure_url && (
+                                            <a
+                                              href={r.files[0].secure_url}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className="inline-flex items-center gap-1 text-blue-700 hover:underline font-bold"
+                                            >
+                                              <Eye className="h-3 w-3" /> View Report
+                                            </a>
+                                          )}
+                                          <a
+                                            href={`/api/v1/diagnostic-reports/${r._id}/download?token=${sessionStorage.getItem("hms_token") || ""}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="inline-flex items-center gap-1 text-green-700 hover:underline font-bold ml-1"
+                                          >
+                                            <Download className="h-3 w-3" /> Download
+                                          </a>
+                                          <button
+                                            onClick={() => setSelectedReportId(r._id)}
+                                            className="inline-flex items-center gap-1 text-navy-700 hover:underline font-bold ml-auto bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded px-2 py-0.5 text-[10px]"
+                                          >
+                                            Details
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </Card>
+
+            {/* Detailed Report Modal */}
+            {selectedReport && (
+              <Modal
+                title={`${selectedReport.requestType} Investigation Report`}
+                isOpen={!!selectedReportId}
+                onClose={() => setSelectedReportId(null)}
+              >
+                <div className="space-y-4">
+                  {/* Patient Info */}
+                  <div className="grid grid-cols-2 gap-4 rounded-xl bg-slate-50 p-4 text-xs border border-slate-200">
+                    <div>
+                      <p className="font-semibold text-slate-400 uppercase">Patient Name</p>
+                      <p className="text-sm font-bold text-slate-800 mt-0.5">{patient?.name || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-400 uppercase">UHID</p>
+                      <p className="text-sm font-mono text-slate-800 mt-0.5">{patient?.uhid || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-400 uppercase">Age / Gender</p>
+                      <p className="text-sm font-medium text-slate-800 mt-0.5">
+                        {patient?.age ? `${patient.age} Yrs` : "—"} / {patient?.gender || "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-400 uppercase">Ordering Doctor</p>
+                      <p className="text-sm font-medium text-slate-800 mt-0.5">Dr. {selectedReport.doctor?.name || "Attending Doctor"}</p>
                     </div>
                   </div>
+
+                  {/* Investigation Details */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Investigation Details</p>
+                    <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 text-xs space-y-1.5">
+                      <div>
+                        <span className="text-slate-400 font-semibold">Test Name:</span> <span className="font-bold text-slate-800">{selectedReport.testName}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-semibold">Status:</span> <span className="font-bold uppercase text-emerald-700">{selectedReport.status}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-semibold">Date:</span> <span className="font-medium text-slate-700">{new Date(selectedReport.uploadedAt).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Findings & Remarks */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-1">
+                      <span className="font-bold text-slate-400 uppercase">Findings / Observations</span>
+                      <p className="text-slate-700 font-medium whitespace-pre-wrap">{selectedReport.observations || "No findings recorded."}</p>
+                    </div>
+                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-1">
+                      <span className="font-bold text-slate-400 uppercase">Technical Remarks</span>
+                      <p className="text-slate-600 italic whitespace-pre-wrap">{selectedReport.remarks || "No technical remarks."}</p>
+                    </div>
+                  </div>
+
+                  {/* Attachments */}
+                  {selectedReport.files && selectedReport.files.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Attached Files ({selectedReport.files.length})</p>
+                      <div className="flex flex-col gap-2">
+                        {selectedReport.files.map((file: any, index: number) => (
+                          <div key={index} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-2.5 text-xs">
+                            <span className="font-semibold text-slate-700 truncate max-w-[250px]">{file.original_filename}</span>
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={file.secure_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 hover:underline text-blue-700 font-bold"
+                              >
+                                <Eye className="h-3.5 w-3.5" /> View Report
+                              </a>
+                              <a
+                                href={`/api/v1/diagnostic-reports/${selectedReport._id}/download?token=${sessionStorage.getItem("hms_token") || ""}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 hover:underline text-green-700 font-bold ml-2"
+                              >
+                                <Download className="h-3.5 w-3.5" /> Download
+                              </a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </Card>
+              </Modal>
+            )}
 
             <Card className="space-y-4">
               <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
