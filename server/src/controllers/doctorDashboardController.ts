@@ -229,7 +229,7 @@ export const getInpatients = catchAsync(async (req: Request, res: Response) => {
 export const addInpatientNotes = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const patientId = req.params.id;
-  const { notes, diagnosis } = req.body;
+  const { notes, diagnosis, plan } = req.body;
   const doctor = await getLoggedDoctor(req);
 
   // Hardened validation: Verify patient has active admission under this doctor
@@ -244,6 +244,41 @@ export const addInpatientNotes = catchAsync(async (req: Request, res: Response) 
     throw new AppError("You do not have authorization to add inpatient notes for this patient.", 403);
   }
 
+  // Calculate admission day
+  const admissionDate = new Date(activeAdmission.admissionDate);
+  const diffTime = Math.abs(new Date().getTime() - admissionDate.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const admissionDay = Math.max(1, diffDays);
+
+  const currentTime = new Date().toTimeString().split(" ")[0].substring(0, 5);
+
+  const progressNoteItem = {
+    doctor: doctor._id,
+    doctorName: doctor.name,
+    date: new Date(),
+    time: currentTime,
+    admissionDay,
+    assessment: diagnosis || "Inpatient Round",
+    plan: plan || "",
+    notes: notes || "Stable."
+  };
+
+  // 1. Push progress notes to Admission record
+  activeAdmission.progressNotes.push(progressNoteItem);
+
+  // 2. Add to timeline
+  activeAdmission.timeline.push({
+    date: new Date(),
+    time: currentTime,
+    userName: doctor.name,
+    userRole: "doctor",
+    eventType: "progress_note",
+    description: `Progress note added by Dr. ${doctor.name}: ${diagnosis || "Inpatient Round"}. Notes: ${notes}`
+  });
+
+  await activeAdmission.save();
+
+  // 3. Keep in Patient medicalHistory for global timeline
   const patient = await Patient.findOneAndUpdate(
     { _id: patientId, hospital: hospitalId },
     {
@@ -253,7 +288,7 @@ export const addInpatientNotes = catchAsync(async (req: Request, res: Response) 
             {
               date: new Date(),
               visitType: "Inpatient Rounds Note",
-              doctorName: req.user!.name,
+              doctorName: doctor.name,
               diagnosis: diagnosis || "Inpatient Round",
               notes: notes || "Stable.",
               status: "Completed",
@@ -270,7 +305,7 @@ export const addInpatientNotes = catchAsync(async (req: Request, res: Response) 
     throw new AppError("Patient not found.", 404);
   }
 
-  res.json({ status: "success", data: patient });
+  res.json({ status: "success", data: activeAdmission });
 });
 
 // 5. Completed Consultations List
@@ -416,17 +451,54 @@ export const createLabOrder = catchAsync(async (req: Request, res: Response) => 
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
   const { patientId, tests, priority, appointmentId } = req.body;
+  const isApptIdValid = appointmentId && mongoose.Types.ObjectId.isValid(appointmentId);
+  const apptId = isApptIdValid ? appointmentId : null;
 
-  const labOrder = await LabOrder.create({
+  let labOrder = await LabOrder.findOne({
     hospital: hospitalId,
     patient: patientId,
     doctor: doctor._id,
-    appointment: appointmentId || null,
-    tests,
-    priority: priority || "Routine",
-    sampleStatus: "Pending",
-    status: "pending",
+    appointment: apptId,
+    status: "pending"
   });
+
+  if (labOrder) {
+    labOrder.tests = Array.from(new Set([...labOrder.tests, ...tests]));
+    if (priority === "STAT" || (priority === "Urgent" && labOrder.priority !== "STAT")) {
+      labOrder.priority = priority;
+    }
+    await labOrder.save();
+  } else {
+    labOrder = await LabOrder.create({
+      hospital: hospitalId,
+      patient: patientId,
+      doctor: doctor._id,
+      appointment: apptId,
+      tests,
+      priority: priority || "Routine",
+      sampleStatus: "Pending",
+      status: "pending",
+    });
+  }
+
+  // Record to active admission timeline
+  const activeAdmission = await Admission.findOne({
+    hospital: hospitalId,
+    patient: patientId,
+    status: "admitted"
+  });
+
+  if (activeAdmission) {
+    activeAdmission.timeline.push({
+      date: new Date(),
+      time: new Date().toTimeString().split(" ")[0].substring(0, 5),
+      userName: doctor.name,
+      userRole: "doctor",
+      eventType: "lab_request",
+      description: `Lab request created/updated: ${tests.join(", ")}`
+    });
+    await activeAdmission.save();
+  }
 
   // Also add to Patient medical history as lab requested
   await Patient.findOneAndUpdate(
@@ -869,17 +941,64 @@ export const createRadiologyOrder = catchAsync(async (req: Request, res: Respons
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
   const { patientId, type, notes, priority } = req.body;
+  const appointmentId = req.params.id;
+  const isApptIdValid = appointmentId && mongoose.Types.ObjectId.isValid(appointmentId);
+  const apptId = isApptIdValid ? appointmentId : null;
 
-  const order = await RadiologyOrder.create({
+  let order = await RadiologyOrder.findOne({
     hospital: hospitalId,
     patient: patientId,
     doctor: doctor._id,
-    appointment: req.params.id || null,
-    type,
-    notes: notes || "",
-    priority: priority || "Routine",
-    status: "pending",
+    appointment: apptId,
+    status: "pending"
   });
+
+  if (order) {
+    const scansList = order.scans || [];
+    if (type && !scansList.includes(type)) {
+      scansList.push(type);
+      order.scans = scansList;
+      order.type = scansList.join(", ");
+    }
+    if (notes) {
+      order.notes = order.notes ? `${order.notes}; ${notes}` : notes;
+    }
+    if (priority === "STAT" || (priority === "Urgent" && order.priority !== "STAT")) {
+      order.priority = priority;
+    }
+    await order.save();
+  } else {
+    order = await RadiologyOrder.create({
+      hospital: hospitalId,
+      patient: patientId,
+      doctor: doctor._id,
+      appointment: apptId,
+      type: type || "",
+      scans: type ? [type] : [],
+      notes: notes || "",
+      priority: priority || "Routine",
+      status: "pending",
+    });
+  }
+
+  // Record to active admission timeline
+  const activeAdmission = await Admission.findOne({
+    hospital: hospitalId,
+    patient: patientId,
+    status: "admitted"
+  });
+
+  if (activeAdmission) {
+    activeAdmission.timeline.push({
+      date: new Date(),
+      time: new Date().toTimeString().split(" ")[0].substring(0, 5),
+      userName: doctor.name,
+      userRole: "doctor",
+      eventType: "radiology_request",
+      description: `Radiology request created/updated: ${type}`
+    });
+    await activeAdmission.save();
+  }
 
   // Also push to medical history
   await Patient.findOneAndUpdate(
@@ -1878,4 +1997,317 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
     dbSession.endSession();
   }
 });
+
+export const getInpatientDetails = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const { id } = req.params; // patientId
+  const doctor = await getLoggedDoctor(req);
+
+  const admission = await Admission.findOne({
+    hospital: hospitalId,
+    patient: id,
+    status: "admitted"
+  })
+    .populate("patient", "name uhid age gender phone bloodGroup allergies")
+    .populate("room")
+    .populate("bed")
+    .populate("admittingDoctor", "name");
+
+  if (!admission) {
+    throw new AppError("No active inpatient admission found for this patient.", 404);
+  }
+
+  const labOrders = await LabOrder.find({ hospital: hospitalId, patient: id }).sort({ createdAt: -1 });
+  const radiologyOrders = await RadiologyOrder.find({ hospital: hospitalId, patient: id }).sort({ createdAt: -1 });
+
+  res.json({
+    status: "success",
+    data: {
+      ...admission.toJSON(),
+      labOrders,
+      radiologyOrders
+    }
+  });
+});
+
+export const addInpatientMedication = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const patientId = req.params.id;
+  const { drugName, dosage, frequency, duration, route, notes } = req.body;
+  const doctor = await getLoggedDoctor(req);
+
+  const activeAdmission = await Admission.findOne({
+    hospital: hospitalId,
+    patient: patientId,
+    admittingDoctor: doctor._id,
+    status: "admitted",
+  });
+
+  if (!activeAdmission) {
+    throw new AppError("No active inpatient admission found or unauthorized.", 403);
+  }
+
+  const currentTime = new Date().toTimeString().split(" ")[0].substring(0, 5);
+
+  const newMed = {
+    drugName,
+    dosage,
+    frequency,
+    duration,
+    route: route || "Oral",
+    status: "active",
+    prescribingDoctor: doctor._id,
+    prescribingDoctorName: doctor.name,
+    orderedAt: new Date(),
+    notes: notes || "",
+    history: [
+      {
+        action: "ordered",
+        timestamp: new Date(),
+        doctorName: doctor.name,
+        details: `Medication ordered: ${drugName} ${dosage} - ${frequency} for ${duration}`
+      }
+    ]
+  };
+
+  activeAdmission.medicationOrders.push(newMed as any);
+
+  // Add timeline entry
+  activeAdmission.timeline.push({
+    date: new Date(),
+    time: currentTime,
+    userName: doctor.name,
+    userRole: "doctor",
+    eventType: "medication_ordered",
+    description: `Medication ordered by Dr. ${doctor.name}: ${drugName} ${dosage} (${frequency})`
+  });
+
+  await activeAdmission.save();
+  await syncInpatientPrescription(activeAdmission, doctor._id);
+
+  res.json({ status: "success", data: activeAdmission });
+});
+
+export const updateInpatientMedication = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const patientId = req.params.id;
+  const { medicationId, action, drugName, dosage, frequency, duration, route, notes } = req.body;
+  const doctor = await getLoggedDoctor(req);
+
+  const activeAdmission = await Admission.findOne({
+    hospital: hospitalId,
+    patient: patientId,
+    admittingDoctor: doctor._id,
+    status: "admitted",
+  });
+
+  if (!activeAdmission) {
+    throw new AppError("No active inpatient admission found or unauthorized.", 403);
+  }
+
+  const med = activeAdmission.medicationOrders.find((m: any) => m._id.toString() === medicationId);
+  if (!med) {
+    throw new AppError("Medication order not found.", 404);
+  }
+
+  const currentTime = new Date().toTimeString().split(" ")[0].substring(0, 5);
+
+  if (action === "stop") {
+    med.status = "stopped";
+    med.stoppedAt = new Date();
+    med.history.push({
+      action: "stopped",
+      timestamp: new Date(),
+      doctorName: doctor.name,
+      details: "Medication stopped"
+    });
+
+    activeAdmission.timeline.push({
+      date: new Date(),
+      time: currentTime,
+      userName: doctor.name,
+      userRole: "doctor",
+      eventType: "medication_stopped",
+      description: `Medication stopped by Dr. ${doctor.name}: ${med.drugName}`
+    });
+  } else if (action === "resume") {
+    med.status = "active";
+    med.history.push({
+      action: "resumed",
+      timestamp: new Date(),
+      doctorName: doctor.name,
+      details: "Medication resumed"
+    });
+
+    activeAdmission.timeline.push({
+      date: new Date(),
+      time: currentTime,
+      userName: doctor.name,
+      userRole: "doctor",
+      eventType: "medication_resumed",
+      description: `Medication resumed by Dr. ${doctor.name}: ${med.drugName}`
+    });
+  } else if (action === "modify") {
+    med.status = "modified";
+    med.modifiedAt = new Date();
+    med.drugName = drugName || med.drugName;
+    med.dosage = dosage || med.dosage;
+    med.frequency = frequency || med.frequency;
+    med.duration = duration || med.duration;
+    med.route = route || med.route;
+    med.notes = notes || med.notes;
+
+    med.history.push({
+      action: "modified",
+      timestamp: new Date(),
+      doctorName: doctor.name,
+      details: `Modified details: ${drugName} ${dosage} - ${frequency} for ${duration}`
+    });
+
+    activeAdmission.timeline.push({
+      date: new Date(),
+      time: currentTime,
+      userName: doctor.name,
+      userRole: "doctor",
+      eventType: "medication_modified",
+      description: `Medication modified by Dr. ${doctor.name}: ${med.drugName} ${med.dosage}`
+    });
+  }
+
+  await activeAdmission.save();
+  await syncInpatientPrescription(activeAdmission, doctor._id);
+
+  res.json({ status: "success", data: activeAdmission });
+});
+
+export const saveInpatientVitals = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const patientId = req.params.id;
+  const { temperature, bloodPressure, pulseRate, respiratoryRate, oxygenSaturation, weight } = req.body;
+  const doctor = await getLoggedDoctor(req);
+
+  const activeAdmission = await Admission.findOne({
+    hospital: hospitalId,
+    patient: patientId,
+    admittingDoctor: doctor._id,
+    status: "admitted",
+  });
+
+  if (!activeAdmission) {
+    throw new AppError("No active inpatient admission found or unauthorized.", 403);
+  }
+
+  const currentTime = new Date().toTimeString().split(" ")[0].substring(0, 5);
+
+  const newVital = {
+    temperature: temperature || "",
+    bloodPressure: bloodPressure || "",
+    pulseRate: pulseRate || "",
+    respiratoryRate: respiratoryRate || "",
+    oxygenSaturation: oxygenSaturation || "",
+    weight: weight || "",
+    recordedAt: new Date(),
+    recordedBy: doctor.name
+  };
+
+  activeAdmission.vitals.push(newVital);
+
+  // Add timeline entry
+  activeAdmission.timeline.push({
+    date: new Date(),
+    time: currentTime,
+    userName: doctor.name,
+    userRole: "doctor",
+    eventType: "vital_update",
+    description: `Vitals recorded: Temp ${temperature || "—"}°F, BP ${bloodPressure || "—"}, Pulse ${pulseRate || "—"} bpm`
+  });
+
+  await activeAdmission.save();
+
+  res.json({ status: "success", data: activeAdmission });
+});
+
+async function syncInpatientPrescription(admission: any, doctorId: Types.ObjectId) {
+  // Filter active or modified medication orders
+  const activeMeds = admission.medicationOrders.filter((m: any) => m.status === "active" || m.status === "modified");
+
+  if (activeMeds.length === 0) {
+    // If no active medications, check if there is a pending prescription and delete/cancel it
+    await Prescription.deleteMany({ admission: admission._id, status: "Pending" });
+    return;
+  }
+
+  // Map to Prescription medications schema
+  const mappedMedications = activeMeds.map((m: any) => {
+    // Parse drug name and strength
+    let dName = m.drugName || "";
+    let str = "";
+    const match = dName.match(/^(.*?)\s*(\d+(?:mg|g|mcg|ml|l|capsule|tablet|tabs|caps))$/i);
+    if (match) {
+      dName = match[1];
+      str = match[2];
+    }
+
+    // Extract instructions from notes
+    let inst = "As directed";
+    if (m.notes && m.notes.startsWith("Instructions: ")) {
+      const parts = m.notes.split(". Notes: ");
+      inst = parts[0].replace("Instructions: ", "");
+    } else if (m.notes) {
+      inst = m.notes;
+    }
+
+    return {
+      name: dName.trim(),
+      strength: str || "N/A",
+      dosage: m.dosage || "1",
+      frequency: m.frequency || "1",
+      duration: m.duration || "1",
+      instructions: inst
+    };
+  });
+
+  // Find if there is already a Pending prescription for this admission
+  let rx = await Prescription.findOne({ admission: admission._id, status: "Pending" });
+
+  if (rx) {
+    rx.medications = mappedMedications as any;
+    rx.doctor = doctorId;
+    await rx.save();
+  } else {
+    const rxNumber = `RX-IP-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+    rx = await Prescription.create({
+      hospital: admission.hospital,
+      patient: admission.patient,
+      admission: admission._id,
+      doctor: doctorId,
+      department: admission.department || null,
+      diagnosis: admission.primaryDiagnosis || "Inpatient Care",
+      medications: mappedMedications,
+      status: "Pending",
+      prescriptionNumber: rxNumber
+    });
+
+    // Generate notification for pharmacist
+    await DbNotification.create({
+      hospital: admission.hospital,
+      title: "New IP Prescription Order",
+      message: `New inpatient prescription ordered: ${rxNumber}`,
+      type: "prescription_ready",
+      recipientRole: "pharmacist",
+      severity: "info",
+      link: `/pharmacy/prescriptions`,
+      data: {
+        prescriptionId: rx._id.toString(),
+        patientId: admission.patient.toString()
+      }
+    });
+
+    emitToHospital(admission.hospital.toString(), "new_prescription", {
+      prescriptionId: rx._id,
+      prescriptionNumber: rxNumber,
+      patientId: admission.patient
+    });
+  }
+}
 

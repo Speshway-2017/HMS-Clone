@@ -509,6 +509,61 @@ export const downloadPrescription = catchAsync(async (req: Request, res: Respons
   }
 
   const pdfPath = path.join(__dirname, "../../../secure_prescriptions", `${prescriptionId}.pdf`);
+  if (!fs.existsSync(pdfPath)) {
+    // Generate PDF on the fly
+    const patient = await Patient.findById(prescription.patient);
+    const doctor = await Doctor.findById(prescription.doctor);
+    const hospital = await Hospital.findById(prescription.hospital);
+    const department = prescription.department ? await Department.findById(prescription.department) : null;
+
+    if (!patient || !doctor || !hospital) {
+      throw new AppError("Associated patient, doctor, or hospital profile not found.", 404);
+    }
+
+    const verificationUrl = `${env.clientUrl}/verify-prescription/${prescription._id}`;
+
+    const secureDir = path.dirname(pdfPath);
+    if (!fs.existsSync(secureDir)) {
+      fs.mkdirSync(secureDir, { recursive: true });
+    }
+
+    const medsFormatted = (prescription.medications || []).map((m: any) => ({
+      name: m.name,
+      strength: m.strength || "N/A",
+      dosage: m.dosage || "1",
+      frequency: m.frequency || "1",
+      duration: m.duration || "1",
+      instructions: m.instructions || "As directed"
+    }));
+
+    await generatePrescriptionPDF({
+      prescriptionId: prescription._id.toString(),
+      prescriptionNumber: prescription.prescriptionNumber || "",
+      hospitalName: hospital.name,
+      hospitalAddress: hospital.address,
+      hospitalPhone: hospital.contactPhone,
+      hospitalEmail: hospital.contactEmail,
+      patientName: patient.name,
+      patientAge: patient.age ?? null,
+      patientGender: patient.gender,
+      patientUhid: patient.uhid || "",
+      doctorName: doctor.name,
+      doctorLicenseNo: doctor.licenseNo,
+      doctorSpecialization: doctor.specialization,
+      departmentName: department ? department.name : "Inpatient Department",
+      visitDate: prescription.createdAt ? new Date(prescription.createdAt) : new Date(),
+      diagnosis: prescription.diagnosis || "",
+      chiefComplaint: prescription.chiefComplaint || "",
+      clinicalNotes: prescription.clinicalNotes || "",
+      medications: medsFormatted,
+      labOrders: (prescription.labOrders as string[]) || [],
+      radiologyOrders: (prescription.radiologyOrders as string[]) || [],
+      advice: prescription.advice || "",
+      followUpDate: prescription.followUpDate ? new Date(prescription.followUpDate) : null,
+      verificationUrl
+    }, pdfPath);
+  }
+
   if (fs.existsSync(pdfPath)) {
     // Lazy migration: Upload existing local prescription to Cloudinary on first view
     const uploadResult = await cloudinary.uploader.upload(pdfPath, {
@@ -529,7 +584,7 @@ export const downloadPrescription = catchAsync(async (req: Request, res: Respons
     return res.redirect(uploadResult.secure_url);
   }
 
-  throw new AppError("Prescription document file not found.", 404);
+  throw new AppError("Prescription document file could not be generated.", 500);
 });
 
 /**

@@ -4,8 +4,9 @@ const prescriptionSchema = new Schema(
   {
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
     patient: { type: Schema.Types.ObjectId, ref: "Patient", required: true },
-    appointment: { type: Schema.Types.ObjectId, ref: "Appointment", required: true },
-    consultation: { type: Schema.Types.ObjectId, ref: "Appointment", required: true },
+    appointment: { type: Schema.Types.ObjectId, ref: "Appointment", default: null },
+    consultation: { type: Schema.Types.ObjectId, ref: "Appointment", default: null },
+    admission: { type: Schema.Types.ObjectId, ref: "Admission", default: null },
     doctor: { type: Schema.Types.ObjectId, ref: "Doctor", required: true },
     department: { type: Schema.Types.ObjectId, ref: "Department", default: null },
     diagnosis: { type: String, default: "" },
