@@ -4,6 +4,7 @@ import { Appointment, Paginated } from "../types/domain";
 
 interface AppointmentListParams {
   page?: number;
+  limit?: number;
   status?: string;
   doctor?: string;
   from?: string;

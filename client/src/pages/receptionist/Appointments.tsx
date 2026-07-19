@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { formatINR } from "../../lib/currency";
-import { Calendar, User, Search, Stethoscope, FolderHeart, Clock, Plus, List, AlertTriangle, RefreshCw, CheckCircle } from "lucide-react";
+import { Calendar, User, Search, Stethoscope, FolderHeart, Clock, Plus, List, AlertTriangle, RefreshCw, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   useBookAppointment,
   useReceptionQueue,
@@ -78,6 +78,41 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
     page: completedPage,
     dateMode: "completed"
   });
+
+  // Calendar Navigation & Query States
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [selectedCalendarDay, setSelectedCalendarDay] = useState<number | null>(null);
+
+  const calYear = calendarDate.getFullYear();
+  const calMonth = calendarDate.getMonth();
+
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const firstDayOfMonth = new Date(calYear, calMonth, 1);
+  const startDayOfWeek = firstDayOfMonth.getDay(); // 0 is Sunday, 1 is Monday...
+
+  const calFromStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-01`;
+  const calToStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
+
+  const { data: calendarAppointmentsData, isLoading: calendarLoading, refetch: refetchCalendar } = useAppointments({
+    from: calFromStr,
+    to: calToStr,
+    limit: 100
+  }, { enabled: tab === "calendar" });
+
+  const calendarAppointments = calendarAppointmentsData?.data || [];
+
+  // Group appointments by day
+  const appointmentsByDay = calendarAppointments.reduce((acc: Record<number, any[]>, appt: any) => {
+    const apptDate = new Date(appt.date);
+    if (apptDate.getFullYear() === calYear && apptDate.getMonth() === calMonth) {
+      const apptDay = apptDate.getDate();
+      if (!acc[apptDay]) {
+        acc[apptDay] = [];
+      }
+      acc[apptDay].push(appt);
+    }
+    return acc;
+  }, {});
 
   const departments = departmentsResponse || [];
 
@@ -333,23 +368,33 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const { data: bookedSlots } = useBookedSlots(selectedDoctorId, selectedDate);
 
   const isWithinRevisitWindow = () => {
-    if (!selectedDoc || !patientDetail?.patient?.medicalHistory) return false;
+    if (!selectedDoc || !patientDetail?.patient?.medicalHistory || !selectedDate) return false;
     
     const limitDays = hospital?.opExpiryLimit ?? 10;
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - limitDays);
-    cutoffDate.setHours(0, 0, 0, 0);
+    
+    // Parse the selected appointment date
+    const appointmentDate = new Date(selectedDate);
+    appointmentDate.setHours(0, 0, 0, 0);
 
     return patientDetail.patient.medicalHistory.some((history: any) => {
-      const isCompleted = history.status === "Completed" || String(history.visitType).toLowerCase().includes("consultation");
+      const isCompleted = 
+        String(history.status).toLowerCase() === "completed" || 
+        String(history.visitType).toLowerCase().includes("consultation");
       if (!isCompleted) return false;
 
-      const sameDoc = String(history.doctorName).toLowerCase().replace("dr. ", "").trim() === 
-                      String(selectedDoc.name).toLowerCase().replace("dr. ", "").trim();
-      if (!sameDoc) return false;
+      const cleanHistoryDoc = String(history.doctorName).toLowerCase().replace("dr. ", "").replace("dr", "").trim();
+      const cleanSelectedDoc = String(selectedDoc.name).toLowerCase().replace("dr. ", "").replace("dr", "").trim();
+      if (cleanHistoryDoc !== cleanSelectedDoc) return false;
 
       const historyDate = new Date(history.date);
-      return historyDate >= cutoffDate;
+      historyDate.setHours(0, 0, 0, 0);
+
+      // Diff in days
+      const diffTime = appointmentDate.getTime() - historyDate.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      // Return true if the new appointment date is on/after the history date AND within the limit
+      return diffDays >= 0 && diffDays <= limitDays;
     });
   };
 
@@ -1186,24 +1231,169 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
         <Card>
           <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
             <h2 className="text-base font-semibold text-slate-850">OP Scheduling Calendar</h2>
-            <div className="text-sm font-semibold text-navy-700">{new Date().toLocaleString("default", { month: "long", year: "numeric" })}</div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setCalendarDate(new Date(calYear, calMonth - 1, 1));
+                  setSelectedCalendarDay(null);
+                }}
+                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition-colors"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <div className="text-sm font-bold text-navy-700 w-32 text-center">
+                {calendarDate.toLocaleString("default", { month: "long", year: "numeric" })}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setCalendarDate(new Date(calYear, calMonth + 1, 1));
+                  setSelectedCalendarDay(null);
+                }}
+                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition-colors"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
           </div>
+
           <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold text-slate-500 border-b border-slate-100 pb-2">
             {["SUN","MON","TUE","WED","THU","FRI","SAT"].map(d => <span key={d}>{d}</span>)}
           </div>
-          <div className="grid grid-cols-7 gap-2 mt-2 h-80">
-            {Array.from({ length: 30 }).map((_, i) => (
-              <div key={i} className={`rounded-lg border border-slate-100 p-2 text-left hover:bg-slate-50 cursor-pointer ${i === 9 ? "bg-navy-50/50 border-navy-200" : ""}`}>
-                <div className="font-bold text-slate-700">{i + 1}</div>
-                {i === 9 && (
-                  <div className="mt-1 rounded bg-navy-600 p-1 text-[8px] font-bold text-white text-center">
-                    {todayAppointments?.length || 0} Slots
+
+          {calendarLoading ? (
+            <div className="py-24 text-center text-slate-400">Loading calendar bookings...</div>
+          ) : (
+            <div className="grid grid-cols-7 gap-2 mt-2 auto-rows-[80px]">
+              {/* Empty leading slots for calendar alignment */}
+              {Array.from({ length: startDayOfWeek }).map((_, idx) => (
+                <div key={`empty-${idx}`} className="rounded-lg border border-transparent bg-slate-50/20 p-2" />
+              ))}
+
+              {/* Month days */}
+              {Array.from({ length: daysInMonth }).map((_, idx) => {
+                const dayNum = idx + 1;
+                const dayAppts = appointmentsByDay[dayNum] || [];
+                const isToday = 
+                  new Date().getDate() === dayNum && 
+                  new Date().getMonth() === calMonth && 
+                  new Date().getFullYear() === calYear;
+
+                return (
+                  <div
+                    key={`day-${dayNum}`}
+                    onClick={() => {
+                      if (dayAppts.length > 0) {
+                        setSelectedCalendarDay(dayNum);
+                      }
+                    }}
+                    className={`rounded-lg border p-2 text-left transition-all ${
+                      dayAppts.length > 0 
+                        ? "border-navy-200 hover:border-navy-400 hover:bg-navy-50/20 cursor-pointer" 
+                        : "border-slate-100 text-slate-400 hover:bg-slate-50"
+                    } ${isToday ? "bg-amber-50/60 border-amber-300 ring-1 ring-amber-200" : ""}`}
+                  >
+                    <div className={`font-bold text-xs ${isToday ? "text-amber-800" : "text-slate-700"}`}>{dayNum}</div>
+                    {dayAppts.length > 0 && (
+                      <div className="mt-1 rounded bg-navy-600 p-1 text-[9px] font-bold text-white text-center truncate">
+                        {dayAppts.length} {dayAppts.length === 1 ? "Slot" : "Slots"}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </Card>
+      )}
+
+      {/* Calendar Day Appointments Details Modal */}
+      {selectedCalendarDay !== null && (
+        <Modal
+          isOpen={selectedCalendarDay !== null}
+          onClose={() => setSelectedCalendarDay(null)}
+          title={`Bookings on ${selectedCalendarDay} ${calendarDate.toLocaleString("default", { month: "long", year: "numeric" })}`}
+        >
+          <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
+            {(appointmentsByDay[selectedCalendarDay] || []).map((appt: any) => {
+              const isBooked = appt.status === "scheduled";
+              const canAct = appt.status !== "completed" && appt.status !== "cancelled" && appt.status !== "no_show" && appt.status !== "missed";
+              
+              return (
+                <div key={appt._id} className="rounded-xl border border-slate-200/80 bg-white p-3.5 space-y-2 text-xs">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-1.5 mb-1.5">
+                    <div>
+                      <span className="font-bold text-slate-800 text-sm">{appt.patient?.name}</span>
+                      <span className="text-[10px] text-slate-400 font-mono block">UHID: {appt.patient?.uhid}</span>
+                    </div>
+                    <span className="rounded-full bg-navy-100 px-2 py-0.5 text-[9px] font-semibold text-navy-800 font-mono">
+                      {appt.time}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-650">
+                    <div>
+                      <span className="font-bold text-slate-450 block uppercase tracking-wider text-[8px]">Consultant Doctor</span>
+                      <span className="font-semibold text-slate-800">Dr. {appt.doctor?.name}</span>
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-455 block uppercase tracking-wider text-[8px]">Department</span>
+                      <span className="font-semibold text-slate-800">{appt.department?.name || "N/A"}</span>
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-450 block uppercase tracking-wider text-[8px]">Appointment Status</span>
+                      <span className="font-bold text-indigo-700 uppercase">{appt.status}</span>
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-450 block uppercase tracking-wider text-[8px]">Token Number</span>
+                      <span className="font-bold text-slate-800 font-mono">{appt.tokenNumber || "N/A"}</span>
+                    </div>
+                  </div>
+
+                  {appt.notes && (
+                    <div className="rounded bg-slate-50 border border-slate-100 p-2 text-[11px] text-slate-500 italic">
+                      Notes: {appt.notes}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 justify-end pt-2 border-t border-slate-100 mt-2">
+                    {isBooked && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await checkInMutation.mutateAsync(appt._id);
+                            toast.success("Patient checked in successfully!");
+                            refetchCalendar();
+                          } catch (err: any) {
+                            toast.error(err.response?.data?.message || err.message || "Failed to check in");
+                          }
+                        }}
+                        disabled={checkInMutation.isPending}
+                        className="rounded bg-indigo-600 hover:bg-indigo-750 px-2.5 py-1 text-xs font-semibold text-white transition-colors"
+                      >
+                        Check-In
+                      </button>
+                    )}
+                    {canAct && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCalendarDay(null);
+                          openDialog(appt);
+                        }}
+                        className="rounded bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-650 hover:bg-red-100 transition-colors"
+                      >
+                        Action
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Modal>
       )}
 
       {/* ── Combined Cancel / Reschedule Modal ── */}
