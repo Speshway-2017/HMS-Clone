@@ -177,12 +177,85 @@ export function useDoctorInpatients() {
 export function useAddInpatientNotes() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ patientId, notes, diagnosis }: { patientId: string; notes: string; diagnosis?: string }) => {
-      const res = await api.post(`/doctors/dashboard/inpatients/${patientId}/notes`, { notes, diagnosis });
+    mutationFn: async ({ patientId, notes, diagnosis, plan }: { patientId: string; notes: string; diagnosis?: string; plan?: string }) => {
+      const res = await api.post(`/doctors/dashboard/inpatients/${patientId}/notes`, { notes, diagnosis, plan });
       return res.data.data;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard", "inpatient", variables.patientId] });
+    },
+  });
+}
+
+export function useInpatientDetails(patientId: string | null) {
+  return useQuery({
+    queryKey: ["doctorDashboard", "inpatient", patientId],
+    queryFn: async () => {
+      if (!patientId) return null;
+      const res = await api.get<{ status: string; data: any }>(`/doctors/dashboard/inpatients/${patientId}/details`);
+      return res.data.data;
+    },
+    enabled: !!patientId,
+  });
+}
+
+export function useAddInpatientMedication() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      patientId, drugName, dosage, frequency, duration, route, notes
+    }: {
+      patientId: string; drugName: string; dosage: string; frequency: string; duration: string; route?: string; notes?: string;
+    }) => {
+      const res = await api.post(`/doctors/dashboard/inpatients/${patientId}/medications`, {
+        drugName, dosage, frequency, duration, route, notes
+      });
+      return res.data.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard", "inpatient", variables.patientId] });
+    },
+  });
+}
+
+export function useUpdateInpatientMedication() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      patientId, medicationId, action, drugName, dosage, frequency, duration, route, notes
+    }: {
+      patientId: string; medicationId: string; action: "modify" | "stop" | "resume"; drugName?: string; dosage?: string; frequency?: string; duration?: string; route?: string; notes?: string;
+    }) => {
+      const res = await api.put(`/doctors/dashboard/inpatients/${patientId}/medications`, {
+        medicationId, action, drugName, dosage, frequency, duration, route, notes
+      });
+      return res.data.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard", "inpatient", variables.patientId] });
+    },
+  });
+}
+
+export function useSaveInpatientVitals() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      patientId, temperature, bloodPressure, pulseRate, respiratoryRate, oxygenSaturation, weight
+    }: {
+      patientId: string; temperature?: string; bloodPressure?: string; pulseRate?: string; respiratoryRate?: string; oxygenSaturation?: string; weight?: string;
+    }) => {
+      const res = await api.post(`/doctors/dashboard/inpatients/${patientId}/vitals`, {
+        temperature, bloodPressure, pulseRate, respiratoryRate, oxygenSaturation, weight
+      });
+      return res.data.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard", "inpatient", variables.patientId] });
     },
   });
 }

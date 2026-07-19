@@ -372,7 +372,7 @@ export function useAdmitPatient() {
   return useMutation({
     mutationFn: async (payload: any) => {
       const res = await api.post("/reception/admissions", payload);
-      return res.data.data.admission;
+      return res.data.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reception", "admissions"] });

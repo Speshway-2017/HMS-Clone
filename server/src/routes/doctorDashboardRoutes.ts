@@ -44,6 +44,11 @@ import {
   getMyPatientById,
   // Discharge
   finalizeDischarge,
+  // New Inpatient EMR Flow
+  getInpatientDetails,
+  addInpatientMedication,
+  updateInpatientMedication,
+  saveInpatientVitals,
 } from "../controllers/doctorDashboardController";
 
 const router = Router();
@@ -61,6 +66,10 @@ router.post("/queue/:id/noshow", markNoShow);
 
 router.get("/inpatients", getInpatients);
 router.post("/inpatients/:id/notes", addInpatientNotes);
+router.get("/inpatients/:id/details", getInpatientDetails);
+router.post("/inpatients/:id/medications", addInpatientMedication);
+router.put("/inpatients/:id/medications", updateInpatientMedication);
+router.post("/inpatients/:id/vitals", saveInpatientVitals);
 
 router.get("/consultations/completed", getCompletedConsultations);
 

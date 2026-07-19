@@ -1674,6 +1674,7 @@ export class ReceptionService {
         attenderPhone,
         insuranceProvider: insuranceProvider || "N/A",
         advancePaid: Number(advanceAmount) || 0,
+        paymentMethod: paymentMethod || "Cash",
         receiptNumber: createdPayment ? createdPayment.transactionId : "N/A",
         admissionNotes: admissionNotes || "",
         

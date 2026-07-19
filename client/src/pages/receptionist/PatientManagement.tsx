@@ -683,16 +683,22 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
               </div>
 
               {/* Payment block */}
-              <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
+              <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-3 gap-4 text-xs">
                 <div>
                   <span className="text-slate-455 block uppercase tracking-wider text-[9px] font-bold">Advance Deposit Paid</span>
                   <span className="font-bold text-slate-800">{formatINR(successData.admissionSlip?.advancePaid)}</span>
                 </div>
                 {successData.admissionSlip?.advancePaid > 0 && (
-                  <div className="text-right">
-                    <span className="text-slate-455 block uppercase tracking-wider text-[9px] font-bold">Receipt Number</span>
-                    <span className="font-semibold text-slate-700 font-mono">{successData.admissionSlip?.receiptNumber}</span>
-                  </div>
+                  <>
+                    <div>
+                      <span className="text-slate-455 block uppercase tracking-wider text-[9px] font-bold">Payment Method</span>
+                      <span className="font-semibold text-slate-800">{successData.admissionSlip?.paymentMethod}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-slate-455 block uppercase tracking-wider text-[9px] font-bold">Receipt Number</span>
+                      <span className="font-semibold text-slate-700 font-mono">{successData.admissionSlip?.receiptNumber}</span>
+                    </div>
+                  </>
                 )}
               </div>
 

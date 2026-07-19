@@ -78,6 +78,79 @@ const admissionSchema = new Schema(
         }
       ],
       default: []
+    },
+    progressNotes: {
+      type: [
+        {
+          doctor: { type: Schema.Types.ObjectId, ref: "Doctor", required: true },
+          doctorName: { type: String, required: true },
+          date: { type: Date, required: true },
+          time: { type: String, required: true },
+          admissionDay: { type: Number, required: true },
+          assessment: { type: String, required: true },
+          plan: { type: String, default: "" },
+          notes: { type: String, required: true }
+        }
+      ],
+      default: []
+    },
+    medicationOrders: {
+      type: [
+        {
+          drugName: { type: String, required: true },
+          dosage: { type: String, required: true },
+          frequency: { type: String, required: true },
+          duration: { type: String, required: true },
+          route: { type: String, default: "Oral" },
+          status: { type: String, enum: ["active", "modified", "stopped", "resumed"], default: "active" },
+          prescribingDoctor: { type: Schema.Types.ObjectId, ref: "Doctor", required: true },
+          prescribingDoctorName: { type: String, required: true },
+          orderedAt: { type: Date, required: true },
+          modifiedAt: { type: Date, default: null },
+          stoppedAt: { type: Date, default: null },
+          notes: { type: String, default: "" },
+          history: {
+            type: [
+              {
+                action: { type: String, required: true },
+                timestamp: { type: Date, required: true },
+                doctorName: { type: String, required: true },
+                details: { type: String, default: "" }
+              }
+            ],
+            default: []
+          }
+        }
+      ],
+      default: []
+    },
+    vitals: {
+      type: [
+        {
+          temperature: { type: String, default: "" },
+          bloodPressure: { type: String, default: "" },
+          pulseRate: { type: String, default: "" },
+          respiratoryRate: { type: String, default: "" },
+          oxygenSaturation: { type: String, default: "" },
+          weight: { type: String, default: "" },
+          recordedAt: { type: Date, required: true },
+          recordedBy: { type: String, required: true }
+        }
+      ],
+      default: []
+    },
+    timeline: {
+      type: [
+        {
+          date: { type: Date, required: true },
+          time: { type: String, required: true },
+          userName: { type: String, required: true },
+          userRole: { type: String, required: true },
+          eventType: { type: String, required: true },
+          description: { type: String, required: true }
+        }
+      ],
+      default: []
     }
   },
   { timestamps: true }
