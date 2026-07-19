@@ -417,8 +417,8 @@ export function AccountantExpensesPage() {
             <Button variant="ghost" onClick={() => setIsAddExpenseOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" loading={isSubmitting}>
-              Save Expense
+            <Button type="submit" variant="primary" disabled={isSubmitting}>
+              {isSubmitting ? "Saving..." : "Save Expense"}
             </Button>
           </div>
         </form>

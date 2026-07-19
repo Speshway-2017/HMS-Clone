@@ -151,9 +151,31 @@ export const getAccountantDashboard = catchAsync(async (req: Request, res: Respo
   const hospitalId = req.hospitalFilter?.hospital as Types.ObjectId | undefined;
   const userId = req.user?._id;
 
-  if (hospitalId && userId) {
-    await seedDefaultExpensesIfEmpty(new mongoose.Types.ObjectId(hospitalId as any), new mongoose.Types.ObjectId(userId as any));
-    await seedDefaultClaimsIfEmpty(new mongoose.Types.ObjectId(hospitalId as any));
+  if (hospitalId) {
+    // Delete any previously seeded dummy data to clean up the DB
+    await Expense.deleteMany({
+      hospital: new mongoose.Types.ObjectId(hospitalId as any),
+      description: {
+        $in: [
+          "Purchase of disposable surgical gloves and masks.",
+          "Main block electricity utility bill payment.",
+          "OPD extension block monthly rental lease.",
+          "CT scanner routine laser calibration & check."
+        ]
+      }
+    });
+
+    await InsuranceClaim.deleteMany({
+      hospital: new mongoose.Types.ObjectId(hospitalId as any),
+      policyNumber: {
+        $in: [
+          "POL-STAR-88129",
+          "POL-HDFC-99120",
+          "POL-ICICI-10219",
+          "POL-MAX-30219"
+        ]
+      }
+    });
   }
 
   const matchFilter = hospitalId ? { hospital: new mongoose.Types.ObjectId(hospitalId as any) } : {};

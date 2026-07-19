@@ -9,6 +9,7 @@ import {
   DollarSign
 } from "lucide-react";
 import { useInvoices } from "../../features/invoices";
+import { useAccountantDashboard } from "../../features/accountantDashboard";
 import { Card } from "../../components/ui/Card";
 import { ChartCard } from "../../components/ui/ChartCard";
 import { 
@@ -32,28 +33,27 @@ const COLORS = ["#1e3a8a", "#10b981", "#3b82f6", "#f59e0b", "#ec4899", "#8b5cf6"
 export function AccountantAnalyticsPage() {
   const [filterPeriod, setFilterPeriod] = useState("This Month");
   const { data: invoiceData } = useInvoices({ page: 1 });
+  const { data: dashboardData, isLoading } = useAccountantDashboard();
 
-  const counts = invoiceData?.counts;
-  const netRevenue = counts?.netRevenue ?? 562400;
+  const dailyCollections = dashboardData?.charts?.daily?.map((d) => ({
+    date: d.label,
+    Collections: d.revenue,
+  })) || [];
 
-  // ── Mock data for advanced analytics ──
-  const dailyCollections = [
-    { date: "07/04", Collections: 42000, Invoices: 12 },
-    { date: "07/05", Collections: 38000, Invoices: 9 },
-    { date: "07/06", Collections: 56000, Invoices: 14 },
-    { date: "07/07", Collections: 69000, Invoices: 17 },
-    { date: "07/08", Collections: 52000, Invoices: 11 },
-    { date: "07/09", Collections: 81000, Invoices: 21 },
-    { date: "07/10", Collections: netRevenue > 500000 ? netRevenue / 7 : 65000, Invoices: 15 },
-  ];
+  const BILLING_TYPE_LABEL: Record<string, string> = {
+    OP: "Outpatient (OP)",
+    IP: "Inpatient (IP)",
+    PHARMACY: "Pharmacy",
+    LAB: "Laboratory",
+    RADIOLOGY: "Radiology",
+    EMERGENCY: "Emergency",
+    OTHER: "Other",
+  };
 
-  const deptShare = [
-    { name: "Outpatient (OP)", value: 185400 },
-    { name: "Inpatient (IP)", value: 295000 },
-    { name: "Pharmacy", value: 124000 },
-    { name: "Laboratory", value: 68000 },
-    { name: "Radiology", value: 43000 },
-  ];
+  const deptShare = dashboardData?.charts?.billingTypeDistribution?.map((item) => ({
+    name: BILLING_TYPE_LABEL[item.type] || item.type,
+    value: item.amount,
+  })) || [];
 
   const taxSummary = [
     { month: "Jan 2026", subtotal: 450000, serviceFee: 21000, taxCollected: 22500, total: 493500 },
@@ -110,21 +110,27 @@ export function AccountantAnalyticsPage() {
         <div className="lg:col-span-2">
           <ChartCard title="Daily Collections (Last 7 Days)" subtitle="Trend of patient payments collected per day">
             <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={dailyCollections} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorCollections" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#1e3a8a" stopOpacity={0.2}/>
-                      <stop offset="95%" stopColor="#1e3a8a" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#64748b" }} />
-                  <YAxis tick={{ fontSize: 12, fill: "#64748b" }} />
-                  <Tooltip formatter={(value) => [`₹${Number(value).toLocaleString("en-IN")}`]} />
-                  <Area type="monotone" dataKey="Collections" stroke="#1e3a8a" strokeWidth={3} fillOpacity={1} fill="url(#colorCollections)" />
-                </AreaChart>
-              </ResponsiveContainer>
+              {isLoading ? (
+                <div className="animate-pulse bg-slate-100 rounded-lg h-full w-full flex items-center justify-center text-slate-400 font-medium">
+                  Loading collections chart...
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={dailyCollections} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorCollections" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#1e3a8a" stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor="#1e3a8a" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#64748b" }} />
+                    <YAxis tick={{ fontSize: 12, fill: "#64748b" }} />
+                    <Tooltip formatter={(value) => [`₹${Number(value).toLocaleString("en-IN")}`]} />
+                    <Area type="monotone" dataKey="Collections" stroke="#1e3a8a" strokeWidth={3} fillOpacity={1} fill="url(#colorCollections)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </ChartCard>
         </div>
@@ -134,33 +140,43 @@ export function AccountantAnalyticsPage() {
           <h3 className="text-base font-semibold text-slate-800 mb-1">Department Revenue Share</h3>
           <p className="text-xs text-slate-500 mb-4">Revenue distribution across clinical services</p>
           <div className="h-56 relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={deptShare}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={4}
-                  dataKey="value"
-                >
-                  {deptShare.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => [`₹${Number(value).toLocaleString("en-IN")}`]} />
-              </PieChart>
-            </ResponsiveContainer>
+            {isLoading ? (
+              <div className="animate-pulse bg-slate-100 rounded-lg h-full w-full flex items-center justify-center text-slate-400 font-medium">
+                Loading share chart...
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={deptShare}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={4}
+                    dataKey="value"
+                  >
+                    {deptShare.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => [`₹${Number(value).toLocaleString("en-IN")}`]} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </div>
           {/* Custom Legend */}
           <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
-            {deptShare.map((item, i) => (
-              <div key={i} className="flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }}></span>
-                <span className="text-slate-650 truncate" title={item.name}>{item.name}</span>
-              </div>
-            ))}
+            {isLoading ? (
+              <div className="h-10 col-span-2"></div>
+            ) : (
+              deptShare.map((item, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }}></span>
+                  <span className="text-slate-650 truncate" title={item.name}>{item.name}</span>
+                </div>
+              ))
+            )}
           </div>
         </Card>
       </div>

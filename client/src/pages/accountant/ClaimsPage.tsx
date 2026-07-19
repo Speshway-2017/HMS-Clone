@@ -359,8 +359,8 @@ export function AccountantClaimsPage() {
               <Button variant="ghost" onClick={() => setIsVerifyOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" variant="primary" loading={isSubmitting}>
-                Submit Decision
+              <Button type="submit" variant="primary" disabled={isSubmitting}>
+                {isSubmitting ? "Submitting..." : "Submit Decision"}
               </Button>
             </div>
           </form>

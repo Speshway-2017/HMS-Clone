@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { List, Plus, Network, BedDouble, UserCheck, ShieldAlert, ArrowRightLeft, DoorOpen, Printer, CheckCircle, FileText, Search } from "lucide-react";
+import { List, Plus, Network, BedDouble, UserCheck, ShieldAlert, ArrowRightLeft, DoorOpen, Printer, CheckCircle, FileText, Search, AlertTriangle } from "lucide-react";
 import {
   useAdmissionRequests,
   useRoomsAvailability,
@@ -1380,6 +1380,32 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                         <p className="text-xs text-slate-700">{adm.specialInstructions || "—"}</p>
                       </div>
                     </div>
+                    {adm.labPharmacyDuesTotal > 0 && (
+                      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-750 space-y-1.5 shadow-sm">
+                        <div className="flex items-center gap-1.5 font-bold text-red-800">
+                          <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-red-600" />
+                          <span>Pending Laboratory / Pharmacy Dues: ₹{Number(adm.labPharmacyDuesTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                        </div>
+                        <p className="leading-relaxed">
+                          Patient has unpaid pharmacy or laboratory invoices. These must be cleared before confirming discharge.
+                        </p>
+                        <div className="divide-y divide-red-100 rounded-lg border border-red-100 bg-white text-[11px] mt-1.5">
+                          {adm.labPharmacyDues?.map((inv: any) => (
+                            <div key={inv._id} className="flex justify-between p-2">
+                              <div>
+                                <span className="font-semibold text-slate-700">
+                                  {inv.billingType === "PHARMACY" ? "Pharmacy" : "Laboratory/Diagnostics"}
+                                </span>
+                                <span className="text-[10px] text-slate-400 block">
+                                  No: {inv.invoiceNumber || inv._id.substring(18).toUpperCase()}
+                                </span>
+                              </div>
+                              <span className="font-bold text-red-600">₹{inv.balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {adm.dischargeRequestedBy && (
                       <p className="text-xs text-slate-400 mt-2">
                         Requested by Dr. {adm.dischargeRequestedBy?.name || "—"} ·{" "}

@@ -232,11 +232,6 @@ export function AccountantDashboard() {
             <RefreshCw className={`h-4 w-4 ${(isLoading || isRefreshing) ? "animate-spin" : ""}`} />
             Refresh
           </button>
-          <Link to="/accountant/billing">
-            <button className="flex items-center gap-1.5 rounded-lg bg-navy-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-800 transition">
-              <Plus className="h-4 w-4" /> New Invoice
-            </button>
-          </Link>
         </div>
       </div>
 
