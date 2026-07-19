@@ -52,6 +52,110 @@ const COMMON_LAB_TESTS = [
   "Thyroid Profile (TSH, T3, T4)",
 ];
 
+interface CombinedConsultationGroup {
+  id: string;
+  date: Date;
+  dateFormatted: string;
+  doctorName: string;
+  department: string;
+  consultation: {
+    diagnosis: string;
+    notes: string;
+    status: string;
+  } | null;
+  prescriptions: {
+    diagnosis: string;
+    notes: string;
+    status: string;
+  }[];
+  labs: {
+    diagnosis: string;
+    notes: string;
+    status: string;
+  }[];
+  radiology: {
+    diagnosis: string;
+    notes: string;
+    status: string;
+  }[];
+  certificates: {
+    diagnosis: string;
+    notes: string;
+    status: string;
+  }[];
+  inpatientNotes: {
+    diagnosis: string;
+    notes: string;
+    status: string;
+  }[];
+  others: any[];
+}
+
+function groupAndCombineHistory(historyList: any[]): CombinedConsultationGroup[] {
+  if (!historyList || historyList.length === 0) return [];
+
+  const map = new Map<string, CombinedConsultationGroup>();
+
+  historyList.forEach((item) => {
+    const dateVal = item.date ? new Date(item.date) : new Date();
+    const dateStr = dateVal.toLocaleDateString("en-IN");
+    const docName = String(item.doctorName || "Attending Doctor").trim();
+    const key = `${dateStr}-${docName}`;
+
+    if (!map.has(key)) {
+      map.set(key, {
+        id: key,
+        date: dateVal,
+        dateFormatted: dateVal.toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric"
+        }),
+        doctorName: docName,
+        department: item.department || "",
+        consultation: null,
+        prescriptions: [],
+        labs: [],
+        radiology: [],
+        certificates: [],
+        inpatientNotes: [],
+        others: []
+      });
+    }
+
+    const group = map.get(key)!;
+    if (!group.department && item.department) {
+      group.department = item.department;
+    }
+
+    const vType = String(item.visitType).toLowerCase();
+
+    const cleanItem = {
+      diagnosis: item.diagnosis || "",
+      notes: item.notes || "",
+      status: item.status || "Completed"
+    };
+
+    if (vType.includes("consultation")) {
+      group.consultation = cleanItem;
+    } else if (vType.includes("prescription")) {
+      group.prescriptions.push(cleanItem);
+    } else if (vType.includes("lab")) {
+      group.labs.push(cleanItem);
+    } else if (vType.includes("radiology")) {
+      group.radiology.push(cleanItem);
+    } else if (vType.includes("certificate")) {
+      group.certificates.push(cleanItem);
+    } else if (vType.includes("inpatient") || vType.includes("rounds")) {
+      group.inpatientNotes.push(cleanItem);
+    } else {
+      group.others.push(item);
+    }
+  });
+
+  return Array.from(map.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
+}
+
 export function ConsultationWorkspacePage() {
   const { id: appointmentId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -859,30 +963,165 @@ export function ConsultationWorkspacePage() {
           )}
 
           {/* TAB 2: HISTORY */}
-          {activeTab === "history" && (
-            <Card className="p-6 space-y-4">
-              <h3 className="text-sm font-bold text-slate-800 border-b pb-2 flex items-center gap-1.5">
-                <History className="h-4 w-4" /> Full Past Medical History Logs
-              </h3>
-              {patient.medicalHistory?.length === 0 ? (
-                <p className="text-sm text-slate-400 py-4">No past medical history logs found.</p>
-              ) : (
-                <div className="space-y-4">
-                  {patient.medicalHistory.map((item: any, idx: number) => (
-                    <div key={idx} className="border-l-2 border-slate-200 pl-4 py-1">
-                      <div className="flex items-center justify-between text-xs text-slate-400">
-                        <span className="font-semibold text-navy-700 bg-navy-50 px-2 py-0.5 rounded">{item.visitType || "Consultation"}</span>
-                        <span>{new Date(item.date).toLocaleDateString("en-IN")}</span>
-                      </div>
-                      <p className="text-sm font-semibold text-slate-800 mt-1">Dr. {item.doctorName}</p>
-                      <p className="text-xs text-slate-600 mt-1"><span className="font-semibold">Diagnosis:</span> {item.diagnosis}</p>
-                      <p className="text-xs text-slate-500 mt-1 whitespace-pre-wrap">{item.notes}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          )}
+          {activeTab === "history" && (() => {
+            const historyGroups = groupAndCombineHistory(patient.medicalHistory || []);
+            return (
+              <Card className="p-6 space-y-4">
+                <h3 className="text-sm font-bold text-slate-800 border-b pb-2 flex items-center gap-1.5">
+                  <History className="h-4 w-4" /> Full Past Medical History Logs
+                </h3>
+                {historyGroups.length === 0 ? (
+                  <p className="text-sm text-slate-400 py-4">No past medical history logs found.</p>
+                ) : (
+                  <div className="space-y-6 max-h-[500px] overflow-y-auto pr-1">
+                    {historyGroups.map((group, idx) => {
+                      const isLatest = idx === 0;
+                      return (
+                        <div
+                          key={group.id}
+                          className={`rounded-xl border p-4.5 transition-all space-y-3.5 ${
+                            isLatest
+                              ? "border-emerald-300 bg-gradient-to-r from-emerald-50/30 via-slate-50 to-white shadow-sm ring-1 ring-emerald-250/30"
+                              : "border-slate-200 bg-slate-50/20"
+                          }`}
+                        >
+                          {/* Group Header */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2 mb-1">
+                            <div className="flex items-center gap-2">
+                              {isLatest ? (
+                                <span className="inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-white shadow-sm">
+                                  Last Consultation
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded bg-slate-200 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-700">
+                                  Previous Consultation
+                                </span>
+                              )}
+                              <span className="text-xs font-bold text-slate-800">
+                                {group.dateFormatted}
+                              </span>
+                            </div>
+                            <span className="text-xs text-slate-500 font-medium">
+                              Consultant: <strong className="text-slate-700">Dr. {group.doctorName}</strong> {group.department && `(${group.department})`}
+                            </span>
+                          </div>
+
+                          {/* Consultation Clinical Summary */}
+                          {group.consultation && (
+                            <div className="bg-white rounded-lg border border-slate-200/60 p-3 space-y-1.5 text-xs shadow-xs">
+                              <div className="flex items-center gap-1.5 text-navy-700 font-bold border-b border-slate-100 pb-1 mb-1">
+                                <FileText className="h-3.5 w-3.5" /> Clinical Examination Details
+                              </div>
+                              {group.consultation.diagnosis && (
+                                <p className="text-slate-700"><span className="font-semibold text-slate-500">Diagnosis:</span> {group.consultation.diagnosis}</p>
+                              )}
+                              {group.consultation.notes && (
+                                <div className="text-slate-600 whitespace-pre-wrap"><span className="font-semibold text-slate-500">Notes:</span> {group.consultation.notes}</div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Prescriptions issued */}
+                          {group.prescriptions.length > 0 && (
+                            <div className="bg-white rounded-lg border border-slate-200/60 p-3 space-y-1.5 text-xs shadow-xs">
+                              <div className="flex items-center gap-1.5 text-indigo-700 font-bold border-b border-slate-100 pb-1 mb-1">
+                                <Pill className="h-3.5 w-3.5" /> Prescriptions Issued
+                              </div>
+                              {group.prescriptions.map((item, i) => (
+                                <div key={i} className="text-slate-650">
+                                  {item.diagnosis && <p className="font-semibold text-slate-700">For: {item.diagnosis}</p>}
+                                  <p className="whitespace-pre-wrap mt-0.5">{item.notes}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Laboratory investigations ordered */}
+                          {group.labs.length > 0 && (
+                            <div className="bg-white rounded-lg border border-slate-200/60 p-3 space-y-1.5 text-xs shadow-xs">
+                              <div className="flex items-center gap-1.5 text-blue-700 font-bold border-b border-slate-100 pb-1 mb-1">
+                                <FlaskConical className="h-3.5 w-3.5" /> Lab Investigations Ordered
+                              </div>
+                              {group.labs.map((item, i) => (
+                                <div key={i} className="text-slate-650 text-[11px] leading-relaxed">
+                                  {item.diagnosis && <p className="font-semibold text-slate-700">Diagnosis/Reason: {item.diagnosis}</p>}
+                                  <p className="whitespace-pre-wrap mt-0.5">{item.notes}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Radiology scans ordered */}
+                          {group.radiology.length > 0 && (
+                            <div className="bg-white rounded-lg border border-slate-200/60 p-3 space-y-1.5 text-xs shadow-xs">
+                              <div className="flex items-center gap-1.5 text-purple-700 font-bold border-b border-slate-100 pb-1 mb-1">
+                                <Scan className="h-3.5 w-3.5" /> Radiology Studies Ordered
+                              </div>
+                              {group.radiology.map((item, i) => (
+                                <div key={i} className="text-slate-650 text-[11px] leading-relaxed">
+                                  {item.diagnosis && <p className="font-semibold text-slate-700">Study Request: {item.diagnosis}</p>}
+                                  <p className="whitespace-pre-wrap mt-0.5">{item.notes}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Inpatient rounds notes */}
+                          {group.inpatientNotes.length > 0 && (
+                            <div className="bg-white rounded-lg border border-slate-200/60 p-3 space-y-1.5 text-xs shadow-xs">
+                              <div className="flex items-center gap-1.5 text-amber-700 font-bold border-b border-slate-100 pb-1 mb-1">
+                                <Heart className="h-3.5 w-3.5" /> Inpatient Rounds Notes
+                              </div>
+                              {group.inpatientNotes.map((item, i) => (
+                                <div key={i} className="text-slate-650">
+                                  {item.diagnosis && <p className="font-semibold text-slate-700">Diagnosis/Status: {item.diagnosis}</p>}
+                                  <p className="whitespace-pre-wrap mt-0.5">{item.notes}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Certificates issued */}
+                          {group.certificates.length > 0 && (
+                            <div className="bg-white rounded-lg border border-slate-200/60 p-3 space-y-1.5 text-xs shadow-xs">
+                              <div className="flex items-center gap-1.5 text-rose-700 font-bold border-b border-slate-100 pb-1 mb-1">
+                                <FileCheck className="h-3.5 w-3.5" /> Medical Certificates Issued
+                              </div>
+                              {group.certificates.map((item, i) => (
+                                <div key={i} className="text-slate-650">
+                                  {item.diagnosis && <p className="font-semibold text-slate-700">Purpose/Diagnosis: {item.diagnosis}</p>}
+                                  <p className="whitespace-pre-wrap mt-0.5">{item.notes}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Fallback if a group somehow has no specific visit types mapped */}
+                          {!group.consultation &&
+                            group.prescriptions.length === 0 &&
+                            group.labs.length === 0 &&
+                            group.radiology.length === 0 &&
+                            group.inpatientNotes.length === 0 &&
+                            group.certificates.length === 0 &&
+                            group.others.length > 0 && (
+                              <div className="space-y-2">
+                                {group.others.map((item: any, i: number) => (
+                                  <div key={i} className="border border-slate-150 rounded-lg p-2.5 bg-white space-y-1 text-xs">
+                                    <p className="font-semibold text-slate-800">{item.visitType || "Medical Entry"}</p>
+                                    {item.diagnosis && <p className="text-slate-600"><span className="font-semibold">Diagnosis:</span> {item.diagnosis}</p>}
+                                    {item.notes && <p className="text-slate-500 italic">{item.notes}</p>}
+                                  </div>
+                                ))}
+                              </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+            );
+          })()}
 
           {/* TAB 3: VITALS FORM */}
           {activeTab === "vitals" && (
@@ -918,90 +1157,94 @@ export function ConsultationWorkspacePage() {
                     </button>
                   </div>
 
-                  <div className="space-y-3">
-                    {prescriptionMeds.map((med, index) => (
-                      <div key={med.key || index} className="flex flex-wrap gap-2 items-end border-b border-slate-100 pb-3">
-                        <div className="flex-1 min-w-[150px]">
-                          <InputField
-                            label={index === 0 ? "Medicine Name" : ""}
-                            value={med.name}
-                            onChange={(e) => handleMedChange(index, "name", e.target.value)}
-                            placeholder="e.g. Amoxicillin"
-                            required
-                            list={`med-datalist-${index}`}
-                          />
-                          <datalist id={`med-datalist-${index}`}>
-                            {med.name.trim().length > 0 &&
-                              rawMeds
-                                .filter((m: any) =>
-                                  m.name.toLowerCase().includes(med.name.toLowerCase())
-                                )
-                                .map((m: any) => (
-                                  <option key={m._id} value={m.name} />
-                                ))}
-                          </datalist>
-                        </div>
-                        <div className="w-24">
-                          <InputField label={index === 0 ? "Strength" : ""} value={med.strength || ""} onChange={(e) => handleMedChange(index, "strength", e.target.value)} placeholder="e.g. 500mg" />
-                        </div>
-                        <div className="w-20">
-                          <InputField label={index === 0 ? "Dosage" : ""} value={med.dosage} onChange={(e) => handleMedChange(index, "dosage", e.target.value)} placeholder="e.g. 1" />
-                        </div>
-                        <div className="w-20">
-                          <InputField label={index === 0 ? "Frequency" : ""} value={med.frequency} onChange={(e) => handleMedChange(index, "frequency", e.target.value)} placeholder="e.g. 3" />
-                        </div>
-                        <div className="w-20">
-                          <InputField label={index === 0 ? "Duration" : ""} value={med.duration} onChange={(e) => handleMedChange(index, "duration", e.target.value)} placeholder="e.g. 5" />
-                        </div>
-                        <div className="w-20">
-                          <InputField
-                            label={index === 0 ? "Total Qty" : ""}
-                            value={((parseFloat(med.dosage) || 0) * (parseFloat(med.frequency) || 0) * (parseFloat(med.duration) || 0)) || ""}
-                            disabled
-                            placeholder="Auto"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-[200px]">
-                          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">
-                            {index === 0 ? "Instructions (Time of Use)" : <span className="invisible">Instructions</span>}
-                          </label>
-                          <div className="flex items-center gap-3 border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white min-h-[38px]">
-                            <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                              <input
-                                type="checkbox"
-                                checked={!!med.morning}
-                                onChange={() => handleCheckboxToggle(index, "morning")}
-                                className="rounded text-navy-600 focus:ring-navy-500 h-4 w-4"
-                              />
-                              <span>Morning</span>
-                            </label>
-                            <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                              <input
-                                type="checkbox"
-                                checked={!!med.afternoon}
-                                onChange={() => handleCheckboxToggle(index, "afternoon")}
-                                className="rounded text-navy-600 focus:ring-navy-500 h-4 w-4"
-                              />
-                              <span>Afternoon</span>
-                            </label>
-                            <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                              <input
-                                type="checkbox"
-                                checked={!!med.night}
-                                onChange={() => handleCheckboxToggle(index, "night")}
-                                className="rounded text-navy-600 focus:ring-navy-500 h-4 w-4"
-                              />
-                              <span>Night</span>
-                            </label>
+                  <div className="overflow-x-auto pb-2 -mx-6 px-6">
+                    <div className="min-w-[850px] space-y-3">
+                      {prescriptionMeds.map((med, index) => (
+                        <div key={med.key || index} className="flex gap-3 items-end border-b border-slate-100 pb-3">
+                          <div className="flex-1 min-w-[200px]">
+                            <InputField
+                              label={index === 0 ? "Medicine Name" : ""}
+                              value={med.name}
+                              onChange={(e) => handleMedChange(index, "name", e.target.value)}
+                              placeholder="e.g. Amoxicillin"
+                              required
+                              list={`med-datalist-${index}`}
+                            />
+                            <datalist id={`med-datalist-${index}`}>
+                              {med.name.trim().length > 0 &&
+                                rawMeds
+                                  .filter((m: any) =>
+                                    m.name.toLowerCase().includes(med.name.toLowerCase())
+                                  )
+                                  .map((m: any) => (
+                                    <option key={m._id} value={m.name} />
+                                  ))}
+                            </datalist>
                           </div>
+                          <div className="w-24">
+                            <InputField label={index === 0 ? "Strength" : ""} value={med.strength || ""} onChange={(e) => handleMedChange(index, "strength", e.target.value)} placeholder="e.g. 500mg" />
+                          </div>
+                          <div className="w-20">
+                            <InputField label={index === 0 ? "Dosage" : ""} value={med.dosage} onChange={(e) => handleMedChange(index, "dosage", e.target.value)} placeholder="e.g. 1" />
+                          </div>
+                          <div className="w-20">
+                            <InputField label={index === 0 ? "Frequency" : ""} value={med.frequency} onChange={(e) => handleMedChange(index, "frequency", e.target.value)} placeholder="e.g. 3" />
+                          </div>
+                          <div className="w-20">
+                            <InputField label={index === 0 ? "Duration" : ""} value={med.duration} onChange={(e) => handleMedChange(index, "duration", e.target.value)} placeholder="e.g. 5" />
+                          </div>
+                          <div className="w-20">
+                            <InputField
+                              label={index === 0 ? "Total Qty" : ""}
+                              value={((parseFloat(med.dosage) || 0) * (parseFloat(med.frequency) || 0) * (parseFloat(med.duration) || 0)) || ""}
+                              disabled
+                              placeholder="Auto"
+                            />
+                          </div>
+                          <div className="w-64">
+                            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">
+                              {index === 0 ? "Instructions (Time of Use)" : <span className="invisible">Instructions</span>}
+                            </label>
+                            <div className="flex items-center gap-3 border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white min-h-[38px]">
+                              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={!!med.morning}
+                                  onChange={() => handleCheckboxToggle(index, "morning")}
+                                  className="rounded text-navy-600 focus:ring-navy-500 h-4 w-4"
+                                />
+                                <span>Morning</span>
+                              </label>
+                              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={!!med.afternoon}
+                                  onChange={() => handleCheckboxToggle(index, "afternoon")}
+                                  className="rounded text-navy-600 focus:ring-navy-500 h-4 w-4"
+                                />
+                                <span>Afternoon</span>
+                              </label>
+                              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={!!med.night}
+                                  onChange={() => handleCheckboxToggle(index, "night")}
+                                  className="rounded text-navy-600 focus:ring-navy-500 h-4 w-4"
+                                />
+                                <span>Night</span>
+                              </label>
+                            </div>
+                          </div>
+                          {prescriptionMeds.length > 1 ? (
+                            <button type="button" onClick={() => handleRemoveMed(index)} className="p-2 text-red-500 hover:bg-red-50 rounded mb-0.5 w-8 flex items-center justify-center">
+                              <Trash2 className="h-4 w-4 shrink-0" />
+                            </button>
+                          ) : (
+                            <div className="w-8" />
+                          )}
                         </div>
-                        {prescriptionMeds.length > 1 && (
-                          <button type="button" onClick={() => handleRemoveMed(index)} className="p-2 text-red-500 hover:bg-red-50 rounded mb-0.5">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
 
                   <div className="flex justify-end gap-2">

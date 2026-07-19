@@ -5,11 +5,15 @@ import { InventoryItem } from "../models/InventoryItem";
 import { Invoice } from "../models/Invoice";
 import { Patient } from "../models/Patient";
 import { Doctor } from "../models/Doctor";
+import { LabOrder } from "../models/LabOrder";
+import { RadiologyOrder } from "../models/RadiologyOrder";
+import { DbNotification } from "../models/DbNotification";
 
 export const getNotifications = catchAsync(async (req: Request, res: Response) => {
   const hospitalFilter = req.hospitalFilter as Record<string, unknown>;
   const isDoctor = req.user!.role === "doctor";
-
+  const isLab = req.user!.role === "laboratory";
+ 
   // Find the doctor ID for this user if they are a doctor
   let doctorId: string | null = null;
   if (isDoctor) {
@@ -22,30 +26,30 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
   const now = new Date();
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
-
+ 
   const endOfTomorrow = new Date(now);
   endOfTomorrow.setDate(endOfTomorrow.getDate() + 2);
   endOfTomorrow.setHours(0, 0, 0, 0);
-
+ 
   const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
+ 
   const apptFilter: Record<string, any> = {
     ...hospitalFilter,
     status: "scheduled",
     date: { $gte: startOfToday, $lt: endOfTomorrow },
   };
-
+ 
   const patientFilter: Record<string, any> = {
     ...hospitalFilter,
     createdAt: { $gte: last24h },
   };
-
+ 
   if (isDoctor && doctorId) {
     apptFilter.doctor = doctorId;
     patientFilter.assignedDoctor = doctorId;
   }
-
-  const [upcomingAppointments, lowStockItems, actionableInvoices, newPatients] = await Promise.all([
+ 
+  const [upcomingAppointments, lowStockItems, actionableInvoices, newPatients, pendingLabOrders, pendingRadiologyOrders, dbNotifications] = await Promise.all([
     // Appointments scheduled today or tomorrow
     Appointment.find(apptFilter)
       .populate("patient", "name")
@@ -53,17 +57,17 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
       .sort({ date: 1 })
       .limit(10)
       .lean(),
-
+ 
     // Inventory at or below reorder level (only fetch for admins)
-    !isDoctor
+    (!isDoctor && !isLab)
       ? InventoryItem.find({ ...hospitalFilter, $expr: { $lte: ["$stockQty", "$reorderLevel"] } })
           .sort({ stockQty: 1 })
           .limit(10)
           .lean()
       : Promise.resolve([]),
-
+ 
     // Overdue invoices or pending invoices with a passed due date (only fetch for admins)
-    !isDoctor
+    (!isDoctor && !isLab)
       ? Invoice.find({
           ...hospitalFilter,
           $or: [
@@ -76,24 +80,56 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
           .limit(10)
           .lean()
       : Promise.resolve([]),
-
+ 
     // Patients registered in the last 24 hours (assigned to doctor if user is doctor)
     Patient.find(patientFilter)
       .sort({ createdAt: -1 })
       .limit(5)
       .lean(),
-  ]);
+ 
+    // Pending lab orders (only for laboratory)
+    isLab
+      ? LabOrder.find({ ...hospitalFilter, status: "pending" })
+          .populate("patient", "name")
+          .populate("doctor", "name")
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .lean()
+      : Promise.resolve([]),
+ 
+    // Pending radiology orders (only for laboratory)
+    isLab
+      ? RadiologyOrder.find({ ...hospitalFilter, status: "pending" })
+          .populate("patient", "name")
+          .populate("doctor", "name")
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .lean()
+      : Promise.resolve([]),
 
+    // Database notifications (e.g. published reports for doctors, role-based for others)
+    DbNotification.find({
+      hospital: hospitalFilter.hospital,
+      $or: [
+        ...(doctorId ? [{ recipientDoctor: doctorId }] : []),
+        { recipientRole: req.user!.role, recipientDoctor: null }
+      ]
+    })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean()
+  ]);
+ 
   type Notification = {
     id: string;
-    type: "appointment" | "inventory" | "invoice" | "patient";
+    type: "appointment" | "inventory" | "invoice" | "patient" | "admission_request" | "general";
     title: string;
     message: string;
     link: string;
     severity: "info" | "warning" | "critical";
     createdAt: Date | string;
   };
-
+ 
   const notifications: Notification[] = [];
 
   // ── Appointments ──
@@ -153,6 +189,50 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
       link: isDoctor ? `/doctor/patient-records` : `/admin/patients/${patient._id}`,
       severity: "info",
       createdAt: patient.createdAt as Date,
+    });
+  }
+
+  // ── Pending Lab Orders ──
+  for (const order of pendingLabOrders) {
+    const patientName = (order.patient as { name?: string })?.name ?? "Unknown patient";
+    const doctorName = (order.doctor as { name?: string })?.name ?? "Unknown doctor";
+    const testsList = (order.tests || []).join(", ");
+    notifications.push({
+      id: `lab-${order._id}`,
+      type: "general",
+      title: "New Lab Request",
+      message: `Dr. ${doctorName} ordered [${testsList}] for ${patientName} (${order.priority || "Routine"})`,
+      link: `/laboratory/requests`,
+      severity: order.priority === "STAT" ? "critical" : order.priority === "Urgent" ? "warning" : "info",
+      createdAt: order.createdAt as Date,
+    });
+  }
+
+  // ── Pending Radiology Orders ──
+  for (const order of pendingRadiologyOrders) {
+    const patientName = (order.patient as { name?: string })?.name ?? "Unknown patient";
+    const doctorName = (order.doctor as { name?: string })?.name ?? "Unknown doctor";
+    notifications.push({
+      id: `rad-${order._id}`,
+      type: "general",
+      title: "New Radiology Request",
+      message: `Dr. ${doctorName} requested ${order.type} for ${patientName} (${order.priority || "Routine"})`,
+      link: `/laboratory/requests`,
+      severity: order.priority === "STAT" ? "critical" : order.priority === "Urgent" ? "warning" : "info",
+      createdAt: order.createdAt as Date,
+    });
+  }
+
+  // ── Database Notifications ──
+  for (const notif of dbNotifications) {
+    notifications.push({
+      id: `db-${notif._id}`,
+      type: (notif.type as any) || "general",
+      title: notif.title,
+      message: notif.message,
+      link: notif.link,
+      severity: (notif.severity as any) || "info",
+      createdAt: notif.createdAt as Date,
     });
   }
 

@@ -27,7 +27,10 @@ import {
   Pill,
   Receipt,
   Eye,
-  Download
+  Download,
+  FileText,
+  Heart,
+  FileCheck
 } from "lucide-react";
 import {
   useRegisterPatient,
@@ -55,9 +58,39 @@ interface HistoryGroup {
   id: string;
   date: Date;
   dateFormatted: string;
-  doctorName?: string;
-  department?: string;
-  entries: any[];
+  doctorName: string;
+  department: string;
+  consultation: {
+    diagnosis: string;
+    notes: string;
+    status: string;
+  } | null;
+  prescriptions: {
+    diagnosis: string;
+    notes: string;
+    status: string;
+  }[];
+  labs: {
+    diagnosis: string;
+    notes: string;
+    status: string;
+  }[];
+  radiology: {
+    diagnosis: string;
+    notes: string;
+    status: string;
+  }[];
+  certificates: {
+    diagnosis: string;
+    notes: string;
+    status: string;
+  }[];
+  inpatientNotes: {
+    diagnosis: string;
+    notes: string;
+    status: string;
+  }[];
+  others: any[];
 }
 
 function groupHistoryByConsultation(historyList: any[]): HistoryGroup[] {
@@ -68,7 +101,7 @@ function groupHistoryByConsultation(historyList: any[]): HistoryGroup[] {
   historyList.forEach((item) => {
     const dateVal = item.date ? new Date(item.date) : new Date();
     const dateStr = dateVal.toLocaleDateString("en-IN");
-    const docName = item.doctorName || "Attending Doctor";
+    const docName = String(item.doctorName || "Attending Doctor").trim();
     const key = `hist-${dateStr}-${docName}`;
 
     if (!map.has(key)) {
@@ -80,16 +113,45 @@ function groupHistoryByConsultation(historyList: any[]): HistoryGroup[] {
           month: "short",
           year: "numeric",
         }),
-        doctorName: item.doctorName,
-        department: item.department,
-        entries: [],
+        doctorName: docName,
+        department: item.department || "",
+        consultation: null,
+        prescriptions: [],
+        labs: [],
+        radiology: [],
+        certificates: [],
+        inpatientNotes: [],
+        others: []
       });
     }
 
     const group = map.get(key)!;
-    group.entries.push(item);
-    if (!group.doctorName && item.doctorName) group.doctorName = item.doctorName;
-    if (!group.department && item.department) group.department = item.department;
+    if (!group.department && item.department) {
+      group.department = item.department;
+    }
+
+    const vType = String(item.visitType).toLowerCase();
+    const cleanItem = {
+      diagnosis: item.diagnosis || "",
+      notes: item.notes || "",
+      status: item.status || "Completed"
+    };
+
+    if (vType.includes("consultation")) {
+      group.consultation = cleanItem;
+    } else if (vType.includes("prescription")) {
+      group.prescriptions.push(cleanItem);
+    } else if (vType.includes("lab")) {
+      group.labs.push(cleanItem);
+    } else if (vType.includes("radiology")) {
+      group.radiology.push(cleanItem);
+    } else if (vType.includes("certificate")) {
+      group.certificates.push(cleanItem);
+    } else if (vType.includes("inpatient") || vType.includes("rounds")) {
+      group.inpatientNotes.push(cleanItem);
+    } else {
+      group.others.push(item);
+    }
   });
 
   return Array.from(map.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -905,7 +967,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                         <History className="h-4.5 w-4.5 text-navy-700" /> Medical History Ledger
                       </h3>
                       <span className="text-xs text-slate-400">
-                        {(patient.medicalHistory || []).length} records across {historyGroups.length} consultations
+                        {historyGroups.length} consultations recorded
                       </span>
                     </div>
 
@@ -916,14 +978,14 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                           return (
                             <div
                               key={group.id}
-                              className={`rounded-xl border p-3.5 transition-all ${
+                              className={`rounded-xl border p-3.5 transition-all space-y-3 ${
                                 isLatest
                                   ? "border-emerald-300/80 bg-gradient-to-r from-emerald-50/40 via-slate-50 to-white shadow-sm ring-1 ring-emerald-200/50"
                                   : "border-slate-200 bg-slate-50/30"
                               }`}
                             >
                               {/* Consultation Header */}
-                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2 mb-2.5">
+                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2 mb-1">
                                 <div className="flex items-center gap-2">
                                   {isLatest ? (
                                     <span className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-sm">
@@ -945,26 +1007,114 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                                 )}
                               </div>
 
-                              {/* Consultation Records/Entries */}
-                              <div className="space-y-2">
-                                {group.entries.map((item: any, i: number) => (
-                                  <div key={i} className="border border-slate-100 rounded-lg p-2.5 bg-white space-y-1 text-xs">
-                                    <div className="flex justify-between items-center">
-                                      <span className="font-semibold text-slate-800 text-xs flex items-center gap-1.5">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-navy-600"></span>
-                                        {item.visitType || "Medical Record"}
-                                      </span>
-                                      <span className="text-[10px] text-slate-400">{new Date(item.date).toLocaleDateString()}</span>
-                                    </div>
-                                    {item.diagnosis && (
-                                      <p className="text-xs text-slate-600"><span className="font-semibold text-slate-700">Diagnosis:</span> {item.diagnosis}</p>
-                                    )}
-                                    {item.notes && (
-                                      <p className="text-xs text-slate-500 italic"><span className="font-semibold text-slate-600">Notes:</span> {item.notes}</p>
-                                    )}
+                              {/* Consultation Clinical Summary */}
+                              {group.consultation && (
+                                <div className="bg-white rounded-lg border border-slate-100 p-2.5 space-y-1 text-xs">
+                                  <div className="flex items-center gap-1.5 text-navy-700 font-bold border-b border-slate-50 pb-1 mb-1">
+                                    <FileText className="h-3.5 w-3.5" /> Clinical Examination Details
                                   </div>
-                                ))}
-                              </div>
+                                  {group.consultation.diagnosis && (
+                                    <p className="text-slate-700"><span className="font-semibold text-slate-500">Diagnosis:</span> {group.consultation.diagnosis}</p>
+                                  )}
+                                  {group.consultation.notes && (
+                                    <p className="text-slate-600 whitespace-pre-wrap"><span className="font-semibold text-slate-500">Notes:</span> {group.consultation.notes}</p>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Prescriptions issued */}
+                              {group.prescriptions.length > 0 && (
+                                <div className="bg-white rounded-lg border border-slate-100 p-2.5 space-y-1 text-xs">
+                                  <div className="flex items-center gap-1.5 text-indigo-700 font-bold border-b border-slate-50 pb-1 mb-1">
+                                    <Pill className="h-3.5 w-3.5" /> Prescriptions Issued
+                                  </div>
+                                  {group.prescriptions.map((item, i) => (
+                                    <div key={i} className="text-slate-655">
+                                      {item.diagnosis && <p className="font-semibold text-slate-700">For: {item.diagnosis}</p>}
+                                      <p className="whitespace-pre-wrap mt-0.5">{item.notes}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Laboratory investigations ordered */}
+                              {group.labs.length > 0 && (
+                                <div className="bg-white rounded-lg border border-slate-100 p-2.5 space-y-1 text-xs">
+                                  <div className="flex items-center gap-1.5 text-blue-700 font-bold border-b border-slate-50 pb-1 mb-1">
+                                    <FlaskConical className="h-3.5 w-3.5" /> Lab Investigations Ordered
+                                  </div>
+                                  {group.labs.map((item, i) => (
+                                    <div key={i} className="text-slate-655 leading-relaxed">
+                                      {item.diagnosis && <p className="font-semibold text-slate-700">Reason: {item.diagnosis}</p>}
+                                      <p className="whitespace-pre-wrap mt-0.5">{item.notes}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Radiology scans ordered */}
+                              {group.radiology.length > 0 && (
+                                <div className="bg-white rounded-lg border border-slate-100 p-2.5 space-y-1 text-xs">
+                                  <div className="flex items-center gap-1.5 text-purple-700 font-bold border-b border-slate-50 pb-1 mb-1">
+                                    <Scan className="h-3.5 w-3.5" /> Radiology Studies Ordered
+                                  </div>
+                                  {group.radiology.map((item, i) => (
+                                    <div key={i} className="text-slate-655 leading-relaxed">
+                                      {item.diagnosis && <p className="font-semibold text-slate-700">Study Request: {item.diagnosis}</p>}
+                                      <p className="whitespace-pre-wrap mt-0.5">{item.notes}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Inpatient rounds notes */}
+                              {group.inpatientNotes.length > 0 && (
+                                <div className="bg-white rounded-lg border border-slate-100 p-2.5 space-y-1 text-xs">
+                                  <div className="flex items-center gap-1.5 text-amber-700 font-bold border-b border-slate-100 pb-1 mb-1">
+                                    <Heart className="h-3.5 w-3.5" /> Inpatient Rounds Notes
+                                  </div>
+                                  {group.inpatientNotes.map((item, i) => (
+                                    <div key={i} className="text-slate-650">
+                                      {item.diagnosis && <p className="font-semibold text-slate-700">Diagnosis/Status: {item.diagnosis}</p>}
+                                      <p className="whitespace-pre-wrap mt-0.5">{item.notes}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Certificates issued */}
+                              {group.certificates.length > 0 && (
+                                <div className="bg-white rounded-lg border border-slate-100 p-2.5 space-y-1 text-xs">
+                                  <div className="flex items-center gap-1.5 text-rose-700 font-bold border-b border-slate-100 pb-1 mb-1">
+                                    <FileCheck className="h-3.5 w-3.5" /> Medical Certificates Issued
+                                  </div>
+                                  {group.certificates.map((item, i) => (
+                                    <div key={i} className="text-slate-655">
+                                      {item.diagnosis && <p className="font-semibold text-slate-700">Purpose/Diagnosis: {item.diagnosis}</p>}
+                                      <p className="whitespace-pre-wrap mt-0.5">{item.notes}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Fallback if a group somehow has no specific visit types mapped */}
+                              {!group.consultation &&
+                                group.prescriptions.length === 0 &&
+                                group.labs.length === 0 &&
+                                group.radiology.length === 0 &&
+                                group.inpatientNotes.length === 0 &&
+                                group.certificates.length === 0 &&
+                                group.others.length > 0 && (
+                                  <div className="space-y-2">
+                                    {group.others.map((item: any, i: number) => (
+                                      <div key={i} className="border border-slate-150 rounded-lg p-2 bg-white space-y-1 text-xs">
+                                        <p className="font-semibold text-slate-800">{item.visitType || "Medical Entry"}</p>
+                                        {item.diagnosis && <p className="text-slate-600"><span className="font-semibold">Diagnosis:</span> {item.diagnosis}</p>}
+                                        {item.notes && <p className="text-slate-500 italic">{item.notes}</p>}
+                                      </div>
+                                    ))}
+                                  </div>
+                              )}
                             </div>
                           );
                         })}

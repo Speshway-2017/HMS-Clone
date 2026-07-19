@@ -320,17 +320,33 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
 export const createInvoice = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital!;
   const body = invoiceSchema.parse(req.body);
-  const invoice = await Invoice.create({ ...body, hospital: hospitalId });
+
+  const computedTotals = computeTotals({
+    items: body.items,
+    taxRate: body.taxRate || 0,
+    serviceFee: body.serviceFee || 0,
+    insuranceCoveragePercent: body.insuranceCoveragePercent || 0,
+  });
+
+  if (req.body.totals && req.body.totals.patientBalance !== undefined) {
+    computedTotals.patientBalance = Number(req.body.totals.patientBalance);
+  }
+
+  const invoice = await Invoice.create({
+    ...body,
+    totals: computedTotals,
+    hospital: hospitalId
+  });
   
   emitToHospital(hospitalId.toString(), "dashboard_update", {
     type: "NEW_INVOICE",
     invoiceId: invoice._id,
     billingType: invoice.billingType,
-    total: computeTotals(invoice).total,
+    total: computedTotals.total,
     timestamp: new Date()
   });
 
-  res.status(201).json({ status: "success", data: { invoice: { ...invoice.toObject(), totals: computeTotals(invoice) } } });
+  res.status(201).json({ status: "success", data: { invoice: { ...invoice.toObject(), totals: computedTotals } } });
 });
 
 export const getInvoice = catchAsync(async (req: Request, res: Response) => {

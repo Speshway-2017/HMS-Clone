@@ -494,7 +494,7 @@ export const getPaymentHistory = catchAsync(async (req: Request, res: Response) 
   // 1. Fetch OP payments
   const opPayments = await Payment.find(filter)
     .populate("patient", "name uhid phone")
-    .populate({ path: "invoice", select: "items totals status" })
+    .populate({ path: "invoice", select: "items totals status billingType" })
     .sort({ paidAt: -1 });
 
   // 2. Fetch IP payments
