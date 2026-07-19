@@ -30,7 +30,8 @@ import {
   Download,
   FileText,
   Heart,
-  FileCheck
+  FileCheck,
+  AlertTriangle
 } from "lucide-react";
 import {
   useRegisterPatient,
@@ -965,6 +966,11 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
               {/* TAB 1: MEDICAL HISTORY */}
               {profileTab === "history" && (() => {
                 const historyGroups = groupHistoryByConsultation(patient.medicalHistory || []);
+                const labOrPharmacyDues = billsData?.data?.filter((inv: any) => 
+                  (inv.billingType === "LAB" || inv.billingType === "RADIOLOGY" || inv.billingType === "PHARMACY") &&
+                  inv.status !== "paid" &&
+                  (inv.totals?.patientBalance > 0 || (inv.totals?.patientBalance === undefined && inv.totals?.total > 0))
+                ) || [];
 
                 return (
                   <div className="space-y-4">
@@ -976,6 +982,53 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                         {historyGroups.length} consultations recorded
                       </span>
                     </div>
+
+                    {/* Laboratory & Pharmacy Outstanding Dues Alert */}
+                    {patient.status === "admitted" && labOrPharmacyDues.length > 0 && (
+                      <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3 shadow-sm">
+                        <div className="flex items-start gap-2.5">
+                          <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <h4 className="text-xs font-bold text-red-800 uppercase tracking-wide">
+                              Outstanding Laboratory / Pharmacy Dues Detected
+                            </h4>
+                            <p className="text-xs text-red-750 leading-relaxed">
+                              This patient is currently an Inpatient and has pending laboratory or pharmacy bills. 
+                              Please ensure these dues are cleared at the respective counters before discharge validation.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="divide-y divide-red-100 rounded-lg border border-red-100 bg-white text-xs">
+                          {labOrPharmacyDues.map((inv: any) => {
+                            const balance = inv.totals?.patientBalance ?? inv.totals?.total ?? 0;
+                            return (
+                              <div key={inv._id} className="flex items-center justify-between p-2.5">
+                                <div>
+                                  <span className="font-semibold text-slate-700">
+                                    {inv.billingType === "PHARMACY" ? "Pharmacy Medication Invoice" : "Laboratory Diagnostics Invoice"}
+                                  </span>
+                                  <span className="text-[10px] text-slate-500 block mt-0.5">
+                                    Invoice: {inv.invoiceNumber || inv._id.substring(18).toUpperCase()} · Date: {new Date(inv.issuedAt).toLocaleDateString()}
+                                  </span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="font-bold text-red-600 block">₹{balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                                  <span className="inline-flex rounded bg-red-50 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-red-700">
+                                    {inv.status.replace("_", " ")}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-b-lg font-bold text-slate-800">
+                            <span>Total Laboratory & Pharmacy Dues:</span>
+                            <span className="text-red-700 text-sm">
+                              ₹{labOrPharmacyDues.reduce((sum, inv) => sum + (inv.totals?.patientBalance ?? inv.totals?.total ?? 0), 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {historyGroups.length > 0 ? (
                       <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">

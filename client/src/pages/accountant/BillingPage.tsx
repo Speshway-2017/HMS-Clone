@@ -20,8 +20,7 @@ import {
   ChevronDown,
   ChevronRight
 } from "lucide-react";
-import { useInvoices, useCreateInvoice } from "../../features/invoices";
-import { usePatients } from "../../features/patients";
+import { useInvoices } from "../../features/invoices";
 import { 
   useIPAdmissions, 
   useIPBillingDetails, 
@@ -119,29 +118,10 @@ export function AccountantBillingPage() {
 
   // Invoices & Patients Queries
   const { data: invoicesData, refetch } = useInvoices({ page, billingType: tabToBillingType[activeTab] });
-  const { data: patientsData } = usePatients({ limit: 100 } as any);
-  const createInvoiceMutation = useCreateInvoice();
 
   // Modals state
-  const [isNewInvoiceOpen, setIsNewInvoiceOpen] = useState(false);
   const [isInvoiceDetailsOpen, setIsInvoiceDetailsOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
-
-  // New Invoice Form state
-  const [patientId, setPatientId] = useState("");
-  const [taxRate, setTaxRate] = useState(5);
-  const [serviceFee, setServiceFee] = useState(150);
-  const [insuranceCoverPercent, setInsuranceCoverPercent] = useState(0);
-  const [dueDate, setDueDate] = useState("");
-  const [items, setItems] = useState<BillingItem[]>([
-    { description: "Consultation Fee", category: "op", quantity: 1, amount: 500 }
-  ]);
-
-  // Form item inputs
-  const [itemDesc, setItemDesc] = useState("");
-  const [itemCat, setItemCat] = useState("op");
-  const [itemQty, setItemQty] = useState(1);
-  const [itemAmt, setItemAmt] = useState(0);
 
   // ── IP Billing States ──
   const [admissionSearch, setAdmissionSearch] = useState("");
@@ -227,13 +207,6 @@ export function AccountantBillingPage() {
     }
   }, [ipDetails?.charges]);
 
-  // Totals calculations
-  const subtotal = items.reduce((sum, item) => sum + item.quantity * item.amount, 0);
-  const taxAmount = subtotal * (taxRate / 100);
-  const total = subtotal + taxAmount + Number(serviceFee);
-  const insuranceCovered = total * (insuranceCoverPercent / 100);
-  const patientBalance = total - insuranceCovered;
-
   // Running Bill Totals
   const gross = ipDetails?.charges?.reduce((sum: number, c: any) => sum + c.total, 0) || 0;
   const grossTax = gross * (taxRateVal / 100);
@@ -254,55 +227,7 @@ export function AccountantBillingPage() {
     : [];
   const allBlockages = [...clinicalBlockages, ...billingBlockages];
 
-  const handleAddItem = () => {
-    if (!itemDesc || itemAmt <= 0 || itemQty <= 0) return;
-    setItems([...items, { description: itemDesc, category: itemCat, quantity: itemQty, amount: itemAmt }]);
-    setItemDesc("");
-    setItemQty(1);
-    setItemAmt(0);
-  };
 
-  const handleRemoveItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
-  };
-
-  const handleCreateInvoiceSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!patientId || items.length === 0) return;
-
-    const firstItemCategory = items[0]?.category;
-    let bType = "OP";
-    if (firstItemCategory === "ip") {
-      bType = "IP";
-    } else if (firstItemCategory === "pharmacy") {
-      bType = "PHARMACY";
-    } else if (firstItemCategory === "laboratory") {
-      bType = "LAB";
-    }
-
-    createInvoiceMutation.mutate(
-      {
-        patient: patientId,
-        items,
-        taxRate,
-        serviceFee,
-        insuranceCoveragePercent: insuranceCoverPercent,
-        billingType: bType,
-        status: "pending",
-        dueDate: dueDate ? new Date(dueDate) : undefined
-      } as any,
-      {
-        onSuccess: () => {
-          setIsNewInvoiceOpen(false);
-          setItems([{ description: "Consultation Fee", category: "op", quantity: 1, amount: 500 }]);
-          setPatientId("");
-          setInsuranceCoverPercent(0);
-          setDueDate("");
-          refetch();
-        }
-      }
-    );
-  };
 
   const handleAddCustomCharge = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -406,12 +331,7 @@ export function AccountantBillingPage() {
           <h1 className="text-2xl font-bold text-slate-900">Patient Billing & Invoices</h1>
           <p className="text-sm text-slate-500">Manage OPD, IPD, laboratory diagnostics, and pharmacy bills.</p>
         </div>
-        <button
-          onClick={() => setIsNewInvoiceOpen(true)}
-          className="flex items-center gap-1.5 rounded-lg bg-navy-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-800 transition self-start sm:self-auto"
-        >
-          <Plus className="h-4 w-4" /> Create Invoice
-        </button>
+
       </div>
 
       {/* Tabs Menu */}
@@ -1123,174 +1043,7 @@ export function AccountantBillingPage() {
         </form>
       </Modal>
 
-      {/* Modal: Generate New Invoice */}
-      <Modal 
-        title="Generate New Invoice" 
-        isOpen={isNewInvoiceOpen} 
-        onClose={() => setIsNewInvoiceOpen(false)}
-      >
-        <form onSubmit={handleCreateInvoiceSubmit} className="space-y-4">
-          <SelectField
-            label="Select Patient"
-            value={patientId}
-            onChange={(e) => setPatientId(e.target.value)}
-            required
-          >
-            <option value="">-- Choose Patient --</option>
-            {patientsData?.data?.map((p) => (
-              <option key={p._id} value={p._id}>
-                {p.name} ({p.phone})
-              </option>
-            ))}
-          </SelectField>
 
-          <div className="grid grid-cols-2 gap-4">
-            <InputField
-              label="Tax Rate (%)"
-              type="number"
-              value={taxRate}
-              onChange={(e) => setTaxRate(Number(e.target.value))}
-              min="0"
-              max="100"
-            />
-            <InputField
-              label="Service Fee (₹)"
-              type="number"
-              value={serviceFee}
-              onChange={(e) => setServiceFee(Number(e.target.value))}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <InputField
-              label="Insurance Coverage (%)"
-              type="number"
-              value={insuranceCoverPercent}
-              onChange={(e) => setInsuranceCoverPercent(Number(e.target.value))}
-              min="0"
-              max="100"
-            />
-            <InputField
-              label="Due Date"
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-            />
-          </div>
-
-          {/* Items Section */}
-          <div className="rounded-xl border border-slate-200 p-4 space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">Invoice Items</h4>
-            
-            {/* Added items list */}
-            {items.length > 0 && (
-              <ul className="divide-y divide-slate-100 text-xs">
-                {items.map((item, i) => (
-                  <li key={i} className="flex items-center justify-between py-1.5">
-                    <div>
-                      <span className="font-semibold text-slate-700">{item.description}</span>
-                      <span className="ml-2 text-[10px] uppercase bg-slate-100 text-slate-500 px-1 py-0.5 rounded">
-                        {item.category}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-slate-600">
-                        {item.quantity} × ₹{item.amount} = ₹{item.quantity * item.amount}
-                      </span>
-                      <button 
-                        type="button" 
-                        onClick={() => handleRemoveItem(i)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {/* Quick add item form */}
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                type="text"
-                placeholder="Item Description"
-                value={itemDesc}
-                onChange={(e) => setItemDesc(e.target.value)}
-                className="col-span-2 rounded border border-slate-200 p-1.5 text-xs outline-none focus:border-navy-500"
-              />
-              <select
-                value={itemCat}
-                onChange={(e) => setItemCat(e.target.value)}
-                className="rounded border border-slate-200 p-1.5 text-xs outline-none bg-white"
-              >
-                <option value="op">OP Consultation</option>
-                <option value="ip">IP Ward/Room</option>
-                <option value="pharmacy">Pharmacy</option>
-                <option value="laboratory">Laboratory</option>
-              </select>
-              <div className="flex gap-1">
-                <input
-                  type="number"
-                  placeholder="Qty"
-                  value={itemQty}
-                  onChange={(e) => setItemQty(Number(e.target.value))}
-                  className="w-12 rounded border border-slate-200 p-1.5 text-xs outline-none"
-                  min="1"
-                />
-                <input
-                  type="number"
-                  placeholder="Price"
-                  value={itemAmt || ""}
-                  onChange={(e) => setItemAmt(Number(e.target.value))}
-                  className="w-full rounded border border-slate-200 p-1.5 text-xs outline-none"
-                  min="0"
-                />
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={handleAddItem}
-              className="w-full rounded bg-slate-100 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200"
-            >
-              Add Item
-            </button>
-          </div>
-
-          {/* Computed Summary */}
-          <div className="bg-slate-50 p-3 rounded-lg text-xs space-y-1.5">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Subtotal:</span>
-              <span className="font-medium text-slate-800">₹{subtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Tax ({taxRate}%):</span>
-              <span className="font-medium text-slate-800">₹{taxAmount.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Service Fee:</span>
-              <span className="font-medium text-slate-800">₹{Number(serviceFee).toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Insurance Benefit ({insuranceCoverPercent}%):</span>
-              <span className="font-medium text-emerald-600">-₹{insuranceCovered.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between border-t border-slate-200 pt-1.5 text-sm font-bold">
-              <span className="text-slate-800">Total Patient Balance:</span>
-              <span className="text-navy-700">₹{patientBalance.toFixed(2)}</span>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" type="button" onClick={() => setIsNewInvoiceOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit" disabled={items.length === 0 || !patientId}>
-              Generate & Save
-            </Button>
-          </div>
-        </form>
-      </Modal>
 
       {/* Modal: Invoice Print/Preview Details */}
       <Modal

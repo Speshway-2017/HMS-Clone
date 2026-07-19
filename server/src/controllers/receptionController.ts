@@ -344,7 +344,35 @@ export const getAdmissions = catchAsync(async (req: Request, res: Response) => {
     .populate("bed")
     .populate("admittingDoctor", "name specialization")
     .populate("dischargeRequestedBy", "name specialization")
-    .sort({ admissionDate: -1 });
+    .sort({ admissionDate: -1 })
+    .lean();
+
+  // Enrich with lab/pharmacy dues
+  for (const adm of admissions) {
+    if (adm.patient) {
+      const unpaidInvoices = await Invoice.find({
+        patient: adm.patient._id,
+        hospital: req.hospitalFilter!.hospital as any,
+        billingType: { $in: ["LAB", "RADIOLOGY", "PHARMACY"] },
+        status: { $ne: "paid" }
+      });
+      
+      const duesTotal = unpaidInvoices.reduce((sum, inv: any) => sum + (inv.totals?.patientBalance ?? inv.totals?.total ?? 0), 0);
+      
+      (adm as any).labPharmacyDues = unpaidInvoices.map((inv: any) => ({
+        _id: inv._id,
+        invoiceNumber: inv.invoiceNumber,
+        billingType: inv.billingType,
+        status: inv.status,
+        issuedAt: inv.issuedAt,
+        balance: inv.totals?.patientBalance ?? inv.totals?.total ?? 0
+      }));
+      (adm as any).labPharmacyDuesTotal = duesTotal;
+    } else {
+      (adm as any).labPharmacyDues = [];
+      (adm as any).labPharmacyDuesTotal = 0;
+    }
+  }
 
   res.json({ status: "success", data: { admissions } });
 });

@@ -1840,6 +1840,19 @@ export class ReceptionService {
       throw new AppError("Active admission record not found.", 404);
     }
 
+    // Check for pending laboratory or pharmacy invoices
+    const unpaidInvoices = await Invoice.find({
+      patient: admission.patient._id,
+      hospital: hospitalId,
+      billingType: { $in: ["LAB", "RADIOLOGY", "PHARMACY"] },
+      status: { $ne: "paid" }
+    });
+
+    const totalPending = unpaidInvoices.reduce((sum, inv) => sum + (inv.totals?.patientBalance ?? inv.totals?.total ?? 0), 0);
+    if (totalPending > 0) {
+      throw new AppError(`Cannot confirm discharge. Patient has pending laboratory or pharmacy dues of ₹${totalPending.toFixed(2)}. Please ask them to clear these dues at the respective counters first.`, 400);
+    }
+
     // Release bed
     await ReceptionRepository.updateBedOccupancy(hospitalId, admission.bed.toString(), false);
 
