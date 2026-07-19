@@ -164,8 +164,10 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
 
   const pendingInvoices = (pendingData?.invoices ?? []).filter((inv: any) => inv.billingType !== "PHARMACY");
   const completedInvoices = (completedData?.invoices ?? []).filter((inv: any) => inv.billingType !== "PHARMACY");
-  const todayPayments = collectionsData?.payments ?? [];
-  const todayTotal = collectionsData?.totalAmount ?? 0;
+  const todayPayments = (collectionsData?.payments ?? []).filter(
+    (p: any) => p.invoice?.billingType?.toUpperCase() !== "LAB"
+  );
+  const todayTotal = todayPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
   const filteredPendingInvoices = pendingInvoices.filter((inv: any) => {
     const q = billingSearchQuery.toLowerCase();

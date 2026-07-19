@@ -41,6 +41,7 @@ const router = Router();
 
 // Specific billing pay override to allow laboratory and pharmacy roles as well
 router.post("/billing/pay", protect, restrictTo("receptionist", "hospital_admin", "accountant", "pharmacist", "laboratory"), scopeToHospital, processBillingPayment);
+router.get("/billing/payment-history", protect, restrictTo("receptionist", "hospital_admin", "accountant", "pharmacist", "laboratory"), scopeToHospital, getPaymentHistory);
 
 // Secure all receptionist routes
 router.use(protect, restrictTo("receptionist", "hospital_admin", "accountant", "pharmacist"), scopeToHospital);

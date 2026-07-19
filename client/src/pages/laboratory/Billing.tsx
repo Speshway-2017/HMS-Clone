@@ -7,6 +7,9 @@ import {
   X, IndianRupee, CalendarDays, BadgeCheck
 } from "lucide-react";
 import { useInvoices } from "../../features/invoices";
+import { useLaboratoryRequests } from "../../features/laboratory";
+import { useMyHospital } from "../../features/hospitals";
+import { usePaymentHistory } from "../../features/receptionist";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -26,20 +29,26 @@ interface ReceiptInfo {
   subtotal: number;
   tax: number;
   total: number;
+  patientBalance: number;
   status: string;
   issuedAt: string;
 }
 
 export function LaboratoryBilling() {
   const { data: invoiceData, isLoading } = useInvoices({ billingType: "LAB" });
+  const { data: requests = [] } = useLaboratoryRequests();
+  const { data: hospitalData } = useMyHospital();
+  const { data: todayPaymentsData } = usePaymentHistory("today");
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"pending" | "paid">("pending");
+  const [activeTab, setActiveTab] = useState<"pending" | "paid" | "today">("pending");
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [receiptInfo, setReceiptInfo] = useState<ReceiptInfo | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
+
+  const prices: Record<string, number> = (hospitalData as any)?.investigationPrices || {};
 
   const rawInvoices: any[] = invoiceData?.data || [];
   const invoices = rawInvoices.map((inv: any) => ({
@@ -50,15 +59,105 @@ export function LaboratoryBilling() {
     subtotal: inv.totals?.subtotal || 0,
     taxAmount: inv.totals?.taxAmount || 0,
     total: inv.totals?.total || 0,
+    patientBalance: inv.totals?.patientBalance ?? 0,
     status: inv.status,
     issuedAt: inv.issuedAt || inv.createdAt,
+    isInvoice: true,
   }));
 
-  const filteredInvoices = invoices.filter((inv) => {
-    const tabMatch = activeTab === "paid" ? inv.status === "paid" : inv.status !== "paid";
+  const pendingRequests = requests
+    .filter((req) => req.status === "pending")
+    .map((req) => {
+      const sub = (req.tests || []).reduce((sum, t) => sum + (prices[t] || 0), 0);
+      return {
+        _id: req._id,
+        patientName: req.patientName,
+        patientUhid: req.patientUhid || "",
+        items: (req.tests || []).map((t) => ({ testName: t, price: prices[t] || 0 })),
+        subtotal: sub,
+        taxAmount: 0,
+        total: sub,
+        patientBalance: sub,
+        status: "unbilled",
+        issuedAt: req.date,
+        isInvoice: false,
+        rawRequest: req,
+      };
+    });
+
+  const rawTodayPayments = todayPaymentsData?.payments || [];
+  const todayLabPayments = rawTodayPayments
+    .filter((p: any) => p.invoice?.billingType === "LAB")
+    .map((p: any) => ({
+      _id: p._id,
+      invoiceId: p.invoice?._id,
+      patientName: p.patient?.name || "—",
+      patientUhid: p.patient?.uhid,
+      items: (p.invoice?.items || []).map((it: any) => ({ testName: it.description, price: it.amount })),
+      amountPaid: p.amount,
+      paymentMethod: p.paymentMethod,
+      transactionId: p.transactionId,
+      paidAt: p.paidAt,
+      subtotal: p.invoice?.totals?.subtotal || 0,
+      taxAmount: p.invoice?.totals?.taxAmount || 0,
+      total: p.invoice?.totals?.total || 0,
+      patientBalance: p.invoice?.totals?.patientBalance || 0,
+      status: p.invoice?.status || "paid",
+      isInvoice: true,
+      issuedAt: p.paidAt,
+    }));
+
+  const paidInvoiceIds = new Set(rawTodayPayments.map((p: any) => p.invoice?._id?.toString()));
+
+  const todayPaidInvoicesWithoutPayments = invoices
+    .filter((inv) => {
+      if (inv.status === "pending" || inv.status === "unbilled") return false;
+
+      const date = new Date(inv.issuedAt);
+      const today = new Date();
+      const isToday = date.getDate() === today.getDate() &&
+                      date.getMonth() === today.getMonth() &&
+                      date.getFullYear() === today.getFullYear();
+
+      return isToday && !paidInvoiceIds.has(inv._id.toString());
+    })
+    .map((inv) => ({
+      _id: inv._id,
+      invoiceId: inv._id,
+      patientName: inv.patientName,
+      patientUhid: inv.patientUhid,
+      items: inv.items,
+      amountPaid: inv.total - inv.patientBalance,
+      paymentMethod: "Cash",
+      transactionId: "LEGACY",
+      paidAt: inv.issuedAt,
+      subtotal: inv.subtotal,
+      taxAmount: inv.taxAmount,
+      total: inv.total,
+      patientBalance: inv.patientBalance,
+      status: inv.status,
+      isInvoice: true,
+      issuedAt: inv.issuedAt,
+    }));
+
+  const conformedTodayCollections = [...todayLabPayments, ...todayPaidInvoicesWithoutPayments];
+
+  const allBillingEntries: any[] = activeTab === "pending"
+    ? [...pendingRequests, ...invoices.filter((inv) => inv.status !== "paid")]
+    : activeTab === "paid"
+    ? invoices.filter((inv) => inv.status === "paid")
+    : conformedTodayCollections;
+
+  // Sort by date descending
+  allBillingEntries.sort((a, b) => new Date(b.issuedAt).getTime() - new Date(a.issuedAt).getTime());
+
+  const filteredInvoices = allBillingEntries.filter((inv) => {
     const q = search.toLowerCase();
-    const searchMatch = !search || inv.patientName.toLowerCase().includes(q) || inv._id.toLowerCase().includes(q);
-    return tabMatch && searchMatch;
+    const searchMatch = !search ||
+      inv.patientName.toLowerCase().includes(q) ||
+      inv._id.toLowerCase().includes(q) ||
+      inv.items.some((it: any) => it.testName.toLowerCase().includes(q));
+    return searchMatch;
   });
 
 
@@ -90,7 +189,7 @@ export function LaboratoryBilling() {
   };
 
   const statusTone = (s: string) =>
-    s === "paid" ? "success" : s === "partially_paid" ? "warning" : "info";
+    s === "paid" ? "success" : s === "partially_paid" ? "warning" : s === "unbilled" ? "warning" : "info";
 
   return (
     <div className="space-y-6">
@@ -113,11 +212,12 @@ export function LaboratoryBilling() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         {[
-          { label: "Total Bills", value: invoices.length, icon: <Receipt className="h-5 w-5 text-blue-500" />, bg: "bg-blue-50" },
-          { label: "Pending", value: invoices.filter(i => i.status !== "paid").length, icon: <CalendarDays className="h-5 w-5 text-amber-500" />, bg: "bg-amber-50" },
+          { label: "Total Bills", value: invoices.length + pendingRequests.length, icon: <Receipt className="h-5 w-5 text-blue-500" />, bg: "bg-blue-50" },
+          { label: "Pending", value: invoices.filter(i => i.status !== "paid").length + pendingRequests.length, icon: <CalendarDays className="h-5 w-5 text-amber-500" />, bg: "bg-amber-50" },
           { label: "Paid", value: invoices.filter(i => i.status === "paid").length, icon: <BadgeCheck className="h-5 w-5 text-green-500" />, bg: "bg-green-50" },
+          { label: "Today's Collecting", value: `₹${conformedTodayCollections.reduce((sum, p) => sum + p.amountPaid, 0).toLocaleString()}`, icon: <IndianRupee className="h-5 w-5 text-indigo-500" />, bg: "bg-indigo-50" },
         ].map((stat) => (
           <div key={stat.label} className={`${stat.bg} rounded-xl p-4 flex items-center gap-3 border border-slate-200`}>
             <div className="p-2 rounded-lg bg-white shadow-sm">{stat.icon}</div>
@@ -133,17 +233,32 @@ export function LaboratoryBilling() {
       <Card>
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-1 justify-between">
           <div className="flex bg-slate-100 p-1 rounded-lg w-fit">
-            {(["pending", "paid"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`rounded-md px-5 py-1.5 text-xs font-semibold transition-colors capitalize ${
-                  activeTab === tab ? "bg-white text-blue-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                {tab} ({invoices.filter(i => tab === "paid" ? i.status === "paid" : i.status !== "paid").length})
-              </button>
-            ))}
+            {(["pending", "paid", "today"] as const).map((tab) => {
+              let count = 0;
+              let label = "";
+              if (tab === "paid") {
+                count = invoices.filter(i => i.status === "paid").length;
+                label = "Paid";
+              } else if (tab === "pending") {
+                count = invoices.filter(i => i.status !== "paid").length + pendingRequests.length;
+                label = "Pending";
+              } else {
+                count = conformedTodayCollections.length;
+                label = "Today's Collecting";
+              }
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`rounded-md px-5 py-1.5 text-xs font-semibold transition-colors capitalize ${
+                    activeTab === tab ? "bg-white text-blue-700 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  {label} ({count})
+                </button>
+              );
+            })}
           </div>
           <div className="relative max-w-xs w-full">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -181,7 +296,9 @@ export function LaboratoryBilling() {
               <tbody>
                 {filteredInvoices.map((inv) => (
                   <tr key={inv._id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3 font-mono text-xs text-blue-700 font-bold">{inv._id.slice(-8).toUpperCase()}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-blue-700 font-bold">
+                      {inv.isInvoice ? inv._id.slice(-8).toUpperCase() : `REQ-${inv._id.slice(-6).toUpperCase()}`}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="font-semibold text-slate-800">{inv.patientName}</div>
                       {inv.patientUhid && <div className="text-[10px] text-slate-400 font-mono">{inv.patientUhid}</div>}
@@ -194,52 +311,129 @@ export function LaboratoryBilling() {
                       </div>
                     </td>
                     <td className="px-4 py-3 font-bold text-slate-800">
-                      <span className="flex items-center gap-0.5"><IndianRupee className="h-3 w-3" />{inv.total.toLocaleString()}</span>
+                      {activeTab === "today" ? (
+                        <div>
+                          <div className="flex items-center gap-0.5 text-green-600 font-bold">
+                            <IndianRupee className="h-3 w-3" />
+                            {inv.amountPaid.toLocaleString()}
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-normal">of ₹{inv.total.toLocaleString()}</div>
+                        </div>
+                      ) : (
+                        <span className="flex items-center gap-0.5"><IndianRupee className="h-3 w-3" />{inv.total.toLocaleString()}</span>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-500">{new Date(inv.issuedAt).toLocaleDateString()}</td>
-                    <td className="px-4 py-3">
-                      <Badge tone={statusTone(inv.status)}>{inv.status.replace("_", " ").toUpperCase()}</Badge>
+                    <td className="px-4 py-3 text-xs text-slate-500">
+                      {activeTab === "today"
+                        ? new Date(inv.issuedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : new Date(inv.issuedAt).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            setReceiptInfo({
-                              invoiceId: inv._id,
-                              patientName: inv.patientName,
-                              patientUhid: inv.patientUhid,
-                              items: inv.items,
-                              subtotal: inv.subtotal,
-                              tax: inv.taxAmount,
-                              total: inv.total,
-                              status: inv.status,
-                              issuedAt: inv.issuedAt,
-                            });
-                            setIsReceiptOpen(true);
-                          }}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                          title="View Receipt"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        {inv.status !== "paid" && (
+                      {activeTab === "today" ? (
+                        <Badge tone="success">{inv.paymentMethod.toUpperCase()}</Badge>
+                      ) : (
+                        <Badge tone={statusTone(inv.status)}>{inv.status.replace("_", " ").toUpperCase()}</Badge>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {activeTab === "today" ? (
+                        <div className="flex gap-2">
                           <button
-                            onClick={async () => {
-                              try {
-                                await api.patch(`/invoices/${inv._id}`, { status: "paid" });
-                                queryClient.invalidateQueries({ queryKey: ["invoices"] });
-                                toast.success("Bill marked as paid!");
-                              } catch {
-                                toast.error("Failed to update status.");
-                              }
+                            onClick={() => {
+                              setReceiptInfo({
+                                invoiceId: inv.invoiceId || inv._id,
+                                patientName: inv.patientName,
+                                patientUhid: inv.patientUhid,
+                                items: inv.items,
+                                subtotal: inv.subtotal,
+                                tax: inv.taxAmount,
+                                total: inv.total,
+                                patientBalance: inv.patientBalance,
+                                status: inv.status,
+                                issuedAt: inv.issuedAt,
+                              });
+                              setIsReceiptOpen(true);
                             }}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-green-600 hover:bg-green-50 transition-colors"
-                            title="Mark as Paid"
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                            title="View Receipt"
                           >
-                            <Check className="h-4 w-4" />
+                            <Eye className="h-4 w-4" />
                           </button>
-                        )}
-                      </div>
+                        </div>
+                      ) : inv.isInvoice ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setReceiptInfo({
+                                invoiceId: inv._id,
+                                patientName: inv.patientName,
+                                patientUhid: inv.patientUhid,
+                                items: inv.items,
+                                subtotal: inv.subtotal,
+                                tax: inv.taxAmount,
+                                total: inv.total,
+                                patientBalance: inv.patientBalance,
+                                status: inv.status,
+                                issuedAt: inv.issuedAt,
+                              });
+                              setIsReceiptOpen(true);
+                            }}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                            title="View Receipt"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                          {inv.status !== "paid" && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  if (inv.patientBalance > 0) {
+                                    await api.post("/reception/billing/pay", {
+                                      invoiceId: inv._id,
+                                      amount: inv.patientBalance,
+                                      paymentMethod: "Cash",
+                                    });
+                                  } else {
+                                    await api.patch(`/invoices/${inv._id}`, { status: "paid" });
+                                  }
+                                  queryClient.invalidateQueries({ queryKey: ["invoices"] });
+                                  queryClient.invalidateQueries({ queryKey: ["reception", "billing", "payment-history"] });
+                                  toast.success("Bill marked as paid!");
+                                } catch {
+                                  toast.error("Failed to update status.");
+                                }
+                              }}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-green-600 hover:bg-green-50 transition-colors"
+                              title="Mark as Paid"
+                            >
+                              <Check className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              const req = inv.rawRequest;
+                              navigate("/laboratory/billing/new", {
+                                state: {
+                                  fromRequest: true,
+                                  patientId: req.patientId,
+                                  patientName: req.patientName,
+                                  patientUhid: req.patientUhid || "",
+                                  tests: req.tests,
+                                  priority: req.priority,
+                                  requestId: req._id,
+                                }
+                              });
+                            }}
+                            className="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-750 text-white px-2.5 py-1 rounded text-xs font-bold transition-colors shadow-xs"
+                            title="Bill and Accept Request"
+                          >
+                            <IndianRupee className="h-3 w-3" /> Bill & Accept
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -302,6 +496,16 @@ export function LaboratoryBilling() {
                     <td style={{ border: "1px solid #ddd", padding: "8px 10px", fontSize: 15 }}>TOTAL</td>
                     <td style={{ border: "1px solid #ddd", padding: "8px 10px", textAlign: "right", fontSize: 15 }}>₹{receiptInfo.total.toLocaleString()}</td>
                   </tr>
+                  <tr style={{ fontWeight: "bold", color: "#16a34a" }}>
+                    <td style={{ border: "1px solid #ddd", padding: "8px 10px" }}>Amount Paid</td>
+                    <td style={{ border: "1px solid #ddd", padding: "8px 10px", textAlign: "right" }}>₹{(receiptInfo.total - receiptInfo.patientBalance).toLocaleString()}</td>
+                  </tr>
+                  {receiptInfo.patientBalance > 0 && (
+                    <tr style={{ fontWeight: "bold", color: "#dc2626" }}>
+                      <td style={{ border: "1px solid #ddd", padding: "8px 10px" }}>Remaining Balance</td>
+                      <td style={{ border: "1px solid #ddd", padding: "8px 10px", textAlign: "right" }}>₹{receiptInfo.patientBalance.toLocaleString()}</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
 

@@ -68,24 +68,19 @@ export function TestRequestDetailsPage() {
     return "Rejected";
   };
 
-  const handleAccept = async (id: string, req: UnifiedRequest) => {
-    try {
-      await acceptRequest.mutateAsync(id);
-      toast.success("Request accepted! Redirecting to billing...");
-      navigate("/laboratory/billing/new", {
-        state: {
-          fromRequest: true,
-          patientId: req.patientId,
-          patientName: req.patientName,
-          patientUhid: req.patientUhid || "",
-          tests: req.tests,
-          priority: req.priority,
-          requestId: req._id,
-        }
-      });
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to accept request.");
-    }
+  const handleAccept = (req: UnifiedRequest) => {
+    toast.success("Redirecting to billing to complete test request...");
+    navigate("/laboratory/billing/new", {
+      state: {
+        fromRequest: true,
+        patientId: req.patientId,
+        patientName: req.patientName,
+        patientUhid: req.patientUhid || "",
+        tests: req.tests,
+        priority: req.priority,
+        requestId: req._id,
+      }
+    });
   };
 
   const handleReject = async () => {
@@ -287,8 +282,8 @@ export function TestRequestDetailsPage() {
                 Reject Request
               </Button>
               <Button
-                onClick={() => handleAccept(request._id, request)}
-                className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 font-bold"
+                onClick={() => handleAccept(request)}
+                className="bg-green-600 hover:bg-green-750 text-white px-6 py-2.5 font-bold"
               >
                 Accept & Bill
               </Button>

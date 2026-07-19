@@ -28,6 +28,7 @@ interface ReceiptInfo {
   subtotal: number;
   tax: number;
   total: number;
+  patientBalance: number;
   status: string;
   issuedAt: string;
 }
@@ -51,6 +52,7 @@ export function NewLabBillPage() {
   const [taxRate, setTaxRate] = useState(0);
   const [payNow, setPayNow] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<"Cash" | "UPI" | "Card">("Cash");
+  const [payingAmount, setPayingAmount] = useState<string>("");
   const [prefillApplied, setPrefillApplied] = useState(false);
 
   // Receipt modal
@@ -87,7 +89,7 @@ export function NewLabBillPage() {
   // Auto-prefill from accepted request navigation
   useEffect(() => {
     const state = location.state as any;
-    if (state?.fromRequest && !prefillApplied && allPatients.length > 0) {
+    if (state?.fromRequest && !prefillApplied && allPatients.length > 0 && hospitalData) {
       const patient = allPatients.find((p: any) => p._id === state.patientId);
       if (patient) {
         setSelectedPatientId(patient._id);
@@ -112,7 +114,7 @@ export function NewLabBillPage() {
       setPrefillApplied(true);
       window.history.replaceState({}, document.title);
     }
-  }, [location.state, allPatients, prefillApplied, prices]);
+  }, [location.state, allPatients, prefillApplied, prices, hospitalData]);
 
   const subtotal = billItems.reduce((sum, it) => sum + it.price, 0);
   const taxAmt = Math.round((subtotal * taxRate) / 100);
@@ -140,6 +142,18 @@ export function NewLabBillPage() {
     if (!selectedPatientId) { toast.error("Please select a patient."); return; }
     if (billItems.length === 0) { toast.error("Add at least one test."); return; }
 
+    const amountToCollect = payNow ? (parseFloat(payingAmount) === 0 ? 0 : parseFloat(payingAmount) || total) : 0;
+    if (payNow) {
+      if (amountToCollect <= 0) {
+        toast.error("Please enter a valid paying amount greater than 0.");
+        return;
+      }
+      if (amountToCollect > total) {
+        toast.error("Paying amount cannot exceed the total bill amount.");
+        return;
+      }
+    }
+
     const items = billItems.map((it) => ({
       description: it.testName,
       category: "laboratory",
@@ -147,7 +161,10 @@ export function NewLabBillPage() {
       amount: it.price,
     }));
 
-    const status = payNow ? ("paid" as const) : ("pending" as const);
+    let status: "paid" | "partially_paid" | "pending" = "pending";
+    if (payNow) {
+      status = amountToCollect === total ? "paid" : "partially_paid";
+    }
 
     try {
       const newInvoice = await createInvoiceMutation.mutateAsync({
@@ -165,19 +182,29 @@ export function NewLabBillPage() {
           discount: 0,
           insuranceCovered: 0,
           total,
-          patientBalance: payNow ? 0 : total,
+          patientBalance: total - amountToCollect,
         } as any,
       } as any);
 
-      if (payNow) {
+      if (payNow && amountToCollect > 0) {
         try {
           await api.post("/reception/billing/pay", {
             invoiceId: newInvoice._id,
-            amount: total,
+            amount: amountToCollect,
             paymentMethod,
           });
         } catch {
           // payment optional—invoice is still saved
+        }
+      }
+
+      // Transition request status to accepted upon successful bill creation
+      const state = location.state as any;
+      if (state?.fromRequest && state?.requestId) {
+        try {
+          await api.post(`/laboratory/${state.requestId}/accept`);
+        } catch (acceptErr) {
+          console.error("Failed to transition request to accepted status:", acceptErr);
         }
       }
 
@@ -191,7 +218,8 @@ export function NewLabBillPage() {
         subtotal,
         tax: taxAmt,
         total,
-        status: payNow ? "paid" : "pending",
+        patientBalance: total - amountToCollect,
+        status: status,
         issuedAt: new Date().toISOString(),
       });
       setIsReceiptOpen(true);
@@ -489,15 +517,32 @@ export function NewLabBillPage() {
                     <label htmlFor="pay-now" className="text-sm font-medium text-slate-700">Collect payment now</label>
                   </div>
                   {payNow && (
-                    <select
-                      value={paymentMethod}
-                      onChange={(e) => setPaymentMethod(e.target.value as any)}
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500 bg-white"
-                    >
-                      <option value="Cash">Cash</option>
-                      <option value="UPI">UPI</option>
-                      <option value="Card">Card</option>
-                    </select>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1">Payment Method</label>
+                        <select
+                          value={paymentMethod}
+                          onChange={(e) => setPaymentMethod(e.target.value as any)}
+                          className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500 bg-white"
+                        >
+                          <option value="Cash">Cash</option>
+                          <option value="UPI">UPI</option>
+                          <option value="Card">Card</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1">Paying Amount (₹)</label>
+                        <input
+                          type="number"
+                          placeholder={`Enter amount (default: ₹${total})`}
+                          value={payingAmount}
+                          min={1}
+                          max={total}
+                          onChange={(e) => setPayingAmount(e.target.value)}
+                          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -583,6 +628,16 @@ export function NewLabBillPage() {
                     <td style={{ border: "1px solid #ddd", padding: "8px 10px", fontSize: 15 }}>TOTAL</td>
                     <td style={{ border: "1px solid #ddd", padding: "8px 10px", textAlign: "right", fontSize: 15 }}>₹{receiptInfo.total.toLocaleString()}</td>
                   </tr>
+                  <tr style={{ fontWeight: "bold", color: "#16a34a" }}>
+                    <td style={{ border: "1px solid #ddd", padding: "8px 10px" }}>Amount Paid</td>
+                    <td style={{ border: "1px solid #ddd", padding: "8px 10px", textAlign: "right" }}>₹{(receiptInfo.total - receiptInfo.patientBalance).toLocaleString()}</td>
+                  </tr>
+                  {receiptInfo.patientBalance > 0 && (
+                    <tr style={{ fontWeight: "bold", color: "#dc2626" }}>
+                      <td style={{ border: "1px solid #ddd", padding: "8px 10px" }}>Remaining Balance</td>
+                      <td style={{ border: "1px solid #ddd", padding: "8px 10px", textAlign: "right" }}>₹{receiptInfo.patientBalance.toLocaleString()}</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
 
