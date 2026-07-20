@@ -741,7 +741,7 @@ export class ReceptionService {
       const isFirstPayment = existingPayments.length === 0; // Check if this is the first payment
 
       // If invoice has provisional data AND it's the FIRST payment (partial or full), create appointment now
-      if (isFirstPayment && (invoice as any).provisionalData?.doctorId) {
+      if (isFirstPayment && invoice.billingType === "OP" && (invoice as any).provisionalData?.doctorId) {
         const provisionalData = (invoice as any).provisionalData;
         const bookingDate = new Date(provisionalData.date);
         const today = new Date();
