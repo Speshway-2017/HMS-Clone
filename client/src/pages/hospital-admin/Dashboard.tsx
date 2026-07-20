@@ -3,16 +3,27 @@ import { CalendarClock, BedDouble, Wallet, Stethoscope, Users2, AlertTriangle, P
 import { useHospitalAnalytics } from "../../features/analytics";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { Card } from "../../components/ui/Card";
+import { useMyHospital } from "../../features/hospitals";
 
 export function HospitalAdminDashboard() {
   const { data } = useHospitalAnalytics();
+  const { data: hospital } = useMyHospital();
   const counts = data?.counts;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Hospital Dashboard</h1>
-        <p className="text-sm text-slate-500">Daily operations overview for your hospital.</p>
+      <div className="flex items-center gap-4">
+        {hospital?.logoUrl ? (
+          <img src={hospital.logoUrl} alt={hospital.name} className="h-12 w-12 rounded-xl object-contain ring-2 ring-slate-100 bg-white p-1" />
+        ) : (
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-navy-100 text-navy-700 font-bold text-xl ring-2 ring-slate-100">
+            {hospital?.name ? hospital.name.charAt(0).toUpperCase() : "H"}
+          </div>
+        )}
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">{hospital?.name || "Hospital Dashboard"}</h1>
+          <p className="text-sm text-slate-500">Daily operations overview for your hospital.</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

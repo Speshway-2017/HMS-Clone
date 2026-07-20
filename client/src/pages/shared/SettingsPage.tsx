@@ -3,6 +3,7 @@ import { Eye, EyeOff, KeyRound, ShieldCheck, CheckCircle2, XCircle, Lock } from 
 import { useChangePassword } from "../../features/auth";
 import { useAuth } from "../../context/AuthContext";
 import { useMyHospital, useUpdateMyHospital } from "../../features/hospitals";
+import { FileUpload } from "../../components/ui/FileUpload";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -246,6 +247,7 @@ function HospitalSettingsCard() {
   const [address, setAddress] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
   const [opExpiryLimit, setOpExpiryLimit] = useState(10);
   const [availableLabTests, setAvailableLabTests] = useState<string[]>([]);
   const [labInput, setLabInput] = useState("");
@@ -259,6 +261,7 @@ function HospitalSettingsCard() {
       setAddress(hospital.address || "");
       setContactEmail(hospital.contactEmail || "");
       setContactPhone(hospital.contactPhone || "");
+      setLogoUrl(hospital.logoUrl || "");
       setOpExpiryLimit(hospital.opExpiryLimit ?? 10);
       setAvailableLabTests((hospital as any).availableLabTests || []);
       setAvailableRadiologyTests((hospital as any).availableRadiologyTests || []);
@@ -302,6 +305,7 @@ function HospitalSettingsCard() {
         address,
         contactEmail,
         contactPhone,
+        logoUrl,
         opExpiryLimit: Number(opExpiryLimit),
         availableLabTests,
         availableRadiologyTests,
@@ -372,6 +376,16 @@ function HospitalSettingsCard() {
               value={contactPhone}
               onChange={(e) => setContactPhone(e.target.value)}
               className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-800 outline-none transition focus:border-navy-500 focus:ring-2 focus:ring-navy-200"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5 sm:col-span-2 border-t border-slate-100 pt-4">
+            <label className="text-sm font-medium text-slate-700">Hospital Logo</label>
+            <FileUpload
+              label="Hospital Logo"
+              folder="hospital-logos"
+              value={logoUrl}
+              onChange={setLogoUrl}
             />
           </div>
         </div>

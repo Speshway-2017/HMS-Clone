@@ -1157,13 +1157,26 @@ export function ConsultationWorkspacePage() {
                     </button>
                   </div>
 
-                  <div className="overflow-x-auto pb-2 -mx-6 px-6">
-                    <div className="min-w-[850px] space-y-3">
-                      {prescriptionMeds.map((med, index) => (
-                        <div key={med.key || index} className="flex gap-3 items-end border-b border-slate-100 pb-3">
+                  <div className="space-y-4">
+                    {prescriptionMeds.map((med, index) => (
+                      <div key={med.key || index} className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 space-y-3 relative">
+                        {/* Trash/Remove button at top right */}
+                        {prescriptionMeds.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMed(index)}
+                            className="absolute top-3 right-3 p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition"
+                            title="Remove Medicine"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+
+                        {/* Row 1: Main Fields */}
+                        <div className="flex flex-wrap gap-3 items-start pr-8">
                           <div className="flex-1 min-w-[200px]">
                             <InputField
-                              label={index === 0 ? "Medicine Name" : ""}
+                              label="Medicine Name"
                               value={med.name}
                               onChange={(e) => handleMedChange(index, "name", e.target.value)}
                               placeholder="e.g. Amoxicillin"
@@ -1181,70 +1194,85 @@ export function ConsultationWorkspacePage() {
                                   ))}
                             </datalist>
                           </div>
-                          <div className="w-24">
-                            <InputField label={index === 0 ? "Strength" : ""} value={med.strength || ""} onChange={(e) => handleMedChange(index, "strength", e.target.value)} placeholder="e.g. 500mg" />
-                          </div>
-                          <div className="w-20">
-                            <InputField label={index === 0 ? "Dosage" : ""} value={med.dosage} onChange={(e) => handleMedChange(index, "dosage", e.target.value)} placeholder="e.g. 1" />
-                          </div>
-                          <div className="w-20">
-                            <InputField label={index === 0 ? "Frequency" : ""} value={med.frequency} onChange={(e) => handleMedChange(index, "frequency", e.target.value)} placeholder="e.g. 3" />
-                          </div>
-                          <div className="w-20">
-                            <InputField label={index === 0 ? "Duration" : ""} value={med.duration} onChange={(e) => handleMedChange(index, "duration", e.target.value)} placeholder="e.g. 5" />
-                          </div>
-                          <div className="w-20">
+                          <div className="w-28 shrink-0">
                             <InputField
-                              label={index === 0 ? "Total Qty" : ""}
+                              label="Strength"
+                              value={med.strength || ""}
+                              onChange={(e) => handleMedChange(index, "strength", e.target.value)}
+                              placeholder="e.g. 500mg"
+                            />
+                          </div>
+                          <div className="w-24 shrink-0">
+                            <InputField
+                              label="Dosage"
+                              value={med.dosage}
+                              onChange={(e) => handleMedChange(index, "dosage", e.target.value)}
+                              placeholder="e.g. 1"
+                            />
+                          </div>
+                          <div className="w-24 shrink-0">
+                            <InputField
+                              label="Frequency"
+                              value={med.frequency}
+                              onChange={(e) => handleMedChange(index, "frequency", e.target.value)}
+                              placeholder="e.g. 3"
+                            />
+                          </div>
+                          <div className="w-24 shrink-0">
+                            <InputField
+                              label="Duration"
+                              value={med.duration}
+                              onChange={(e) => handleMedChange(index, "duration", e.target.value)}
+                              placeholder="e.g. 5"
+                            />
+                          </div>
+                          <div className="w-24 shrink-0">
+                            <InputField
+                              label="Total Qty"
                               value={((parseFloat(med.dosage) || 0) * (parseFloat(med.frequency) || 0) * (parseFloat(med.duration) || 0)) || ""}
                               disabled
                               placeholder="Auto"
                             />
                           </div>
-                          <div className="w-64">
-                            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">
-                              {index === 0 ? "Instructions (Time of Use)" : <span className="invisible">Instructions</span>}
-                            </label>
-                            <div className="flex items-center gap-3 border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white min-h-[38px]">
-                              <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                                <input
-                                  type="checkbox"
-                                  checked={!!med.morning}
-                                  onChange={() => handleCheckboxToggle(index, "morning")}
-                                  className="rounded text-navy-600 focus:ring-navy-500 h-4 w-4"
-                                />
-                                <span>Morning</span>
-                              </label>
-                              <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                                <input
-                                  type="checkbox"
-                                  checked={!!med.afternoon}
-                                  onChange={() => handleCheckboxToggle(index, "afternoon")}
-                                  className="rounded text-navy-600 focus:ring-navy-500 h-4 w-4"
-                                />
-                                <span>Afternoon</span>
-                              </label>
-                              <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                                <input
-                                  type="checkbox"
-                                  checked={!!med.night}
-                                  onChange={() => handleCheckboxToggle(index, "night")}
-                                  className="rounded text-navy-600 focus:ring-navy-500 h-4 w-4"
-                                />
-                                <span>Night</span>
-                              </label>
-                            </div>
-                          </div>
-                          {prescriptionMeds.length > 1 ? (
-                            <button type="button" onClick={() => handleRemoveMed(index)} className="p-2 text-red-500 hover:bg-red-50 rounded mb-0.5 w-8 flex items-center justify-center">
-                              <Trash2 className="h-4 w-4 shrink-0" />
-                            </button>
-                          ) : (
-                            <div className="w-8" />
-                          )}
                         </div>
-                      ))}
-                    </div>
+
+                        {/* Row 2: Instructions */}
+                        <div className="border-t border-slate-200/60 pt-2 flex flex-col sm:flex-row sm:items-center gap-3">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Instructions (Time of Use):
+                          </span>
+                          <div className="flex items-center gap-4 text-xs font-medium text-slate-700">
+                            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={!!med.morning}
+                                onChange={() => handleCheckboxToggle(index, "morning")}
+                                className="rounded text-navy-600 focus:ring-navy-500 h-4 w-4"
+                              />
+                              <span>Morning</span>
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={!!med.afternoon}
+                                onChange={() => handleCheckboxToggle(index, "afternoon")}
+                                className="rounded text-navy-600 focus:ring-navy-500 h-4 w-4"
+                              />
+                              <span>Afternoon</span>
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={!!med.night}
+                                onChange={() => handleCheckboxToggle(index, "night")}
+                                className="rounded text-navy-600 focus:ring-navy-500 h-4 w-4"
+                              />
+                              <span>Night</span>
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
                   <div className="flex justify-end gap-2">
@@ -1263,8 +1291,11 @@ export function ConsultationWorkspacePage() {
               {/* Printable Prescription Template (Hidden on screen, shown in ref) */}
               <div className="hidden">
                 <div ref={printRef} className="p-10 max-w-2xl mx-auto space-y-6 text-slate-800">
-                  <div className="text-center border-b pb-4">
-                    <h1 className="text-2xl font-bold uppercase tracking-wide">Hospital Medical Center</h1>
+                  <div className="text-center border-b pb-4 flex flex-col items-center gap-2 justify-center">
+                    {hospitalData?.logoUrl && (
+                      <img src={hospitalData.logoUrl} alt={hospitalData.name} className="h-14 object-contain" />
+                    )}
+                    <h1 className="text-2xl font-bold uppercase tracking-wide">{hospitalData?.name || "Hospital Medical Center"}</h1>
                     <p className="text-xs text-slate-500">OPD Department · Printable Rx Slip</p>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-xs">

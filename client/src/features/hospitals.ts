@@ -76,9 +76,10 @@ export function useDeleteHospital() {
   });
 }
 
-export function useMyHospital() {
+export function useMyHospital(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["hospitals", "me"],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get("/hospitals/me");
       return res.data.data.hospital as Hospital;
