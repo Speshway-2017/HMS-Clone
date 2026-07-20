@@ -15,6 +15,7 @@ import { Admission } from "../models/Admission";
 import { IPBill } from "../models/IPBill";
 import { IPBillPayment } from "../models/IPBillPayment";
 import { Appointment } from "../models/Appointment";
+import { getIPBillItemsSummary } from "./ipBillController";
 
 
 // Validation Schemas
@@ -809,6 +810,64 @@ export const getQueueDetails = catchAsync(async (req: Request, res: Response) =>
       currentlyConsulting,
       missedAppointments,
       completedVisits
+    }
+  });
+});
+
+export const checkAdmissionBillingStatus = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as any;
+  const admissionId = req.params.id;
+
+  const admission = await Admission.findOne({ _id: admissionId, hospital: hospitalId }).populate("patient");
+  if (!admission) {
+    throw new AppError("Admission record not found.", 404);
+  }
+
+  // 1. Fetch pending OP invoices (laboratory, pharmacy, radiology)
+  const unpaidInvoices = await Invoice.find({
+    patient: admission.patient._id,
+    hospital: hospitalId,
+    billingType: { $in: ["LAB", "RADIOLOGY", "PHARMACY"] },
+    status: { $ne: "paid" }
+  });
+
+  const totalPendingOP = unpaidInvoices.reduce((sum, inv) => sum + (inv.totals?.patientBalance ?? inv.totals?.total ?? 0), 0);
+
+  // 2. Fetch IP bill status & outstanding
+  const ipBill = await IPBill.findOne({
+    admission: admissionId,
+    hospital: hospitalId,
+    status: { $ne: "Cancelled" }
+  });
+
+  let ipOutstanding = 0;
+  let hasDraftIPBill = false;
+  if (ipBill) {
+    if (ipBill.status === "Draft") {
+      hasDraftIPBill = true;
+      const items = await getIPBillItemsSummary(ipBill, admission, hospitalId);
+      const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+      const tax = subtotal * (ipBill.taxRate / 100);
+      const totalDiscount = ipBill.discountType === "percentage"
+        ? subtotal * ((ipBill.hospitalDiscount + ipBill.doctorDiscount + ipBill.managementDiscount) / 100)
+        : (ipBill.hospitalDiscount + ipBill.doctorDiscount + ipBill.managementDiscount);
+      const grandTotal = subtotal + tax - totalDiscount;
+      ipOutstanding = Math.max(0, grandTotal - ipBill.insuranceCovered - ipBill.advancePaid);
+    } else {
+      ipOutstanding = ipBill.outstanding;
+    }
+  }
+
+  const totalDues = totalPendingOP + ipOutstanding;
+
+  res.json({
+    status: "success",
+    data: {
+      hasOutstandingBills: totalDues > 1,
+      totalPendingOP,
+      ipOutstanding,
+      totalDues,
+      hasDraftIPBill
     }
   });
 });

@@ -1853,6 +1853,32 @@ export class ReceptionService {
       throw new AppError(`Cannot confirm discharge. Patient has pending laboratory or pharmacy dues of ₹${totalPending.toFixed(2)}. Please ask them to clear these dues at the respective counters first.`, 400);
     }
 
+    // Check for outstanding inpatient bill
+    const ipBill = await mongoose.model("IPBill").findOne({
+      admission: admissionId,
+      hospital: hospitalId,
+      status: { $ne: "Cancelled" }
+    });
+
+    if (ipBill) {
+      let ipOutstanding = ipBill.outstanding;
+      if (ipBill.status === "Draft") {
+        const { getIPBillItemsSummary } = await import("../controllers/ipBillController");
+        const items = await getIPBillItemsSummary(ipBill, admission, hospitalId);
+        const subtotal = items.reduce((sum: number, item: any) => sum + item.total, 0);
+        const tax = subtotal * (ipBill.taxRate / 100);
+        const totalDiscount = ipBill.discountType === "percentage"
+          ? subtotal * ((ipBill.hospitalDiscount + ipBill.doctorDiscount + ipBill.managementDiscount) / 100)
+          : (ipBill.hospitalDiscount + ipBill.doctorDiscount + ipBill.managementDiscount);
+        const grandTotal = subtotal + tax - totalDiscount;
+        ipOutstanding = Math.max(0, grandTotal - ipBill.insuranceCovered - ipBill.advancePaid);
+      }
+
+      if (ipOutstanding > 1) {
+        throw new AppError(`Cannot confirm discharge. Patient has outstanding inpatient bill balance of ₹${ipOutstanding.toFixed(2)}. Please clear these dues in the billing section first.`, 400);
+      }
+    }
+
     // Release bed
     await ReceptionRepository.updateBedOccupancy(hospitalId, admission.bed.toString(), false);
 

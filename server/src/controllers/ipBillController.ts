@@ -70,7 +70,7 @@ const getRadiologyRate = (scanType: string): number => {
 };
 
 // Helper: Get Consolidated Inpatient Bill Items (Manual + Auto-Fetched)
-const getIPBillItemsSummary = async (bill: any, admission: any, hospitalId: any) => {
+export const getIPBillItemsSummary = async (bill: any, admission: any, hospitalId: any) => {
   const patientId = admission.patient._id || admission.patient;
 
   // Load hospital to retrieve lab/radiology prices

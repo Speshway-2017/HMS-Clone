@@ -109,6 +109,28 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const confirmDischargeMutation = useConfirmDischarge();
   const markReadMutation = useMarkNotificationRead();
 
+  const checkBillingAndOpenDischarge = async (admissionId: string) => {
+    const loadingToast = toast.loading("Checking patient billing status...");
+    try {
+      const res = await api.get(`/reception/admissions/${admissionId}/billing-status`);
+      toast.dismiss(loadingToast);
+      const { hasOutstandingBills, totalDues } = res.data.data;
+      if (hasOutstandingBills) {
+        toast.error(`Patient has outstanding dues of ₹${totalDues.toFixed(2)}. Redirecting to billing...`);
+        setTimeout(() => {
+          navigate(`/receptionist/billing/ip?admissionId=${admissionId}`);
+        }, 1200);
+      } else {
+        setDischargeAdmissionId(admissionId);
+        setDischargeNotes("");
+        setIsDischargeOpen(true);
+      }
+    } catch (err: any) {
+      toast.dismiss(loadingToast);
+      toast.error(err.response?.data?.message || "Failed to verify billing status.");
+    }
+  };
+
   // Handle URL query parameters at startup
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
@@ -124,9 +146,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
     }
     if (urlDischargeId) {
       setTab("admissions");
-      setDischargeAdmissionId(urlDischargeId);
-      setDischargeNotes("");
-      setIsDischargeOpen(true);
+      checkBillingAndOpenDischarge(urlDischargeId);
     }
   }, [window.location.search]);
 
@@ -326,15 +346,13 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
         notes: dischargeNotes
       });
 
-      toast.success("Discharge completed. Bed is now vacant. Redirecting to billing...");
-      const idToRedirect = dischargeAdmissionId;
+      toast.success("Patient discharged successfully.");
       setDischargeAdmissionId("");
       setDischargeNotes("");
       setIsDischargeOpen(false);
       refetchRooms();
       refetchAdmissions();
       setTab("admissions");
-      navigate(`/receptionist/billing/ip?admissionId=${idToRedirect}`);
     } catch (err: any) {
       alert(err.message || "Failed to complete discharge");
     }
@@ -392,11 +410,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
           </Button>
           <Button
             type="button"
-            onClick={() => {
-              setDischargeAdmissionId(row._id);
-              setDischargeNotes("");
-              setIsDischargeOpen(true);
-            }}
+            onClick={() => checkBillingAndOpenDischarge(row._id)}
             variant="danger"
             className="text-[10px] px-2 py-1 flex items-center gap-1"
           >
@@ -1430,14 +1444,26 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                       variant="primary"
                       onClick={async () => {
                         if (!window.confirm(`Confirm discharge for ${adm.patient?.name}? This will vacate the bed.`)) return;
+                        const loadingToast = toast.loading("Checking patient billing status...");
                         try {
+                          const statusRes = await api.get(`/reception/admissions/${adm._id}/billing-status`);
+                          toast.dismiss(loadingToast);
+                          const { hasOutstandingBills, totalDues } = statusRes.data.data;
+                          if (hasOutstandingBills) {
+                            toast.error(`Patient has outstanding dues of ₹${totalDues.toFixed(2)}. Redirecting to billing...`);
+                            setTimeout(() => {
+                              navigate(`/receptionist/billing/ip?admissionId=${adm._id}`);
+                            }, 1200);
+                            return;
+                          }
+
                           await confirmDischargeMutation.mutateAsync({ admissionId: adm._id, notes: adm.diagnosisAtDischarge || "Doctor finalized discharge" });
-                          toast.success(`${adm.patient?.name} has been discharged. Bed is now vacant. Redirecting to billing...`);
+                          toast.success(`${adm.patient?.name} has been discharged successfully.`);
                           refetchDischargeRequests();
                           refetchAdmissions();
                           refetchRooms();
-                          navigate(`/receptionist/billing/ip?admissionId=${adm._id}`);
                         } catch (err: any) {
+                          toast.dismiss(loadingToast);
                           toast.error(err?.response?.data?.message || "Failed to confirm discharge.");
                         }
                       }}
