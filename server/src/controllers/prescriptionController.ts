@@ -611,15 +611,17 @@ export const dispensePrescription = catchAsync(async (req: Request, res: Respons
       throw new AppError("Prescription has already been fully dispensed and completed.", 400);
     }
 
-    // One Prescription = One Pharmacy Invoice validation check
-    const existingInvoice = await Invoice.findOne({
-      hospital: hospitalId,
-      billingType: "PHARMACY",
-      prescription: prescription._id
-    }).session(session);
+    // One Prescription = One Pharmacy Invoice validation check (except for Partially Dispensed ones)
+    if (prescription.status !== "Partially Dispensed") {
+      const existingInvoice = await Invoice.findOne({
+        hospital: hospitalId,
+        billingType: "PHARMACY",
+        prescription: prescription._id
+      }).session(session);
 
-    if (existingInvoice) {
-      throw new AppError("This prescription has already been dispensed and an invoice generated.", 400);
+      if (existingInvoice) {
+        throw new AppError("This prescription has already been dispensed and an invoice generated.", 400);
+      }
     }
 
     // Safety check: verify patient
