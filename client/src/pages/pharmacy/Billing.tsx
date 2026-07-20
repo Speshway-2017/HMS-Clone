@@ -5,6 +5,7 @@ import { api } from "../../lib/api";
 import { Receipt, Search, Eye, Printer, Check, CreditCard, IndianRupee, Wallet } from "lucide-react";
 import { usePatients } from "../../features/patients";
 import { useInvoices } from "../../features/invoices";
+import { useMyHospital } from "../../features/hospitals";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
 import { Badge } from "../../components/ui/Badge";
@@ -41,6 +42,7 @@ export function PharmacyBilling() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const highlightInvoiceId = searchParams.get("invoiceId") || "";
+  const { data: hospitalData } = useMyHospital();
 
   const { data: patientData, isLoading: isPatientsLoading } = usePatients({});
   const { data: dbInvoiceData, isLoading: isInvoicesLoading } = useInvoices({ billingType: "PHARMACY", limit: 100 });
@@ -456,8 +458,11 @@ export function PharmacyBilling() {
         >
           <div className="space-y-4">
             <div id="pharmacy-invoice-print" className="border border-slate-200 p-6 rounded-xl bg-white space-y-4 font-sans text-xs">
-              <div className="text-center">
-                <h2 className="text-lg font-bold text-slate-900">Sunrise General Hospital</h2>
+              <div className="text-center flex flex-col items-center gap-1.5 justify-center">
+                {hospitalData?.logoUrl && (
+                  <img src={hospitalData.logoUrl} alt={hospitalData.name} className="h-10 object-contain" />
+                )}
+                <h2 className="text-lg font-bold text-slate-900">{hospitalData?.name || "Sunrise General Hospital"}</h2>
                 <p className="text-[10px] text-slate-500 font-medium">PHARMACY INVOICE & RECEIPT</p>
                 <div className="text-[9px] text-slate-400 mt-0.5">GSTIN: 27AACCS1092F1Z4 | Lic: PH-2024-99882</div>
               </div>

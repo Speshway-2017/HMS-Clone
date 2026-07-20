@@ -62,6 +62,7 @@ const patientSchema = z.object({
   allergies: z.string().optional().default(""),
   insuranceProvider: z.string().optional().default(""),
   insurancePolicyNumber: z.string().optional().default(""),
+  photoUrl: z.string().optional().default(""),
 });
 
 export const listPatients = catchAsync(async (req: Request, res: Response) => {

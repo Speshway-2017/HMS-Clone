@@ -48,6 +48,19 @@ export async function generatePrescriptionPDF(data: PDFData, outputPath: string)
 
   const qrBuffer = await QRCode.toBuffer(data.verificationUrl, { width: 85, margin: 1 });
 
+  let logoBuffer: Buffer | null = null;
+  if (data.hospitalLogoUrl) {
+    try {
+      const res = await fetch(data.hospitalLogoUrl);
+      if (res.ok) {
+        const arrayBuffer = await res.arrayBuffer();
+        logoBuffer = Buffer.from(arrayBuffer);
+      }
+    } catch (err) {
+      console.error("Error fetching hospital logo for PDF:", err);
+    }
+  }
+
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ size: "A4", margin: 50 });
@@ -74,25 +87,38 @@ export async function generatePrescriptionPDF(data: PDFData, outputPath: string)
       doc.rect(0, 0, 595.28, 15).fill(primaryColor);
 
       // Hospital Info
-      doc.fillColor(primaryColor).font("Helvetica-Bold").fontSize(22).text(data.hospitalName.toUpperCase(), 50, 40);
+      doc.fillColor(primaryColor).font("Helvetica-Bold").fontSize(18).text(data.hospitalName.toUpperCase(), 50, 32, { width: 410 });
       doc.fillColor(secondaryColor).font("Helvetica").fontSize(9);
       if (data.hospitalAddress) {
-        doc.text(data.hospitalAddress, 50, 68);
+        doc.text(data.hospitalAddress, { width: 410 });
       }
       const contactInfo = [
         data.hospitalPhone ? `Tel: ${data.hospitalPhone}` : "",
         data.hospitalEmail ? `Email: ${data.hospitalEmail}` : "",
       ].filter(Boolean).join("  |  ");
       if (contactInfo) {
-        doc.text(contactInfo, 50, 80);
+        doc.text(contactInfo, { width: 410 });
       }
 
-      // Draw a Red Cross (Hospital Symbol) as Logo
-      doc.save();
-      doc.translate(500, 45);
-      doc.rect(-6, -18, 12, 36).fill("#EF4444");
-      doc.rect(-18, -6, 36, 12).fill("#EF4444");
-      doc.restore();
+      // Draw Logo or Red Cross Symbol
+      if (logoBuffer) {
+        try {
+          doc.image(logoBuffer, 480, 25, { fit: [65, 65], align: "right", valign: "center" });
+        } catch (imgError) {
+          console.error("Failed to render custom logo image, drawing default symbol:", imgError);
+          doc.save();
+          doc.translate(500, 45);
+          doc.rect(-6, -18, 12, 36).fill("#EF4444");
+          doc.rect(-18, -6, 36, 12).fill("#EF4444");
+          doc.restore();
+        }
+      } else {
+        doc.save();
+        doc.translate(500, 45);
+        doc.rect(-6, -18, 12, 36).fill("#EF4444");
+        doc.rect(-18, -6, 36, 12).fill("#EF4444");
+        doc.restore();
+      }
 
       // Divider Line
       doc.moveTo(50, 105).lineTo(545, 105).strokeColor(primaryColor).lineWidth(1.5).stroke();

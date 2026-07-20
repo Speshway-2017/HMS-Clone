@@ -171,8 +171,14 @@ export function LaboratoryBilling() {
       <html><head><title>Lab Invoice</title>
       <style>
         body { font-family: Arial, sans-serif; padding: 24px; font-size: 13px; }
-        h1 { font-size: 20px; margin-bottom: 4px; }
-        h2 { font-size: 14px; margin-bottom: 16px; color: #555; }
+        .print-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ddd; padding-bottom: 12px; margin-bottom: 16px; }
+        .print-logo-section { display: flex; align-items: center; gap: 10px; }
+        .print-logo { height: 40px; width: 40px; object-fit: contain; border-radius: 4px; }
+        .print-title { font-size: 16px; font-weight: bold; margin: 0; color: #1e3a8a; }
+        .print-subtitle { margin: 0; font-size: 10px; color: #666; }
+        .print-right-align { text-align: right; }
+        .print-doc-type { font-size: 12px; font-weight: bold; margin: 0; color: #333; }
+        .print-invoice-no { margin: 0; font-size: 10px; color: #666; font-family: monospace; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
         th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; }
         th { background: #f5f5f5; font-weight: 600; }
@@ -450,8 +456,25 @@ export function LaboratoryBilling() {
         <Modal title="Laboratory Invoice / Receipt" isOpen={isReceiptOpen} onClose={() => setIsReceiptOpen(false)}>
           <div className="space-y-4">
             <div ref={printRef} className="space-y-4 text-sm">
-              <h1 style={{ fontSize: 20, fontWeight: "bold", marginBottom: 4 }}>Laboratory Invoice</h1>
-              <h2 style={{ color: "#555", marginBottom: 12 }}>Invoice #{receiptInfo.invoiceId.slice(-8).toUpperCase()}</h2>
+              <div className="print-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2px solid #ddd", paddingBottom: "12px", marginBottom: "16px" }}>
+                <div className="print-logo-section" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  {hospitalData?.logoUrl ? (
+                    <img className="print-logo" src={hospitalData.logoUrl} alt={hospitalData.name} style={{ height: "40px", width: "40px", objectFit: "contain", borderRadius: "4px" }} />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded bg-navy-100 text-navy-700 font-bold text-lg">
+                      {hospitalData?.name ? hospitalData.name.charAt(0).toUpperCase() : "H"}
+                    </div>
+                  )}
+                  <div>
+                    <h1 className="print-title" style={{ fontSize: "16px", fontWeight: "bold", margin: 0, color: "#1e3a8a" }}>{hospitalData?.name || "Laboratory Invoice"}</h1>
+                    <p className="print-subtitle" style={{ margin: 0, fontSize: "10px", color: "#666" }}>Diagnostic Services Desk</p>
+                  </div>
+                </div>
+                <div className="print-right-align" style={{ textAlign: "right" }}>
+                  <h4 className="print-doc-type" style={{ fontSize: "12px", fontWeight: "bold", margin: 0, color: "#333" }}>LAB INVOICE</h4>
+                  <p className="print-invoice-no" style={{ margin: 0, fontSize: "10px", color: "#666", fontFamily: "monospace" }}>Invoice #{receiptInfo.invoiceId.slice(-8).toUpperCase()}</p>
+                </div>
+              </div>
 
               <div className="grid grid-cols-2 gap-4 text-sm border-b border-slate-100 pb-3">
                 <div>

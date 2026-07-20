@@ -25,6 +25,7 @@ import { DataTable } from "../../components/ui/DataTable";
 import { Badge } from "../../components/ui/Badge";
 import { formatINR } from "../../lib/currency";
 import { api } from "../../lib/api";
+import { useMyHospital } from "../../features/hospitals";
 
 interface Props {
   activeTab?: "new" | "admissions" | "rooms" | "transfer" | "discharges";
@@ -33,6 +34,7 @@ interface Props {
 export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const navigate = useNavigate();
   const [tab, setTab] = useState<"new" | "admissions" | "rooms" | "transfer" | "discharges">(activeTab);
+  const { data: hospitalData } = useMyHospital();
 
   useEffect(() => {
     setTab(activeTab);
@@ -488,14 +490,14 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Inpatient (IP) Management</h1>
           <p className="text-sm text-slate-500">Handle IP admissions, ward transfers, and patient discharge requests.</p>
         </div>
-
+ 
         {/* Tab triggers */}
-        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-1">
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 w-fit">
           <button
             onClick={() => setTab("admissions")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
@@ -569,14 +571,17 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
               <div className="max-w-xl mx-auto">
                 
                 {/* 1. Admission Slip Card */}
-                <Card className="space-y-4 border border-slate-200 shadow-md p-6 bg-white relative">
+                <Card id="admission-slip-print" className="space-y-4 border border-slate-200 shadow-md p-6 bg-white relative print:border-none print:shadow-none print:p-0">
                   <div className="absolute top-4 right-4 bg-navy-50 text-navy-700 font-bold font-mono text-xs px-2 py-0.5 rounded border border-navy-100">
                     ADMISSION SLIP
                   </div>
                   
                   {/* Header */}
-                  <div className="text-center pb-4 border-b border-dashed border-slate-200">
-                    <h3 className="text-base font-bold text-slate-800 uppercase tracking-wide">{successData.admissionSlip?.hospitalName}</h3>
+                  <div className="text-center pb-4 border-b border-dashed border-slate-200 flex flex-col items-center gap-1.5 justify-center">
+                    {hospitalData?.logoUrl && (
+                      <img src={hospitalData.logoUrl} alt={hospitalData.name} className="h-12 object-contain" />
+                    )}
+                    <h3 className="text-base font-bold text-slate-800 uppercase tracking-wide">{hospitalData?.name || successData.admissionSlip?.hospitalName}</h3>
                     <p className="text-[10px] text-slate-450 mt-0.5">INPATIENT DEPT (IPD) RECORD</p>
                   </div>
 
@@ -761,11 +766,17 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                       Patient Demographics
                     </h3>
                     <div className="flex flex-col items-center text-center p-3 space-y-3">
-                      <img
-                        src={patientDetail.patient?.photoUrl || "https://images.unsplash.com/photo-1579684389782-64d84b5e901a?q=80&w=150"}
-                        alt="Patient Photo"
-                        className="w-20 h-20 rounded-full border border-slate-200 object-cover"
-                      />
+                      {patientDetail.patient?.photoUrl ? (
+                        <img
+                          src={patientDetail.patient.photoUrl}
+                          alt="Patient Photo"
+                          className="w-20 h-20 rounded-full border border-slate-200 object-cover shadow-sm"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 bg-slate-100 rounded-full border border-slate-200 flex items-center justify-center text-3xl font-extrabold text-slate-400 uppercase">
+                          {patientDetail.patient?.name?.charAt(0) || "?"}
+                        </div>
+                      )}
                       <div>
                         <h4 className="font-bold text-slate-800 text-sm">{patientDetail.patient?.name}</h4>
                         <span className="font-mono text-xs text-indigo-600 font-bold">{patientDetail.patient?.uhid}</span>

@@ -41,6 +41,7 @@ import {
 } from "../../features/ipBills";
 import { api } from "../../lib/api";
 import { socket } from "../../lib/socket";
+import { useMyHospital } from "../../features/hospitals";
 import { InputField, SelectField } from "../../components/ui/Field";
 import { formatINR, roundCurrency, toPaise } from "../../lib/currency";
 import { Button } from "../../components/ui/Button";
@@ -121,6 +122,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
   const [tab, setTab] = useState<"consultation" | "pending" | "completed" | "collections" | "ip">(activeTab as any);
   const location = useLocation();
   const navigate = useNavigate();
+  const { data: hospitalData } = useMyHospital();
 
   useEffect(() => {
     setTab(activeTab);
@@ -918,7 +920,22 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
             )}
 
             {receiptData && (
-              <Card className="space-y-4 border-t-4 border-t-green-600 bg-green-50/10">
+              <Card id="opd-receipt-print" className="space-y-4 border-t-4 border-t-green-600 bg-green-50/10 print:border-none print:shadow-none print:p-0">
+                <div className="flex justify-between items-center border-b pb-2">
+                  <div className="flex items-center gap-2">
+                    {hospitalData?.logoUrl ? (
+                      <img src={hospitalData.logoUrl} alt={hospitalData.name} className="h-8 w-8 object-contain rounded bg-slate-50 p-0.5 border" />
+                    ) : (
+                      <div className="flex h-8 w-8 items-center justify-center rounded bg-navy-100 text-navy-700 font-bold text-xs">
+                        {hospitalData?.name ? hospitalData.name.charAt(0).toUpperCase() : "H"}
+                      </div>
+                    )}
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800">{hospitalData?.name || "HMS Hospital Network"}</h4>
+                      <p className="text-[9px] text-slate-400">Payment Receipt</p>
+                    </div>
+                  </div>
+                </div>
                 <div className="flex items-center gap-2 text-green-700 font-bold text-sm">
                   <CheckCircle className="h-5 w-5 text-green-600" /> Payment Processed Successfully
                 </div>
@@ -1672,10 +1689,19 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
         {receiptDetails && (
           <div className="space-y-6">
             <div id="receipt-print-area" className="space-y-4">
-              <div className="flex justify-between border-b pb-3">
-                <div>
-                  <h3 className="text-sm font-bold text-navy-700">HMS Hospital Network</h3>
-                  <p className="text-[10px] text-slate-400">Inpatient Payments Desk</p>
+              <div className="flex justify-between border-b pb-3 items-center">
+                <div className="flex items-center gap-2">
+                  {hospitalData?.logoUrl ? (
+                    <img src={hospitalData.logoUrl} alt={hospitalData.name} className="h-10 w-10 object-contain rounded bg-slate-50 p-0.5 border" />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded bg-navy-100 text-navy-700 font-bold text-lg">
+                      {hospitalData?.name ? hospitalData.name.charAt(0).toUpperCase() : "H"}
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="text-sm font-bold text-navy-700">{hospitalData?.name || "HMS Hospital Network"}</h3>
+                    <p className="text-[10px] text-slate-400">Inpatient Payments Desk</p>
+                  </div>
                 </div>
                 <div className="text-right">
                   <h4 className="text-xs font-bold text-slate-800">RECEIPT</h4>

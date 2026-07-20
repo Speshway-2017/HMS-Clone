@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -47,7 +47,10 @@ import {
 import { usePrescriptions } from "../../features/doctorDashboard";
 import { useInvoices } from "../../features/invoices";
 import { usePatientReports } from "../../features/laboratory";
+import { useMyHospital } from "../../features/hospitals";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
+import { FileUpload } from "../../components/ui/FileUpload";
+import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
@@ -329,6 +332,11 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
   }, [activeTab]);
 
   const [photoUrl, setPhotoUrl] = useState<string>("");
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
 
@@ -342,6 +350,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
   const { data: listData, isLoading: listLoading } = usePatientsList({ page, limit: 10 });
   const { data: todayData, isLoading: todayLoading } = useTodayRegistrations();
   const { data: patient, isLoading: patientLoading, error: patientError } = usePatientDetails(id);
+  const { data: hospitalData } = useMyHospital();
 
   // Redesigned right panel tabs state
   const [profileTab, setProfileTab] = useState<"history" | "prescriptions" | "billing" | "reports">("history");
@@ -500,6 +509,82 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
     } catch (err: any) {
       const errMsg = err.response?.data?.message || err.message || "Failed to register patient.";
       toast.error(errMsg);
+    }
+  };
+
+  const startCamera = async () => {
+    setCameraError(null);
+    setIsCameraOpen(true);
+    try {
+      setTimeout(async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 640, height: 480, facingMode: "user" }
+          });
+          setCameraStream(stream);
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        } catch (err: any) {
+          console.error("Camera getUserMedia error:", err);
+          setCameraError("Camera access was blocked or is unavailable. Please verify device permissions.");
+        }
+      }, 100);
+    } catch (err: any) {
+      console.error("Camera access error:", err);
+      setCameraError("Could not access webcam. Please check camera permissions.");
+    }
+  };
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+    }
+    setIsCameraOpen(false);
+  };
+
+  const capturePhoto = async () => {
+    if (!videoRef.current) return;
+    setIsCapturing(true);
+    try {
+      const video = videoRef.current;
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      }
+
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+      if (!blob) throw new Error("Failed to capture image blob.");
+
+      const file = new File([blob], `patient-photo-${Date.now()}.jpg`, { type: "image/jpeg" });
+      
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", "patient-photos");
+      
+      const res = await api.post("/uploads", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+
+      if (res.data?.data?.url) {
+        setPhotoUrl(res.data.data.url);
+        toast.success("Patient photo captured and uploaded successfully!");
+        stopCamera();
+      } else {
+        throw new Error("Invalid upload response.");
+      }
+    } catch (err: any) {
+      console.error("Capture upload failed:", err);
+      toast.error(err.response?.data?.message || err.message || "Failed to upload captured photo.");
+    } finally {
+      setIsCapturing(false);
     }
   };
 
@@ -798,11 +883,16 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
         </div>
 
         {/* Dynamic Printable Patient Card ID Mockup */}
-        <div className="hidden print:block bg-white text-black p-8 rounded-2xl border-4 border-slate-900 max-w-md mx-auto space-y-6">
+        <div id="patient-card-print" className="hidden print:block bg-white text-black p-8 rounded-2xl border-4 border-slate-900 max-w-md mx-auto space-y-6">
           <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
             <div>
-              <h2 className="text-xl font-black uppercase tracking-wider text-slate-950">HMS Enterprise</h2>
-              <p className="text-[10px] uppercase font-bold text-slate-500">Hospital Registry Card</p>
+              <div className="flex items-center gap-2 mb-1">
+                {hospitalData?.logoUrl && (
+                  <img src={hospitalData.logoUrl} alt={hospitalData.name} className="h-6 w-6 object-contain rounded" />
+                )}
+                <h2 className="text-sm font-black uppercase tracking-wider text-slate-955 truncate max-w-[200px]" title={hospitalData?.name || "HMS Enterprise"}>{hospitalData?.name || "HMS Enterprise"}</h2>
+              </div>
+              <p className="text-[10px] uppercase font-bold text-slate-500 font-sans">Hospital Registry Card</p>
             </div>
             <span className="text-xs font-mono font-black border border-slate-900 px-2 py-0.5 rounded">
               {patient.patientCode}
@@ -1982,22 +2072,87 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                 <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                   <Camera className="h-4 w-4" /> Patient Photo
                 </h3>
-                <div className="flex flex-col items-center gap-4">
-                  {photoUrl ? (
-                    <img src={photoUrl} alt="Patient preview" className="h-32 w-32 rounded-lg object-cover border border-slate-200 shadow-sm" />
-                  ) : (
-                    <div className="flex h-32 w-32 flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 text-slate-400">
-                      <Camera className="h-8 w-8" />
-                      <span className="text-[10px] mt-1">No photo captured</span>
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <Button type="button" onClick={triggerWebcamSimulation} variant="secondary" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
-                      <Camera className="h-3.5 w-3.5" /> Webcam Capture
+                <div className="space-y-3">
+                  <FileUpload
+                    label="Patient Photo"
+                    folder="patient-photos"
+                    value={photoUrl}
+                    onChange={setPhotoUrl}
+                  />
+                  <div className="flex gap-2 justify-center border-t border-slate-100 pt-2.5">
+                    <Button type="button" onClick={startCamera} variant="secondary" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
+                      <Camera className="h-3.5 w-3.5" /> Start Webcam
+                    </Button>
+                    <Button type="button" onClick={triggerWebcamSimulation} variant="secondary" className="text-[10px] px-2 py-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 border border-slate-200">
+                      Simulate
                     </Button>
                   </div>
                 </div>
               </Card>
+
+              {/* Webcam Capture Modal Overlay */}
+              {isCameraOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+                  <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4 border border-slate-100 flex flex-col items-center">
+                    <div className="w-full flex items-center justify-between border-b border-slate-100 pb-3">
+                      <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                        <Camera className="h-4 w-4 text-navy-700" /> Device Webcam Capture
+                      </h3>
+                      <button type="button" onClick={stopCamera} className="text-slate-400 hover:text-slate-700 text-lg font-semibold">
+                        &times;
+                      </button>
+                    </div>
+
+                    {cameraError ? (
+                      <div className="w-full p-4 rounded-xl bg-red-50 text-red-600 text-xs border border-red-200 text-center font-medium">
+                        {cameraError}
+                      </div>
+                    ) : (
+                      <div className="w-full aspect-[4/3] bg-slate-950 rounded-xl overflow-hidden shadow-inner border border-slate-850 relative">
+                        {!cameraStream && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-405 gap-2">
+                            <Loader2 className="h-8 w-8 animate-spin" />
+                            <span className="text-xs">Accessing camera stream...</span>
+                          </div>
+                        )}
+                        <video
+                          ref={videoRef}
+                          autoPlay
+                          playsInline
+                          className="w-full h-full object-cover scale-x-[-1]"
+                        />
+                      </div>
+                    )}
+
+                    <div className="w-full flex justify-end gap-2 border-t border-slate-100 pt-3">
+                      <Button type="button" onClick={stopCamera} variant="secondary" className="text-xs">
+                        Cancel
+                      </Button>
+                      {!cameraError && (
+                        <Button
+                          type="button"
+                          onClick={capturePhoto}
+                          disabled={isCapturing || !cameraStream}
+                          variant="primary"
+                          className="text-xs flex items-center gap-1 px-4"
+                        >
+                          {isCapturing ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Camera className="h-3.5 w-3.5" />
+                              Capture & Save
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <Card className="space-y-4">
                 <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">

@@ -21,6 +21,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { useInvoices } from "../../features/invoices";
+import { useMyHospital } from "../../features/hospitals";
 import { 
   useIPAdmissions, 
   useIPBillingDetails, 
@@ -118,6 +119,7 @@ export function AccountantBillingPage() {
 
   // Invoices & Patients Queries
   const { data: invoicesData, refetch } = useInvoices({ page, billingType: tabToBillingType[activeTab] });
+  const { data: hospitalData } = useMyHospital();
 
   // Modals state
   const [isInvoiceDetailsOpen, setIsInvoiceDetailsOpen] = useState(false);
@@ -1055,10 +1057,19 @@ export function AccountantBillingPage() {
           <div className="space-y-6">
             {/* Invoice Header */}
             <div id="invoice-print-area" className="space-y-4">
-              <div className="flex justify-between border-b pb-4">
-                <div>
-                  <h3 className="text-lg font-bold text-navy-700">HMS Enterprise</h3>
-                  <p className="text-xs text-slate-500">Global Hospital Group Network</p>
+              <div className="flex justify-between border-b pb-4 items-center">
+                <div className="flex items-center gap-3">
+                  {hospitalData?.logoUrl ? (
+                    <img src={hospitalData.logoUrl} alt={hospitalData.name} className="h-12 w-12 object-contain rounded bg-slate-50 p-0.5 border" />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded bg-navy-100 text-navy-700 font-bold text-lg">
+                      {hospitalData?.name ? hospitalData.name.charAt(0).toUpperCase() : "H"}
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="text-lg font-bold text-navy-700">{hospitalData?.name || "HMS Enterprise"}</h3>
+                    <p className="text-xs text-slate-500">Global Hospital Group Network</p>
+                  </div>
                 </div>
                 <div className="text-right">
                   <h4 className="text-sm font-bold text-slate-800">GST INVOICE</h4>
