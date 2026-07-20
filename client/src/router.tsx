@@ -118,6 +118,7 @@ import { LaboratoryBilling } from "./pages/laboratory/Billing";
 import { NewLabBillPage } from "./pages/laboratory/NewLabBill";
 import { UploadReportPage } from "./pages/laboratory/UploadReportPage";
 import { TestRequestDetailsPage } from "./pages/laboratory/TestRequestDetailsPage";
+import { LaboratoryQualityControl } from "./pages/laboratory/QualityControl";
 
 export const router = createBrowserRouter([
   {
@@ -343,6 +344,7 @@ export const router = createBrowserRouter([
           { path: "samples", element: <LaboratorySampleCollection /> },
           { path: "processing", element: <LaboratoryTestProcessing /> },
           { path: "processing/upload", element: <UploadReportPage /> },
+          { path: "qc", element: <LaboratoryQualityControl /> },
           { path: "inventory", element: <LaboratoryInventory /> },
           { path: "reports", element: <LaboratoryReportDelivery /> },
           { path: "billing", element: <LaboratoryBilling /> },

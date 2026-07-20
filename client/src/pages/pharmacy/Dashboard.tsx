@@ -39,7 +39,7 @@ interface Prescription {
   doctorName: string;
   medicines: string[];
   date: string;
-  status: "Pending" | "Approved" | "Rejected";
+  status: "Pending" | "Partially Dispensed" | "Dispensed" | "Completed" | "Cancelled" | "Approved" | "Rejected";
 }
 
 interface Sale {
@@ -128,6 +128,7 @@ export function PharmacyDashboard() {
   }).length;
 
   const pendingPrescriptionsCount = prescriptions.filter(p => p.status === "Pending").length;
+  const pendingRequestsCount = prescriptions.filter(p => p.status === "Pending" || p.status === "Partially Dispensed" || p.status === "Dispensed").length;
 
   const lowStockMedicinesList = medicines
     .filter(med => med.stockQty <= med.reorderLevel)
@@ -150,7 +151,7 @@ export function PharmacyDashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-6">
         <KpiCard 
           label="Today's Sales" 
           value={todaySalesCount} 
@@ -173,6 +174,14 @@ export function PharmacyDashboard() {
           icon={<FileText className="h-4 w-4" />} 
           trend={pendingPrescriptionsCount > 0 ? { direction: "up", text: "Action required" } : undefined}
           to="/pharmacy/prescriptions"
+          size="sm"
+        />
+        <KpiCard 
+          label="Pending Requests" 
+          value={pendingRequestsCount} 
+          icon={<ClipboardCheck className="h-4 w-4" />} 
+          trend={pendingRequestsCount > 0 ? { direction: "up", text: "Dispense queue" } : undefined}
+          to="/pharmacy/dispensing"
           size="sm"
         />
         <KpiCard 

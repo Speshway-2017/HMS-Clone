@@ -105,24 +105,28 @@ export function LaboratoryDashboard() {
           value={stats.pendingRequests} 
           icon={<ClipboardList className="h-4 w-4" />} 
           emphasis
+          to="/laboratory/requests"
           size="sm"
         />
         <KpiCard 
           label="Samples Collected" 
           value={stats.samplesCollectedToday} 
           icon={<FlaskConical className="h-4 w-4" />} 
+          to="/laboratory/samples"
           size="sm"
         />
         <KpiCard 
           label="Tests In Progress" 
           value={stats.testsInProgress} 
           icon={<Activity className="h-4 w-4" />} 
+          to="/laboratory/processing"
           size="sm"
         />
         <KpiCard 
           label="Completed Reports" 
           value={stats.completedReports} 
           icon={<FileText className="h-4 w-4" />} 
+          to="/laboratory/reports"
           size="sm"
         />
         <KpiCard 
@@ -130,6 +134,7 @@ export function LaboratoryDashboard() {
           value={stats.criticalReports} 
           icon={<AlertOctagon className="h-4 w-4 text-red-500" />} 
           trend={stats.criticalReports > 0 ? { direction: "up", text: "Action required" } : undefined}
+          to="/laboratory/qc"
           size="sm"
         />
       </div>

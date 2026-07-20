@@ -39,6 +39,21 @@ export function PatientsPage() {
     },
     { header: "Gender/Age", render: (p) => <span className="text-slate-600">{[p.gender, p.age ? `${p.age} yrs` : null].filter(Boolean).join(", ") || "—"}</span> },
     { header: "Assigned Doctor", render: (p) => <span className="text-slate-600">{typeof p.assignedDoctor === "object" && p.assignedDoctor ? p.assignedDoctor.name : "Unassigned"}</span> },
+    {
+      header: "Registered On",
+      render: (p) => (
+        <span className="text-xs text-slate-600 font-medium">
+          {p.createdAt ? new Date(p.createdAt).toLocaleString("en-IN", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true
+          }) : "N/A"}
+        </span>
+      )
+    },
     { header: "Status", render: (p) => <Badge tone={STATUS_TONE[p.status]}>{p.status.toUpperCase()}</Badge> },
     {
       header: "Actions",

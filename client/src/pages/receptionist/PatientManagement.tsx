@@ -556,6 +556,21 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
       render: (p: any) => <span className="text-xs text-slate-600 font-mono">{p.phone}</span>
     },
     {
+      header: "Registered On",
+      render: (p: any) => (
+        <span className="text-xs text-slate-600 font-medium">
+          {p.createdAt ? new Date(p.createdAt).toLocaleString("en-IN", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true
+          }) : "N/A"}
+        </span>
+      )
+    },
+    {
       header: "Status",
       render: (p: any) => {
         const isAdmitted = p.status === "admitted";
@@ -872,8 +887,21 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                   <span className="font-semibold text-slate-800">{patient.age} yrs / {patient.gender}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-450">Blood Group:</span>
+                  <span className="text-slate-455">Blood Group:</span>
                   <span className="font-semibold text-slate-800">{patient.bloodGroup || "N/A"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-455">Registered On:</span>
+                  <span className="font-semibold text-slate-805">
+                    {patient.createdAt ? new Date(patient.createdAt).toLocaleString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true
+                    }) : "N/A"}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-450">Current Status:</span>
@@ -2073,10 +2101,10 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                     <span className="font-mono text-slate-700">{registeredPatient.patientCode}</span>
                   </div>
                   <div>
-                    <span className="text-slate-450 block uppercase tracking-wider text-[10px] font-bold">Registration Date</span>
+                    <span className="text-slate-455 block uppercase tracking-wider text-[10px] font-bold">Registration Date &amp; Time</span>
                     <span className="font-semibold text-slate-700">
-                      {new Date(registeredPatient.createdAt || Date.now()).toLocaleDateString("en-US", {
-                        year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit"
+                      {new Date(registeredPatient.createdAt || Date.now()).toLocaleString("en-US", {
+                        year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true
                       })}
                     </span>
                   </div>
