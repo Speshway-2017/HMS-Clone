@@ -7,8 +7,10 @@ const auditLogSchema = new Schema(
     userEmail: { type: String, default: "" },
     userRole: { type: String, default: "system" },
     action: { type: String, required: true },
-    entity: { type: String, required: true },
+    entity: { type: String, required: true, default: "system" },
     entityId: { type: String, default: "" },
+    resource: { type: String, default: "" },
+    resourceId: { type: Schema.Types.Mixed, default: null },
     details: { type: Schema.Types.Mixed, default: {} },
     ipAddress: { type: String, default: "" },
     userAgent: { type: String, default: "" },
@@ -16,6 +18,20 @@ const auditLogSchema = new Schema(
   },
   { timestamps: true }
 );
+
+auditLogSchema.pre("validate", function (next) {
+  if (!this.entity || this.entity === "system") {
+    if (this.resource) {
+      this.entity = String(this.resource);
+    } else {
+      this.entity = "system";
+    }
+  }
+  if (!this.entityId && this.resourceId) {
+    this.entityId = String(this.resourceId);
+  }
+  next();
+});
 
 auditLogSchema.index({ hospital: 1, timestamp: -1 });
 auditLogSchema.index({ user: 1, timestamp: -1 });
