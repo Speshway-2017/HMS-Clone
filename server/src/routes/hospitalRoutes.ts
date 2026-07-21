@@ -9,10 +9,12 @@ import {
   listUnassignedHospitalAdmins,
   getMyHospital,
   updateMyHospital,
+  getPublicHospital,
 } from "../controllers/hospitalController";
 
 const router = Router();
 
+router.get("/public", getPublicHospital);
 router.get("/me", protect, getMyHospital);
 router.patch("/me", protect, restrictTo("hospital_admin", "laboratory"), updateMyHospital);
 

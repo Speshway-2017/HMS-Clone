@@ -11,6 +11,8 @@ import { Bed } from "../models/Bed";
 import { Appointment } from "../models/Appointment";
 import { LabOrder } from "../models/LabOrder";
 import { RadiologyOrder } from "../models/RadiologyOrder";
+import { emitToHospital } from "../config/socket";
+import { logAudit } from "../utils/auditLogger";
 
 async function getLoggedDoctor(req: Request) {
   const doctor = await Doctor.findOne({ email: req.user!.email, isActive: { $ne: false } });
@@ -127,6 +129,19 @@ export const listPatients = catchAsync(async (req: Request, res: Response) => {
 export const createPatient = catchAsync(async (req: Request, res: Response) => {
   const body = patientSchema.parse(req.body);
   const patient = await Patient.create({ ...body, hospital: req.hospitalFilter!.hospital });
+
+  if (req.hospitalFilter?.hospital) {
+    emitToHospital(req.hospitalFilter.hospital, "patient_created", { patientId: patient._id, name: patient.name, uhid: patient.uhid });
+  }
+
+  await logAudit({
+    req,
+    action: "CREATE_PATIENT",
+    entity: "Patient",
+    entityId: patient._id.toString(),
+    details: { name: patient.name, uhid: patient.uhid }
+  });
+
   res.status(201).json({
     success: true,
     patientId: patient._id,
@@ -195,6 +210,19 @@ export const updatePatient = catchAsync(async (req: Request, res: Response) => {
   if (!patient) {
     throw new AppError("Patient not found.", 404);
   }
+
+  if (req.hospitalFilter?.hospital) {
+    emitToHospital(req.hospitalFilter.hospital, "patient_updated", { patientId: patient._id });
+  }
+
+  await logAudit({
+    req,
+    action: "UPDATE_PATIENT",
+    entity: "Patient",
+    entityId: patient._id.toString(),
+    details: body
+  });
+
   res.json({ status: "success", data: { patient } });
 });
 
@@ -215,6 +243,19 @@ export const deletePatient = catchAsync(async (req: Request, res: Response) => {
   if (!patient) {
     throw new AppError("Patient not found.", 404);
   }
+
+  if (hospitalId) {
+    emitToHospital(hospitalId, "patient_deleted", { patientId });
+  }
+
+  await logAudit({
+    req,
+    action: "DELETE_PATIENT",
+    entity: "Patient",
+    entityId: patientId,
+    details: { name: patient.name, uhid: patient.uhid }
+  });
+
   res.status(204).send();
 });
 
@@ -229,5 +270,18 @@ export const addMedicalHistoryEntry = catchAsync(async (req: Request, res: Respo
   if (!patient) {
     throw new AppError("Patient not found.", 404);
   }
+
+  if (req.hospitalFilter?.hospital) {
+    emitToHospital(req.hospitalFilter.hospital, "patient_updated", { patientId: patient._id });
+  }
+
+  await logAudit({
+    req,
+    action: "ADD_MEDICAL_HISTORY",
+    entity: "Patient",
+    entityId: patient._id.toString(),
+    details: entry
+  });
+
   res.status(201).json({ status: "success", data: { patient } });
 });

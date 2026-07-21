@@ -6,12 +6,26 @@ import { Topbar } from "../components/ui/Topbar";
 import { useAuth } from "../context/AuthContext";
 import { socket } from "../lib/socket";
 import { useDoctorProfileMe } from "../features/doctors";
+import { useMyHospital } from "../features/hospitals";
 
 export function DashboardLayout() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: doctorProfile } = useDoctorProfileMe();
+  const { data: hospital } = useMyHospital({ enabled: !!user?.hospital });
+
+  useEffect(() => {
+    if (hospital?.logoUrl) {
+      let favicon = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+      if (!favicon) {
+        favicon = document.createElement("link");
+        favicon.rel = "icon";
+        document.getElementsByTagName("head")[0].appendChild(favicon);
+      }
+      favicon.href = hospital.logoUrl;
+    }
+  }, [hospital?.logoUrl]);
 
   useEffect(() => {
     if (user?.hospital) {

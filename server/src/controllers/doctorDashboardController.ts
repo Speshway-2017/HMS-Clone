@@ -18,6 +18,7 @@ import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import mongoose, { Types } from "mongoose";
 import { emitToHospital } from "../config/socket";
+import { logAudit } from "../utils/auditLogger";
 import { createOrUpdatePrescriptionCore } from "./prescriptionController";
 
 
@@ -521,6 +522,18 @@ export const createLabOrder = catchAsync(async (req: Request, res: Response) => 
       },
     }
   );
+
+  if (hospitalId) {
+    emitToHospital(hospitalId.toString(), "lab_order_created", { labOrderId: labOrder._id, tests });
+  }
+
+  await logAudit({
+    req,
+    action: "CREATE_LAB_ORDER",
+    entity: "LabOrder",
+    entityId: labOrder._id.toString(),
+    details: { tests, priority: labOrder.priority }
+  });
 
   res.status(201).json({ status: "success", data: labOrder });
 });

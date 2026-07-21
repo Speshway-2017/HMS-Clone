@@ -6,7 +6,8 @@ import { LabOrder } from "../models/LabOrder";
 import { RadiologyOrder } from "../models/RadiologyOrder";
 import { DiagnosticReport } from "../models/DiagnosticReport";
 import { DbNotification } from "../models/DbNotification";
-import { emitToDoctor } from "../config/socket";
+import { emitToDoctor, emitToHospital } from "../config/socket";
+import { logAudit } from "../utils/auditLogger";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 
@@ -205,6 +206,18 @@ export const acceptRequest = catchAsync(async (req: Request, res: Response) => {
     await order.save();
   }
 
+  if (hospitalId) {
+    emitToHospital(hospitalId, "lab_order_updated", { requestId, status: "accepted" });
+  }
+
+  await logAudit({
+    req,
+    action: "ACCEPT_LAB_REQUEST",
+    entity: "LabOrder",
+    entityId: requestId,
+    details: { type, status: "accepted" }
+  });
+
   res.json({ status: "success", data: order });
 });
 
@@ -233,6 +246,18 @@ export const rejectRequest = catchAsync(async (req: Request, res: Response) => {
     await order.save();
   }
 
+  if (hospitalId) {
+    emitToHospital(hospitalId, "lab_order_updated", { requestId, status: "rejected" });
+  }
+
+  await logAudit({
+    req,
+    action: "REJECT_LAB_REQUEST",
+    entity: "LabOrder",
+    entityId: requestId,
+    details: { type, status: "rejected", rejectionReason }
+  });
+
   res.json({ status: "success", data: order });
 });
 
@@ -258,6 +283,18 @@ export const startProcessing = catchAsync(async (req: Request, res: Response) =>
     if (type === "Laboratory") order.sampleStatus = "Processing";
     await order.save();
   }
+
+  if (hospitalId) {
+    emitToHospital(hospitalId, "lab_order_updated", { requestId, status: "processing" });
+  }
+
+  await logAudit({
+    req,
+    action: "START_LAB_PROCESSING",
+    entity: "LabOrder",
+    entityId: requestId,
+    details: { type, status: "processing" }
+  });
 
   res.json({ status: "success", data: order });
 });
@@ -362,6 +399,18 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
       await session.commitTransaction();
       session.endSession();
 
+      if (order.hospital) {
+        emitToHospital(order.hospital, "lab_report_uploaded", { requestId: order._id });
+      }
+
+      await logAudit({
+        req,
+        action: "UPLOAD_LAB_REPORT",
+        entity: "DiagnosticReport",
+        entityId: order._id.toString(),
+        details: { requestType: type }
+      });
+
       return res.status(201).json({ status: "success", data: { reports: createdReports, order } });
     } else {
       // Fallback to legacy single report behavior
@@ -451,6 +500,18 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
 
       await session.commitTransaction();
       session.endSession();
+
+      if (order.hospital) {
+        emitToHospital(order.hospital, "lab_report_uploaded", { requestId: order._id });
+      }
+
+      await logAudit({
+        req,
+        action: "UPLOAD_LAB_REPORT",
+        entity: "DiagnosticReport",
+        entityId: order._id.toString(),
+        details: { requestType: type }
+      });
 
       res.status(201).json({ status: "success", data: { report: report[0], order } });
     }

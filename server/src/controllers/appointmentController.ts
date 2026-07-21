@@ -6,6 +6,8 @@ import { Invoice } from "../models/Invoice";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
+import { emitToHospital } from "../config/socket";
+import { logAudit } from "../utils/auditLogger";
 
 async function generateReferenceId(hospitalId: string, bookingDate: Date): Promise<string> {
   const dateStr = bookingDate.toISOString().split("T")[0].replace(/-/g, "");
@@ -152,6 +154,19 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
     hospital: req.hospitalFilter!.hospital,
     referenceId,
   });
+
+  if (req.hospitalFilter?.hospital) {
+    emitToHospital(req.hospitalFilter.hospital, "appointment_created", { appointmentId: appointment._id, referenceId });
+  }
+
+  await logAudit({
+    req,
+    action: "CREATE_APPOINTMENT",
+    entity: "Appointment",
+    entityId: appointment._id.toString(),
+    details: { referenceId, date: body.date, time: body.time }
+  });
+
   res.status(201).json({ status: "success", data: { appointment } });
 });
 
@@ -188,6 +203,19 @@ export const updateAppointment = catchAsync(async (req: Request, res: Response) 
   if (!appointment) {
     throw new AppError("Appointment not found or unauthorized.", 403);
   }
+
+  if (req.hospitalFilter?.hospital) {
+    emitToHospital(req.hospitalFilter.hospital, "appointment_updated", { appointmentId: appointment._id, status: appointment.status });
+  }
+
+  await logAudit({
+    req,
+    action: "UPDATE_APPOINTMENT",
+    entity: "Appointment",
+    entityId: appointment._id.toString(),
+    details: body
+  });
+
   res.json({ status: "success", data: { appointment } });
 });
 
@@ -202,6 +230,19 @@ export const deleteAppointment = catchAsync(async (req: Request, res: Response) 
   if (!appointment) {
     throw new AppError("Appointment not found or unauthorized.", 403);
   }
+
+  if (req.hospitalFilter?.hospital) {
+    emitToHospital(req.hospitalFilter.hospital, "appointment_deleted", { appointmentId: req.params.id });
+  }
+
+  await logAudit({
+    req,
+    action: "DELETE_APPOINTMENT",
+    entity: "Appointment",
+    entityId: req.params.id,
+    details: { referenceId: appointment.referenceId }
+  });
+
   res.status(204).send();
 });
 

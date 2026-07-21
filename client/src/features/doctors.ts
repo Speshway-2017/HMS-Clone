@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { Doctor, Paginated } from "../types/domain";
+import { useAuth } from "../context/AuthContext";
 
 interface DoctorListParams {
   page?: number;
@@ -57,7 +58,6 @@ export function useCreateDoctor() {
   });
 }
 
-
 export function useUpdateDoctor(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -79,9 +79,12 @@ export function useDeleteDoctor() {
   });
 }
 
-export function useDoctorProfileMe() {
+export function useDoctorProfileMe(options?: { enabled?: boolean }) {
+  const { user } = useAuth();
   return useQuery({
     queryKey: ["doctors", "me"],
+    enabled: (options?.enabled ?? true) && user?.role === "doctor",
+    retry: false,
     queryFn: async () => {
       const res = await api.get("/doctors/me");
       return res.data.data.doctor as Doctor;

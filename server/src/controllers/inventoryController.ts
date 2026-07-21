@@ -4,6 +4,8 @@ import { InventoryItem, INVENTORY_CATEGORIES } from "../models/InventoryItem";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
+import { emitToHospital } from "../config/socket";
+import { logAudit } from "../utils/auditLogger";
 
 const inventoryItemSchema = z.object({
   name: z.string().min(1),
@@ -55,6 +57,19 @@ export const listInventory = catchAsync(async (req: Request, res: Response) => {
 export const createInventoryItem = catchAsync(async (req: Request, res: Response) => {
   const body = inventoryItemSchema.parse(req.body);
   const item = await InventoryItem.create({ ...body, hospital: req.hospitalFilter!.hospital });
+
+  if (req.hospitalFilter?.hospital) {
+    emitToHospital(req.hospitalFilter.hospital, "inventory_updated", { itemId: item._id, name: item.name });
+  }
+
+  await logAudit({
+    req,
+    action: "CREATE_INVENTORY_ITEM",
+    entity: "InventoryItem",
+    entityId: item._id.toString(),
+    details: { name: item.name, sku: item.sku, stockQty: item.stockQty }
+  });
+
   res.status(201).json({ status: "success", data: { item: withComputedStatus(item) } });
 });
 
@@ -75,6 +90,19 @@ export const updateInventoryItem = catchAsync(async (req: Request, res: Response
   if (!item) {
     throw new AppError("Inventory item not found.", 404);
   }
+
+  if (req.hospitalFilter?.hospital) {
+    emitToHospital(req.hospitalFilter.hospital, "inventory_updated", { itemId: item._id, name: item.name });
+  }
+
+  await logAudit({
+    req,
+    action: "UPDATE_INVENTORY_ITEM",
+    entity: "InventoryItem",
+    entityId: item._id.toString(),
+    details: body
+  });
+
   res.json({ status: "success", data: { item: withComputedStatus(item) } });
 });
 
@@ -83,5 +111,18 @@ export const deleteInventoryItem = catchAsync(async (req: Request, res: Response
   if (!item) {
     throw new AppError("Inventory item not found.", 404);
   }
+
+  if (req.hospitalFilter?.hospital) {
+    emitToHospital(req.hospitalFilter.hospital, "inventory_updated", { itemId: req.params.id });
+  }
+
+  await logAudit({
+    req,
+    action: "DELETE_INVENTORY_ITEM",
+    entity: "InventoryItem",
+    entityId: req.params.id,
+    details: { name: item.name, sku: item.sku }
+  });
+
   res.status(204).send();
 });

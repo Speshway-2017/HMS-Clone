@@ -154,3 +154,12 @@ export const updateMyHospital = catchAsync(async (req: Request, res: Response) =
   });
   res.json({ status: "success", data: { hospital } });
 });
+
+export const getPublicHospital = catchAsync(async (_req: Request, res: Response) => {
+  let hospital = await Hospital.findOne({ status: "active" }).sort({ createdAt: 1 });
+  if (!hospital) {
+    hospital = await Hospital.findOne().sort({ createdAt: 1 });
+  }
+  res.json({ status: "success", data: { hospital: hospital ?? null } });
+});
+
