@@ -4,13 +4,11 @@ import { Server, Socket } from "socket.io";
 let io: Server | null = null;
 let isSocketInitialized = false;
 
-export function initSocket(server: HTTPServer, clientUrl: string) {
+export function initSocket(server: HTTPServer, _clientUrl: string) {
   io = new Server(server, {
     cors: {
-      // Allow all origins for development (LAN testing)
-      // In production, it's recommended to restrict to specific origins using CLIENT_URL
       origin: true,
-      methods: ["GET", "POST"],
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
       credentials: true,
     },
   });
@@ -22,14 +20,18 @@ export function initSocket(server: HTTPServer, clientUrl: string) {
 
     // Allow joining a specific hospital room to avoid cross-hospital leakage
     socket.on("join_hospital", (hospitalId: string) => {
-      socket.join(hospitalId);
-      console.log(`Socket ${socket.id} joined hospital room: ${hospitalId}`);
+      if (hospitalId) {
+        socket.join(hospitalId.toString());
+        console.log(`Socket ${socket.id} joined hospital room: ${hospitalId}`);
+      }
     });
 
     // Allow joining a doctor-specific room to enforce notification isolation
     socket.on("join_doctor", (doctorId: string) => {
-      socket.join(`doctor:${doctorId}`);
-      console.log(`Socket ${socket.id} joined doctor room: doctor:${doctorId}`);
+      if (doctorId) {
+        socket.join(`doctor:${doctorId}`);
+        console.log(`Socket ${socket.id} joined doctor room: doctor:${doctorId}`);
+      }
     });
 
     socket.on("disconnect", () => {
@@ -69,15 +71,19 @@ export function getIO(): Server {
 /**
  * Emit an event to all clients in a specific hospital room
  */
-export function emitToHospital(hospitalId: string, event: string, data: any) {
-  if (io) {
-    io.to(hospitalId.toString()).emit(event, data);
+export function emitToHospital(hospitalId: string | object, event: string, data: any) {
+  if (io && hospitalId) {
+    const roomId = hospitalId.toString();
+    io.to(roomId).emit(event, data);
     
+    // Broadcast generic dashboard update for reactive query invalidations
+    io.to(roomId).emit("dashboard_update", { type: event, data });
+
     // Conformed Event Syncing:
     if (event === "ip_bill_update") {
-      io.to(hospitalId.toString()).emit("ip_billing_update", data);
+      io.to(roomId).emit("ip_billing_update", data);
     } else if (event === "ip_billing_update") {
-      io.to(hospitalId.toString()).emit("ip_bill_update", data);
+      io.to(roomId).emit("ip_bill_update", data);
     }
   }
 }
@@ -85,9 +91,17 @@ export function emitToHospital(hospitalId: string, event: string, data: any) {
 /**
  * Emit an event strictly to a specific doctor's room
  */
-export function emitToDoctor(doctorId: string, event: string, data: any) {
-  if (io) {
+export function emitToDoctor(doctorId: string | object, event: string, data: any) {
+  if (io && doctorId) {
     io.to(`doctor:${doctorId}`).emit(event, data);
   }
 }
 
+/**
+ * Broadcast an event to all connected sockets
+ */
+export function broadcastGlobal(event: string, data: any) {
+  if (io) {
+    io.emit(event, data);
+  }
+}

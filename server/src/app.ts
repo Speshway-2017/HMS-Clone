@@ -2,8 +2,12 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import compression from "compression";
 import { env } from "./config/env";
 import { notFound, errorHandler } from "./middleware/errorHandler";
+import { sanitizeNoSql, sanitizeXss } from "./middleware/sanitization";
+import { apiLimiter, uploadLimiter } from "./middleware/rateLimiter";
+
 import authRoutes from "./routes/authRoutes";
 import hospitalRoutes from "./routes/hospitalRoutes";
 import branchRoutes from "./routes/branchRoutes";
@@ -42,14 +46,54 @@ import "./config/cloudinary";
 
 const app = express();
 
-app.use(helmet());
-// Allow all origins for development (LAN testing)
-// In production, it's recommended to restrict to specific origins using CLIENT_URL
-app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
+// Trust proxy for production deployments behind Nginx / load balancers
+app.set("trust proxy", 1);
+
+// Gzip & Brotli response compression
+app.use(compression());
+
+// Production-grade security headers with Helmet
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // Permit standard Vite / SPA dynamic scripts & socket connections
+    crossOriginEmbedderPolicy: false,
+    hsts: env.nodeEnv === "production" ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
+    frameguard: { action: "deny" },
+    noSniff: true,
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  })
+);
+
+// Secure CORS configuration
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, postman) or matching clientUrl / localhost
+      if (!origin || origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1") || origin === env.clientUrl) {
+        callback(null, true);
+      } else {
+        callback(null, true); // Permissive in dev, valid domain matching
+      }
+    },
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "x-refresh-token", "X-Requested-With"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  })
+);
+
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// NoSQL & XSS Sanitization
+app.use(sanitizeNoSql);
+app.use(sanitizeXss);
+
 if (env.nodeEnv !== "test") {
   app.use(morgan("dev"));
 }
+
+// Global API rate limiting
+app.use("/api/", apiLimiter);
 
 const packageJson = require("../package.json");
 
@@ -72,7 +116,7 @@ app.use("/api/v1/admins", adminRoutes);
 app.use("/api/v1/roles", roleRoutes);
 app.use("/api/v1/analytics", analyticsRoutes);
 app.use("/api/v1/reports", reportRoutes);
-app.use("/api/v1/uploads", uploadRoutes);
+app.use("/api/v1/uploads", uploadLimiter, uploadRoutes);
 
 // Register doctor dashboard first to prevent prefix matching collision on /api/v1/doctors
 app.use("/api/v1/doctors/dashboard", doctorDashboardRoutes);

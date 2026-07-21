@@ -1,11 +1,28 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "../../components/ui/Button";
 import { ROLE_HOME_PATH } from "../../types/auth";
+import { usePublicHospital } from "../../features/hospitals";
 
 export function LoginPage() {
   const { user, login } = useAuth();
+  const { data: hospital } = usePublicHospital();
+  const hospitalName = hospital?.name || "HMS Enterprise";
+  const logoUrl = hospital?.logoUrl;
+
+  useEffect(() => {
+    document.title = hospitalName;
+    if (logoUrl) {
+      let favicon = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+      if (!favicon) {
+        favicon = document.createElement("link");
+        favicon.rel = "icon";
+        document.getElementsByTagName("head")[0].appendChild(favicon);
+      }
+      favicon.href = logoUrl;
+    }
+  }, [hospitalName, logoUrl]);
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState("");
@@ -36,8 +53,11 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <Link to="/" className="text-2xl font-bold text-navy-700">
-            HMS Enterprise
+          <Link to="/" className="text-2xl font-bold text-navy-700 flex items-center justify-center gap-2">
+            {hospital?.logoUrl && (
+              <img src={hospital.logoUrl} alt={hospitalName} className="h-8 w-8 rounded object-cover" />
+            )}
+            <span>{hospitalName}</span>
           </Link>
           <p className="mt-1 text-sm text-slate-500">Sign in to your dashboard</p>
         </div>

@@ -17,8 +17,11 @@ export const protect = catchAsync(async (req: Request, _res: Response, next: Nex
   let payload: TokenPayload;
   try {
     payload = jwt.verify(token, env.jwtSecret) as TokenPayload;
-  } catch {
-    throw new AppError("Invalid or expired session. Please log in again.", 401);
+  } catch (err: any) {
+    if (err?.name === "TokenExpiredError") {
+      throw new AppError("Token expired. Please refresh your session.", 401);
+    }
+    throw new AppError("Invalid session token. Please log in again.", 401);
   }
 
   const user = await User.findById(payload.id);

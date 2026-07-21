@@ -16,9 +16,13 @@ export function AccountantAuditLogsPage() {
   const { data: logs, isLoading } = useAuditLogs();
 
   const filteredLogs = (logs ?? []).filter((log) => {
-    return log.action.toLowerCase().includes(search.toLowerCase()) ||
-           log.performedBy?.name?.toLowerCase().includes(search.toLowerCase()) ||
-           log.details?.toLowerCase().includes(search.toLowerCase());
+    const searchLower = search.toLowerCase();
+    const actionMatch = log.action?.toLowerCase().includes(searchLower);
+    const userMatch = (log.performedBy?.name || log.user?.name || log.userEmail)?.toLowerCase().includes(searchLower);
+    const entityMatch = (log.resource || log.entity)?.toLowerCase().includes(searchLower);
+    const detailsStr = typeof log.details === "object" ? JSON.stringify(log.details) : String(log.details || "");
+    const detailsMatch = detailsStr.toLowerCase().includes(searchLower);
+    return actionMatch || userMatch || entityMatch || detailsMatch;
   });
 
   return (
@@ -76,25 +80,25 @@ export function AccountantAuditLogsPage() {
                     <td className="px-4 py-3 whitespace-nowrap text-slate-500 font-mono text-xs">
                       <span className="flex items-center gap-1.5">
                         <Clock className="h-3.5 w-3.5 text-slate-400" />
-                        {new Date(log.createdAt).toLocaleString()}
+                        {new Date(log.createdAt || log.timestamp || Date.now()).toLocaleString()}
                       </span>
                     </td>
                     <td className="px-4 py-3 font-semibold text-slate-800">
-                      {log.performedBy?.name ?? "System"}
+                      {log.performedBy?.name || log.user?.name || log.userEmail || "System"}
                       <span className="block text-[10px] text-slate-400 uppercase font-bold tracking-wider">
-                        {log.performedBy?.role?.replace("_", " ") ?? "Daemon"}
+                        {(log.performedBy?.role || log.user?.role || log.userRole || "Daemon").replace("_", " ")}
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <Badge tone={log.action.includes("create") || log.action.includes("payment") ? "success" : "neutral"}>
+                      <Badge tone={log.action?.toLowerCase().includes("create") || log.action?.toLowerCase().includes("payment") || log.action?.toLowerCase().includes("login") ? "success" : "neutral"}>
                         {log.action}
                       </Badge>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                      {log.resource}
+                      {log.resource || log.entity || "-"}
                     </td>
-                    <td className="px-4 py-3 text-xs font-mono max-w-sm truncate text-slate-600" title={log.details}>
-                      {log.details}
+                    <td className="px-4 py-3 text-xs font-mono max-w-sm truncate text-slate-600" title={typeof log.details === "object" ? JSON.stringify(log.details) : String(log.details || "")}>
+                      {typeof log.details === "object" ? JSON.stringify(log.details) : String(log.details || "-")}
                     </td>
                   </tr>
                 ))

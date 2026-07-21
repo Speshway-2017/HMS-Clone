@@ -35,7 +35,9 @@ body {
   #opd-receipt-print,
   #opd-receipt-print *,
   #patient-card-print,
-  #patient-card-print * {
+  #patient-card-print *,
+  #consolidated-patient-statement-print,
+  #consolidated-patient-statement-print * {
     visibility: visible !important;
   }
 
@@ -50,7 +52,8 @@ body {
   #receipt-print-area,
   #admission-slip-print,
   #opd-receipt-print,
-  #patient-card-print {
+  #patient-card-print,
+  #consolidated-patient-statement-print {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;

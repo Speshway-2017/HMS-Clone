@@ -87,6 +87,16 @@ export function useMyHospital(options?: { enabled?: boolean }) {
   });
 }
 
+export function usePublicHospital() {
+  return useQuery({
+    queryKey: ["hospitals", "public"],
+    queryFn: async () => {
+      const res = await api.get("/hospitals/public");
+      return (res.data.data.hospital ?? null) as Hospital | null;
+    },
+  });
+}
+
 export function useUpdateMyHospital() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -96,6 +106,7 @@ export function useUpdateMyHospital() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hospitals", "me"] });
+      queryClient.invalidateQueries({ queryKey: ["hospitals", "public"] });
     },
   });
 }

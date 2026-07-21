@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   Building2,
@@ -12,6 +13,7 @@ import {
   Search,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
+import { usePublicHospital } from "../../features/hospitals";
 
 const STATS = [
   { value: "3", label: "Role-based dashboards" },
@@ -66,11 +68,33 @@ const ROLES = [
 ];
 
 export function LandingPage() {
+  const { data: hospital } = usePublicHospital();
+  const hospitalName = hospital?.name || "HMS Enterprise";
+  const logoUrl = hospital?.logoUrl;
+
+  useEffect(() => {
+    document.title = hospitalName;
+    if (logoUrl) {
+      let favicon = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+      if (!favicon) {
+        favicon = document.createElement("link");
+        favicon.rel = "icon";
+        document.getElementsByTagName("head")[0].appendChild(favicon);
+      }
+      favicon.href = logoUrl;
+    }
+  }, [hospitalName, logoUrl]);
+
   return (
     <div className="flex flex-col overflow-x-clip">
       <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 py-4 xs:px-6 sm:px-8 lg:px-12">
-          <div className="text-lg font-bold text-navy-700 xs:text-xl">HMS Enterprise</div>
+          <div className="flex items-center gap-2.5 text-lg font-bold text-navy-700 xs:text-xl">
+            {logoUrl && (
+              <img src={logoUrl} alt={hospitalName} className="h-7 w-7 rounded object-cover" />
+            )}
+            <span>{hospitalName}</span>
+          </div>
           <nav className="hidden items-center gap-8 text-sm font-medium text-slate-600 md:flex">
             <a href="#features" className="hover:text-navy-700">
               Features
@@ -106,7 +130,7 @@ export function LandingPage() {
                 One platform to run your entire hospital network
               </h1>
               <p className="mx-auto mt-5 max-w-xl text-base text-slate-600 xs:text-lg lg:mx-0">
-                HMS Enterprise brings hospitals, doctors, patients, billing, and reporting together in a
+                {hospitalName} brings hospitals, doctors, patients, billing, and reporting together in a
                 single, role-aware system built for administrators, hospital staff, and finance teams.
               </p>
               <div className="mt-8 flex flex-col items-center gap-3 xs:flex-row xs:justify-center lg:justify-start">
@@ -250,7 +274,12 @@ export function LandingPage() {
       <footer className="border-t border-slate-200 px-4 py-10 xs:px-6 sm:px-8 lg:px-12">
         <div className="mx-auto grid max-w-[1600px] grid-cols-2 gap-8 sm:grid-cols-4">
           <div className="col-span-2 sm:col-span-1">
-            <div className="text-lg font-bold text-navy-700">HMS Enterprise</div>
+            <div className="flex items-center gap-2 text-lg font-bold text-navy-700">
+              {logoUrl && (
+                <img src={logoUrl} alt={hospitalName} className="h-6 w-6 rounded object-cover" />
+              )}
+              <span>{hospitalName}</span>
+            </div>
             <p className="mt-2 text-sm text-slate-500">Unified hospital management for the whole network.</p>
           </div>
           <div>
@@ -289,7 +318,7 @@ export function LandingPage() {
           </div>
         </div>
         <div className="mx-auto mt-8 max-w-[1600px] border-t border-slate-100 pt-6 text-center text-sm text-slate-400">
-          © {new Date().getFullYear()} HMS Enterprise. All rights reserved.
+          © {new Date().getFullYear()} {hospitalName}. All rights reserved.
         </div>
       </footer>
     </div>

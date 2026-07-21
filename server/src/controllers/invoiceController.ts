@@ -8,6 +8,7 @@ import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 import { emitToHospital } from "../config/socket";
+import { logAudit } from "../utils/auditLogger";
 
 const invoiceItemSchema = z.object({
   description: z.string().min(1),
@@ -51,7 +52,9 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
 
   // Query OP invoices
   const opInvoicesPromise = Invoice.find(filter)
-    .populate("patient", "name uhid phone age gender")
+    .populate("patient", "name uhid phone age gender status")
+    .populate("appointment")
+    .populate("admission")
     .sort({ createdAt: -1 });
 
   // Determine IP Bill filters
@@ -71,7 +74,7 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
   const includeIP = !billingType || billingType === "IP";
 
   const ipBillsPromise = includeIP
-    ? IPBill.find(ipFilter).populate("patient", "name").sort({ createdAt: -1 })
+    ? IPBill.find(ipFilter).populate("patient", "name uhid phone age gender status").sort({ createdAt: -1 })
     : Promise.resolve([]);
 
   const [
@@ -346,6 +349,14 @@ export const createInvoice = catchAsync(async (req: Request, res: Response) => {
     timestamp: new Date()
   });
 
+  await logAudit({
+    req,
+    action: "CREATE_INVOICE",
+    entity: "Invoice",
+    entityId: invoice._id.toString(),
+    details: { billingType: invoice.billingType, total: computedTotals.total }
+  });
+
   res.status(201).json({ status: "success", data: { invoice: { ...invoice.toObject(), totals: computedTotals } } });
 });
 
@@ -380,6 +391,14 @@ export const updateInvoice = catchAsync(async (req: Request, res: Response) => {
     timestamp: new Date()
   });
 
+  await logAudit({
+    req,
+    action: "UPDATE_INVOICE",
+    entity: "Invoice",
+    entityId: invoice._id.toString(),
+    details: body
+  });
+
   res.json({ status: "success", data: { invoice: { ...invoice.toObject(), totals: computeTotals(invoice, totalPaid) } } });
 });
 
@@ -388,5 +407,22 @@ export const deleteInvoice = catchAsync(async (req: Request, res: Response) => {
   if (!invoice) {
     throw new AppError("Invoice not found.", 404);
   }
+
+  if (req.hospitalFilter?.hospital) {
+    emitToHospital(req.hospitalFilter.hospital.toString(), "dashboard_update", {
+      type: "DELETE_INVOICE",
+      invoiceId: req.params.id,
+      timestamp: new Date()
+    });
+  }
+
+  await logAudit({
+    req,
+    action: "DELETE_INVOICE",
+    entity: "Invoice",
+    entityId: req.params.id,
+    details: { billingType: invoice.billingType }
+  });
+
   res.status(204).send();
 });
