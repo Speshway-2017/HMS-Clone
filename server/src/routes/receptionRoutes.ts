@@ -34,7 +34,8 @@ import {
   rejectAdmissionRequest,
   getBookedSlots,
   checkInAppointment,
-  getQueueDetails
+  getQueueDetails,
+  checkAdmissionBillingStatus
 } from "../controllers/receptionController";
 
 const router = Router();
@@ -84,6 +85,7 @@ router.post("/admissions/requests/:id/reject", rejectAdmissionRequest);
 router.route("/admissions").post(admitPatient).get(getAdmissions);
 router.post("/admissions/transfer", transferPatient);
 router.post("/admissions/:id/discharge", requestDischarge);
+router.get("/admissions/:id/billing-status", checkAdmissionBillingStatus);
 
 // Doctors / Rooms
 router.get("/doctors/availability", getDoctorsAvailability);

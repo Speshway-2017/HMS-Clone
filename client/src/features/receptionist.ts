@@ -437,42 +437,6 @@ export function useMarkNotificationRead() {
     }
   });
 }
-
-// ── Simulated Doctor Hooks ──
-export function useSimulateCall() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (queueId: string) => {
-      const res = await api.post(`/reception/queues/${queueId}/call`);
-      return res.data.data.token;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["reception", "queues"] });
-      queryClient.invalidateQueries({ queryKey: ["reception", "stats"] });
-    }
-  });
-}
-
-export function useSimulateComplete() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (payload: { queueId: string; outcome: "op" | "ip"; notes: string; ward?: string; roomType?: string }) => {
-      const res = await api.post(`/reception/queues/${payload.queueId}/complete`, {
-        outcome: payload.outcome,
-        notes: payload.notes,
-        ward: payload.ward,
-        roomType: payload.roomType
-      });
-      return res.data.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["reception", "queues"] });
-      queryClient.invalidateQueries({ queryKey: ["reception", "admissions", "requests"] });
-      queryClient.invalidateQueries({ queryKey: ["reception", "stats"] });
-    }
-  });
-}
-
 // ── Reports Hooks ──
 export function useExportReports() {
   return useQuery({
