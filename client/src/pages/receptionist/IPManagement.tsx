@@ -87,6 +87,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const [dischargeAdmissionId, setDischargeAdmissionId] = useState("");
   const [dischargeNotes, setDischargeNotes] = useState("");
   const [isDischargeOpen, setIsDischargeOpen] = useState(false);
+  const [billingHistory, setBillingHistory] = useState<any>(null);
 
   // Queries
   const { data: requests, refetch: refetchRequests } = useAdmissionRequests();
@@ -109,22 +110,15 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const confirmDischargeMutation = useConfirmDischarge();
   const markReadMutation = useMarkNotificationRead();
 
-  const checkBillingAndOpenDischarge = async (admissionId: string) => {
-    const loadingToast = toast.loading("Checking patient billing status...");
+  const checkBillingAndOpenDischarge = async (admissionId: string, initialNotes?: string) => {
+    const loadingToast = toast.loading("Fetching patient billing history...");
     try {
       const res = await api.get(`/reception/admissions/${admissionId}/billing-status`);
       toast.dismiss(loadingToast);
-      const { hasOutstandingBills, totalDues } = res.data.data;
-      if (hasOutstandingBills) {
-        toast.error(`Patient has outstanding dues of ₹${totalDues.toFixed(2)}. Redirecting to billing...`);
-        setTimeout(() => {
-          navigate(`/receptionist/billing/ip?admissionId=${admissionId}`);
-        }, 1200);
-      } else {
-        setDischargeAdmissionId(admissionId);
-        setDischargeNotes("");
-        setIsDischargeOpen(true);
-      }
+      setBillingHistory(res.data.data);
+      setDischargeAdmissionId(admissionId);
+      setDischargeNotes(initialNotes || "");
+      setIsDischargeOpen(true);
     } catch (err: any) {
       toast.dismiss(loadingToast);
       toast.error(err.response?.data?.message || "Failed to verify billing status.");
@@ -350,8 +344,10 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       setDischargeAdmissionId("");
       setDischargeNotes("");
       setIsDischargeOpen(false);
+      setBillingHistory(null);
       refetchRooms();
       refetchAdmissions();
+      refetchDischargeRequests();
       setTab("admissions");
     } catch (err: any) {
       alert(err.message || "Failed to complete discharge");
@@ -1442,31 +1438,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                     <Button
                       type="button"
                       variant="primary"
-                      onClick={async () => {
-                        if (!window.confirm(`Confirm discharge for ${adm.patient?.name}? This will vacate the bed.`)) return;
-                        const loadingToast = toast.loading("Checking patient billing status...");
-                        try {
-                          const statusRes = await api.get(`/reception/admissions/${adm._id}/billing-status`);
-                          toast.dismiss(loadingToast);
-                          const { hasOutstandingBills, totalDues } = statusRes.data.data;
-                          if (hasOutstandingBills) {
-                            toast.error(`Patient has outstanding dues of ₹${totalDues.toFixed(2)}. Redirecting to billing...`);
-                            setTimeout(() => {
-                              navigate(`/receptionist/billing/ip?admissionId=${adm._id}`);
-                            }, 1200);
-                            return;
-                          }
-
-                          await confirmDischargeMutation.mutateAsync({ admissionId: adm._id, notes: adm.diagnosisAtDischarge || "Doctor finalized discharge" });
-                          toast.success(`${adm.patient?.name} has been discharged successfully.`);
-                          refetchDischargeRequests();
-                          refetchAdmissions();
-                          refetchRooms();
-                        } catch (err: any) {
-                          toast.dismiss(loadingToast);
-                          toast.error(err?.response?.data?.message || "Failed to confirm discharge.");
-                        }
-                      }}
+                      onClick={() => checkBillingAndOpenDischarge(adm._id, adm.diagnosisAtDischarge || "Doctor finalized discharge")}
                       className="flex items-center gap-1.5 text-xs"
                     >
                       <CheckCircle className="h-4 w-4" /> Confirm Discharge
@@ -1491,29 +1463,248 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       )}
 
       {/* Discharge Dialog */}
-      {isDischargeOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <form onSubmit={handleDischargeSubmit} className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl space-y-4">
-            <h2 className="text-lg font-semibold text-slate-800">Confirm Patient Discharge</h2>
-            <p className="text-xs text-slate-500">This action will vacant the bed immediately and set patient status to discharged.</p>
-            <TextareaField
-              label="Discharge Summary Notes"
-              required
-              value={dischargeNotes}
-              onChange={(e) => setDischargeNotes(e.target.value)}
-              rows={3}
-            />
-            <div className="flex justify-end gap-3 pt-2">
-              <Button type="button" onClick={() => setIsDischargeOpen(false)} variant="secondary">
-                Cancel
-              </Button>
-              <Button type="submit" variant="danger">
-                Complete Discharge
-              </Button>
+      {isDischargeOpen && (() => {
+        const currentAdm = activeAdmissions?.find((a: any) => a._id === dischargeAdmissionId) || 
+                           dischargeRequests?.find((a: any) => a._id === dischargeAdmissionId);
+        const patientName = currentAdm?.patient?.name || "Patient";
+        const uhid = currentAdm?.patient?.uhid || "";
+        const isBlocked = billingHistory && billingHistory.totalDues > 1;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 overflow-y-auto backdrop-blur-xs">
+            <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col my-8 max-h-[90vh]">
+              {/* Header */}
+              <div className="bg-slate-900 p-6 text-white flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight">Discharge & Billing Verification</h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Verify patient financial balance and medical discharge details.
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-semibold">{patientName}</div>
+                  <div className="text-[10px] text-slate-400 font-mono">UHID: {uhid}</div>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 overflow-y-auto space-y-6 flex-1">
+                {/* Billing Summary Status Banner */}
+                {billingHistory ? (
+                  isBlocked ? (
+                    <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3 text-rose-800 shadow-sm">
+                      <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-bold text-sm text-rose-900">Outstanding Balance Detected</h4>
+                        <p className="text-xs mt-1 leading-relaxed">
+                          Patient cannot be discharged. There is a total pending balance of <span className="font-bold">₹{billingHistory.totalDues.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>. All outstanding dues must be fully cleared before discharge.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3 text-emerald-800 shadow-sm">
+                      <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-bold text-sm text-emerald-900">Financial Clearance Approved</h4>
+                        <p className="text-xs mt-0.5 leading-relaxed">
+                          Patient is clear for discharge. All outstanding dues have been paid.
+                        </p>
+                      </div>
+                    </div>
+                  )
+                ) : (
+                  <div className="text-center py-6 text-slate-400 text-xs">Loading billing details...</div>
+                )}
+
+                {/* Billing History Section */}
+                {billingHistory && (
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Financial History Breakdown</h3>
+                    
+                    {/* IP Bill Details */}
+                    <div className="rounded-xl border border-slate-105 bg-slate-50/50 p-4 space-y-3">
+                      <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                        <span className="text-xs font-bold text-slate-700">Inpatient (IP) Bill Status</span>
+                        {billingHistory.ipBill ? (
+                          <span className={`text-[10px] rounded-full border px-2 py-0.5 font-bold uppercase ${
+                            billingHistory.ipBill.status === "Paid" ? "bg-green-50 text-green-700 border-green-200" : "bg-amber-50 text-amber-700 border-amber-200"
+                          }`}>
+                            {billingHistory.ipBill.status}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic">No active IP bill</span>
+                        )}
+                      </div>
+
+                      {billingHistory.ipBill && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                          <div>
+                            <div className="text-slate-400 text-[10px] uppercase font-semibold">Bill Number</div>
+                            <div className="font-bold text-slate-700 mt-0.5">{billingHistory.ipBill.billNumber}</div>
+                          </div>
+                          <div>
+                            <div className="text-slate-400 text-[10px] uppercase font-semibold">Total Amount</div>
+                            <div className="font-bold text-slate-700 mt-0.5">₹{billingHistory.ipBill.grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                          </div>
+                          <div>
+                            <div className="text-slate-400 text-[10px] uppercase font-semibold">Advance & Ins. Paid</div>
+                            <div className="font-semibold text-slate-500 mt-0.5">₹{(billingHistory.ipBill.advancePaid + billingHistory.ipBill.insuranceCovered).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                          </div>
+                          <div>
+                            <div className="text-rose-600 text-[10px] uppercase font-bold">IP Outstanding</div>
+                            <div className="font-black text-rose-700 mt-0.5">₹{billingHistory.ipBill.outstanding.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* IP Bill Items Breakdown */}
+                      {billingHistory.ipBillItems && billingHistory.ipBillItems.length > 0 && (
+                        <div className="mt-2 rounded-lg border border-slate-200 bg-white overflow-hidden text-[11px] max-h-40 overflow-y-auto">
+                          <table className="min-w-full divide-y divide-slate-200">
+                            <thead className="bg-slate-50 text-slate-550 font-semibold sticky top-0">
+                              <tr>
+                                <th className="px-3 py-1.5 text-left">Category</th>
+                                <th className="px-3 py-1.5 text-left">Description</th>
+                                <th className="px-3 py-1.5 text-center">Qty/Days</th>
+                                <th className="px-3 py-1.5 text-right">Price</th>
+                                <th className="px-3 py-1.5 text-right">Discount</th>
+                                <th className="px-3 py-1.5 text-right">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-slate-700">
+                              {billingHistory.ipBillItems.map((item: any, idx: number) => (
+                                <tr key={idx} className="hover:bg-slate-50">
+                                  <td className="px-3 py-1 font-semibold">{item.category}</td>
+                                  <td className="px-3 py-1 text-slate-500">{item.description}</td>
+                                  <td className="px-3 py-1 text-center">{item.quantity || item.days || 1}</td>
+                                  <td className="px-3 py-1 text-right">₹{item.unitPrice || 0}</td>
+                                  <td className="px-3 py-1 text-right">₹{item.discount || 0}</td>
+                                  <td className="px-3 py-1 text-right font-medium">₹{item.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* OP/Pharmacy/Diagnostics Invoices */}
+                    <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 space-y-3">
+                      <div className="text-xs font-bold text-slate-700 pb-2 border-b border-slate-200/60 flex justify-between">
+                        <span>Laboratory, Pharmacy & OP Invoices</span>
+                        <span className="font-bold text-rose-650">Pending Dues: ₹{billingHistory.totalPendingOP.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      
+                      {!billingHistory.invoices || billingHistory.invoices.length === 0 ? (
+                        <p className="text-xs text-slate-400 italic text-center py-2">No other pharmacy or laboratory invoices found for this patient.</p>
+                      ) : (
+                        <div className="rounded-lg border border-slate-200 bg-white overflow-hidden text-[11px] max-h-40 overflow-y-auto">
+                          <table className="min-w-full divide-y divide-slate-200">
+                            <thead className="bg-slate-50 text-slate-500 font-semibold sticky top-0">
+                              <tr>
+                                <th className="px-3 py-1.5 text-left">Invoice No</th>
+                                <th className="px-3 py-1.5 text-left">Type</th>
+                                <th className="px-3 py-1.5 text-left">Date</th>
+                                <th className="px-3 py-1.5 text-right">Total</th>
+                                <th className="px-3 py-1.5 text-right">Balance Due</th>
+                                <th className="px-3 py-1.5 text-center">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-slate-700">
+                              {billingHistory.invoices.map((inv: any) => {
+                                const invNum = inv.invoiceNumber || inv._id.substring(18).toUpperCase();
+                                const dateStr = new Date(inv.issuedAt || inv.createdAt).toLocaleDateString("en-IN");
+                                return (
+                                  <tr key={inv._id} className="hover:bg-slate-50">
+                                    <td className="px-3 py-1 font-mono">{invNum}</td>
+                                    <td className="px-3 py-1 font-medium">{inv.billingType}</td>
+                                    <td className="px-3 py-1 text-slate-500">{dateStr}</td>
+                                    <td className="px-3 py-1 text-right">₹{inv.totals?.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                                    <td className="px-3 py-1 text-right font-semibold text-rose-600">₹{(inv.totals?.patientBalance ?? (inv.status === "paid" ? 0 : inv.totals?.total)).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                                    <td className="px-3 py-1 text-center">
+                                      <span className={`inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${
+                                        inv.status === "paid" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"
+                                      }`}>
+                                        {inv.status}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Form Inputs */}
+                <form onSubmit={handleDischargeSubmit} className="space-y-4">
+                  <div>
+                    <TextareaField
+                      label="Discharge Summary & Audit Notes"
+                      required
+                      value={dischargeNotes}
+                      onChange={(e) => setDischargeNotes(e.target.value)}
+                      rows={3}
+                      placeholder="Provide diagnosis at discharge or final discharge notes..."
+                    />
+                  </div>
+
+                  {/* Actions Panel */}
+                  <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-slate-100">
+                    <div className="text-left w-full sm:w-auto">
+                      <div className="text-[10px] text-slate-400 uppercase font-semibold">Total Outstanding Balance</div>
+                      <div className={`text-lg font-black ${isBlocked ? "text-rose-600" : "text-emerald-600"}`}>
+                        ₹{billingHistory ? billingHistory.totalDues.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "0.00"}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 w-full sm:w-auto justify-end">
+                      <Button 
+                        type="button" 
+                        onClick={() => {
+                          setIsDischargeOpen(false);
+                          setBillingHistory(null);
+                        }} 
+                        variant="secondary"
+                        className="text-xs px-4"
+                      >
+                        Cancel
+                      </Button>
+                      
+                      {isBlocked ? (
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            setIsDischargeOpen(false);
+                            setBillingHistory(null);
+                            navigate(`/receptionist/billing/ip?admissionId=${dischargeAdmissionId}`);
+                          }}
+                          variant="primary"
+                          className="text-xs px-4 bg-indigo-650 hover:bg-indigo-750 flex items-center gap-1"
+                        >
+                          <FileText className="h-4 w-4" /> Go to Billing Dashboard
+                        </Button>
+                      ) : (
+                        <Button 
+                          type="submit" 
+                          variant="danger" 
+                          className="text-xs px-4 flex items-center gap-1"
+                          disabled={dischargeMutation.isPending}
+                        >
+                          {dischargeMutation.isPending ? "Discharging..." : "Complete Discharge"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </form>
+              </div>
             </div>
-          </form>
-        </div>
-      )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

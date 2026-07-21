@@ -823,14 +823,14 @@ export const checkAdmissionBillingStatus = catchAsync(async (req: Request, res: 
     throw new AppError("Admission record not found.", 404);
   }
 
-  // 1. Fetch pending OP invoices (laboratory, pharmacy, radiology)
-  const unpaidInvoices = await Invoice.find({
+  // 1. Fetch all invoices for this patient during their stay
+  const allInvoices = await Invoice.find({
     patient: admission.patient._id,
-    hospital: hospitalId,
-    billingType: { $in: ["LAB", "RADIOLOGY", "PHARMACY"] },
-    status: { $ne: "paid" }
-  });
+    hospital: hospitalId
+  }).sort({ createdAt: -1 });
 
+  // Calculate pending OP balance from unpaid invoices
+  const unpaidInvoices = allInvoices.filter(inv => inv.status !== "paid");
   const totalPendingOP = unpaidInvoices.reduce((sum, inv) => sum + (inv.totals?.patientBalance ?? inv.totals?.total ?? 0), 0);
 
   // 2. Fetch IP bill status & outstanding
@@ -842,20 +842,38 @@ export const checkAdmissionBillingStatus = catchAsync(async (req: Request, res: 
 
   let ipOutstanding = 0;
   let hasDraftIPBill = false;
+  let ipBillItems: any[] = [];
+  let ipBillSummary: any = null;
+
   if (ipBill) {
+    const items = await getIPBillItemsSummary(ipBill, admission, hospitalId);
+    ipBillItems = items;
+
+    const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+    const tax = subtotal * (ipBill.taxRate / 100);
+    const totalDiscount = ipBill.discountType === "percentage"
+      ? subtotal * ((ipBill.hospitalDiscount + ipBill.doctorDiscount + ipBill.managementDiscount) / 100)
+      : (ipBill.hospitalDiscount + ipBill.doctorDiscount + ipBill.managementDiscount);
+    const grandTotal = subtotal + tax - totalDiscount;
+    ipOutstanding = Math.max(0, grandTotal - ipBill.insuranceCovered - ipBill.advancePaid);
+
     if (ipBill.status === "Draft") {
       hasDraftIPBill = true;
-      const items = await getIPBillItemsSummary(ipBill, admission, hospitalId);
-      const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-      const tax = subtotal * (ipBill.taxRate / 100);
-      const totalDiscount = ipBill.discountType === "percentage"
-        ? subtotal * ((ipBill.hospitalDiscount + ipBill.doctorDiscount + ipBill.managementDiscount) / 100)
-        : (ipBill.hospitalDiscount + ipBill.doctorDiscount + ipBill.managementDiscount);
-      const grandTotal = subtotal + tax - totalDiscount;
-      ipOutstanding = Math.max(0, grandTotal - ipBill.insuranceCovered - ipBill.advancePaid);
-    } else {
-      ipOutstanding = ipBill.outstanding;
     }
+
+    ipBillSummary = {
+      _id: ipBill._id,
+      billNumber: ipBill.billNumber,
+      status: ipBill.status,
+      advancePaid: ipBill.advancePaid,
+      insuranceCovered: ipBill.insuranceCovered,
+      taxRate: ipBill.taxRate,
+      discount: totalDiscount,
+      subtotal,
+      taxAmount: tax,
+      grandTotal,
+      outstanding: ipOutstanding
+    };
   }
 
   const totalDues = totalPendingOP + ipOutstanding;
@@ -867,8 +885,12 @@ export const checkAdmissionBillingStatus = catchAsync(async (req: Request, res: 
       totalPendingOP,
       ipOutstanding,
       totalDues,
-      hasDraftIPBill
+      hasDraftIPBill,
+      invoices: allInvoices,
+      ipBill: ipBillSummary,
+      ipBillItems: ipBillItems
     }
   });
 });
+
 
