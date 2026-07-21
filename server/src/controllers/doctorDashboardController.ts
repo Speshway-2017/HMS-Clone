@@ -22,9 +22,15 @@ import { logAudit } from "../utils/auditLogger";
 import { createOrUpdatePrescriptionCore } from "./prescriptionController";
 
 
-// Helper helper to resolve the logged-in doctor profile
 async function getLoggedDoctor(req: Request) {
-  const doctor = await Doctor.findOne({ email: req.user!.email, isActive: { $ne: false } });
+  if (!req.user?.email) {
+    throw new AppError("User profile email not found.", 401);
+  }
+  const emailRegex = new RegExp(`^${req.user.email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+  let doctor = await Doctor.findOne({ email: emailRegex, isActive: { $ne: false } });
+  if (!doctor && req.user.hospital) {
+    doctor = await Doctor.findOne({ hospital: req.user.hospital, email: emailRegex, isActive: { $ne: false } });
+  }
   if (!doctor) {
     throw new AppError("Doctor profile not found for the logged-in user.", 404);
   }
@@ -1343,15 +1349,16 @@ export const getMyPatients = catchAsync(async (req: Request, res: Response) => {
     Patient.distinct("_id", { hospital: hospitalId, assignedDoctor: doctorObjId }),
   ]);
 
-  // Merge and deduplicate using string keys, then convert back to ObjectIds
-  const patientIdSet = new Set<string>([
-    ...apptPatients.map((id: any) => id.toString()),
-    ...admissionPatients.map((id: any) => id.toString()),
-    ...labPatients.map((id: any) => id.toString()),
-    ...radioPatients.map((id: any) => id.toString()),
-    ...assignedPatients.map((id: any) => id.toString()),
-  ]);
+  // Filter out falsy/invalid values before calling toString()
+  const rawIds = [
+    ...apptPatients,
+    ...admissionPatients,
+    ...labPatients,
+    ...radioPatients,
+    ...assignedPatients,
+  ].filter((id) => id != null && Types.ObjectId.isValid(id.toString()));
 
+  const patientIdSet = new Set<string>(rawIds.map((id: any) => id.toString()));
   const patientIds = Array.from(patientIdSet).map((id) => new Types.ObjectId(id));
 
   // Step 2: fetch the actual patient documents — scoped to hospital + owned ids
@@ -1360,10 +1367,13 @@ export const getMyPatients = catchAsync(async (req: Request, res: Response) => {
     _id: { $in: patientIds },
   };
 
-  if (search) {
+  const searchStr = (search || "").trim();
+  if (searchStr) {
+    const escapedSearch = searchStr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     filter.$or = [
-      { name: new RegExp(search, "i") },
-      { phone: new RegExp(search, "i") },
+      { name: new RegExp(escapedSearch, "i") },
+      { phone: new RegExp(escapedSearch, "i") },
+      { uhid: new RegExp(escapedSearch, "i") },
     ];
   }
 
@@ -1372,19 +1382,18 @@ export const getMyPatients = catchAsync(async (req: Request, res: Response) => {
     .sort({ createdAt: -1 });
 
   // Step 3: Audit log — record access
-  if (req.user) {
-    await AuditLog.create({
-      hospital: hospitalId,
-      user: req.user._id,
-      action: "doctor_patient_list_accessed",
-      details: `Dr. ${doctor.name} accessed their patient records list (${patients.length} patients).`,
-      ipAddress: getClientIp(req),
-      resource: "patient",
-      resourceId: null,
-      oldValues: null,
-      newValues: { doctorId: doctorObjId.toString(), count: patients.length },
-    });
-  }
+  await logAudit({
+    req,
+    hospitalId: hospitalId.toString(),
+    userId: req.user?._id?.toString(),
+    action: "doctor_patient_list_accessed",
+    entity: "patient",
+    details: {
+      message: `Dr. ${doctor.name} accessed their patient records list (${patients.length} patients).`,
+      doctorId: doctorObjId.toString(),
+      count: patients.length,
+    },
+  });
 
   res.json({
     status: "success",
