@@ -65,6 +65,8 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "Inventory", path: "/admin/inventory", icon: Boxes },
     { label: "Beds & Wards", path: "/admin/beds", icon: BedDouble },
     { label: "Roles", path: "/admin/roles", icon: ShieldCheck },
+    { label: "Hospital Info", path: "/admin/hospital-info", icon: Building2 },
+    { label: "Contact Enquiries", path: "/admin/enquiries", icon: ClipboardList },
     { label: "Settings", path: "/admin/settings", icon: Settings },
   ],
   receptionist: [

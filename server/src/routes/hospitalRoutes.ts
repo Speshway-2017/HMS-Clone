@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { protect, restrictTo } from "../middleware/auth";
+import { scopeToHospital } from "../middleware/scopeToHospital";
 import {
   listHospitals,
   createHospital,
@@ -10,11 +11,27 @@ import {
   getMyHospital,
   updateMyHospital,
   getPublicHospital,
+  getPublicHospitalDepartments,
+  getPublicHospitalDoctors,
+  createPublicAppointment,
+  createPublicEnquiry,
+  listHospitalEnquiries,
+  updateEnquiryStatus,
 } from "../controllers/hospitalController";
 
 const router = Router();
 
+// Public facing routes (patient website)
 router.get("/public", getPublicHospital);
+router.get("/public/departments", getPublicHospitalDepartments);
+router.get("/public/doctors", getPublicHospitalDoctors);
+router.post("/public/appointments", createPublicAppointment);
+router.post("/public/enquiries", createPublicEnquiry);
+
+// Hospital Admin Enquiries endpoints
+router.get("/enquiries", protect, restrictTo("hospital_admin"), scopeToHospital, listHospitalEnquiries);
+router.patch("/enquiries/:id", protect, restrictTo("hospital_admin"), scopeToHospital, updateEnquiryStatus);
+
 router.get("/me", protect, getMyHospital);
 router.patch("/me", protect, restrictTo("hospital_admin", "laboratory"), updateMyHospital);
 

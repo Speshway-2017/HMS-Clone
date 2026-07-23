@@ -15,6 +15,8 @@ export interface UserDocument extends Document {
   avatarUrl: string;
   status: "active" | "inactive";
   lastLogin: Date | null;
+  resetPasswordToken?: string | null;
+  resetPasswordExpiresAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidate: string): Promise<boolean>;
@@ -33,6 +35,8 @@ const userSchema = new Schema<UserDocument>(
     avatarUrl: { type: String, default: "" },
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     lastLogin: { type: Date, default: null },
+    resetPasswordToken: { type: String, default: null },
+    resetPasswordExpiresAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
