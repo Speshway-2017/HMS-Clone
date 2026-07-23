@@ -16,6 +16,27 @@ const hospitalSchema = new Schema(
     investigationPrices: { type: Map, of: Number, default: {} },
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },
+    
+    // Website Customization Parameters
+    heroBannerUrl: { type: String, default: "" },
+    aboutText: { type: String, default: "" },
+    googleMapsLink: { type: String, default: "" },
+    workingHours: { type: String, default: "" },
+    footerText: { type: String, default: "" },
+    socialLinks: { type: Map, of: String, default: {} },
+    faqs: {
+      type: [{ q: { type: String, default: "" }, a: { type: String, default: "" } }],
+      default: []
+    },
+    heroTitle: { type: String, default: "" },
+    heroSub: { type: String, default: "" },
+    whyChooseUs: {
+      type: [{ title: { type: String, default: "" }, desc: { type: String, default: "" } }],
+      default: []
+    },
+    missionText: { type: String, default: "" },
+    visionText: { type: String, default: "" },
+    valuesText: { type: String, default: "" },
   },
   { timestamps: true },
 );

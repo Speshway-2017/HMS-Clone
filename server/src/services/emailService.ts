@@ -6,6 +6,7 @@ export interface EmailOptions {
   to: string;
   subject: string;
   body: string;
+  html?: string;
   pdfPath?: string;
 }
 
@@ -43,6 +44,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
         to: options.to,
         subject: options.subject,
         text: options.body,
+        html: options.html,
         attachments,
       });
 

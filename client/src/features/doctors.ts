@@ -31,7 +31,11 @@ export function useDoctor(id: string | undefined) {
     enabled: !!id,
     queryFn: async () => {
       const res = await api.get(`/doctors/${id}`);
-      return res.data.data as { doctor: Doctor; stats: { patientsTreated: number } };
+      return res.data.data as {
+        doctor: Doctor;
+        stats: { patientsTreated: number };
+        patients: any[];
+      };
     },
   });
 }

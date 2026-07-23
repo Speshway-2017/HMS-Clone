@@ -15,6 +15,21 @@ export interface Hospital {
   investigationPrices?: Record<string, number>;
   createdAt: string;
   primaryAdminName?: string | null;
+  
+  // Customization fields
+  heroBannerUrl?: string;
+  aboutText?: string;
+  googleMapsLink?: string;
+  workingHours?: string;
+  footerText?: string;
+  socialLinks?: Record<string, string>;
+  faqs?: { q: string; a: string }[];
+  heroTitle?: string;
+  heroSub?: string;
+  whyChooseUs?: { title: string; desc: string }[];
+  missionText?: string;
+  visionText?: string;
+  valuesText?: string;
 }
 
 export interface Branch {

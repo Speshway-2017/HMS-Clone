@@ -3,6 +3,8 @@ import { PublicLayout } from "./layouts/PublicLayout";
 import { DashboardLayout } from "./layouts/DashboardLayout";
 import { LandingPage } from "./pages/public/LandingPage";
 import { LoginPage } from "./pages/auth/LoginPage";
+import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
+import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { VerifyPrescriptionPage } from "./pages/public/VerifyPrescriptionPage";
 
@@ -41,6 +43,8 @@ import { InventoryPage } from "./pages/hospital-admin/InventoryPage";
 import { InventoryFormPage } from "./pages/hospital-admin/InventoryFormPage";
 import { InventoryItemDetailsPage } from "./pages/hospital-admin/InventoryItemDetailsPage";
 import { BedsPage } from "./pages/hospital-admin/BedsPage";
+import { HospitalInfoPage } from "./pages/hospital-admin/HospitalInfoPage";
+import { EnquiriesPage } from "./pages/hospital-admin/EnquiriesPage";
 
 // Accountant module
 import { AccountantDashboard } from "./pages/accountant/Dashboard";
@@ -126,6 +130,8 @@ export const router = createBrowserRouter([
     children: [
       { path: "/", element: <LandingPage /> },
       { path: "/login", element: <LoginPage /> },
+      { path: "/forgot-password", element: <ForgotPasswordPage /> },
+      { path: "/reset-password/:token", element: <ResetPasswordPage /> },
       { path: "/verify-prescription/:id", element: <VerifyPrescriptionPage /> },
     ],
   },
@@ -195,6 +201,8 @@ export const router = createBrowserRouter([
           { path: "roles/new", element: <RoleFormPage /> },
           { path: "roles/:id/edit", element: <RoleFormPage /> },
           { path: "beds", element: <BedsPage /> },
+          { path: "hospital-info", element: <HospitalInfoPage /> },
+          { path: "enquiries", element: <EnquiriesPage /> },
           { path: "settings", element: <SettingsPage /> },
         ],
       },

@@ -4,6 +4,8 @@ import { z } from "zod";
 import { Doctor, DOCTOR_STATUSES } from "../models/Doctor";
 import { User } from "../models/User";
 import { Appointment } from "../models/Appointment";
+import { Prescription } from "../models/Prescription";
+import { DiagnosticReport } from "../models/DiagnosticReport";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { generateTempPassword } from "../utils/idGenerator";
@@ -100,9 +102,61 @@ export const getDoctor = catchAsync(async (req: Request, res: Response) => {
   const busyDoctorIds = await getBusyDoctorIds(req.hospitalFilter!.hospital as any);
   const resolvedDoctor = { ...doctor.toObject(), status: getDoctorDynamicStatus(doctor, busyDoctorIds) };
 
+  // Count total completed patients
   const patientsTreated = await Appointment.countDocuments({ doctor: doctor._id, status: "completed" });
 
-  res.json({ status: "success", data: { doctor: resolvedDoctor, stats: { patientsTreated } } });
+  // Fetch all appointments for this doctor populated with patient details
+  const appointments = await Appointment.find({ doctor: doctor._id })
+    .populate("patient", "name uhid age gender phone email")
+    .sort({ date: -1, timeSlot: -1 });
+
+  const appointmentIds = appointments.map(app => app._id);
+
+  // Retrieve prescriptions and diagnostic reports for these appointments
+  const prescriptions = await Prescription.find({ appointment: { $in: appointmentIds } });
+  const diagnosticReports = await DiagnosticReport.find({ appointment: { $in: appointmentIds } });
+
+  // Group by unique patient
+  const patientGroupsMap = new Map<string, {
+    patient: any;
+    history: Array<{
+      appointment: any;
+      prescription: any;
+      reports: any[];
+    }>;
+  }>();
+
+  for (const app of appointments) {
+    if (!app.patient) continue;
+    const patientId = (app.patient as any)._id.toString();
+
+    if (!patientGroupsMap.has(patientId)) {
+      patientGroupsMap.set(patientId, {
+        patient: app.patient,
+        history: []
+      });
+    }
+
+    const appPrescription = prescriptions.find(p => p.appointment?.toString() === app._id.toString());
+    const appReports = diagnosticReports.filter(r => r.appointment?.toString() === app._id.toString());
+
+    patientGroupsMap.get(patientId)!.history.push({
+      appointment: app,
+      prescription: appPrescription || null,
+      reports: appReports
+    });
+  }
+
+  const patientHistory = Array.from(patientGroupsMap.values());
+
+  res.json({
+    status: "success",
+    data: {
+      doctor: resolvedDoctor,
+      stats: { patientsTreated },
+      patients: patientHistory
+    }
+  });
 });
 
 export const updateDoctor = catchAsync(async (req: Request, res: Response) => {
