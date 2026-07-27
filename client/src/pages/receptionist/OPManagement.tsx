@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Plus, List, ClipboardList, CheckCircle } from "lucide-react";
+import { Search, Plus, List, ClipboardList, CheckCircle, Filter } from "lucide-react";
 import {
   usePatientsSearch,
   useDoctorsAvailability,
@@ -14,7 +14,7 @@ import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
 import { Pagination } from "../../components/ui/Pagination";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 interface Props {
   activeTab?: "new" | "queue" | "history";
@@ -22,10 +22,18 @@ interface Props {
 
 export function OPManagementPage({ activeTab = "queue" }: Props) {
   const [tab, setTab] = useState<"new" | "queue" | "history">(activeTab);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialFilter = searchParams.get("filter") || "all";
+  const [queueFilter, setQueueFilter] = useState<string>(initialFilter);
 
   useEffect(() => {
     setTab(activeTab);
   }, [activeTab]);
+
+  useEffect(() => {
+    const f = searchParams.get("filter");
+    if (f) setQueueFilter(f);
+  }, [searchParams]);
 
   const [patientQuery, setPatientQuery] = useState("");
   const [selectedPatientId, setSelectedPatientId] = useState("");
@@ -199,11 +207,64 @@ export function OPManagementPage({ activeTab = "queue" }: Props) {
       {/* Active Queue Tab */}
       {tab === "queue" && (
         <Card>
-          <h2 className="mb-4 text-base font-semibold text-slate-800">Today's Outpatient Line</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-100 pb-3">
+            <div>
+              <h2 className="text-base font-semibold text-slate-800">Today's Outpatient Line</h2>
+              <p className="text-xs text-slate-500 font-medium">Real-time status tracking for checked-in and waiting patients.</p>
+            </div>
+
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 text-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-450 mr-1 flex items-center gap-1">
+                <Filter className="h-3 w-3" /> Filter:
+              </span>
+              {[
+                { id: "all", label: "All Queue" },
+                { id: "waiting", label: "Waiting" },
+                { id: "walkin", label: "Walk-Ins" },
+                { id: "checkedin", label: "Checked-In" },
+                { id: "consulting", label: "In Consultation" },
+                { id: "completed", label: "Completed" },
+                { id: "missed", label: "Missed/Skipped" }
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => {
+                    setQueueFilter(f.id);
+                    setSearchParams({ filter: f.id });
+                  }}
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all shrink-0 ${
+                    queueFilter === f.id
+                      ? "bg-navy-700 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {queueLoading ? (
             <div className="py-8 text-center text-slate-400">Loading OP Queue...</div>
           ) : (
-            <DataTable columns={queueColumns} rows={queueTokens || []} rowKey={(row) => row._id} />
+            <DataTable
+              columns={queueColumns}
+              rows={(queueTokens || []).filter((item: any) => {
+                if (queueFilter === "all") return true;
+                if (queueFilter === "waiting") return item.status === "waiting";
+                if (queueFilter === "walkin") {
+                  const apptType = item.appointment?.type;
+                  return item.status === "waiting" && (apptType === "Walk-in" || apptType === "Walk-in Visit" || item.type === "walk-in" || !item.appointment);
+                }
+                if (queueFilter === "checkedin" || queueFilter === "checked_in") return item.status === "waiting" || item.status === "called" || item.status === "completed";
+                if (queueFilter === "consulting") return item.status === "called";
+                if (queueFilter === "completed") return item.status === "completed";
+                if (queueFilter === "missed") return item.status === "skipped" || item.status === "no_show" || item.status === "missed";
+                return true;
+              })}
+              rowKey={(row) => row._id}
+            />
           )}
         </Card>
       )}

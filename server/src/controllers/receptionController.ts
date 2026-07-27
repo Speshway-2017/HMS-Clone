@@ -717,7 +717,7 @@ export const checkInAppointment = catchAsync(async (req: Request, res: Response)
 export const getQueueDetails = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   
-  // Update scheduled alerts
+  // Update scheduled alerts & mark missed appointments
   await ReceptionService.generateScheduledAlerts(hospitalId);
 
   const startOfToday = new Date();
@@ -738,10 +738,13 @@ export const getQueueDetails = catchAsync(async (req: Request, res: Response) =>
   // Fetch all queue items today
   const queueItems = await Queue.find({
     hospital: hospitalId,
-    createdAt: { $gte: startOfToday, $lte: endOfToday }
+    $or: [
+      { date: { $gte: startOfToday, $lte: endOfToday } },
+      { createdAt: { $gte: startOfToday, $lte: endOfToday } }
+    ]
   })
     .populate("patient", "name uhid phone age gender")
-    .populate("doctor", "name specialization")
+    .populate("doctor", "name specialization department")
     .populate("department", "name")
     .populate("appointment");
 
@@ -795,10 +798,26 @@ export const getQueueDetails = catchAsync(async (req: Request, res: Response) =>
 
   const waitingPatients = queueItems.filter(q => q.status === "waiting");
   const currentlyConsulting = queueItems.filter(q => q.status === "called");
-  const completedVisits = appointments.filter(a => a.status === "completed");
-  const checkedInPatients = queueItems.filter(q => q.status === "waiting" || q.status === "called");
-  const currentWalkInQueue = queueItems.filter(q => q.status === "waiting" && (q.appointment as any)?.type === "Walk-in");
-  const missedAppointments = appointments.filter(a => a.status === "no_show" || a.status === "missed");
+
+  // Completed visits: combine completed appointments & completed queue items
+  const completedApptIds = new Set(appointments.filter(a => a.status === "completed").map(a => a._id.toString()));
+  const completedVisits = [
+    ...appointments.filter(a => a.status === "completed"),
+    ...queueItems.filter(q => q.status === "completed" && (!q.appointment || !completedApptIds.has((q.appointment as any)._id?.toString())))
+  ];
+
+  // All checked-in patients today (waiting, consulting, or completed)
+  const checkedInPatients = queueItems;
+
+  // Walk-in queue items waiting currently
+  const currentWalkInQueue = queueItems.filter(q => {
+    if (q.status !== "waiting") return false;
+    const apptType = (q.appointment as any)?.type;
+    return apptType === "Walk-in" || apptType === "Walk-in Visit" || (q as any).type === "walk-in" || !q.appointment;
+  });
+
+  // Missed or no-show appointments
+  const missedAppointments = appointments.filter(a => a.status === "no_show" || a.status === "missed" || a.status === "cancelled");
 
   res.json({
     status: "success",

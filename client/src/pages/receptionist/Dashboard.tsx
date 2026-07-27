@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Users,
@@ -9,13 +10,18 @@ import {
   Activity,
   AlertTriangle,
   Stethoscope,
-  LayoutGrid
+  LayoutGrid,
+  Clock,
+  UserCheck,
+  CheckCircle,
+  ExternalLink
 } from "lucide-react";
 import { useReceptionStats, useQueueDetails } from "../../features/receptionist";
 import { useCheckInAppointment } from "../../features/appointments";
 import { useNotifications } from "../../features/notifications";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { Card } from "../../components/ui/Card";
+import { Modal } from "../../components/ui/Modal";
 import { formatINR } from "../../lib/currency";
 import toast from "react-hot-toast";
 
@@ -48,6 +54,13 @@ export function ReceptionistDashboard() {
   const checkInMutation = useCheckInAppointment();
   const { data: notifData } = useNotifications();
   const notifications = notifData?.data?.notifications ?? [];
+
+  const [selectedKpiModal, setSelectedKpiModal] = useState<{
+    title: string;
+    filterKey: string;
+    icon: any;
+    items: any[];
+  } | null>(null);
 
   if (isLoading) {
     return (
@@ -214,35 +227,148 @@ export function ReceptionistDashboard() {
 
           {/* Detailed Live Queue Analytics */}
           <Card>
-            <h3 className="mb-4 text-base font-semibold text-slate-800 flex items-center gap-1.5">
-              <Activity className="h-4.5 w-4.5 text-emerald-600" />
-              Live Queue Desk Overview
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-slate-800 flex items-center gap-1.5">
+                <Activity className="h-4.5 w-4.5 text-emerald-600" />
+                Live Queue Desk Overview
+              </h3>
+              <span className="text-[11px] font-medium text-slate-450">
+                Click any card to inspect patient details
+              </span>
+            </div>
+
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-center">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-450">Waiting Patients</p>
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedKpiModal({
+                    title: "Waiting Patients",
+                    filterKey: "waiting",
+                    icon: <Clock className="h-5 w-5 text-amber-600" />,
+                    items: queueDetails?.waitingPatients ?? []
+                  })
+                }
+                className="group flex flex-col items-center justify-between rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 text-center transition-all hover:-translate-y-0.5 hover:bg-amber-50/30 hover:border-amber-300 hover:shadow-md cursor-pointer"
+              >
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 group-hover:text-amber-700 flex items-center gap-1">
+                  <Clock className="h-3 w-3 text-amber-600 shrink-0" />
+                  <span>Waiting Patients</span>
+                </p>
                 <p className="mt-1 text-2xl font-bold text-amber-600">{queueDetails?.waitingPatients?.length ?? 0}</p>
-              </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-center">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-450">Walk-In Queue</p>
+                <span className="mt-1 text-[9px] font-semibold text-slate-400 group-hover:text-amber-700 flex items-center gap-0.5">
+                  Inspect queue <ExternalLink className="h-2.5 w-2.5" />
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedKpiModal({
+                    title: "Walk-In Queue",
+                    filterKey: "walkin",
+                    icon: <Users className="h-5 w-5 text-indigo-650" />,
+                    items: queueDetails?.currentWalkInQueue ?? []
+                  })
+                }
+                className="group flex flex-col items-center justify-between rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 text-center transition-all hover:-translate-y-0.5 hover:bg-indigo-50/30 hover:border-indigo-300 hover:shadow-md cursor-pointer"
+              >
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 group-hover:text-indigo-700 flex items-center gap-1">
+                  <Users className="h-3 w-3 text-indigo-650 shrink-0" />
+                  <span>Walk-In Queue</span>
+                </p>
                 <p className="mt-1 text-2xl font-bold text-indigo-650">{queueDetails?.currentWalkInQueue?.length ?? 0}</p>
-              </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-center">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-450">Checked-In Today</p>
+                <span className="mt-1 text-[9px] font-semibold text-slate-400 group-hover:text-indigo-650 flex items-center gap-0.5">
+                  Inspect walk-ins <ExternalLink className="h-2.5 w-2.5" />
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedKpiModal({
+                    title: "Checked-In Today",
+                    filterKey: "checkedin",
+                    icon: <UserCheck className="h-5 w-5 text-slate-800" />,
+                    items: queueDetails?.checkedInPatients ?? []
+                  })
+                }
+                className="group flex flex-col items-center justify-between rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 text-center transition-all hover:-translate-y-0.5 hover:bg-slate-100/60 hover:border-slate-300 hover:shadow-md cursor-pointer"
+              >
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 group-hover:text-slate-900 flex items-center gap-1">
+                  <UserCheck className="h-3 w-3 text-slate-700 shrink-0" />
+                  <span>Checked-In Today</span>
+                </p>
                 <p className="mt-1 text-2xl font-bold text-slate-800">{queueDetails?.checkedInPatients?.length ?? 0}</p>
-              </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-center">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-450">In Consultation</p>
+                <span className="mt-1 text-[9px] font-semibold text-slate-400 group-hover:text-slate-800 flex items-center gap-0.5">
+                  Inspect checked-in <ExternalLink className="h-2.5 w-2.5" />
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedKpiModal({
+                    title: "In Consultation",
+                    filterKey: "consulting",
+                    icon: <Stethoscope className="h-5 w-5 text-emerald-650" />,
+                    items: queueDetails?.currentlyConsulting ?? []
+                  })
+                }
+                className="group flex flex-col items-center justify-between rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 text-center transition-all hover:-translate-y-0.5 hover:bg-emerald-50/30 hover:border-emerald-300 hover:shadow-md cursor-pointer"
+              >
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 group-hover:text-emerald-700 flex items-center gap-1">
+                  <Stethoscope className="h-3 w-3 text-emerald-650 shrink-0" />
+                  <span>In Consultation</span>
+                </p>
                 <p className="mt-1 text-2xl font-bold text-emerald-650">{queueDetails?.currentlyConsulting?.length ?? 0}</p>
-              </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-center">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-450">Missed Appts</p>
+                <span className="mt-1 text-[9px] font-semibold text-slate-400 group-hover:text-emerald-650 flex items-center gap-0.5">
+                  Inspect active visits <ExternalLink className="h-2.5 w-2.5" />
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedKpiModal({
+                    title: "Missed Appointments",
+                    filterKey: "missed",
+                    icon: <AlertTriangle className="h-5 w-5 text-rose-600" />,
+                    items: queueDetails?.missedAppointments ?? []
+                  })
+                }
+                className="group flex flex-col items-center justify-between rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 text-center transition-all hover:-translate-y-0.5 hover:bg-rose-50/30 hover:border-rose-300 hover:shadow-md cursor-pointer"
+              >
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 group-hover:text-rose-700 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3 text-rose-600 shrink-0" />
+                  <span>Missed Appts</span>
+                </p>
                 <p className="mt-1 text-2xl font-bold text-rose-600">{queueDetails?.missedAppointments?.length ?? 0}</p>
-              </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 text-center">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-450">Completed Visits</p>
+                <span className="mt-1 text-[9px] font-semibold text-slate-400 group-hover:text-rose-600 flex items-center gap-0.5">
+                  Inspect missed <ExternalLink className="h-2.5 w-2.5" />
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedKpiModal({
+                    title: "Completed Visits",
+                    filterKey: "completed",
+                    icon: <CheckCircle className="h-5 w-5 text-green-700" />,
+                    items: queueDetails?.completedVisits ?? []
+                  })
+                }
+                className="group flex flex-col items-center justify-between rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 text-center transition-all hover:-translate-y-0.5 hover:bg-green-50/30 hover:border-green-300 hover:shadow-md cursor-pointer"
+              >
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 group-hover:text-green-800 flex items-center gap-1">
+                  <CheckCircle className="h-3 w-3 text-green-700 shrink-0" />
+                  <span>Completed Visits</span>
+                </p>
                 <p className="mt-1 text-2xl font-bold text-green-700">{queueDetails?.completedVisits?.length ?? 0}</p>
-              </div>
+                <span className="mt-1 text-[9px] font-semibold text-slate-400 group-hover:text-green-700 flex items-center gap-0.5">
+                  Inspect completed <ExternalLink className="h-2.5 w-2.5" />
+                </span>
+              </button>
             </div>
           </Card>
         </div>
@@ -321,6 +447,104 @@ export function ReceptionistDashboard() {
           </Card>
         </div>
       </div>
+
+      {/* KPI Detail Breakdown Modal */}
+      {selectedKpiModal && (
+        <Modal
+          isOpen={!!selectedKpiModal}
+          onClose={() => setSelectedKpiModal(null)}
+          title={selectedKpiModal.title}
+        >
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-150 pb-3">
+              <div className="flex items-center gap-2">
+                {selectedKpiModal.icon}
+                <span className="text-xs font-semibold text-slate-600">
+                  {selectedKpiModal.items.length} records today
+                </span>
+              </div>
+              <Link
+                to={`/receptionist/op/queue?filter=${selectedKpiModal.filterKey}`}
+                onClick={() => setSelectedKpiModal(null)}
+                className="text-xs font-bold text-indigo-650 hover:text-indigo-800 hover:underline flex items-center gap-1"
+              >
+                Open Full OP Desk Queue →
+              </Link>
+            </div>
+
+            {selectedKpiModal.items.length === 0 ? (
+              <div className="py-10 text-center text-slate-400 text-xs">
+                No patient records currently found in this category for today.
+              </div>
+            ) : (
+              <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                {selectedKpiModal.items.map((item: any, idx: number) => {
+                  const patientName = item.patient?.name || item.patientName || "Patient";
+                  const uhid = item.patient?.uhid || "N/A";
+                  const doctorName = item.doctor?.name || "Unassigned";
+                  const token = item.tokenNumber || item.referenceId || `#${idx + 1}`;
+                  const timeDisplay = item.time || (item.createdAt ? new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Today");
+
+                  return (
+                    <div
+                      key={item._id || idx}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between rounded-xl border border-slate-200 bg-slate-50/50 p-3 hover:bg-slate-100/60 transition-colors gap-2"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="rounded bg-white border border-slate-250 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-800">
+                            {token}
+                          </span>
+                          <span className="font-bold text-slate-900 text-xs">{patientName}</span>
+                          <span className="text-[10px] font-mono text-slate-400">({uhid})</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500">
+                          Dr. {doctorName} · Slot/Time: <span className="font-semibold text-slate-700">{timeDisplay}</span>
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {item.status === "scheduled" && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await checkInMutation.mutateAsync(item._id);
+                                toast.success("Patient checked in successfully!");
+                                refetchQueueDetails();
+                                setSelectedKpiModal(null);
+                              } catch (err: any) {
+                                toast.error(err.message || "Failed to check in");
+                              }
+                            }}
+                            disabled={checkInMutation.isPending}
+                            className="rounded-lg bg-indigo-650 hover:bg-indigo-700 px-3 py-1 text-xs font-semibold text-white transition-colors"
+                          >
+                            Check-In
+                          </button>
+                        )}
+                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                          item.status === "waiting"
+                            ? "bg-amber-50 text-amber-700 border-amber-200"
+                            : item.status === "called"
+                            ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                            : item.status === "completed"
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : item.status === "no_show" || item.status === "missed"
+                            ? "bg-rose-50 text-rose-700 border-rose-200"
+                            : "bg-slate-100 text-slate-700 border-slate-200"
+                        }`}>
+                          {item.status || "active"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

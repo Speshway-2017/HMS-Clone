@@ -71,7 +71,7 @@ export function FinancePage() {
 
   const patientInvoices = (patientInvoicesData?.data || []).filter((inv: any) => {
     if (!selectedPatient) return false;
-    const pId = typeof inv.patient === "object" ? inv.patient._id : inv.patient;
+    const pId = inv.patient && typeof inv.patient === "object" ? inv.patient._id : inv.patient;
     return pId === selectedPatient._id;
   });
 
@@ -144,7 +144,7 @@ export function FinancePage() {
 
   const columns: Column<Invoice>[] = [
     { header: "Invoice", render: (inv) => <span className="font-mono text-xs text-slate-500">{inv._id.slice(-8).toUpperCase()}</span> },
-    { header: "Patient", render: (inv) => <span className="font-medium text-slate-700">{typeof inv.patient === "object" ? inv.patient.name : ""}</span> },
+    { header: "Patient", render: (inv) => <span className="font-medium text-slate-700">{inv.patient && typeof inv.patient === "object" ? inv.patient.name : "Walk-in Patient"}</span> },
     { header: "Date Issued", render: (inv) => <span className="text-slate-600">{new Date(inv.issuedAt).toLocaleDateString()}</span> },
     { header: "Amount", render: (inv) => <span className="font-semibold text-slate-800">₹{(inv.totals?.total ?? 0).toFixed(2)}</span> },
     { header: "Status", render: (inv) => <Badge tone={STATUS_TONE[inv.status]}>{inv.status.replace("_", " ")}</Badge> },

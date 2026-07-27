@@ -169,7 +169,7 @@ export function LoginPage() {
                 {/* Email input */}
                 <div>
                   <label htmlFor="email" className="block mb-1 text-xs text-slate-600">
-                    Administrator / Staff Email
+                    Email
                   </label>
                   <input
                     id="email"
