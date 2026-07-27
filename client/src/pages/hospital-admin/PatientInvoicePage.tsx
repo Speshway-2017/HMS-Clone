@@ -16,8 +16,8 @@ export function PatientInvoicePage() {
     return <p className="text-slate-400">Loading...</p>;
   }
 
-  const patientName = typeof invoice.patient === "object" ? invoice.patient.name : "";
-  const patientId = typeof invoice.patient === "object" ? invoice.patient._id : invoice.patient;
+  const patientName = invoice.patient && typeof invoice.patient === "object" ? invoice.patient.name : "Walk-in Patient";
+  const patientId = invoice.patient && typeof invoice.patient === "object" ? invoice.patient._id : invoice.patient;
 
   return (
     <div className="space-y-6">

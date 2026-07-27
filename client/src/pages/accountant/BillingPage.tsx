@@ -145,7 +145,7 @@ export function AccountantBillingPage() {
 
   const patientInvoices = (patientInvoicesData?.data || []).filter((inv: any) => {
     if (!selectedPatient) return false;
-    const pId = typeof inv.patient === "object" ? inv.patient._id : inv.patient;
+    const pId = inv.patient && typeof inv.patient === "object" ? inv.patient._id : inv.patient;
     return pId === selectedPatient._id;
   });
 
@@ -422,7 +422,7 @@ export function AccountantBillingPage() {
 
   // Filter invoices client-side
   const filteredInvoices = (invoicesData?.data ?? []).filter((inv) => {
-    const pName = typeof inv.patient === "object" ? (inv.patient as any).name : "";
+    const pName = inv.patient && typeof inv.patient === "object" ? inv.patient.name : "";
     return pName.toLowerCase().includes(search.toLowerCase()) || 
            inv._id.toLowerCase().includes(search.toLowerCase());
   });
@@ -1412,7 +1412,7 @@ export function AccountantBillingPage() {
                         {inv._id.slice(-8).toUpperCase()}
                       </td>
                       <td className="px-4 py-3 font-medium text-slate-700">
-                        {typeof inv.patient === "object" ? (inv.patient as any).name : "Walk-in"}
+                        {inv.patient && typeof inv.patient === "object" ? inv.patient.name : "Walk-in"}
                       </td>
                       <td className="px-4 py-3 text-slate-600">
                         <span className="capitalize">{(inv as any).billingType || inv.items[0]?.category.toUpperCase() || "OP"}</span>
@@ -1535,13 +1535,13 @@ export function AccountantBillingPage() {
                 <div>
                   <h5 className="font-bold text-slate-400 uppercase tracking-wide">Billed To:</h5>
                   <p className="font-semibold text-slate-850">
-                    {typeof selectedInvoice.patient === "object" ? selectedInvoice.patient.name : "Walk-in"}
+                    {selectedInvoice.patient && typeof selectedInvoice.patient === "object" ? selectedInvoice.patient.name : "Walk-in"}
                   </p>
                   <p className="text-slate-500">
-                    Phone: {typeof selectedInvoice.patient === "object" ? selectedInvoice.patient.phone : "N/A"}
+                    Phone: {selectedInvoice.patient && typeof selectedInvoice.patient === "object" ? selectedInvoice.patient.phone : "N/A"}
                   </p>
                   <p className="text-slate-500">
-                    Status: <span className="capitalize">{typeof selectedInvoice.patient === "object" ? selectedInvoice.patient.status : "OPD"}</span>
+                    Status: <span className="capitalize">{selectedInvoice.patient && typeof selectedInvoice.patient === "object" ? selectedInvoice.patient.status : "OPD"}</span>
                   </p>
                 </div>
                 <div>

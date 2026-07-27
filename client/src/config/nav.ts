@@ -38,7 +38,6 @@ export interface NavItem {
   label: string;
   path: string;
   icon: LucideIcon;
-  children?: { label: string; path: string }[];
 }
 
 export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
@@ -71,77 +70,13 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   ],
   receptionist: [
     { label: "Dashboard", path: "/receptionist", icon: LayoutDashboard },
-    {
-      label: "Patient Management",
-      path: "/receptionist/patients",
-      icon: Users,
-      children: [
-        { label: "New Patient", path: "/receptionist/patients/new" },
-        { label: "Search Patient", path: "/receptionist/patients/search" },
-        { label: "Patient List", path: "/receptionist/patients" },
-      ],
-    },
-    {
-      label: "Appointments",
-      path: "/receptionist/appointments",
-      icon: CalendarClock,
-      children: [
-        { label: "Book Appointment", path: "/receptionist/appointments/new" },
-        { label: "Today's Appointments", path: "/receptionist/appointments/today" },
-        { label: "Calendar", path: "/receptionist/appointments/calendar" },
-      ],
-    },
-    {
-      label: "OP Management",
-      path: "/receptionist/op",
-      icon: UserCheck,
-      children: [
-        { label: "New OP Visit", path: "/receptionist/op/new" },
-        { label: "Today's OP Queue", path: "/receptionist/op/queue" },
-        { label: "OP History", path: "/receptionist/op/history" },
-      ],
-    },
-    {
-      label: "IP Management",
-      path: "/receptionist/ip",
-      icon: Building2,
-      children: [
-        { label: "New Admission", path: "/receptionist/ip/new" },
-        { label: "Current Admissions", path: "/receptionist/ip/admissions" },
-        { label: "Room Allocation", path: "/receptionist/ip/rooms" },
-        { label: "Transfer Patient", path: "/receptionist/ip/transfer" },
-        { label: "Discharge Requests", path: "/receptionist/ip/discharges" },
-      ],
-    },
-    {
-      label: "Billing",
-      path: "/receptionist/billing",
-      icon: Wallet,
-      children: [
-        { label: "Consultation Billing", path: "/receptionist/billing/consultation" },
-        { label: "Payments", path: "/receptionist/billing/payments" },
-        { label: "Pending Bills", path: "/receptionist/billing/pending" },
-        { label: "Receipts", path: "/receptionist/billing/receipts" },
-      ],
-    },
-    {
-      label: "Queue",
-      path: "/receptionist/queue",
-      icon: ClipboardList,
-      children: [
-        { label: "Token Queue", path: "/receptionist/queue/tokens" },
-        { label: "Display Queue", path: "/receptionist/queue/display" },
-      ],
-    },
-    {
-      label: "Doctors",
-      path: "/receptionist/doctors",
-      icon: Stethoscope,
-      children: [
-        { label: "Doctor Availability", path: "/receptionist/doctors/availability" },
-        { label: "Consultation Timings", path: "/receptionist/doctors/timings" },
-      ],
-    },
+    { label: "Patient Management", path: "/receptionist/patients", icon: Users },
+    { label: "Appointments", path: "/receptionist/appointments", icon: CalendarClock },
+    { label: "OP Management", path: "/receptionist/op", icon: UserCheck },
+    { label: "IP Management", path: "/receptionist/ip", icon: Building2 },
+    { label: "Billing", path: "/receptionist/billing", icon: Wallet },
+    { label: "Queue", path: "/receptionist/queue", icon: ClipboardList },
+    { label: "Doctors", path: "/receptionist/doctors", icon: Stethoscope },
     { label: "Notifications", path: "/receptionist/notifications", icon: History },
     { label: "Reports", path: "/receptionist/reports", icon: BarChart3 },
     { label: "Settings", path: "/receptionist/settings", icon: Settings },
