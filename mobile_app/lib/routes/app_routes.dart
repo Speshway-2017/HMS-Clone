@@ -132,6 +132,15 @@ class AppRoutes {
         final args = settings.arguments as Map<String, dynamic>;
         return PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) => PatientVitalsScreen(patientData: args),
+          settings: settings,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: animation,
+              child: child,
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 500),
+        );
       case patientDashboard:
         return PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) => const PatientDashboard(),
