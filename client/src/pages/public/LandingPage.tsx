@@ -312,7 +312,7 @@ export function LandingPage() {
           <div className="hidden items-center gap-4 shrink-0 lg:flex">
             <Link to="/login">
               <button className="text-sm font-bold text-slate-700 transition-colors hover:text-navy-700">
-                Staff Portal
+                Login
               </button>
             </Link>
             <button
@@ -359,7 +359,7 @@ export function LandingPage() {
               <div className="flex flex-col gap-3">
                 <Link to="/login" className="w-full">
                   <Button variant="secondary" className="w-full py-2.5">
-                    Staff Portal
+                    Login
                   </Button>
                 </Link>
                 <Button onClick={() => changeTab("book")} variant="primary" className="w-full py-2.5 bg-navy-700">

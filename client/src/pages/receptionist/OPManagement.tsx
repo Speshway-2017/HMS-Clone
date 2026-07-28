@@ -169,39 +169,37 @@ export function OPManagementPage({ activeTab = "queue" }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Outpatient (OP) Desk</h1>
-          <p className="text-sm text-slate-500">Register new outpatient consultations and browse consultation queues.</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Outpatient (OP) Desk</h1>
+        <p className="text-sm text-slate-500">Register new outpatient consultations and browse consultation queues.</p>
+      </div>
 
-        {/* Tab triggers */}
-        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-1">
-          <button
-            onClick={() => setTab("queue")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "queue" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            <List className="h-3.5 w-3.5" /> Active Queue
-          </button>
-          <button
-            onClick={() => setTab("new")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "new" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            <Plus className="h-3.5 w-3.5" /> Register OP Visit
-          </button>
-          <button
-            onClick={() => setTab("history")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "history" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            <ClipboardList className="h-3.5 w-3.5" /> OP Visit History
-          </button>
-        </div>
+      {/* Tabs Navigation Row */}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 max-w-max">
+        <button
+          onClick={() => setTab("queue")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+            tab === "queue" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          <List className="h-3.5 w-3.5" /> Active Queue
+        </button>
+        <button
+          onClick={() => setTab("new")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+            tab === "new" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          <Plus className="h-3.5 w-3.5" /> Register OP Visit
+        </button>
+        <button
+          onClick={() => setTab("history")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+            tab === "history" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          <ClipboardList className="h-3.5 w-3.5" /> OP Visit History
+        </button>
       </div>
 
       {/* Active Queue Tab */}

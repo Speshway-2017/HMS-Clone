@@ -18,6 +18,7 @@ import {
   useRejectAdmissionRequest
 } from "../../features/receptionist";
 import { useDepartments } from "../../features/departments";
+import { useStaffList } from "../../features/staff";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -63,8 +64,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const [dailyTariff, setDailyTariff] = useState(0);
   const [selectedRoomId, setSelectedRoomId] = useState("");
   const [selectedBedId, setSelectedBedId] = useState("");
-  const [attenderName, setAttenderName] = useState("");
-  const [attenderPhone, setAttenderPhone] = useState("");
+  const [assignedNurse, setAssignedNurse] = useState("");
   const [insuranceProvider, setInsuranceProvider] = useState("");
   const [insurancePolicyNumber, setInsurancePolicyNumber] = useState("");
   const [advanceAmount, setAdvanceAmount] = useState("0");
@@ -102,6 +102,8 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const departments = departmentsResponse || [];
   const { data: searchPatients } = usePatientsSearch(patientSearchQuery);
   const { data: patientDetail } = usePatientDetail(selectedPatientId);
+  const { data: staffData } = useStaffList({ role: "nurse", limit: 100 } as any);
+  const nurses = staffData?.data || [];
 
   // Mutations
   const admitMutation = useAdmitPatient();
@@ -201,8 +203,8 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       alert("Please search and select a patient first");
       return;
     }
-    if (!ward || !selectedRoomId || !selectedBedId || !attenderName || !attenderPhone) {
-      alert("Please fill all required attender and room/bed allocation fields");
+    if (!ward || !selectedRoomId || !selectedBedId || !assignedNurse) {
+      alert("Please fill all required room/bed allocation fields and select a nurse");
       return;
     }
 
@@ -228,8 +230,9 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
         ward,
         roomId: selectedRoomId,
         bedId: selectedBedId,
-        attenderName,
-        attenderPhone,
+        assignedNurse,
+        attenderName: "N/A",
+        attenderPhone: "N/A",
         insuranceProvider,
         insurancePolicyNumber,
         advanceAmount: parseFloat(advanceAmount),
@@ -278,8 +281,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       setWard("");
       setSelectedRoomId("");
       setSelectedBedId("");
-      setAttenderName("");
-      setAttenderPhone("");
+      setAssignedNurse("");
       setInsuranceProvider("");
       setInsurancePolicyNumber("");
       setAdvanceAmount("0");
@@ -381,11 +383,13 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       )
     },
     {
-      header: "Attender",
+      header: "Assigned Nurse",
       render: (row: any) => (
-        <div className="text-xs">
-          <div>{row.attenderName}</div>
-          <div className="text-[10px] text-slate-400">{row.attenderPhone}</div>
+        <div className="text-xs font-semibold text-slate-700">
+          {row.assignedNurse?.name || "N/A"}
+          {row.assignedNurse?.employeeId && (
+            <div className="text-[10px] text-slate-450 font-normal">ID: {row.assignedNurse.employeeId}</div>
+          )}
         </div>
       )
     },
@@ -622,12 +626,8 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                       <span className="font-semibold text-slate-700">Bed {successData.admissionSlip?.bedNumber}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Attender Name</span>
-                      <span className="font-semibold text-slate-700">{successData.admissionSlip?.attenderName}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Attender Phone</span>
-                      <span className="font-semibold text-slate-700">{successData.admissionSlip?.attenderPhone}</span>
+                      <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Assigned Nurse</span>
+                      <span className="font-semibold text-slate-700">{successData.admissionSlip?.assignedNurseName || "N/A"}</span>
                     </div>
                     <div>
                       <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Admission Date & Time</span>
@@ -745,11 +745,9 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                                 navigate(`/receptionist/patients/${p._id}`);
                                 return;
                               }
+                              // Set selected patient
                               setSelectedPatientId(p._id);
                               setPatientSearchQuery(`${p.name} (${p.uhid})`);
-                              // Auto-populate some attender fields if same as emergency contact
-                              setAttenderName(anyP.emergencyContact?.name || "");
-                              setAttenderPhone(anyP.emergencyContact?.phone || "");
                             }}
                             className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-slate-50 ${
                               selectedPatientId === p._id ? "bg-indigo-50 font-semibold" : ""
@@ -1124,21 +1122,22 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
 
                     <Card className="space-y-4">
                       <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500">
-                        Attender & Finance Information
+                        Nurse & Finance Information
                       </h3>
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <InputField
-                          label="Attender Name"
+                        <SelectField
+                          label="Assign Nurse"
                           required
-                          value={attenderName}
-                          onChange={(e) => setAttenderName(e.target.value)}
-                        />
-                        <InputField
-                          label="Attender Phone"
-                          required
-                          value={attenderPhone}
-                          onChange={(e) => setAttenderPhone(e.target.value)}
-                        />
+                          value={assignedNurse}
+                          onChange={(e: any) => setAssignedNurse(e.target.value)}
+                        >
+                          <option value="">Select Nurse</option>
+                          {nurses.map((n: any) => (
+                            <option key={n._id} value={n._id}>
+                              {n.name} {n.employeeId ? `(${n.employeeId})` : ""}
+                            </option>
+                          ))}
+                        </SelectField>
                         <InputField
                           label="Insurance Provider"
                           value={insuranceProvider}

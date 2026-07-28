@@ -1246,8 +1246,9 @@ export class ReceptionService {
       ward,
       roomId,
       bedId,
-      attenderName,
-      attenderPhone,
+      attenderName = "",
+      attenderPhone = "",
+      assignedNurse,
       insuranceProvider,
       insurancePolicyNumber,
       advanceAmount,
@@ -1431,6 +1432,7 @@ export class ReceptionService {
         bed: bedId,
         attenderName,
         attenderPhone,
+        assignedNurse: assignedNurse || null,
         insuranceProvider,
         insurancePolicyNumber,
         advanceAmount: Number(advanceAmount) || 0,
@@ -1658,6 +1660,14 @@ export class ReceptionService {
         ? docRecord?.name
         : (lastOpVisit?.doctor as any)?.name || "N/A";
 
+      let nurseName = "N/A";
+      if (assignedNurse) {
+        const nurseRecord = await Staff.findById(assignedNurse).session(session);
+        if (nurseRecord) {
+          nurseName = nurseRecord.name;
+        }
+      }
+
       const admissionSlip = {
         hospitalName,
         admissionNumber,
@@ -1670,8 +1680,9 @@ export class ReceptionService {
         ward,
         roomNumber: room.roomNumber,
         bedNumber: bed.bedNumber,
-        attenderName,
-        attenderPhone,
+        assignedNurseName: nurseName,
+        attenderName: attenderName || "N/A",
+        attenderPhone: attenderPhone || "N/A",
         insuranceProvider: insuranceProvider || "N/A",
         advancePaid: Number(advanceAmount) || 0,
         paymentMethod: paymentMethod || "Cash",

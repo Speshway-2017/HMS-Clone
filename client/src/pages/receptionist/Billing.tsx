@@ -626,15 +626,14 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Header and top tab triggers */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Billing Desk</h1>
-          <p className="text-sm text-slate-500">Collect consultation fees, manage inpatient bills, and track receipts.</p>
-        </div>
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Billing Desk</h1>
+        <p className="text-sm text-slate-500">Collect consultation fees, manage inpatient bills, and track receipts.</p>
+      </div>
 
-        {/* Tab triggers */}
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+      {/* Tabs Navigation Row */}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 shadow-sm max-w-max">
           <button
             onClick={() => setTab("consultation")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
@@ -679,7 +678,6 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
             <Clock className="h-3.5 w-3.5" /> Today's Collections
           </button>
         </div>
-      </div>
 
       {/* OPD Consultation Billing Tab */}
       {tab === "consultation" && (
@@ -1148,7 +1146,15 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                           </div>
                           <div>
                             <span className="text-slate-400 block font-semibold mb-0.5">Admitting Doctor</span>
-                            <span className="font-bold text-slate-700">Dr. {ipBillData.bill.admission?.attenderName || "N/A"}</span>
+                            <span className="font-bold text-slate-700">
+                              Dr. {ipBillData.bill.admission?.admittingDoctor?.name || "N/A"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block font-semibold mb-0.5">Assigned Nurse</span>
+                            <span className="font-bold text-slate-700 font-medium">
+                              {ipBillData.bill.admission?.assignedNurse?.name || "N/A"}
+                            </span>
                           </div>
                           <div>
                             <span className="text-slate-400 block font-semibold mb-0.5">Admission Date & Time</span>
@@ -1159,7 +1165,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                           <div>
                             <span className="text-slate-400 block font-semibold mb-0.5">Ward / Room / Bed</span>
                             <span className="font-bold text-slate-750">
-                              {ipBillData.bill.admission?.ward} / Room / Bed: {ipBillData.bill.admission?.attenderPhone || "N/A"}
+                              {ipBillData.bill.admission?.ward} / Room {ipBillData.bill.admission?.room?.roomNumber || "N/A"} / Bed {ipBillData.bill.admission?.bed?.bedNumber || "N/A"}
                             </span>
                           </div>
                           <div>
