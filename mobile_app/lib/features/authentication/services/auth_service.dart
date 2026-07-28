@@ -7,6 +7,9 @@ import '../../../core/config/api_config.dart';
 class AuthService {
   final http.Client _client;
 
+  /// Holds the active user profile from registration or login
+  static Map<String, dynamic>? currentUser;
+
   AuthService({http.Client? client}) : _client = client ?? http.Client();
 
   /// Authenticates credentials against the MERN database endpoint.

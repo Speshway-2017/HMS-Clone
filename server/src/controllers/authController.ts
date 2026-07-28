@@ -16,6 +16,13 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const registerSchema = z.object({
+  name: z.string().min(2),
+  email: z.string().email(),
+  password: z.string().min(6),
+  phone: z.string().optional().default(""),
+});
+
 function sanitizeUser(user: UserDocument) {
   return {
     id: user._id,
@@ -32,6 +39,58 @@ function sanitizeUser(user: UserDocument) {
 function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
+
+export const register = catchAsync(async (req: Request, res: Response) => {
+  const { name, email, password, phone } = registerSchema.parse(req.body);
+
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    throw new AppError("Email is already registered.", 400);
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  const user = await User.create({
+    name,
+    email,
+    passwordHash,
+    role: "patient",
+    status: "active",
+    phone,
+  });
+
+  const accessToken = signAccessToken({ id: user._id.toString(), role: user.role });
+  const refreshToken = signRefreshToken({ id: user._id.toString(), role: user.role });
+
+  const tokenHash = hashToken(refreshToken);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+  await RefreshToken.create({
+    user: user._id,
+    tokenHash,
+    expiresAt,
+    ipAddress: req.ip || "",
+    userAgent: req.get("user-agent") || "",
+  });
+
+  await logAudit({
+    req,
+    userId: user._id.toString(),
+    userEmail: user.email,
+    userRole: user.role,
+    action: "USER_REGISTERED",
+    entity: "User",
+    entityId: user._id.toString(),
+  });
+
+  res.status(201).json({
+    status: "success",
+    data: {
+      user: sanitizeUser(user),
+      token: accessToken,
+      refreshToken: refreshToken,
+    },
+  });
+});
 
 export const login = catchAsync(async (req: Request, res: Response) => {
   const { email, password } = loginSchema.parse(req.body);

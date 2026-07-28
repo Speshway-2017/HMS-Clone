@@ -9,6 +9,7 @@ import '../features/nurse/screens/shift_handover_screen.dart';
 import '../features/nurse/screens/nursing_notes_screen.dart';
 import '../features/nurse/screens/patient_profile_screen.dart';
 import '../features/nurse/screens/patient_vitals_screen.dart';
+import '../features/patient/screens/patient_dashboard.dart';
 
 class AppRoutes {
   static const String splash = '/';
@@ -21,6 +22,7 @@ class AppRoutes {
   static const String nurseNursingNotes = '/nurse/nursing-notes';
   static const String nursePatientProfile = '/nurse/patient-profile';
   static const String nursePatientVitals = '/nurse/patient-vitals';
+  static const String patientDashboard = '/patient/dashboard';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -130,6 +132,9 @@ class AppRoutes {
         final args = settings.arguments as Map<String, dynamic>;
         return PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) => PatientVitalsScreen(patientData: args),
+      case patientDashboard:
+        return PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => const PatientDashboard(),
           settings: settings,
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(
