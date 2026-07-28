@@ -682,7 +682,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
       {/* OPD Consultation Billing Tab */}
       {tab === "consultation" && (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          <div className="md:col-span-2 space-y-6">
+          <div className={`${invoice ? "md:col-span-2" : "md:col-span-3"} space-y-6`}>
             {invoiceLoading ? (
               <div className="p-12 text-center text-slate-400">Loading invoice details...</div>
             ) : invoice ? (
