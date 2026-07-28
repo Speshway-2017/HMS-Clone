@@ -162,6 +162,8 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.pushReplacementNamed(context, AppRoutes.adminDashboard);
         } else if (role == 'doctor') {
           Navigator.pushReplacementNamed(context, AppRoutes.doctorDashboard);
+        } else if (role == 'nurse') {
+          Navigator.pushReplacementNamed(context, AppRoutes.nurseDashboard);
         } else {
           // If the role is registered in database but not yet supported on mobile
           setState(() {

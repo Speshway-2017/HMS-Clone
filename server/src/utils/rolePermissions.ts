@@ -36,5 +36,10 @@ export const ROLE_PERMISSIONS: Record<Role, { label: string; description: string
     description: "The Laboratory role manages lab test requests, sample collections, test processing, quality control, laboratory inventory, and report delivery.",
     permissions: ["Manage Test Requests", "Collect Samples", "Process Tests", "Quality Control", "Lab Inventory", "Report Delivery"],
   },
+  nurse: {
+    label: "Nurse",
+    description: "Provides direct patient care, records vital signs, administers medications, and manages ward workflows.",
+    permissions: ["Record Vitals", "Administer Medications", "Ward Management", "Patient Care"],
+  },
 };
 
