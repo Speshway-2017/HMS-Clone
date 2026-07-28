@@ -124,6 +124,11 @@ import { UploadReportPage } from "./pages/laboratory/UploadReportPage";
 import { TestRequestDetailsPage } from "./pages/laboratory/TestRequestDetailsPage";
 import { LaboratoryQualityControl } from "./pages/laboratory/QualityControl";
 
+// Nurse module
+import { NurseDashboard } from "./pages/nurse/Dashboard";
+import { AssignTaskPage } from "./pages/nurse/AssignTaskPage";
+import { NursingNotesPage } from "./pages/nurse/NursingNotesPage";
+
 export const router = createBrowserRouter([
   {
     element: <PublicLayout />,
@@ -358,6 +363,21 @@ export const router = createBrowserRouter([
           { path: "billing", element: <LaboratoryBilling /> },
           { path: "billing/new", element: <NewLabBillPage /> },
           { path: "settings", element: <LaboratorySettings /> },
+        ],
+      },
+    ],
+  },
+  {
+    element: <ProtectedRoute allow={["nurse"]} />,
+    children: [
+      {
+        path: "/nurse",
+        element: <DashboardLayout />,
+        children: [
+          { index: true, element: <NurseDashboard /> },
+          { path: "assign-task", element: <AssignTaskPage /> },
+          { path: "notes", element: <NursingNotesPage /> },
+          { path: "settings", element: <SettingsPage /> },
         ],
       },
     ],

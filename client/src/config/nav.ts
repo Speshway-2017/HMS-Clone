@@ -123,5 +123,11 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "Billing", path: "/laboratory/billing", icon: Receipt },
     { label: "Settings", path: "/laboratory/settings", icon: Settings },
   ],
+  nurse: [
+    { label: "Dashboard", path: "/nurse", icon: LayoutDashboard },
+    { label: "Assign Task", path: "/nurse/assign-task", icon: ClipboardCheck },
+    { label: "Nursing Notes", path: "/nurse/notes", icon: FileText },
+    { label: "Settings", path: "/nurse/settings", icon: Settings },
+  ],
 };
 
