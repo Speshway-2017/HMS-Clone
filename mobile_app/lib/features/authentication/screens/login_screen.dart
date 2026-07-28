@@ -17,22 +17,31 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
   
   final _emailFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
+  final _nameFocusNode = FocusNode();
+  final _phoneFocusNode = FocusNode();
 
   final _authService = AuthService();
 
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _isRegisterMode = false;
   String? _errorMessage;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
     _emailFocusNode.dispose();
     _passwordFocusNode.dispose();
+    _nameFocusNode.dispose();
+    _phoneFocusNode.dispose();
     super.dispose();
   }
 
@@ -135,6 +144,62 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  void _handleSubmit() {
+    if (_isRegisterMode) {
+      _handleRegister();
+    } else {
+      _handleLogin();
+    }
+  }
+
+  void _handleRegister() async {
+    setState(() {
+      _errorMessage = null;
+    });
+
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final name = _nameController.text.trim();
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
+      final phone = _phoneController.text.trim();
+
+      try {
+        final role = await _authService.register(name, email, password, phone);
+
+        if (!mounted) return;
+
+        setState(() {
+          _isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Registration successful! Logging in...'),
+            backgroundColor: AppColors.emerald600,
+          ),
+        );
+
+        if (role == 'patient') {
+          Navigator.pushReplacementNamed(context, AppRoutes.patientDashboard);
+        } else {
+          setState(() {
+            _errorMessage = 'Registered successfully, but role "$role" is not recognized.';
+          });
+        }
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+    }
+  }
+
   void _handleLogin() async {
     setState(() {
       _errorMessage = null;
@@ -164,6 +229,8 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.pushReplacementNamed(context, AppRoutes.doctorDashboard);
         } else if (role == 'nurse') {
           Navigator.pushReplacementNamed(context, AppRoutes.nurseDashboard);
+        } else if (role == 'patient') {
+          Navigator.pushReplacementNamed(context, AppRoutes.patientDashboard);
         } else {
           // If the role is registered in database but not yet supported on mobile
           setState(() {
@@ -222,7 +289,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           SizedBox(height: responsive.scaleHeight(16.0)),
                           Text(
-                            'Sign In to Dashboard',
+                            _isRegisterMode ? 'Patient Registration' : 'Sign In to Dashboard',
                             style: TextStyle(
                               fontSize: responsive.scaleText(18.0),
                               fontWeight: FontWeight.w800,
@@ -231,7 +298,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Enter your credentials registered by the Super Administrator.',
+                            _isRegisterMode
+                                ? 'Create a patient account to access personal health records.'
+                                : 'Enter your credentials registered by the Super Administrator.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: responsive.scaleText(12.0),
@@ -245,7 +314,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     
                     SizedBox(height: responsive.scaleHeight(28.0)),
                     
-                    // Login Form Card
+                    // Form Card
                     Container(
                       padding: EdgeInsets.all(responsive.scaleWidth(24.0)),
                       decoration: BoxDecoration(
@@ -268,9 +337,51 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            // Full Name Field (Visible in Register Mode only)
+                            if (_isRegisterMode) ...[
+                              Text(
+                                'Full Name',
+                                style: TextStyle(
+                                  fontSize: responsive.scaleText(12.0),
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.slate700,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              TextFormField(
+                                controller: _nameController,
+                                focusNode: _nameFocusNode,
+                                keyboardType: TextInputType.name,
+                                textInputAction: TextInputAction.next,
+                                style: TextStyle(
+                                  fontSize: responsive.scaleText(14.0),
+                                  color: AppColors.slate900,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                decoration: const InputDecoration(
+                                  hintText: 'John Doe',
+                                ),
+                                validator: (value) {
+                                  if (_isRegisterMode) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Full name is required';
+                                    }
+                                    if (value.trim().length < 2) {
+                                      return 'Name must be at least 2 characters';
+                                    }
+                                  }
+                                  return null;
+                                },
+                                onFieldSubmitted: (_) {
+                                  FocusScope.of(context).requestFocus(_emailFocusNode);
+                                },
+                              ),
+                              SizedBox(height: responsive.scaleHeight(20.0)),
+                            ],
+
                             // Email Field
                             Text(
-                              'Administrator / Staff Email',
+                              _isRegisterMode ? 'Email Address' : 'Administrator / Staff Email',
                               style: TextStyle(
                                 fontSize: responsive.scaleText(12.0),
                                 fontWeight: FontWeight.bold,
@@ -289,7 +400,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 fontWeight: FontWeight.w500,
                               ),
                               decoration: const InputDecoration(
-                                hintText: 'name@hospital.com',
+                                  hintText: 'name@hospital.com',
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
@@ -303,11 +414,54 @@ class _LoginScreenState extends State<LoginScreen> {
                                 return null;
                               },
                               onFieldSubmitted: (_) {
-                                FocusScope.of(context).requestFocus(_passwordFocusNode);
+                                if (_isRegisterMode) {
+                                  FocusScope.of(context).requestFocus(_phoneFocusNode);
+                                } else {
+                                  FocusScope.of(context).requestFocus(_passwordFocusNode);
+                                }
                               },
                             ),
                             
                             SizedBox(height: responsive.scaleHeight(20.0)),
+
+                            // Phone Field (Visible in Register Mode only)
+                            if (_isRegisterMode) ...[
+                              Text(
+                                'Phone Number',
+                                style: TextStyle(
+                                  fontSize: responsive.scaleText(12.0),
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.slate700,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              TextFormField(
+                                controller: _phoneController,
+                                focusNode: _phoneFocusNode,
+                                keyboardType: TextInputType.phone,
+                                textInputAction: TextInputAction.next,
+                                style: TextStyle(
+                                  fontSize: responsive.scaleText(14.0),
+                                  color: AppColors.slate900,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                decoration: const InputDecoration(
+                                  hintText: '+1 234 567 8900',
+                                ),
+                                validator: (value) {
+                                  if (_isRegisterMode) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Phone number is required';
+                                    }
+                                  }
+                                  return null;
+                                },
+                                onFieldSubmitted: (_) {
+                                  FocusScope.of(context).requestFocus(_passwordFocusNode);
+                                },
+                              ),
+                              SizedBox(height: responsive.scaleHeight(20.0)),
+                            ],
                             
                             // Password Field Label
                             Text(
@@ -328,7 +482,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 fontSize: responsive.scaleText(14.0),
                                 color: AppColors.slate900,
                                 fontWeight: FontWeight.w500,
-                              ),
+                               ),
                               decoration: InputDecoration(
                                 hintText: '••••••••',
                                 suffixIcon: IconButton(
@@ -348,9 +502,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                 if (value == null || value.isEmpty) {
                                   return 'Password is required';
                                 }
+                                if (_isRegisterMode && value.length < 6) {
+                                  return 'Password must be at least 6 characters';
+                                }
                                 return null;
                               },
-                              onFieldSubmitted: (_) => _handleLogin(),
+                              onFieldSubmitted: (_) => _handleSubmit(),
                             ),
                             
                             // Validation error block
@@ -384,9 +541,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             
                             SizedBox(height: responsive.scaleHeight(24.0)),
                             
-                            // Sign In Action Button
+                            // Action Button
                             ElevatedButton(
-                              onPressed: _isLoading ? null : _handleLogin,
+                              onPressed: _isLoading ? null : _handleSubmit,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.navy700,
                                 padding: const EdgeInsets.symmetric(vertical: 15.0),
@@ -401,12 +558,36 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ),
                                     )
                                   : Text(
-                                      'Secure Sign In',
+                                      _isRegisterMode ? 'Register Account' : 'Secure Sign In',
                                       style: TextStyle(
                                         fontSize: responsive.scaleText(14.0),
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
+                            ),
+                            
+                            const SizedBox(height: 16),
+                            
+                            // Toggle Mode Link
+                            Center(
+                              child: TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _isRegisterMode = !_isRegisterMode;
+                                    _errorMessage = null;
+                                  });
+                                },
+                                child: Text(
+                                  _isRegisterMode
+                                      ? 'Already have an account? Sign In'
+                                      : 'Are you a patient? Create an account',
+                                  style: TextStyle(
+                                    color: AppColors.navy700,
+                                    fontSize: responsive.scaleText(12.5),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -442,9 +623,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            '1. Ensure your PC and this phone are on the same Wi-Fi network.\n'
-                            '2. Tap the settings gear icon in the top right to configure your PC\'s local IP address.\n'
-                            '3. Use credentials registered in your database (e.g. superadmin@hms.com / admin123).',
+                            _isRegisterMode
+                                ? '1. Ensure your PC and this phone are on the same Wi-Fi network.\n'
+                                  '2. Fill in your details to create a patient profile in the backend.\n'
+                                  '3. After registration, you will be automatically logged in to your portal.'
+                                : '1. Ensure your PC and this phone are on the same Wi-Fi network.\n'
+                                  '2. Tap the settings gear icon in the top right to configure your PC\'s local IP address.\n'
+                                  '3. Use credentials registered in your database (e.g. superadmin@hms.com / admin123).',
                             style: TextStyle(
                               fontSize: responsive.scaleText(10.5),
                               color: AppColors.navy900,

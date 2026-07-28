@@ -41,5 +41,10 @@ export const ROLE_PERMISSIONS: Record<Role, { label: string; description: string
     description: "Provides direct patient care, records vital signs, administers medications, and manages ward workflows.",
     permissions: ["Record Vitals", "Administer Medications", "Ward Management", "Patient Care"],
   },
+  patient: {
+    label: "Patient",
+    description: "Accesses own medical records, prescriptions, billing summaries, and appointments scheduler.",
+    permissions: ["View Personal Records", "View Prescriptions", "Book Appointments", "View Billing"],
+  },
 };
 

@@ -60,4 +60,55 @@ class AuthService {
       rethrow;
     }
   }
+
+  /// Registers a new patient account against the MERN database endpoint.
+  /// Throws standard user-facing error messages on validation failures or network outages.
+  Future<String?> register(String name, String email, String password, String phone) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/auth/register');
+    
+    try {
+      final response = await _client.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({
+          'name': name.trim(),
+          'email': email.trim(),
+          'password': password,
+          'phone': phone.trim(),
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      final decoded = jsonDecode(response.body);
+
+      if (response.statusCode == 201) {
+        if (decoded['status'] == 'success' && decoded['data'] != null) {
+          final user = decoded['data']['user'];
+          if (user != null && user['role'] != null) {
+            return user['role'].toString();
+          }
+        }
+        throw Exception('Malformed registration response payload.');
+      } else {
+        final message = decoded['message'] ?? 'Registration failed.';
+        throw Exception(message);
+      }
+    } on SocketException {
+      throw Exception(
+        'Unable to connect to the server. Please check your internet connection '
+        'and verify the configured server address is active and accessible.',
+      );
+    } on HttpException {
+      throw Exception('Server returned an invalid HTTP response. Please try again.');
+    } on FormatException {
+      throw Exception('Failed to parse server response. Please verify the API server is active.');
+    } catch (e) {
+      if (e.toString().contains('TimeoutException')) {
+        throw Exception('Request timed out. Please verify your backend server connection.');
+      }
+      rethrow;
+    }
+  }
 }
