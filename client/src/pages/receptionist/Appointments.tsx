@@ -712,43 +712,43 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Outpatient Bookings</h1>
-          <p className="text-sm text-slate-500">Manage consultant appointment scheduling and queues.</p>
-        </div>
-        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-1">
-          <button
-            onClick={() => setTab("today")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "today" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
-          >
-            <List className="h-3.5 w-3.5" /> Today's Queue
-          </button>
-          <button
-            onClick={() => setTab("scheduled")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "scheduled" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
-          >
-            <Clock className="h-3.5 w-3.5" /> Scheduled Bookings
-          </button>
-          <button
-            onClick={() => setTab("completed")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "completed" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
-          >
-            <CheckCircle className="h-3.5 w-3.5" /> Completed
-          </button>
-          <button
-            onClick={() => setTab("new")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "new" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
-          >
-            <Plus className="h-3.5 w-3.5" /> Book Appointment
-          </button>
-          <button
-            onClick={() => setTab("calendar")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "calendar" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
-          >
-            <Calendar className="h-3.5 w-3.5" /> Calendar View
-          </button>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Outpatient Bookings</h1>
+        <p className="text-sm text-slate-500">Manage consultant appointment scheduling and queues.</p>
+      </div>
+
+      {/* Tabs Navigation Row */}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 max-w-max">
+        <button
+          onClick={() => setTab("today")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "today" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
+        >
+          <List className="h-3.5 w-3.5" /> Today's Queue
+        </button>
+        <button
+          onClick={() => setTab("scheduled")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "scheduled" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
+        >
+          <Clock className="h-3.5 w-3.5" /> Scheduled Bookings
+        </button>
+        <button
+          onClick={() => setTab("completed")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "completed" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
+        >
+          <CheckCircle className="h-3.5 w-3.5" /> Completed
+        </button>
+        <button
+          onClick={() => setTab("new")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "new" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
+        >
+          <Plus className="h-3.5 w-3.5" /> Book Appointment
+        </button>
+        <button
+          onClick={() => setTab("calendar")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "calendar" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
+        >
+          <Calendar className="h-3.5 w-3.5" /> Calendar View
+        </button>
       </div>
 
       {/* Today's Queue */}

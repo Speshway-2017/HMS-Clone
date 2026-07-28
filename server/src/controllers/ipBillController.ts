@@ -616,6 +616,7 @@ export const getIPBillDetails = catchAsync(async (req: Request, res: Response) =
     .populate("room")
     .populate("bed")
     .populate("admittingDoctor", "name specialization")
+    .populate("assignedNurse", "name role")
     .populate("department", "name");
 
   if (!admission) {

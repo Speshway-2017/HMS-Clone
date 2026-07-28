@@ -80,21 +80,21 @@ export function LoginPage() {
     <div className="flex min-h-screen bg-slate-50">
       <div className="flex w-full grid-cols-12 lg:grid">
         {/* --- LEFT PANEL: SaaS Info (Hidden on mobile) --- */}
-        <div className="relative hidden flex-col justify-between bg-gradient-to-br from-navy-800 to-navy-950 p-12 text-white lg:col-span-5 lg:flex xl:col-span-4 overflow-hidden">
+        <div className="relative hidden flex-col justify-between bg-gradient-to-br from-slate-900 via-slate-950 to-indigo-950 p-12 text-white lg:col-span-5 lg:flex xl:col-span-4 overflow-hidden">
           {/* Background overlay shapes */}
-          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-navy-700/40 blur-3xl pointer-events-none" />
-          <div className="absolute -left-10 bottom-10 h-48 w-48 rounded-full bg-emerald-700/20 blur-2xl pointer-events-none" />
+          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+          <div className="absolute -left-10 bottom-10 h-48 w-48 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none" />
 
           {/* Logo Branding */}
           <Link to="/" className="flex items-center gap-3 text-lg font-extrabold tracking-tight relative z-10">
             {logoUrl ? (
               <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover shadow-sm" />
             ) : (
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-navy-750 text-white font-bold text-sm shadow-md border border-white/10">
-                <Activity className="h-4 w-4" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-white font-bold text-sm shadow-md border border-white/10">
+                <Activity className="h-4 w-4 text-emerald-400" />
               </div>
             )}
-            <span className="bg-gradient-to-r from-white to-navy-100 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">
               {hospitalName}
             </span>
           </Link>
@@ -102,33 +102,33 @@ export function LoginPage() {
           {/* Marketing rotating text */}
           <div className="my-auto space-y-10 relative z-10">
             <div className="space-y-4">
-              <span className="inline-block rounded-full bg-white/10 border border-white/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-navy-200">
+              <span className="inline-block rounded-full bg-white/5 border border-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-300">
                 Enterprise Health Architecture
               </span>
-              <h2 className="text-3xl font-extrabold leading-tight">
+              <h2 className="text-3xl font-extrabold leading-tight tracking-tight text-white">
                 One Platform. Seamless Compliance.
               </h2>
-              <p className="text-sm leading-relaxed text-navy-100/90">
+              <p className="text-sm leading-relaxed text-slate-300">
                 HMS Enterprise integrates outpatient reception desks, clinician workspaces, and accountant audit ledgers into a unified clinical software matrix.
               </p>
             </div>
 
             {/* Carousel Promo */}
             <div className="rounded-xl border border-white/10 bg-white/5 p-5 backdrop-blur-md min-h-[120px] transition-all duration-300">
-              <span className="text-[9px] font-bold text-emerald-450 uppercase tracking-widest block mb-1">
+              <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest block mb-1">
                 SYSTEM BENEFIT
               </span>
-              <h4 className="text-sm font-bold flex items-center gap-1.5">
+              <h4 className="text-sm font-bold flex items-center gap-1.5 text-white">
                 <ShieldCheck className="h-4.5 w-4.5 text-emerald-400" />
                 {promos[activePromoIdx].title}
               </h4>
-              <p className="mt-2 text-xs text-navy-150 leading-relaxed">
+              <p className="mt-2 text-xs text-slate-300 leading-relaxed">
                 {promos[activePromoIdx].desc}
               </p>
             </div>
 
             {/* Quick trust metrics */}
-            <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-6 text-xs text-navy-200">
+            <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-6 text-xs text-slate-300">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-emerald-400" /> 100% HIPAA Isolated
               </div>
@@ -139,7 +139,7 @@ export function LoginPage() {
           </div>
 
           {/* Footer of Left Panel */}
-          <div className="text-[10px] text-navy-300 relative z-10">
+          <div className="text-[10px] text-slate-400 relative z-10">
             © {new Date().getFullYear()} {hospitalName}. Managed Clinical Network.
           </div>
         </div>

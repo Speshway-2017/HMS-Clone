@@ -238,7 +238,7 @@ export const router = createBrowserRouter([
           { index: true, element: <ReceptionistDashboard /> },
           { path: "patients", element: <PatientManagementPage /> },
           { path: "patients/new", element: <PatientManagementPage activeTab="new" /> },
-          { path: "patients/search", element: <PatientManagementPage activeTab="search" /> },
+          { path: "patients/search", element: <PatientManagementPage activeTab="list" /> },
           { path: "patients/:id", element: <PatientManagementPage /> },
           { path: "appointments", element: <ReceptionAppointmentsPage /> },
           { path: "appointments/new", element: <ReceptionAppointmentsPage activeTab="new" /> },

@@ -1,31 +1,12 @@
-import { Search, Settings } from "lucide-react";
-import { Link } from "react-router-dom";
+import { LogOut } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { NotificationPanel } from "./NotificationPanel";
 
-const SETTINGS_PATH: Record<string, string> = {
-  super_admin: "/super-admin/settings",
-  hospital_admin: "/admin/settings",
-  accountant: "/accountant/settings",
-  pharmacist: "/pharmacy/settings",
-  laboratory: "/laboratory/settings",
-  doctor: "/doctor/settings",
-};
-
 export function Topbar() {
-  const { user } = useAuth();
-  const settingsPath = user?.role ? (SETTINGS_PATH[user.role] ?? "/") : "/";
+  const { user, logout } = useAuth();
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6">
-      <div className="flex w-full max-w-md items-center gap-2 rounded-lg bg-slate-100 px-3 py-2">
-        <Search className="h-4 w-4 text-slate-400" />
-        <input
-          type="text"
-          placeholder="Search..."
-          className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-        />
-      </div>
+    <header className="flex h-16 shrink-0 items-center justify-end border-b border-slate-200 bg-white px-6">
 
       <div className="flex items-center gap-3">
         {/* Notification bell — for hospital_admin, doctor, receptionist, accountant, pharmacist, and laboratory roles */}
@@ -36,10 +17,10 @@ export function Topbar() {
           user?.role === "pharmacist" ||
           user?.role === "laboratory") && <NotificationPanel />}
 
-        {/* Avatar + name → Settings */}
-        <Link
-          to={settingsPath}
-          aria-label="Go to Settings"
+        {/* Avatar + name → Log Out */}
+        <button
+          onClick={() => logout()}
+          aria-label="Log out"
           className="flex items-center gap-2 rounded-lg px-2 py-1 transition hover:bg-slate-100"
         >
           {user?.avatarUrl ? (
@@ -54,8 +35,8 @@ export function Topbar() {
             </div>
           )}
           <span className="text-sm font-medium text-slate-700">{user?.name}</span>
-          <Settings className="h-3.5 w-3.5 text-slate-400" />
-        </Link>
+          <LogOut className="h-3.5 w-3.5 text-slate-400" />
+        </button>
       </div>
     </header>
   );

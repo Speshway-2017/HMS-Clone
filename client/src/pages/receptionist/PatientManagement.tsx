@@ -35,7 +35,6 @@ import {
 } from "lucide-react";
 import {
   useRegisterPatient,
-  usePatientsSearch,
   usePatientsList,
   usePatientDetails,
   useTodayRegistrations,
@@ -48,6 +47,7 @@ import { usePrescriptions } from "../../features/doctorDashboard";
 import { useInvoices } from "../../features/invoices";
 import { usePatientReports } from "../../features/laboratory";
 import { useMyHospital } from "../../features/hospitals";
+import { useStaffList } from "../../features/staff";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { FileUpload } from "../../components/ui/FileUpload";
 import { api } from "../../lib/api";
@@ -316,7 +316,7 @@ const getFlatErrors = (errs: any): { field: string; message: string }[] => {
 };
 
 interface Props {
-  activeTab?: "new" | "search" | "list";
+  activeTab?: "new" | "list";
 }
 
 export function PatientManagementPage({ activeTab = "list" }: Props) {
@@ -325,7 +325,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
   // Read ?filter=today from URL (set by dashboard "Today's Registrations" card click)
   const todayFilter = new URLSearchParams(window.location.search).get("filter") === "today";
 
-  const [tab, setTab] = useState<"new" | "search" | "list">(activeTab);
+  const [tab, setTab] = useState<"new" | "list">(activeTab);
 
   useEffect(() => {
     setTab(activeTab);
@@ -340,14 +340,17 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
 
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery]);
+
   // Success modal states
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [registeredPatient, setRegisteredPatient] = useState<any | null>(null);
 
   // Queries & Mutations
   const registerMutation = useRegisterPatient();
-  const { data: searchResults, isFetching: searchLoading } = usePatientsSearch(searchQuery);
-  const { data: listData, isLoading: listLoading } = usePatientsList({ page, limit: 10 });
+  const { data: listData, isLoading: listLoading } = usePatientsList({ page, limit: 10, search: searchQuery });
   const { data: todayData, isLoading: todayLoading } = useTodayRegistrations();
   const { data: patient, isLoading: patientLoading, error: patientError } = usePatientDetails(id);
   const { data: hospitalData } = useMyHospital();
@@ -371,6 +374,8 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
   const { data: rooms } = useRoomsAvailability();
   const { data: doctors } = useDoctorsAvailability();
   const admitMutation = useAdmitPatient();
+  const { data: staffData } = useStaffList({ role: "nurse", limit: 100 } as any);
+  const nurses = staffData?.data || [];
   const uniqueWards = Array.from(new Set(rooms?.map((r: any) => r.wardName).filter(Boolean)));
 
   const [isConvertOpen, setIsConvertOpen] = useState(false);
@@ -385,8 +390,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
   const [ward, setWard] = useState("");
   const [selectedRoomId, setSelectedRoomId] = useState("");
   const [selectedBedId, setSelectedBedId] = useState("");
-  const [attenderName, setAttenderName] = useState("");
-  const [attenderPhone, setAttenderPhone] = useState("");
+  const [assignedNurse, setAssignedNurse] = useState("");
   const [insuranceProvider, setInsuranceProvider] = useState("");
   const [insurancePolicyNumber, setInsurancePolicyNumber] = useState("");
   const [advanceAmount, setAdvanceAmount] = useState("0");
@@ -405,12 +409,8 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
       alert("Admitting doctor selection is mandatory.");
       return;
     }
-    if (!ward || !selectedRoomId || !selectedBedId) {
-      alert("Please select ward, room and bed.");
-      return;
-    }
-    if (!attenderName || !attenderPhone) {
-      alert("Attender details are required.");
+    if (!ward || !selectedRoomId || !selectedBedId || !assignedNurse) {
+      alert("Please select ward, room, bed, and assign a nurse.");
       return;
     }
     if (!verbalApproval) {
@@ -426,8 +426,9 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
         ward,
         roomId: selectedRoomId,
         bedId: selectedBedId,
-        attenderName,
-        attenderPhone,
+        assignedNurse,
+        attenderName: "N/A",
+        attenderPhone: "N/A",
         insuranceProvider,
         insurancePolicyNumber,
         advanceAmount: parseFloat(advanceAmount),
@@ -452,8 +453,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
       setWard("");
       setSelectedRoomId("");
       setSelectedBedId("");
-      setAttenderName("");
-      setAttenderPhone("");
+      setAssignedNurse("");
       setInsuranceProvider("");
       setInsurancePolicyNumber("");
       setAdvanceAmount("0");
@@ -743,12 +743,8 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                   <span className="font-semibold text-slate-700">Dr. {successData.admissionSlip?.admittingDoctorName}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Attender Name</span>
-                  <span className="font-semibold text-slate-700">{successData.admissionSlip?.attenderName}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Attender Phone</span>
-                  <span className="font-semibold text-slate-700">{successData.admissionSlip?.attenderPhone}</span>
+                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Assigned Nurse</span>
+                  <span className="font-semibold text-slate-700">{successData.admissionSlip?.assignedNurseName || "N/A"}</span>
                 </div>
                 <div>
                   <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Admission Date & Time</span>
@@ -1910,57 +1906,64 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
           <p className="text-sm text-slate-500">Register new patient files, search records, or list active registry files.</p>
         </div>
 
-        {/* Tab triggers */}
-        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-1">
-          <button
+        {/* CTA Button */}
+        {tab === "new" ? (
+          <Button
             onClick={() => setTab("list")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "list" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
-            }`}
+            variant="secondary"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold"
           >
-            <List className="h-3.5 w-3.5" /> Patient List
-          </button>
-          <button
-            onClick={() => setTab("search")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "search" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            <Search className="h-3.5 w-3.5" /> Patient Search
-          </button>
-          <button
+            <List className="h-4 w-4" /> View Patient Registry
+          </Button>
+        ) : (
+          <Button
             onClick={() => setTab("new")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "new" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
-            }`}
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold"
           >
-            <Plus className="h-3.5 w-3.5" /> New Registration
-          </button>
-        </div>
+            <Plus className="h-4 w-4" /> New Registration
+          </Button>
+        )}
       </div>
 
       {/* List Tab */}
       {tab === "list" && (
         <Card>
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4">
             <div>
               <h2 className="text-base font-semibold text-slate-800">
                 {todayFilter ? "Today's Registrations" : "Master Patient Registry"}
               </h2>
-              {todayFilter && (
+              {todayFilter ? (
                 <p className="text-xs text-amber-600 mt-0.5">
                   Showing patients registered today · Count matches dashboard
                 </p>
+              ) : (
+                <p className="text-xs text-slate-450 mt-0.5">
+                  Real-time registry of all outpatients and inpatients.
+                </p>
               )}
             </div>
+
+            {/* In-table Search Bar */}
+            <div className="flex-1 max-w-sm relative">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by UHID, phone, name, or code..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-slate-50 pl-9 pr-4 py-2 text-xs outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500 transition-colors"
+              />
+            </div>
+
             <div className="flex items-center gap-2">
               {todayFilter && !todayLoading && (
                 <span className="rounded-full bg-navy-50 text-navy-700 border border-navy-200 text-xs font-semibold px-2.5 py-0.5">
                   {todayData?.total ?? 0} registered today
                 </span>
               )}
-              <Button onClick={() => window.print()} variant="secondary" className="px-3 py-1.5 text-xs">
-                Print Registry
+              <Button onClick={() => window.print()} variant="secondary" className="px-3 py-1.5 text-xs flex items-center gap-1.5">
+                <Printer className="h-3.5 w-3.5" /> Print Registry
               </Button>
             </div>
           </div>
@@ -1992,31 +1995,6 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
             )
           )}
         </Card>
-      )}
-
-      {/* Search Tab */}
-      {tab === "search" && (
-        <div className="space-y-4">
-          <Card>
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search patient by UHID, phone number, name, or code..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 pl-10 pr-4 py-2 text-sm outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
-              />
-            </div>
-          </Card>
-
-          {searchResults && (
-            <Card>
-              <h2 className="mb-3 text-sm font-semibold text-slate-700">Search Results ({searchResults.length})</h2>
-              <DataTable columns={columns} rows={searchResults} rowKey={(row) => row._id} />
-            </Card>
-          )}
-        </div>
       )}
 
       {/* New Registration Form */}

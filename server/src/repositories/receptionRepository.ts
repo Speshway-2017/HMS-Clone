@@ -205,7 +205,8 @@ export class ReceptionRepository {
       .populate("patient", "name uhid phone age gender bloodGroup address emergencyContact insurance photoUrl")
       .populate("room")
       .populate("bed")
-      .populate("admittingDoctor", "name specialization");
+      .populate("admittingDoctor", "name specialization")
+      .populate("assignedNurse", "name role");
   }
 
   static async findActiveAdmissionByPatient(hospitalId: Types.ObjectId, patientId: string) {
@@ -268,6 +269,7 @@ export class ReceptionRepository {
       .populate("bed")
       .populate("admittingDoctor", "name specialization")
       .populate("dischargeRequestedBy", "name specialization")
+      .populate("assignedNurse", "name role")
       .sort({ admissionDate: -1 });
   }
 
