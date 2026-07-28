@@ -9,6 +9,7 @@ import { catchAsync } from "../utils/catchAsync";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/token";
 import { logAudit } from "../utils/auditLogger";
 import { Hospital } from "../models/Hospital";
+import { Patient } from "../models/Patient";
 import { sendEmail } from "../services/emailService";
 
 const loginSchema = z.object({
@@ -48,6 +49,10 @@ export const register = catchAsync(async (req: Request, res: Response) => {
     throw new AppError("Email is already registered.", 400);
   }
 
+  // Find the first active/existing hospital in the database
+  const hospital = await Hospital.findOne();
+  const hospitalId = hospital ? hospital._id : null;
+
   const passwordHash = await bcrypt.hash(password, 10);
   const user = await User.create({
     name,
@@ -56,7 +61,35 @@ export const register = catchAsync(async (req: Request, res: Response) => {
     role: "patient",
     status: "active",
     phone,
+    hospital: hospitalId,
   });
+
+  // If a hospital is available, also register this patient in the patients registry collection
+  if (hospitalId) {
+    const generateDigits = (length: number): string => {
+      let result = "";
+      const characters = "0123456789";
+      for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+      }
+      return result;
+    };
+    const uhid = `UHID-${generateDigits(10)}`;
+    const patientCode = `PAT-${generateDigits(6)}`;
+    const qrCode = `HMS|${uhid}|${name}|${phone}`;
+
+    await Patient.create({
+      hospital: hospitalId,
+      uhid,
+      patientCode,
+      qrCode,
+      name,
+      email,
+      phone,
+      status: "opd",
+      isActive: true,
+    });
+  }
 
   const accessToken = signAccessToken({ id: user._id.toString(), role: user.role });
   const refreshToken = signRefreshToken({ id: user._id.toString(), role: user.role });

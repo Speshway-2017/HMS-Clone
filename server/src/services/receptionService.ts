@@ -17,6 +17,7 @@ import { OPVisit } from "../models/OPVisit";
 import { Hospital } from "../models/Hospital";
 import { DbNotification } from "../models/DbNotification";
 import { Ward } from "../models/Ward";
+import { Staff } from "../models/Staff";
 import { emitToHospital, emitToDoctor } from "../config/socket";
 import { createDoctorNotification } from "../utils/notificationHelper";
 import { IPBill } from "../models/IPBill";
