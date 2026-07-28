@@ -20,6 +20,7 @@ import uploadRoutes from "./routes/uploadRoutes";
 import doctorRoutes from "./routes/doctorRoutes";
 import staffRoutes from "./routes/staffRoutes";
 import patientRoutes from "./routes/patientRoutes";
+import nurseRoutes from "./routes/nurseRoutes";
 import appointmentRoutes from "./routes/appointmentRoutes";
 import inventoryRoutes from "./routes/inventoryRoutes";
 import invoiceRoutes from "./routes/invoiceRoutes";
@@ -124,6 +125,7 @@ app.use("/api/v1/doctors", doctorRoutes);
 
 app.use("/api/v1/staff", staffRoutes);
 app.use("/api/v1/patients", patientRoutes);
+app.use("/api/v1/nurse", nurseRoutes);
 app.use("/api/v1/appointments", appointmentRoutes);
 app.use("/api/v1/inventory", inventoryRoutes);
 app.use("/api/v1/invoices", invoiceRoutes);
