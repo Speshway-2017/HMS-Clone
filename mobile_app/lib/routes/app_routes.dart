@@ -3,12 +3,14 @@ import '../features/authentication/screens/splash_screen.dart';
 import '../features/authentication/screens/login_screen.dart';
 import '../features/admin/screens/admin_dashboard.dart';
 import '../features/doctor/screens/doctor_dashboard.dart';
+import '../features/nurse/screens/nurse_dashboard.dart';
 
 class AppRoutes {
   static const String splash = '/';
   static const String login = '/login';
   static const String adminDashboard = '/admin/dashboard';
   static const String doctorDashboard = '/doctor/dashboard';
+  static const String nurseDashboard = '/nurse/dashboard';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -44,6 +46,18 @@ class AppRoutes {
       case doctorDashboard:
         return PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) => const DoctorDashboard(),
+          settings: settings,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: animation,
+              child: child,
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 500),
+        );
+      case nurseDashboard:
+        return PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => const NurseDashboard(),
           settings: settings,
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(
