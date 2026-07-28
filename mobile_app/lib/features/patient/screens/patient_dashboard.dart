@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../routes/app_routes.dart';
 import '../../../utils/responsive_helper.dart';
+import '../../authentication/services/auth_service.dart';
 
 class PatientDashboard extends StatefulWidget {
   const PatientDashboard({super.key});
@@ -13,85 +14,42 @@ class PatientDashboard extends StatefulWidget {
 class _PatientDashboardState extends State<PatientDashboard> {
   int _currentIndex = 0;
 
-  // Mock Patient Info
-  final String _patientName = 'Aditya Sharma';
-  final String _patientUhid = 'UHID-5928374102';
-  final String _hospitalName = 'Sunrise General Hospital';
+  // Real Patient Info
+  late String _patientName;
+  late String _patientUhid;
+  late String _hospitalName;
 
-  // Mock Vitals
-  final Map<String, String> _vitals = {
-    'bp': '120/80 mmHg',
-    'pulse': '72 bpm',
-    'spo2': '98%',
-    'temp': '98.6 °F',
-    'lastChecked': 'Today, 10:00 AM',
-  };
+  // Real Patient Vitals, Appointments, Prescriptions, Reports
+  Map<String, String>? _vitals;
+  List<Map<String, dynamic>> _appointments = [];
+  List<Map<String, dynamic>> _prescriptions = [];
+  List<Map<String, dynamic>> _reports = [];
 
-  // Mock Appointments
-  final List<Map<String, dynamic>> _appointments = [
-    {
-      'doctorName': 'Dr. Alexander Watson',
-      'specialty': 'Cardiology',
-      'date': 'Tomorrow, July 29',
-      'time': '10:15 AM',
-      'type': 'OPD Consultation',
-      'status': 'Confirmed',
-    },
-    {
-      'doctorName': 'Dr. Sophia Carter',
-      'specialty': 'Pediatrics',
-      'date': 'Aug 04, 2026',
-      'time': '03:30 PM',
-      'type': 'Follow-up',
-      'status': 'Scheduled',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadPatientProfile();
+  }
 
-  // Mock Prescriptions
-  final List<Map<String, dynamic>> _prescriptions = [
-    {
-      'id': 'RX-829104',
-      'doctorName': 'Dr. Alexander Watson',
-      'date': 'July 24, 2026',
-      'diagnosis': 'Mild Angina',
-      'medications': [
-        'Tab. Aspirin 75mg — Once daily (Morning) • 30 Days',
-        'Tab. Atorvastatin 10mg — Once daily (Night) • 30 Days',
-      ],
-    },
-    {
-      'id': 'RX-710293',
-      'doctorName': 'Dr. Marcus Vance',
-      'date': 'June 12, 2026',
-      'diagnosis': 'Seasonal Allergies',
-      'medications': [
-        'Tab. Cetirizine 10mg — Once daily (Night) • 10 Days',
-        'Nasal Spray Fluticasone — 2 sprays each nostril • 15 Days',
-      ],
-    },
-  ];
-
-  // Mock Reports
-  final List<Map<String, dynamic>> _reports = [
-    {
-      'title': 'Complete Blood Count (CBC)',
-      'date': 'July 25, 2026',
-      'category': 'Laboratory',
-      'status': 'Completed',
-    },
-    {
-      'title': 'Electrocardiogram (ECG)',
-      'date': 'July 24, 2026',
-      'category': 'Cardiology',
-      'status': 'Completed',
-    },
-    {
-      'title': 'Lipid Profile test',
-      'date': 'July 28, 2026',
-      'category': 'Laboratory',
-      'status': 'Pending Lab Approval',
-    },
-  ];
+  void _loadPatientProfile() {
+    final user = AuthService.currentUser;
+    if (user != null) {
+      _patientName = (user['name'] != null && user['name'].toString().trim().isNotEmpty)
+          ? user['name'].toString().trim()
+          : (user['email']?.toString().split('@').first ?? 'Registered Patient');
+      
+      _patientUhid = user['uhid'] ??
+          (user['_id'] != null
+              ? 'UHID-${user['_id'].toString().substring(0, 8).toUpperCase()}'
+              : 'UHID-${user['phone'] ?? 'REG'}');
+      
+      _hospitalName = user['hospital']?.toString() ?? 'Sunrise General Hospital';
+    } else {
+      _patientName = 'Registered Patient';
+      _patientUhid = 'UHID-REGISTERED';
+      _hospitalName = 'Sunrise General Hospital';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -289,6 +247,39 @@ class _PatientDashboardState extends State<PatientDashboard> {
   }
 
   Widget _buildVitalsCard(ResponsiveHelper responsive) {
+    if (_vitals == null || _vitals!.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(12.0),
+          border: Border.all(color: AppColors.slate200),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.monitor_heart_outlined, color: AppColors.navy700, size: 24),
+            SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'No Clinical Vitals Logged',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.slate800),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Blood pressure, pulse & temp will be updated after clinical checkup.',
+                    style: TextStyle(fontSize: 10, color: AppColors.slate500),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
@@ -313,7 +304,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                 ],
               ),
               Text(
-                _vitals['lastChecked']!,
+                _vitals!['lastChecked'] ?? 'Recently',
                 style: const TextStyle(fontSize: 10, color: AppColors.slate400, fontWeight: FontWeight.w500),
               ),
             ],
@@ -322,10 +313,10 @@ class _PatientDashboardState extends State<PatientDashboard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildVitalItem('BP', _vitals['bp']!, Icons.speed, Colors.purple),
-              _buildVitalItem('Pulse', _vitals['pulse']!, Icons.favorite, Colors.red),
-              _buildVitalItem('SpO2', _vitals['spo2']!, Icons.air, Colors.blue),
-              _buildVitalItem('Temp', _vitals['temp']!, Icons.thermostat, Colors.orange),
+              _buildVitalItem('BP', _vitals!['bp'] ?? '--', Icons.speed, Colors.purple),
+              _buildVitalItem('Pulse', _vitals!['pulse'] ?? '--', Icons.favorite, Colors.red),
+              _buildVitalItem('SpO2', _vitals!['spo2'] ?? '--', Icons.air, Colors.blue),
+              _buildVitalItem('Temp', _vitals!['temp'] ?? '--', Icons.thermostat, Colors.orange),
             ],
           ),
         ],
@@ -364,6 +355,39 @@ class _PatientDashboardState extends State<PatientDashboard> {
   }
 
   Widget _buildAppointmentsList(ResponsiveHelper responsive) {
+    if (_appointments.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(12.0),
+          border: Border.all(color: AppColors.slate200),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.calendar_month_outlined, color: AppColors.navy700, size: 24),
+            SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'No Upcoming Appointments',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.slate800),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Book an OPD consultation to schedule your next hospital visit.',
+                    style: TextStyle(fontSize: 10, color: AppColors.slate500),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -394,12 +418,12 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      apt['doctorName'],
+                      apt['doctorName'] ?? 'Attending Doctor',
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.slate900),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${apt['specialty']} • ${apt['type']}',
+                      '${apt['specialty'] ?? 'General'} • ${apt['type'] ?? 'Consultation'}',
                       style: const TextStyle(fontSize: 10, color: AppColors.slate500, fontWeight: FontWeight.w500),
                     ),
                     const SizedBox(height: 4),
@@ -417,7 +441,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  apt['status'].toString().toUpperCase(),
+                  (apt['status'] ?? 'Scheduled').toString().toUpperCase(),
                   style: const TextStyle(color: AppColors.emerald600, fontSize: 8, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -537,6 +561,38 @@ class _PatientDashboardState extends State<PatientDashboard> {
 
   // --- PRESCRIPTIONS SCREEN ---
   Widget _buildPrescriptionsScreen(ResponsiveHelper responsive) {
+    if (_prescriptions.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(responsive.scaleWidth(24.0)),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: AppColors.navy50,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.receipt_long_outlined, size: 48, color: AppColors.navy700),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'No Active Prescriptions',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate800),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Your digital prescription slips will appear here once issued by your doctor.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: AppColors.slate500, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return ListView.builder(
       physics: const BouncingScrollPhysics(),
       padding: EdgeInsets.all(responsive.scaleWidth(16.0)),
@@ -684,6 +740,38 @@ class _PatientDashboardState extends State<PatientDashboard> {
 
   // --- REPORTS SCREEN ---
   Widget _buildReportsScreen(ResponsiveHelper responsive) {
+    if (_reports.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(responsive.scaleWidth(24.0)),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: AppColors.navy50,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.folder_open_outlined, size: 48, color: AppColors.navy700),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'No Diagnostic Reports Available',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate800),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Laboratory and radiology test results will be posted here after verification.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: AppColors.slate500, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return ListView.builder(
       physics: const BouncingScrollPhysics(),
       padding: EdgeInsets.all(responsive.scaleWidth(16.0)),
