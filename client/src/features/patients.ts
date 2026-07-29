@@ -97,6 +97,20 @@ export function usePatientProfileMe(options?: { enabled?: boolean }) {
   });
 }
 
+export function useUpdatePatientProfileMe() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: Partial<Patient> & Record<string, any>) => {
+      const res = await api.patch("/patients/me", payload);
+      return res.data.data.patient as Patient;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      queryClient.invalidateQueries({ queryKey: ["patients", "me"] });
+    },
+  });
+}
+
 export function usePatientInvoices() {
   return useQuery({
     queryKey: ["patients", "invoices"],

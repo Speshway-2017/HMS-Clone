@@ -35,11 +35,12 @@ export const listDoctors = catchAsync(async (req: Request, res: Response) => {
   if (status) filter.status = status;
   if (search) filter.name = new RegExp(search, "i");
 
-  const busyDoctorIds = await getBusyDoctorIds(req.hospitalFilter!.hospital as any);
+  const hospitalId = req.hospitalFilter?.hospital;
+  const busyDoctorIds = await getBusyDoctorIds(hospitalId as any);
 
   const [doctors, allHospitalDoctors] = await Promise.all([
     Doctor.find(filter).populate("department", "name").sort({ createdAt: -1 }).skip(skip).limit(limit),
-    Doctor.find(req.hospitalFilter as Record<string, unknown>),
+    Doctor.find(filter),
   ]);
 
   const resolvedPaginated = doctors.map(d => {

@@ -65,6 +65,11 @@ const patientSchema = z.object({
   insuranceProvider: z.string().optional().default(""),
   insurancePolicyNumber: z.string().optional().default(""),
   photoUrl: z.string().optional().default(""),
+  emergencyContact: z.object({
+    name: z.string().optional().default(""),
+    phone: z.string().optional().default(""),
+    relation: z.string().optional().default("")
+  }).optional(),
 });
 
 export const listPatients = catchAsync(async (req: Request, res: Response) => {
@@ -291,6 +296,35 @@ export const getPatientProfileMe = catchAsync(async (req: Request, res: Response
   if (!patient) {
     throw new AppError("Patient profile not found for the logged-in user.", 404);
   }
+  res.json({ status: "success", data: { patient } });
+});
+
+export const updatePatientProfileMe = catchAsync(async (req: Request, res: Response) => {
+  const patientSelf = await Patient.findOne({ email: req.user!.email });
+  if (!patientSelf) {
+    throw new AppError("Patient profile not found for the logged-in user.", 404);
+  }
+
+  const body = patientSchema.partial().parse(req.body);
+  delete (body as any).uhid;
+
+  const patient = await Patient.findByIdAndUpdate(patientSelf._id, body, {
+    new: true,
+    runValidators: true,
+  });
+
+  if (patientSelf.hospital) {
+    emitToHospital(patientSelf.hospital.toString(), "patient_updated", { patientId: patient!._id });
+  }
+
+  await logAudit({
+    req,
+    action: "UPDATE_PATIENT_PROFILE",
+    entity: "Patient",
+    entityId: patientSelf._id.toString(),
+    details: body
+  });
+
   res.json({ status: "success", data: { patient } });
 });
 

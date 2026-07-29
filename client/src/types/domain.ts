@@ -192,6 +192,7 @@ export interface Patient {
   uhid?: string;
   insuranceProvider: string;
   insurancePolicyNumber: string;
+  emergencyContact?: { name?: string; phone?: string; relation?: string };
   medicalHistory: MedicalHistoryEntry[];
   createdAt: string;
 }
