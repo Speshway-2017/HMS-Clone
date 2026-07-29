@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Eye, EyeOff, KeyRound, ShieldCheck, CheckCircle2, XCircle, Lock } from "lucide-react";
-import { useChangePassword } from "../../features/auth";
+import { useChangePassword, useUpdateProfile } from "../../features/auth";
 import { useAuth } from "../../context/AuthContext";
 import { useMyHospital, useUpdateMyHospital } from "../../features/hospitals";
 import { FileUpload } from "../../components/ui/FileUpload";
@@ -55,8 +55,9 @@ function PasswordInput({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export function SettingsPage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { mutate, isPending } = useChangePassword();
+  const updateProfileMutation = useUpdateProfile();
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -68,6 +69,24 @@ export function SettingsPage() {
   function showToast(type: "success" | "error", message: string) {
     setToast({ type, message });
     setTimeout(() => setToast(null), 4500);
+  }
+
+  async function handleAvatarChange(url: string) {
+    updateProfileMutation.mutate(
+      { avatarUrl: url },
+      {
+        onSuccess: () => {
+          refreshUser();
+          showToast("success", "Profile photo updated successfully!");
+        },
+        onError: (err: unknown) => {
+          const msg =
+            (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+            "Failed to save profile image.";
+          showToast("error", msg);
+        },
+      }
+    );
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -104,28 +123,40 @@ export function SettingsPage() {
         <p className="mt-1 text-sm text-slate-500">Manage your account preferences</p>
       </div>
 
-      {/* ── Profile card (read-only info) ── */}
+      {/* ── Profile card (with upload photo) ── */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-4">
-          {user?.avatarUrl ? (
-            <img
-              src={user.avatarUrl}
-              alt={user.name}
-              className="h-16 w-16 rounded-full object-cover ring-4 ring-navy-100"
-            />
-          ) : (
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-navy-100 text-navy-700 ring-4 ring-navy-50">
-              <span className="text-2xl font-bold">
-                {user?.name?.charAt(0).toUpperCase() ?? "?"}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.name}
+                className="h-16 w-16 rounded-full object-cover ring-4 ring-navy-100 shadow-sm"
+              />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-navy-100 text-navy-700 ring-4 ring-navy-50 shadow-sm animate-pulse-slow">
+                <span className="text-2xl font-bold">
+                  {user?.name?.charAt(0).toUpperCase() ?? "?"}
+                </span>
+              </div>
+            )}
+            <div>
+              <p className="text-lg font-semibold text-slate-800">{user?.name}</p>
+              <p className="text-sm text-slate-500">{user?.email}</p>
+              <span className="mt-1 inline-block rounded-full bg-navy-100 px-2.5 py-0.5 text-xs font-medium capitalize text-navy-700">
+                {user?.role?.replace("_", " ")}
               </span>
             </div>
-          )}
-          <div>
-            <p className="text-lg font-semibold text-slate-800">{user?.name}</p>
-            <p className="text-sm text-slate-500">{user?.email}</p>
-            <span className="mt-1 inline-block rounded-full bg-navy-100 px-2.5 py-0.5 text-xs font-medium capitalize text-navy-700">
-              {user?.role?.replace("_", " ")}
-            </span>
+          </div>
+
+          <div className="w-full sm:w-64 border-t border-slate-100 pt-4 sm:border-t-0 sm:pt-0">
+            <FileUpload
+              label="Update Profile Photo"
+              folder={user?.role === "doctor" ? "doctor-photos" : "staff-photos"}
+              value={user?.avatarUrl || ""}
+              onChange={handleAvatarChange}
+              hint="PNG, JPG or WEBP up to 2MB"
+            />
           </div>
         </div>
       </div>

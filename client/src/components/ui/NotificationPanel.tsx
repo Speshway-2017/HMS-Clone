@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useNotifications, AppNotification, NotificationType, NotificationSeverity } from "../../features/notifications";
 import { useAuth } from "../../context/AuthContext";
+import { useNurseNotifications } from "../../features/nurse";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -121,10 +122,35 @@ export function NotificationPanel() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // Conditionally load nurse notifications count
+  const isNurse = user?.role === "nurse";
+  const { data: nurseNotifsData } = useNurseNotifications(isNurse);
+
   const { data, isLoading } = useNotifications();
   const notifications = data?.data?.notifications ?? [];
   const total = data?.data?.total ?? 0;
-  const unreadCount = notifications.filter((n) => !readIds.has(n.id)).length;
+
+  // Compute unreadCount based on role
+  const unreadCount = isNurse
+    ? (nurseNotifsData || []).filter(n => !n.isRead).length
+    : notifications.filter((n) => !readIds.has(n.id)).length;
+
+  if (isNurse) {
+    return (
+      <button
+        onClick={() => navigate("/nurse/notifications")}
+        className="relative rounded-full p-2 text-slate-400 hover:text-navy-705 hover:bg-navy-50 transition-all cursor-pointer"
+        title="Nurse Notification Center"
+      >
+        <Bell className="h-5 w-5" />
+        {unreadCount > 0 && (
+          <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white animate-pulse">
+            {unreadCount}
+          </span>
+        )}
+      </button>
+    );
+  }
 
   // Close on outside click
   useEffect(() => {

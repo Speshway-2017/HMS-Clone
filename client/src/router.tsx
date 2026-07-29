@@ -126,6 +126,8 @@ import { LaboratoryQualityControl } from "./pages/laboratory/QualityControl";
 
 // Nurse & Patient modules
 import { NurseDashboard } from "./pages/nurse/Dashboard";
+import ShiftHandover from "./pages/nurse/ShiftHandover";
+import NurseNotificationsPage from "./pages/nurse/NotificationsPage";
 import { PatientDashboard } from "./pages/patient/Dashboard";
 
 export const router = createBrowserRouter([
@@ -375,6 +377,8 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <NurseDashboard /> },
           { path: "inpatients", element: <NurseDashboard activeTab="inpatients" /> },
+          { path: "handover", element: <ShiftHandover /> },
+          { path: "notifications", element: <NurseNotificationsPage /> },
           { path: "settings", element: <SettingsPage /> },
         ],
       },

@@ -14,3 +14,17 @@ async function changePasswordFn(payload: ChangePasswordPayload) {
 export function useChangePassword() {
   return useMutation({ mutationFn: changePasswordFn });
 }
+
+export interface UpdateProfilePayload {
+  name?: string;
+  avatarUrl?: string;
+}
+
+async function updateProfileFn(payload: UpdateProfilePayload) {
+  const { data } = await api.patch("/auth/update-profile", payload);
+  return data;
+}
+
+export function useUpdateProfile() {
+  return useMutation({ mutationFn: updateProfileFn });
+}
