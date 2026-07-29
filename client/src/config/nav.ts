@@ -128,9 +128,15 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   ],
   nurse: [
     { label: "Dashboard", path: "/nurse", icon: LayoutDashboard },
-    { label: "Wards & Inpatients", path: "/nurse/inpatients", icon: BedDouble },
-    { label: "Shift Handover", path: "/nurse/handover", icon: ClipboardList },
-    { label: "Notifications", path: "/nurse/notifications", icon: Bell },
+    { label: "Assigned Patients", path: "/nurse/patients", icon: Users },
+    { label: "Medication Admin", path: "/nurse/medications", icon: Pill },
+    { label: "Vitals Monitoring", path: "/nurse/vitals", icon: Activity },
+    { label: "Nursing Notes", path: "/nurse/notes", icon: FileText },
+    { label: "Care Plans", path: "/nurse/care-plans", icon: ClipboardCheck },
+    { label: "Shift Handover", path: "/nurse/shift-handover", icon: ClipboardList },
+    { label: "Ward Management", path: "/nurse/wards", icon: BedDouble },
+    { label: "Emergency Alerts", path: "/nurse/alerts", icon: Bell },
+    { label: "Notifications", path: "/nurse/notifications", icon: History },
     { label: "Settings", path: "/nurse/settings", icon: Settings },
   ],
   patient: [
