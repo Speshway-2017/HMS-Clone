@@ -342,4 +342,79 @@ class AuthService {
       }
     } catch (_) {}
   }
+
+  /// Fetches the patient's prescriptions
+  Future<List<Map<String, dynamic>>> getPatientPrescriptions() async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/prescriptions/patient');
+    final activeToken = await getToken() ?? authToken ?? currentUser?['token']?.toString();
+
+    final headers = <String, String>{
+      'Accept': 'application/json',
+    };
+    if (activeToken != null && activeToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $activeToken';
+    }
+
+    try {
+      final response = await _client.get(url, headers: headers).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded['status'] == 'success' && decoded['data'] != null) {
+          final List<dynamic> list = decoded['data'];
+          return list.map((item) => Map<String, dynamic>.from(item)).toList();
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  /// Fetches the patient's appointments
+  Future<List<Map<String, dynamic>>> getPatientAppointments() async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/appointments/patient');
+    final activeToken = await getToken() ?? authToken ?? currentUser?['token']?.toString();
+
+    final headers = <String, String>{
+      'Accept': 'application/json',
+    };
+    if (activeToken != null && activeToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $activeToken';
+    }
+
+    try {
+      final response = await _client.get(url, headers: headers).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded['status'] == 'success' && decoded['data'] != null) {
+          final List<dynamic> list = decoded['data'];
+          return list.map((item) => Map<String, dynamic>.from(item)).toList();
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  /// Fetches the patient's diagnostic reports
+  Future<List<Map<String, dynamic>>> getPatientReports() async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/diagnostic-reports');
+    final activeToken = await getToken() ?? authToken ?? currentUser?['token']?.toString();
+
+    final headers = <String, String>{
+      'Accept': 'application/json',
+    };
+    if (activeToken != null && activeToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $activeToken';
+    }
+
+    try {
+      final response = await _client.get(url, headers: headers).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded['status'] == 'success' && decoded['data'] != null) {
+          final List<dynamic> list = decoded['data'];
+          return list.map((item) => Map<String, dynamic>.from(item)).toList();
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
 }

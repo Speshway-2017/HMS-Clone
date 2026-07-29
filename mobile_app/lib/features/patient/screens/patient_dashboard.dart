@@ -50,10 +50,13 @@ class _PatientDashboardState extends State<PatientDashboard> {
   final List<Map<String, dynamic>> _prescriptions = [];
   final List<Map<String, dynamic>> _reports = [];
 
+  bool _isLoadingMedicalData = false;
+
   @override
   void initState() {
     super.initState();
     _loadPatientProfile();
+    _fetchMedicalDetails();
   }
 
   @override
@@ -83,6 +86,16 @@ class _PatientDashboardState extends State<PatientDashboard> {
       _avatarUrl = user['avatarUrl']?.toString();
       _email = user['email']?.toString() ?? 'patient@hms.com';
       _phone = user['phone']?.toString() ?? '+91 9876543210';
+
+      // Also set vitals list if present in the user profile response
+      if (user['bloodGroup'] != null || user['age'] != null || user['gender'] != null || user['allergies'] != null) {
+        _vitals = {
+          'Blood Group': user['bloodGroup']?.toString() ?? 'N/A',
+          'Age': user['age']?.toString() ?? 'N/A',
+          'Gender': user['gender']?.toString() ?? 'N/A',
+          'Allergies': user['allergies']?.toString() ?? 'None',
+        };
+      }
     } else {
       _patientName = 'Registered Patient';
       _patientUhid = 'UHID-REGISTERED';
@@ -90,6 +103,127 @@ class _PatientDashboardState extends State<PatientDashboard> {
       _avatarUrl = null;
       _email = 'patient@hms.com';
       _phone = '+91 9876543210';
+    }
+  }
+
+  void _fetchMedicalDetails() async {
+    setState(() {
+      _isLoadingMedicalData = true;
+    });
+
+    try {
+      final authService = AuthService();
+      
+      // 1. Fetch prescriptions
+      final rawPrescriptions = await authService.getPatientPrescriptions();
+      final List<Map<String, dynamic>> mappedPrescriptions = [];
+      for (var rx in rawPrescriptions) {
+        final List<String> medsList = [];
+        if (rx['medications'] != null && rx['medications'] is List) {
+          for (var med in rx['medications']) {
+            final name = med['name'] ?? '';
+            final strength = med['strength'] ?? '';
+            final dosage = med['dosage'] ?? '';
+            final freq = med['frequency'] ?? '';
+            final dur = med['duration'] ?? '';
+            medsList.add("$name $strength - $dosage ($freq, $dur)".trim());
+          }
+        }
+
+        String formattedDate = 'N/A';
+        if (rx['createdAt'] != null) {
+          try {
+            final parsedDate = DateTime.parse(rx['createdAt'].toString());
+            formattedDate = "${parsedDate.day.toString().padLeft(2, '0')}/${parsedDate.month.toString().padLeft(2, '0')}/${parsedDate.year}";
+          } catch (_) {}
+        }
+
+        mappedPrescriptions.add({
+          'id': rx['prescriptionNumber'] ?? rx['_id'] ?? 'RX-N/A',
+          'doctorName': rx['doctor'] != null ? (rx['doctor']['name'] ?? 'N/A') : 'N/A',
+          'date': formattedDate,
+          'diagnosis': rx['diagnosis'] ?? 'N/A',
+          'medications': medsList,
+        });
+      }
+
+      // 2. Fetch appointments (OPD consultations)
+      final rawAppointments = await authService.getPatientAppointments();
+      final List<Map<String, dynamic>> mappedAppointments = [];
+      for (var apt in rawAppointments) {
+        String formattedDate = 'N/A';
+        if (apt['date'] != null) {
+          try {
+            final parsedDate = DateTime.parse(apt['date'].toString());
+            formattedDate = "${parsedDate.day.toString().padLeft(2, '0')}/${parsedDate.month.toString().padLeft(2, '0')}/${parsedDate.year}";
+          } catch (_) {}
+        }
+
+        mappedAppointments.add({
+          'doctorName': apt['doctor'] != null ? (apt['doctor']['name'] ?? 'Attending Doctor') : 'Attending Doctor',
+          'specialty': apt['doctor'] != null ? (apt['doctor']['specialization'] ?? 'General') : 'General',
+          'type': apt['type'] ?? 'Consultation',
+          'date': formattedDate,
+          'time': apt['time'] ?? 'N/A',
+          'status': apt['status'] ?? 'Scheduled',
+        });
+      }
+
+      // 3. Fetch diagnostic reports
+      final rawReports = await authService.getPatientReports();
+      final List<Map<String, dynamic>> mappedReports = [];
+      for (var report in rawReports) {
+        String formattedDate = 'N/A';
+        if (report['uploadedAt'] != null) {
+          try {
+            final parsedDate = DateTime.parse(report['uploadedAt'].toString());
+            formattedDate = "${parsedDate.day.toString().padLeft(2, '0')}/${parsedDate.month.toString().padLeft(2, '0')}/${parsedDate.year}";
+          } catch (_) {}
+        }
+
+        mappedReports.add({
+          'title': report['testName'] ?? report['name'] ?? 'Diagnostic Report',
+          'category': report['category'] ?? 'General',
+          'date': formattedDate,
+          'status': (report['status'] == 'verified' || report['status'] == 'completed') ? 'Completed' : 'Pending',
+        });
+      }
+
+      // 4. Update vitals if available from the user object
+      final user = AuthService.currentUser;
+      Map<String, String>? vitalsMap;
+      if (user != null && (user['bloodGroup'] != null || user['age'] != null || user['gender'] != null || user['allergies'] != null)) {
+        vitalsMap = {
+          'Blood Group': user['bloodGroup']?.toString() ?? 'N/A',
+          'Age': user['age']?.toString() ?? 'N/A',
+          'Gender': user['gender']?.toString() ?? 'N/A',
+          'Allergies': user['allergies']?.toString() ?? 'None',
+        };
+      }
+
+      if (mounted) {
+        setState(() {
+          _prescriptions.clear();
+          _prescriptions.addAll(mappedPrescriptions);
+
+          _appointments.clear();
+          _appointments.addAll(mappedAppointments);
+
+          _reports.clear();
+          _reports.addAll(mappedReports);
+
+          if (vitalsMap != null) {
+            _vitals = vitalsMap;
+          }
+          _isLoadingMedicalData = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoadingMedicalData = false;
+        });
+      }
     }
   }
 
