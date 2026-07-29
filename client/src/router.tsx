@@ -125,8 +125,16 @@ import { TestRequestDetailsPage } from "./pages/laboratory/TestRequestDetailsPag
 import { LaboratoryQualityControl } from "./pages/laboratory/QualityControl";
 
 // Nurse & Patient modules
-import { NurseDashboard } from "./pages/nurse/Dashboard";
+import { NurseDashboardPage } from "./pages/nurse/DashboardPage";
+import { AssignedPatientsPage } from "./pages/nurse/AssignedPatientsPage";
+import { MedicationAdminPage } from "./pages/nurse/MedicationAdminPage";
+import { VitalsMonitoringPage } from "./pages/nurse/VitalsMonitoringPage";
+import { NursingNotesPage } from "./pages/nurse/NursingNotesPage";
+import { CarePlansPage } from "./pages/nurse/CarePlansPage";
 import ShiftHandover from "./pages/nurse/ShiftHandover";
+import { WardManagementPage } from "./pages/nurse/WardManagementPage";
+import { EmergencyAlertsPage } from "./pages/nurse/EmergencyAlertsPage";
+import { AlertDetailPage } from "./pages/nurse/AlertDetailPage";
 import NurseNotificationsPage from "./pages/nurse/NotificationsPage";
 import { PatientDashboard } from "./pages/patient/Dashboard";
 
@@ -375,9 +383,18 @@ export const router = createBrowserRouter([
         path: "/nurse",
         element: <DashboardLayout />,
         children: [
-          { index: true, element: <NurseDashboard /> },
-          { path: "inpatients", element: <NurseDashboard activeTab="inpatients" /> },
+          { index: true, element: <NurseDashboardPage /> },
+          { path: "patients", element: <AssignedPatientsPage /> },
+          { path: "inpatients", element: <AssignedPatientsPage /> },
+          { path: "medications", element: <MedicationAdminPage /> },
+          { path: "vitals", element: <VitalsMonitoringPage /> },
+          { path: "notes", element: <NursingNotesPage /> },
+          { path: "care-plans", element: <CarePlansPage /> },
+          { path: "shift-handover", element: <ShiftHandover /> },
           { path: "handover", element: <ShiftHandover /> },
+          { path: "wards", element: <WardManagementPage /> },
+          { path: "alerts", element: <EmergencyAlertsPage /> },
+          { path: "alerts/:id", element: <AlertDetailPage /> },
           { path: "notifications", element: <NurseNotificationsPage /> },
           { path: "settings", element: <SettingsPage /> },
         ],
