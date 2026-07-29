@@ -102,6 +102,17 @@ export function useDoctorDashboardMetrics() {
   });
 }
 
+// 1b. Advanced Analytics
+export function useDoctorDashboardAnalytics(filters?: { range?: string; startDate?: string; endDate?: string }) {
+  return useQuery({
+    queryKey: ["doctorDashboard", "analytics", filters],
+    queryFn: async () => {
+      const res = await api.get<{ status: string; data: any }>("/doctors/dashboard/analytics", { params: filters });
+      return res.data.data;
+    },
+  });
+}
+
 // 2. Today's Appointments
 export function useDoctorTodayAppointments() {
   return useQuery({
