@@ -49,6 +49,7 @@ import {
   addInpatientMedication,
   updateInpatientMedication,
   saveInpatientVitals,
+  getAnalytics,
 } from "../controllers/doctorDashboardController";
 
 const router = Router();
@@ -57,6 +58,7 @@ const router = Router();
 router.use(protect, restrictTo("doctor"), scopeToHospital);
 
 router.get("/metrics", getMetrics);
+router.get("/analytics", getAnalytics);
 router.get("/appointments/today", getTodayAppointments);
 
 router.get("/queue", getQueue);

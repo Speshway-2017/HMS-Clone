@@ -47,41 +47,82 @@ export function CompletedConsultationsPage() {
           <p className="text-xs text-slate-400">You haven't completed any consultations today yet.</p>
         </Card>
       ) : (
-        <div className="overflow-hidden bg-white rounded-xl border border-slate-200 shadow-sm">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Patient Name</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">UHID</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Time</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Clinical Notes</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-slate-200">
-              {consultations?.map((appt) => {
-                const patient = appt.patient as any;
-                const patientName = patient?.name || "Unknown Patient";
-                const uhid = patient?.uhid || "—";
+        <>
+          {/* Card-based layout for mobile and tablet */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:hidden">
+            {consultations?.map((appt) => {
+              const patient = appt.patient as any;
+              const patientName = patient?.name || "Unknown Patient";
+              const uhid = patient?.uhid || "—";
 
-                return (
-                  <tr key={appt._id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-slate-900">{patientName}</div>
-                      <div className="text-xs text-slate-400">{patient?.age ? `${patient.age} yrs · ${patient.gender}` : ""}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-mono">{uhid}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-medium">{appt.time}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge tone="success">Completed</Badge>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">{appt.clinicalNotes || appt.notes || "No notes recorded."}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+              return (
+                <Card key={appt._id} className="p-4 space-y-3 border border-slate-100 hover:border-slate-200 transition-all shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-bold text-slate-800 text-sm">{patientName}</h4>
+                      <p className="text-xs text-slate-400 font-medium">
+                        {patient?.age ? `${patient.age} yrs · ${patient.gender}` : ""}
+                      </p>
+                    </div>
+                    <Badge tone="success">Completed</Badge>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2 text-xs border-t border-slate-50 pt-2 font-medium">
+                    <div>
+                      <span className="text-slate-400 font-extrabold uppercase text-[9px] block">UHID</span>
+                      <span className="text-slate-700 font-mono">{uhid}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-extrabold uppercase text-[9px] block">Time</span>
+                      <span className="text-slate-700">{appt.time}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-slate-400 font-extrabold uppercase text-[9px] block">Clinical Notes</span>
+                      <span className="text-slate-700 block">{appt.clinicalNotes || appt.notes || "No notes recorded."}</span>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Table layout for desktops */}
+          <div className="hidden lg:block bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Patient Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">UHID</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Time</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Clinical Notes</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-slate-200">
+                {consultations?.map((appt) => {
+                  const patient = appt.patient as any;
+                  const patientName = patient?.name || "Unknown Patient";
+                  const uhid = patient?.uhid || "—";
+
+                  return (
+                    <tr key={appt._id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-slate-900">{patientName}</div>
+                        <div className="text-xs text-slate-400">{patient?.age ? `${patient.age} yrs · ${patient.gender}` : ""}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-mono">{uhid}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-medium">{appt.time}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Badge tone="success">Completed</Badge>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{appt.clinicalNotes || appt.notes || "No notes recorded."}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );
