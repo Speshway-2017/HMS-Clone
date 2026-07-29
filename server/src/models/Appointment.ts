@@ -4,6 +4,8 @@ export const APPOINTMENT_TYPES = [
   "Appointment",
   "Walk-in",
   "Emergency",
+  "Video Consultation",
+  "Consultation",
 ] as const;
 
 export const APPOINTMENT_STATUSES = [
