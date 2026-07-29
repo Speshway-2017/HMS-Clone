@@ -33,10 +33,12 @@ export function Sidebar() {
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {items.map((item) => {
-          const isActive =
-            item.label === "Dashboard"
-              ? location.pathname === item.path
-              : location.pathname === item.path || location.pathname.startsWith(item.path + "/");
+          const currentFullPath = location.pathname + location.search;
+          const isActive = item.path.includes("?")
+            ? currentFullPath === item.path
+            : item.label === "Dashboard"
+            ? (location.pathname === item.path && (!location.search || location.search === "?tab=overview"))
+            : location.pathname === item.path || location.pathname.startsWith(item.path + "/");
 
           return (
             <NavLink
