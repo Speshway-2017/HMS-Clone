@@ -30,6 +30,9 @@ import {
   Pill,
   ClipboardCheck,
   Truck,
+  User,
+  Heart,
+  Bell,
   type LucideIcon,
 } from "lucide-react";
 import { Role } from "../types/auth";
@@ -130,7 +133,18 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   ],
   patient: [
     { label: "Dashboard", path: "/patient", icon: LayoutDashboard },
+    { label: "Profile Management", path: "/patient?tab=profile", icon: User },
+    { label: "Appointments", path: "/patient?tab=appointments", icon: CalendarClock },
+    { label: "Medical History", path: "/patient?tab=history", icon: Heart },
+    { label: "Prescriptions", path: "/patient?tab=prescriptions", icon: Pill },
+    { label: "Lab Reports", path: "/patient?tab=reports", icon: FileText },
+    { label: "Radiology & Scans", path: "/patient?tab=imaging", icon: ScanLine },
+    { label: "Billing & Pay", path: "/patient?tab=billing", icon: Wallet },
+    { label: "Insurance Details", path: "/patient?tab=insurance", icon: ShieldCheck },
+    { label: "Video Consult", path: "/patient?tab=telehealth", icon: Video },
+    { label: "Notifications", path: "/patient?tab=notifications", icon: Bell },
     { label: "Settings", path: "/patient/settings", icon: Settings },
   ],
 };
+
 

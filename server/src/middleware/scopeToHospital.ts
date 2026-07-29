@@ -18,6 +18,10 @@ export function scopeToHospital(req: Request, _res: Response, next: NextFunction
   }
 
   if (!req.user.hospital) {
+    if (req.user.role === "patient") {
+      req.hospitalFilter = {};
+      return next();
+    }
     throw new AppError("This account is not assigned to a hospital.", 403);
   }
 
