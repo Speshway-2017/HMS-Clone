@@ -15,7 +15,8 @@ export function Topbar() {
           user?.role === "receptionist" ||
           user?.role === "accountant" || 
           user?.role === "pharmacist" ||
-          user?.role === "laboratory") && <NotificationPanel />}
+          user?.role === "laboratory" ||
+          user?.role === "nurse") && <NotificationPanel />}
 
         {/* Avatar + name → Log Out */}
         <button

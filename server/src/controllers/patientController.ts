@@ -285,3 +285,12 @@ export const addMedicalHistoryEntry = catchAsync(async (req: Request, res: Respo
 
   res.status(201).json({ status: "success", data: { patient } });
 });
+
+export const getPatientProfileMe = catchAsync(async (req: Request, res: Response) => {
+  const patient = await Patient.findOne({ email: req.user!.email }).populate("assignedDoctor", "name");
+  if (!patient) {
+    throw new AppError("Patient profile not found for the logged-in user.", 404);
+  }
+  res.json({ status: "success", data: { patient } });
+});
+

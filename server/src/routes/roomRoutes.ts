@@ -11,7 +11,7 @@ import {
 const router = Router();
 
 // Secure all routes
-router.use(protect, restrictTo("hospital_admin", "receptionist"), scopeToHospital);
+router.use(protect, restrictTo("hospital_admin", "receptionist", "nurse"), scopeToHospital);
 
 router.route("/")
   .get(listRooms)

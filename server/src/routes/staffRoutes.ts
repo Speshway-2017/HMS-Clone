@@ -1,9 +1,11 @@
 import { Router } from "express";
 import { protect, restrictTo } from "../middleware/auth";
 import { scopeToHospital } from "../middleware/scopeToHospital";
-import { listStaff, getTopStaff, createStaff, getStaffMember, updateStaff, deleteStaff } from "../controllers/staffController";
+import { listStaff, getTopStaff, createStaff, getStaffMember, updateStaff, deleteStaff, getStaffProfileMe } from "../controllers/staffController";
 
 const router = Router();
+
+router.get("/me", protect, restrictTo("nurse"), getStaffProfileMe);
 
 router.use(protect, restrictTo("hospital_admin", "receptionist", "accountant", "pharmacist", "laboratory"), scopeToHospital);
 

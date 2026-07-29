@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
-import { Patient, Paginated } from "../types/domain";
+import { Patient, Paginated, Invoice } from "../types/domain";
 
 interface PatientListParams {
   page?: number;
@@ -83,5 +83,36 @@ export function useAddMedicalHistory(patientId: string) {
       return res.data.data.patient as Patient;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["patients", patientId] }),
+  });
+}
+
+export function usePatientProfileMe(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ["patients", "me"],
+    enabled: options?.enabled ?? true,
+    queryFn: async () => {
+      const res = await api.get("/patients/me");
+      return res.data.data.patient as Patient;
+    },
+  });
+}
+
+export function usePatientInvoices() {
+  return useQuery({
+    queryKey: ["patients", "invoices"],
+    queryFn: async () => {
+      const res = await api.get("/invoices");
+      return res.data.data as Invoice[];
+    },
+  });
+}
+
+export function usePatientReports() {
+  return useQuery({
+    queryKey: ["patients", "reports"],
+    queryFn: async () => {
+      const res = await api.get("/diagnostic-reports");
+      return res.data.data as any[];
+    },
   });
 }

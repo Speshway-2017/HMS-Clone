@@ -8,11 +8,16 @@ import {
   updatePatient,
   deletePatient,
   addMedicalHistoryEntry,
+  getPatientProfileMe,
 } from "../controllers/patientController";
 
 const router = Router();
 
-router.use(protect, restrictTo("hospital_admin", "doctor", "receptionist", "accountant", "pharmacist", "laboratory"), scopeToHospital);
+// Allow patient to retrieve their own profile details
+router.route("/me")
+  .get(protect, restrictTo("patient"), getPatientProfileMe);
+
+router.use(protect, restrictTo("hospital_admin", "doctor", "receptionist", "accountant", "pharmacist", "laboratory", "nurse"), scopeToHospital);
 
 router.route("/")
   .get(listPatients)

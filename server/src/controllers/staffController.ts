@@ -116,3 +116,12 @@ export const deleteStaff = catchAsync(async (req: Request, res: Response) => {
   }
   res.status(204).send();
 });
+
+export const getStaffProfileMe = catchAsync(async (req: Request, res: Response) => {
+  const staff = await Staff.findOne({ email: req.user!.email }).populate("department", "name");
+  if (!staff) {
+    throw new AppError("Staff profile not found for the logged-in user.", 404);
+  }
+  res.json({ status: "success", data: { staff } });
+});
+

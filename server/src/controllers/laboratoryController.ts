@@ -6,6 +6,7 @@ import { LabOrder } from "../models/LabOrder";
 import { RadiologyOrder } from "../models/RadiologyOrder";
 import { DiagnosticReport } from "../models/DiagnosticReport";
 import { DbNotification } from "../models/DbNotification";
+import { Patient } from "../models/Patient";
 import { emitToDoctor, emitToHospital } from "../config/socket";
 import { logAudit } from "../utils/auditLogger";
 import { AppError } from "../utils/AppError";
@@ -731,15 +732,25 @@ export const downloadReport = catchAsync(async (req: Request, res: Response) => 
 
 export const getPatientReports = catchAsync(async (req: Request, res: Response) => {
   const { patientId } = req.query;
+  let resolvedPatientId = patientId;
   const hospitalId = req.hospitalFilter!.hospital;
 
-  if (!patientId) {
+  if (req.user!.role === "patient") {
+    const patientDoc = await Patient.findOne({ email: req.user!.email });
+    if (patientDoc) {
+      resolvedPatientId = patientDoc._id.toString();
+    } else {
+      return res.json({ status: "success", data: [] });
+    }
+  }
+
+  if (!resolvedPatientId) {
     throw new AppError("Patient ID is required.", 400);
   }
 
   const reports = await DiagnosticReport.find({
     hospital: hospitalId,
-    patient: patientId,
+    patient: resolvedPatientId,
     status: { $in: ["report_uploaded", "verified", "completed"] }
   })
     .sort({ uploadedAt: -1 })

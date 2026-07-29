@@ -4,6 +4,7 @@ import { Invoice, INVOICE_STATUSES } from "../models/Invoice";
 import { Payment } from "../models/Payment";
 import { IPBill } from "../models/IPBill";
 import { IPBillPayment } from "../models/IPBillPayment";
+import { Patient } from "../models/Patient";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
@@ -45,10 +46,26 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req, 20);
   const { status, patient, billingType } = req.query as Record<string, string | undefined>;
 
-  const filter: Record<string, unknown> = { ...req.hospitalFilter };
+  const filter: Record<string, any> = { ...req.hospitalFilter };
   if (status) filter.status = status;
   if (patient) filter.patient = patient;
   if (billingType) filter.billingType = billingType;
+
+  // Determine IP Bill filters
+  const ipFilter: any = { ...req.hospitalFilter };
+  if (patient) ipFilter.patient = patient;
+
+  // Enforce patient data isolation for invoices listing
+  if (req.user!.role === "patient") {
+    const patientDoc = await Patient.findOne({ email: req.user!.email });
+    if (patientDoc) {
+      filter.patient = patientDoc._id;
+      ipFilter.patient = patientDoc._id;
+    } else {
+      filter.patient = "000000000000000000000000";
+      ipFilter.patient = "000000000000000000000000";
+    }
+  }
 
   // Query OP invoices
   const opInvoicesPromise = Invoice.find(filter)
@@ -56,9 +73,6 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
     .populate("appointment")
     .populate("admission")
     .sort({ createdAt: -1 });
-
-  // Determine IP Bill filters
-  const ipFilter: any = { ...req.hospitalFilter };
   if (status) {
     if (status === "pending" || status === "partially_paid") {
       ipFilter.status = "Generated";

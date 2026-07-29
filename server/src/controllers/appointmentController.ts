@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Appointment, APPOINTMENT_STATUSES, APPOINTMENT_TYPES } from "../models/Appointment";
 import { Doctor } from "../models/Doctor";
 import { Invoice } from "../models/Invoice";
+import { Patient } from "../models/Patient";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
@@ -64,6 +65,16 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
       filter.status = "never_match_status";
     } else if (!status) {
       filter.status = { $ne: "pending_payment" };
+    }
+  }
+
+  // Enforce patient data isolation for appointment listing
+  if (req.user!.role === "patient") {
+    const patientDoc = await Patient.findOne({ email: req.user!.email });
+    if (patientDoc) {
+      filter.patient = patientDoc._id;
+    } else {
+      filter.patient = "000000000000000000000000";
     }
   }
 

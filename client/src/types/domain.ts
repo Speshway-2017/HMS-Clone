@@ -279,4 +279,5 @@ export interface Invoice {
   issuedAt: string;
   dueDate: string | null;
   totals: InvoiceTotals;
+  billingType?: string;
 }
