@@ -129,6 +129,8 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   nurse: [
     { label: "Dashboard", path: "/nurse", icon: LayoutDashboard },
     { label: "Wards & Inpatients", path: "/nurse/inpatients", icon: BedDouble },
+    { label: "Shift Handover", path: "/nurse/handover", icon: ClipboardList },
+    { label: "Notifications", path: "/nurse/notifications", icon: Bell },
     { label: "Settings", path: "/nurse/settings", icon: Settings },
   ],
   patient: [

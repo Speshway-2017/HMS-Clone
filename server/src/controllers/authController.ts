@@ -10,6 +10,7 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/
 import { logAudit } from "../utils/auditLogger";
 import { Hospital } from "../models/Hospital";
 import { Patient } from "../models/Patient";
+import { Staff } from "../models/Staff";
 import { sendEmail } from "../services/emailService";
 
 const loginSchema = z.object({
@@ -478,5 +479,28 @@ export const resetPassword = catchAsync(async (req: Request, res: Response) => {
   res.status(200).json({
     status: "success",
     message: "Your password has been successfully reset. You can now log in with your new credentials."
+  });
+});
+
+export const updateProfile = catchAsync(async (req: Request, res: Response) => {
+  const { name, avatarUrl } = req.body;
+  const user = await User.findById(req.user!._id);
+  if (!user) throw new AppError("User not found.", 404);
+
+  if (name) user.name = name;
+  if (avatarUrl !== undefined) user.avatarUrl = avatarUrl;
+  await user.save();
+
+  // If this user is staff, sync the avatar to their staff photoUrl / name
+  const staff = await Staff.findOne({ email: user.email });
+  if (staff) {
+    if (name) staff.name = name;
+    if (avatarUrl !== undefined) staff.photoUrl = avatarUrl;
+    await staff.save();
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: { user: sanitizeUser(user) }
   });
 });
