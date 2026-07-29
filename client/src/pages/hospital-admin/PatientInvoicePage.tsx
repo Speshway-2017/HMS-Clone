@@ -25,7 +25,7 @@ export function PatientInvoicePage() {
         <div>
           <p className="text-sm text-slate-400">
             <Link to="/admin/finance" className="hover:text-navy-700">
-              Finance
+              Revenue Analytics
             </Link>{" "}
             / Invoices / {id}
           </p>

@@ -167,7 +167,7 @@ export function FinancePage() {
       {/* Header & Sub-Tabs Navigation */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Financial Dashboard</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Revenue Analytics</h1>
           <p className="text-sm text-slate-500">Real revenue, billing overview, and consolidated patient statements.</p>
         </div>
       </div>
