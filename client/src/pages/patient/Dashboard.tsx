@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import { socket } from "../../lib/socket";
 import {
   Activity,
   Calendar,
@@ -203,6 +204,28 @@ export function PatientDashboard() {
 
   const doctors = doctorsRes?.data || [];
   const appointments = apptResponse?.data || [];
+
+  // Real-time Socket Event Sync for Receptionist Bookings & Billing Updates
+  useEffect(() => {
+    const handleSync = () => {
+      refetchAppts();
+      refetchPatient();
+    };
+
+    const socketEvents = [
+      "appointment_updated",
+      "appointment_update",
+      "dashboard_update",
+      "billing_updated",
+      "payment_update",
+      "patient_updated",
+    ];
+
+    socketEvents.forEach((evt) => socket.on(evt, handleSync));
+    return () => {
+      socketEvents.forEach((evt) => socket.off(evt, handleSync));
+    };
+  }, [refetchAppts, refetchPatient]);
 
   // Profile Edit State
   const [isEditingProfile, setIsEditingProfile] = useState(false);

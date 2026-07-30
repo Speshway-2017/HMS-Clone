@@ -20,6 +20,7 @@ export function useAppointments(params: AppointmentListParams, options?: { enabl
   return useQuery({
     queryKey: ["appointments", params],
     enabled: options?.enabled ?? true,
+    refetchInterval: 10000,
     queryFn: async () => {
       const res = await api.get<AppointmentListResponse>("/appointments", { params });
       return res.data;

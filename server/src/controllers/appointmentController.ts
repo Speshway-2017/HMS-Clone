@@ -70,9 +70,35 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
 
   // Enforce patient data isolation for appointment listing
   if (req.user!.role === "patient") {
-    const patientDoc = await Patient.findOne({ email: req.user!.email });
-    if (patientDoc) {
-      filter.patient = patientDoc._id;
+    // Delete hospital filter for patient role so all appointments booked for this patient across hospitals are fetched
+    delete filter.hospital;
+
+    const userEmail = (req.user!.email || "").trim();
+    const userPhone = (req.user!.phone || "").replace(/\D/g, "").slice(-10);
+    const userName = (req.user!.name || "").trim();
+    const userId = req.user!._id;
+
+    const patientConditions: any[] = [];
+    if (userId) {
+      patientConditions.push({ user: userId });
+    }
+    if (userEmail) {
+      patientConditions.push({ email: { $regex: `^${userEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+    }
+    if (userPhone && userPhone.length >= 7) {
+      patientConditions.push({ phone: { $regex: `${userPhone}$` } });
+    }
+    if (userName) {
+      patientConditions.push({ name: { $regex: `^${userName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+    }
+
+    const patientDocs = await Patient.find({
+      $or: patientConditions.length > 0 ? patientConditions : [{ user: userId }]
+    }).select("_id");
+
+    const patientIds = patientDocs.map(p => p._id);
+    if (patientIds.length > 0) {
+      filter.patient = { $in: patientIds };
     } else {
       filter.patient = "000000000000000000000000";
     }

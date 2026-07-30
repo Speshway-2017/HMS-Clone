@@ -6,7 +6,7 @@ import { AuthUser } from "../types/auth";
 interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<AuthUser>;
+  login: (identifier: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -98,10 +98,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (identifier: string, password: string) => {
     try {
       const res = await api.post<{ data: { user: AuthUser; token: string; refreshToken: string } }>("/auth/login", {
-        email,
+        identifier,
+        email: identifier,
         password,
       });
 

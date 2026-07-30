@@ -292,15 +292,79 @@ export const addMedicalHistoryEntry = catchAsync(async (req: Request, res: Respo
 });
 
 export const getPatientProfileMe = catchAsync(async (req: Request, res: Response) => {
-  const patient = await Patient.findOne({ email: req.user!.email }).populate("assignedDoctor", "name");
-  if (!patient) {
-    throw new AppError("Patient profile not found for the logged-in user.", 404);
+  const userEmail = (req.user!.email || "").trim();
+  const userPhone = (req.user!.phone || "").replace(/\D/g, "").slice(-10);
+  const userName = (req.user!.name || "").trim();
+  const userId = req.user!._id;
+
+  const conditions: any[] = [{ user: userId }];
+  if (userEmail) {
+    conditions.push({ email: { $regex: `^${userEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
   }
+  if (userPhone && userPhone.length >= 7) {
+    conditions.push({ phone: { $regex: `${userPhone}$` } });
+  }
+  if (userName) {
+    conditions.push({ name: { $regex: `^${userName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+  }
+
+  let patient = await Patient.findOne({ $or: conditions }).populate("assignedDoctor", "name");
+
+  if (patient && !patient.user) {
+    patient.user = userId as any;
+    if (userEmail && !patient.email) patient.email = userEmail;
+    if (userPhone && !patient.phone) patient.phone = req.user!.phone || userPhone;
+    await patient.save();
+  }
+
+  if (!patient) {
+    const generateDigits = (length: number): string => {
+      let result = "";
+      const characters = "0123456789";
+      for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+      }
+      return result;
+    };
+    const uhid = `UHID-${generateDigits(10)}`;
+    const patientCode = `PAT-${generateDigits(6)}`;
+    const qrCode = `HMS|${uhid}|${userName}|${req.user!.phone || ""}`;
+
+    patient = await Patient.create({
+      user: userId,
+      hospital: req.user!.hospital || undefined,
+      uhid,
+      patientCode,
+      qrCode,
+      name: userName || "Patient",
+      email: userEmail,
+      phone: req.user!.phone || "",
+      status: "opd",
+      isActive: true,
+    });
+  }
+
   res.json({ status: "success", data: { patient } });
 });
 
 export const updatePatientProfileMe = catchAsync(async (req: Request, res: Response) => {
-  const patientSelf = await Patient.findOne({ email: req.user!.email });
+  const userEmail = (req.user!.email || "").trim();
+  const userPhone = (req.user!.phone || "").replace(/\D/g, "").slice(-10);
+  const userName = (req.user!.name || "").trim();
+  const userId = req.user!._id;
+
+  const conditions: any[] = [{ user: userId }];
+  if (userEmail) {
+    conditions.push({ email: { $regex: `^${userEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+  }
+  if (userPhone && userPhone.length >= 7) {
+    conditions.push({ phone: { $regex: `${userPhone}$` } });
+  }
+  if (userName) {
+    conditions.push({ name: { $regex: `^${userName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+  }
+
+  let patientSelf = await Patient.findOne({ $or: conditions });
   if (!patientSelf) {
     throw new AppError("Patient profile not found for the logged-in user.", 404);
   }
