@@ -484,7 +484,7 @@ export class ReceptionService {
 
     // Check if patient has any prior non-cancelled appointment with this doctor within opExpiryLimit
     const hospitalRecord = await Hospital.findById(hospitalId);
-    const opExpiryLimit = hospitalRecord?.opExpiryLimit ?? 10;
+    const opExpiryLimit = doctor.opExpiryLimit ?? hospitalRecord?.opExpiryLimit ?? 10;
     const expiryDate = new Date(bookingDate);
     expiryDate.setDate(expiryDate.getDate() - opExpiryLimit);
     expiryDate.setHours(0, 0, 0, 0);

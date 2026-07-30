@@ -30,6 +30,7 @@ export function DoctorFormPage() {
     licenseNo: "",
     status: "on_duty" as "on_duty" | "on_leave" | "off_duty",
     rating: 0,
+    opExpiryLimit: 10,
   });
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ email: string; tempPassword: string } | null>(null);
@@ -49,6 +50,7 @@ export function DoctorFormPage() {
         licenseNo: doctor.licenseNo,
         status: doctor.status,
         rating: doctor.rating,
+        opExpiryLimit: doctor.opExpiryLimit ?? 10,
       });
     }
   }, [data]);
@@ -187,6 +189,13 @@ export function DoctorFormPage() {
             max={100}
             value={form.rating}
             onChange={(e) => setForm({ ...form, rating: Number(e.target.value) })}
+          />
+          <InputField
+            label="OP Consultation Expiry Limit (Days)"
+            type="number"
+            min={0}
+            value={form.opExpiryLimit}
+            onChange={(e) => setForm({ ...form, opExpiryLimit: Number(e.target.value) })}
           />
         </FormSection>
 

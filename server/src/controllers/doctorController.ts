@@ -24,6 +24,7 @@ const doctorSchema = z.object({
   bio: z.string().optional().default(""),
   status: z.enum(DOCTOR_STATUSES).optional(),
   rating: z.coerce.number().min(0).max(100).optional(),
+  opExpiryLimit: z.coerce.number().min(0).optional(),
 });
 
 export const listDoctors = catchAsync(async (req: Request, res: Response) => {
@@ -237,6 +238,7 @@ const updateDoctorMeSchema = z.object({
   bio: z.string().optional(),
   languages: z.string().optional(),
   consultationFee: z.string().optional(),
+  opExpiryLimit: z.coerce.number().min(0).optional(),
   workingHours: z.array(z.object({
     day: z.string(),
     from: z.string(),

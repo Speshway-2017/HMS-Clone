@@ -117,7 +117,7 @@ export function DoctorProfilePage() {
           <h3 className="mb-2 text-base font-semibold text-slate-800">Professional Biography</h3>
           <p className="text-sm text-slate-600">{doctor.bio || "No biography on file."}</p>
 
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-lg bg-slate-50 p-4">
               <h4 className="mb-2 text-sm font-semibold text-slate-700">Qualification</h4>
               <p className="text-sm text-slate-600">{doctor.qualification || "Not specified"}</p>
@@ -125,6 +125,10 @@ export function DoctorProfilePage() {
             <div className="rounded-lg bg-slate-50 p-4">
               <h4 className="mb-2 text-sm font-semibold text-slate-700">License</h4>
               <p className="text-sm text-slate-600">{doctor.licenseNo || "Not specified"}</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-4">
+              <h4 className="mb-2 text-sm font-semibold text-slate-700">OP Expiry Limit</h4>
+              <p className="text-sm text-slate-600">{doctor.opExpiryLimit !== undefined ? `${doctor.opExpiryLimit} Days` : "10 Days (Default)"}</p>
             </div>
           </div>
         </Card>

@@ -370,7 +370,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const isWithinRevisitWindow = () => {
     if (!selectedDoc || !selectedDate) return false;
     
-    const limitDays = hospital?.opExpiryLimit ?? 10;
+    const limitDays = selectedDoc?.opExpiryLimit ?? hospital?.opExpiryLimit ?? 10;
     
     // Parse the selected appointment date
     const appointmentDate = new Date(selectedDate);

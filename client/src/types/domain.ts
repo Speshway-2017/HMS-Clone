@@ -146,6 +146,7 @@ export interface Doctor {
   monthlyAvailability?: Array<{ date: string; from: string; to: string; active: boolean }>;
   languages?: string;
   consultationFee?: string;
+  opExpiryLimit?: number;
 }
 
 export interface Staff {
