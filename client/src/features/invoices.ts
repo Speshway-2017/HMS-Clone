@@ -32,10 +32,11 @@ interface InvoiceListResponse extends Paginated<Invoice> {
   };
 }
 
-export function useInvoices(params: InvoiceListParams) {
+export function useInvoices(params: InvoiceListParams, options?: { enabled?: boolean }) {
   const qKey = params.billingType ? params.billingType.toUpperCase() : "ALL";
   return useQuery({
     queryKey: ["invoices", qKey, params],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<InvoiceListResponse>("/invoices", { params });
       return res.data;

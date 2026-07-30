@@ -13,9 +13,10 @@ interface PatientListResponse extends Paginated<Patient> {
   counts: { total: number; admitted: number; opd: number; discharged: number; newToday: number };
 }
 
-export function usePatients(params: PatientListParams) {
+export function usePatients(params: PatientListParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["patients", params],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<PatientListResponse>("/patients", { params });
       return res.data;
