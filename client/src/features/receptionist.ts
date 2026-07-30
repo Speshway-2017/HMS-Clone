@@ -311,11 +311,12 @@ export function useAdmissionRequests() {
   });
 }
 
-export function useAdmissions(params?: string | { status?: string; patientId?: string }) {
+export function useAdmissions(params?: string | { status?: string; patientId?: string }, options?: { enabled?: boolean }) {
   const queryParams = typeof params === "string" ? { status: params } : params;
   const status = queryParams?.status || "admitted";
   return useQuery({
     queryKey: ["reception", "admissions", "list", queryParams],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<{ data: { admissions: InpatientAdmission[] } }>("/reception/admissions", {
         params: queryParams
