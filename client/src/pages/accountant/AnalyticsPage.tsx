@@ -25,7 +25,9 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer, 
-  Legend 
+  Legend,
+  ComposedChart,
+  Line
 } from "recharts";
 
 const COLORS = ["#1e3a8a", "#10b981", "#3b82f6", "#f59e0b", "#ec4899", "#8b5cf6"];
@@ -55,21 +57,14 @@ export function AccountantAnalyticsPage() {
     value: item.amount,
   })) || [];
 
-  const taxSummary = [
-    { month: "Jan 2026", subtotal: 450000, serviceFee: 21000, taxCollected: 22500, total: 493500 },
-    { month: "Feb 2026", subtotal: 520000, serviceFee: 24000, taxCollected: 26000, total: 570000 },
-    { month: "Mar 2026", subtotal: 490000, serviceFee: 22500, taxCollected: 24500, total: 537000 },
-    { month: "Apr 2026", subtotal: 630000, serviceFee: 31000, taxCollected: 31500, total: 692500 },
-    { month: "May 2026", subtotal: 580000, serviceFee: 28000, taxCollected: 29000, total: 637000 },
-    { month: "Jun 2026", subtotal: 710000, serviceFee: 34500, taxCollected: 35500, total: 780000 },
-  ];
+  const taxSummary = dashboardData?.charts?.taxComplianceSeries || [];
 
   // CSV Exporter
   const handleExportCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
     csvContent += "Reporting Month,Subtotal (INR),Service Fee (INR),Tax Collected (INR),Total Collections (INR)\r\n";
     
-    taxSummary.forEach((row) => {
+    taxSummary.forEach((row: any) => {
       csvContent += `${row.month},${row.subtotal},${row.serviceFee},${row.taxCollected},${row.total}\r\n`;
     });
 
@@ -181,6 +176,88 @@ export function AccountantAnalyticsPage() {
         </Card>
       </div>
 
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Monthly Profitability Trend */}
+        <div className="lg:col-span-2">
+          <ChartCard title="Monthly Profitability Trend" subtitle="Revenues, operational expenses, and net profit margins over the last 7 months">
+            <div className="h-72 w-full">
+              {isLoading ? (
+                <div className="animate-pulse bg-slate-100 rounded-lg h-full w-full flex items-center justify-center text-slate-400 font-medium">
+                  Loading profitability chart...
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={dashboardData?.charts?.monthly} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#64748b" }} />
+                    <YAxis tick={{ fontSize: 12, fill: "#64748b" }} />
+                    <Tooltip formatter={(v: number, name: string) => [`₹${Number(v).toLocaleString("en-IN")}`, name]} />
+                    <Legend formatter={(value) => <span className="text-xs text-slate-650 font-semibold">{value}</span>} />
+                    <Bar dataKey="revenue" name="Revenue" fill="#1e3a8a" radius={[3, 3, 0, 0]} maxBarSize={30} />
+                    <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[3, 3, 0, 0]} maxBarSize={30} />
+                    <Line
+                      type="monotone"
+                      dataKey="profit"
+                      name="Net Profit"
+                      stroke="#10b981"
+                      strokeWidth={3}
+                      dot={{ r: 4, fill: "#10b981" }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </ChartCard>
+        </div>
+
+        {/* Doctor consultation revenue share */}
+        <Card>
+          <h3 className="text-base font-semibold text-slate-800 mb-1">Doctor Revenue Share</h3>
+          <p className="text-xs text-slate-500 mb-4">Total fees collected per attending doctor</p>
+          <div className="h-56 relative">
+            {isLoading ? (
+              <div className="animate-pulse bg-slate-100 rounded-lg h-full w-full flex items-center justify-center text-slate-400 font-medium">
+                Loading share chart...
+              </div>
+            ) : (dashboardData?.charts?.doctorRevenueDistribution?.length ?? 0) === 0 ? (
+              <div className="h-full flex items-center justify-center text-slate-400 text-sm font-medium">
+                No consultation payments logged.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={dashboardData?.charts?.doctorRevenueDistribution}
+                    dataKey="amount"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={4}
+                  >
+                    {dashboardData?.charts?.doctorRevenueDistribution?.map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => [`₹${Number(value).toLocaleString("en-IN")}`]} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+          {/* Custom Legend */}
+          <div className="grid grid-cols-2 gap-2 mt-2 text-[10px]">
+            {!isLoading && dashboardData?.charts?.doctorRevenueDistribution?.map((item: any, i: number) => (
+              <div key={i} className="flex items-center gap-1.5 min-w-0">
+                <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }}></span>
+                <span className="text-slate-650 truncate" title={item.name}>{item.name}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
       {/* Tax Summary Table */}
       <Card>
         <div className="flex justify-between items-center mb-4">
@@ -202,7 +279,7 @@ export function AccountantAnalyticsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {taxSummary.map((row, idx) => (
+              {taxSummary.map((row: any, idx: number) => (
                 <tr key={idx} className="hover:bg-slate-50">
                   <td className="px-4 py-3 font-semibold text-slate-800">
                     {row.month}

@@ -4,6 +4,7 @@ import { Appointment, APPOINTMENT_STATUSES, APPOINTMENT_TYPES } from "../models/
 import { Doctor } from "../models/Doctor";
 import { Invoice } from "../models/Invoice";
 import { Patient } from "../models/Patient";
+import { Payment } from "../models/Payment";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
@@ -47,6 +48,8 @@ const appointmentSchema = z.object({
   type: z.enum(APPOINTMENT_TYPES as unknown as [string, ...string[]]).optional().default("Appointment"),
   status: z.enum(APPOINTMENT_STATUSES).optional(),
   notes: z.string().optional().default(""),
+  billingStatus: z.string().optional(),
+  paymentMethod: z.string().optional(),
 });
 
 export const listAppointments = catchAsync(async (req: Request, res: Response) => {
@@ -208,6 +211,69 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
     hospital: hospitalId,
     referenceId,
   });
+
+  // If billingStatus is 'Paid', automatically generate a paid Invoice and Payment record
+  if (body.billingStatus === "Paid" || req.body.billingStatus === "Paid") {
+    let consultationFee = 500;
+    if (doctor.consultationFee) {
+      const cleanedFee = String(doctor.consultationFee).replace(/[₹, \s]/g, "");
+      const parsedFee = parseFloat(cleanedFee);
+      if (!isNaN(parsedFee)) {
+        consultationFee = parsedFee;
+      }
+    }
+
+    const invoice = await Invoice.create({
+      hospital: hospitalId,
+      patient: body.patient,
+      appointment: appointment._id,
+      billingType: "OP",
+      items: [
+        {
+          description: `${body.type || "OPD Consultation"} Fee`,
+          category: "consultation",
+          quantity: 1,
+          amount: consultationFee,
+        },
+      ],
+      taxRate: 0,
+      serviceFee: 0,
+      discount: 0,
+      insuranceCoveragePercent: 0,
+      status: "paid",
+      issuedAt: new Date(),
+      dueDate: new Date(),
+      totals: {
+        subtotal: consultationFee,
+        taxAmount: 0,
+        serviceFee: 0,
+        discount: 0,
+        insuranceCovered: 0,
+        total: consultationFee,
+        patientBalance: 0,
+      },
+    });
+
+    let paymentMethod = body.paymentMethod || req.body.paymentMethod || "UPI";
+    if (paymentMethod === "NetBanking") {
+      paymentMethod = "Net Banking";
+    }
+    if (!["UPI", "Cash", "Card", "Net Banking", "Cheque", "Mixed"].includes(paymentMethod)) {
+      paymentMethod = "UPI";
+    }
+
+    const transactionId = `TXN-${Math.floor(1000000000 + Math.random() * 9000000000)}`;
+
+    await Payment.create({
+      hospital: hospitalId,
+      invoice: invoice._id,
+      patient: body.patient,
+      amount: consultationFee,
+      paymentMethod,
+      transactionId,
+      paidAt: new Date(),
+    });
+  }
 
   emitToHospital(hospitalId.toString(), "appointment_created", { appointmentId: appointment._id, referenceId });
 
