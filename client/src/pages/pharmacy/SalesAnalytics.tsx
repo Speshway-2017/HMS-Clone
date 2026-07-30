@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { BarChart3, TrendingUp, TrendingDown, ArrowDownRight, ArrowUpRight, DollarSign, Pill, Award, Clipboard, Download, Calendar } from "lucide-react";
-import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Card } from "../../components/ui/Card";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { ChartCard } from "../../components/ui/ChartCard";
@@ -281,6 +281,91 @@ export function PharmacySalesAnalytics() {
                 <Area type="monotone" dataKey="monthRevenue" stroke="#10B981" strokeWidth={2} fillOpacity={1} fill="url(#colorMonthSales)" />
               </AreaChart>
             </ResponsiveContainer>
+          </div>
+        </ChartCard>
+      </div>
+
+      {/* Visual top selling & invoice status split */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Top Selling Medicine Quantities sold (Bar Chart) */}
+        <ChartCard 
+          title="Medicine Volume Distribution" 
+          subtitle="Top 5 formulations by total quantity sold."
+        >
+          <div className="h-[300px]">
+            {topMeds.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-slate-450 text-xs font-medium">No sales data recorded.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topMeds} layout="vertical" margin={{ top: 10, right: 10, left: 30, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: "#64748B" }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "#64748B" }} width={80} />
+                  <Tooltip />
+                  <Bar dataKey="qtySold" name="Qty Sold" fill="#8b5cf6" radius={[0, 4, 4, 0]} maxBarSize={20} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </ChartCard>
+
+        {/* Pharmacy Invoice Payment Split (Pie/Donut Chart) */}
+        <ChartCard 
+          title="Invoices Clearance Split" 
+          subtitle="Proportion of paid vs pending pharmacy invoices (volume & count)."
+        >
+          <div className="h-[300px]">
+            {(() => {
+              const invoicesList = dbInvoiceData?.data || [];
+              let paidCount = 0;
+              let pendingCount = 0;
+              let paidAmt = 0;
+              let pendingAmt = 0;
+              invoicesList.forEach((inv: any) => {
+                const amt = inv.totals?.total || inv.total || 0;
+                if (inv.status === "paid") {
+                  paidCount++;
+                  paidAmt += amt;
+                } else {
+                  pendingCount++;
+                  pendingAmt += amt;
+                }
+              });
+
+              const billingStatsData = [
+                { name: "Paid collections", value: paidAmt, count: paidCount, color: "#10b981" },
+                { name: "Outstanding bills", value: pendingAmt, count: pendingCount, color: "#f59e0b" }
+              ].filter(d => d.value > 0);
+
+              if (billingStatsData.length === 0) {
+                return <div className="h-full flex items-center justify-center text-slate-450 text-xs font-medium">No invoices logged.</div>;
+              }
+
+              return (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={billingStatsData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={90}
+                      paddingAngle={3}
+                    >
+                      {billingStatsData.map((entry, idx) => (
+                        <Cell key={`cell-${idx}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v: number) => [`₹${v.toLocaleString("en-IN")}`]} />
+                    <Legend
+                      formatter={(value) => <span className="text-[11px] text-slate-650 font-medium">{value}</span>}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              );
+            })()}
           </div>
         </ChartCard>
       </div>
