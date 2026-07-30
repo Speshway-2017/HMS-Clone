@@ -126,15 +126,15 @@ export function HospitalAdminDashboard() {
   };
 
   // Safe array extractions
-  const doctorsListArray = Array.isArray(doctorsData) ? doctorsData : (doctorsData?.data || []);
-  const departmentsListArray = Array.isArray(departmentsData) ? departmentsData : (departmentsData?.data || []);
-  const patientsList = Array.isArray(patientsData) ? patientsData : (patientsData?.data || []);
-  const appointmentsList = Array.isArray(appointmentsData) ? appointmentsData : (appointmentsData?.data || []);
-  const invoicesList = Array.isArray(invoicesData) ? invoicesData : (invoicesData?.data || []);
-  const staffList = Array.isArray(staffResponse) ? staffResponse : (staffResponse?.data || []);
-  const bedsList = Array.isArray(bedsData) ? bedsData : (bedsData?.data || []);
-  const inventoryList = Array.isArray(inventoryData) ? inventoryData : (inventoryData?.data || []);
-  const labRequestsList = Array.isArray(labRequestsData) ? labRequestsData : (labRequestsData?.data || []);
+  const doctorsListArray = Array.isArray(doctorsData) ? doctorsData : ((doctorsData as any)?.data || []);
+  const departmentsListArray = Array.isArray(departmentsData) ? departmentsData : ((departmentsData as any)?.data || []);
+  const patientsList = Array.isArray(patientsData) ? patientsData : ((patientsData as any)?.data || []);
+  const appointmentsList = Array.isArray(appointmentsData) ? appointmentsData : ((appointmentsData as any)?.data || []);
+  const invoicesList = Array.isArray(invoicesData) ? invoicesData : ((invoicesData as any)?.data || []);
+  const staffList = Array.isArray(staffResponse) ? staffResponse : ((staffResponse as any)?.data || []);
+  const bedsList = Array.isArray(bedsData) ? bedsData : ((bedsData as any)?.data || []);
+  const inventoryList = Array.isArray(inventoryData) ? inventoryData : ((inventoryData as any)?.data || []);
+  const labRequestsList = Array.isArray(labRequestsData) ? labRequestsData : ((labRequestsData as any)?.data || []);
 
   const ipList = Array.isArray(ipAdmissionsData) ? ipAdmissionsData : [];
   const recList = Array.isArray(recAdmissionsData) ? recAdmissionsData : [];
@@ -314,7 +314,7 @@ export function HospitalAdminDashboard() {
       {(activeTab === "overview" || activeTab === "diagnostics") && (
         <div className="space-y-8 pt-4">
           <LabRadiologyPharmacySection labRequests={labRequestsList} inventory={inventoryList} />
-          <BedStaffEmergencySection beds={bedsList} staff={staffList} admissions={admissionsList} hospitalCounts={counts} />
+          {(BedStaffEmergencySection as any)({ beds: bedsList, staff: staffList, admissions: admissionsList, hospitalCounts: counts })}
         </div>
       )}
 

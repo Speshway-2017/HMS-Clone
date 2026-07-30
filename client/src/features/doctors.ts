@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 
 interface DoctorListParams {
   page?: number;
+  limit?: number;
   department?: string;
   status?: string;
   search?: string;

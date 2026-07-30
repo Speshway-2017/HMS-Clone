@@ -226,6 +226,16 @@ export function LoginPage() {
                   {isSubmitting ? "Authenticating Session..." : "Secure Sign In"}
                 </Button>
               </form>
+
+              {/* Patient Register link */}
+              <div className="mt-6 border-t border-slate-100 pt-4 text-center">
+                <p className="text-xs text-slate-500 font-medium">
+                  New Patient?{" "}
+                  <Link to="/register" className="font-bold text-navy-700 hover:text-navy-900 hover:underline">
+                    Register for Patient Portal & Appointments →
+                  </Link>
+                </p>
+              </div>
             </div>
 
             {/* Back button */}

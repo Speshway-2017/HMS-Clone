@@ -189,7 +189,7 @@ export function PatientDashboard() {
     setActiveTab(tab);
     setSearchParams({ tab });
   };
-  
+
   // Real backend queries & mutations
   const { data: patient, isLoading: isPatientLoading, refetch: refetchPatient } = usePatientProfileMe();
   const { data: apptResponse, isLoading: isApptsLoading, refetch: refetchAppts } = useAppointments({ limit: 100 });
@@ -290,10 +290,10 @@ export function PatientDashboard() {
     const slots: string[] = [];
     const [startH, startM] = from.split(":").map(Number);
     const [endH, endM] = to.split(":").map(Number);
-    
+
     let current = startH * 60 + startM;
     const end = endH * 60 + endM;
-    
+
     let breakStart = -1;
     let breakEnd = -1;
     if (breakTime) {
@@ -503,8 +503,8 @@ export function PatientDashboard() {
       const timeToUse = bookingTime || (availSlots.length > 0 ? availSlots[0] : "09:00");
 
       const selectedDoctor = doctors.find((doc: any) => doc._id === docId);
-      const deptId = typeof selectedDoctor?.department === "object" && selectedDoctor?.department 
-        ? (selectedDoctor.department as any)._id 
+      const deptId = typeof selectedDoctor?.department === "object" && selectedDoctor?.department
+        ? (selectedDoctor.department as any)._id
         : selectedDoctor?.department;
 
       let typeToSend: "Appointment" | "Walk-in" | "Emergency" | "Video Consultation" | "Consultation" = "Appointment";
@@ -726,19 +726,17 @@ export function PatientDashboard() {
             <button
               key={t.id}
               onClick={() => changeTab(t.id as any)}
-              className={`relative flex items-center gap-2 whitespace-nowrap px-3.5 py-2.5 text-xs font-bold rounded-lg transition-all ${
-                isActive
+              className={`relative flex items-center gap-2 whitespace-nowrap px-3.5 py-2.5 text-xs font-bold rounded-lg transition-all ${isActive
                   ? "bg-navy-700 text-white shadow-md"
                   : "text-slate-600 hover:text-navy-700 hover:bg-slate-100/80"
-              }`}
+                }`}
             >
               <Icon className={`h-4 w-4 ${isActive ? "text-indigo-200" : "text-slate-400"}`} />
               <span>{t.label}</span>
               {t.badge !== undefined && t.badge !== 0 && (
                 <span
-                  className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${
-                    isActive ? "bg-white text-navy-800" : "bg-indigo-100 text-indigo-700"
-                  }`}
+                  className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${isActive ? "bg-white text-navy-800" : "bg-indigo-100 text-indigo-700"
+                    }`}
                 >
                   {t.badge}
                 </span>
@@ -992,9 +990,8 @@ export function PatientDashboard() {
             </div>
             <button
               onClick={() => setIsEditingProfile(!isEditingProfile)}
-              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition-all ${
-                isEditingProfile ? "bg-slate-200 text-slate-700" : "bg-navy-700 text-white hover:bg-navy-800 shadow"
-              }`}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition-all ${isEditingProfile ? "bg-slate-200 text-slate-700" : "bg-navy-700 text-white hover:bg-navy-800 shadow"
+                }`}
             >
               {isEditingProfile ? <X className="h-4 w-4" /> : <Edit3 className="h-4 w-4" />}
               {isEditingProfile ? "Cancel Editing" : "Edit Details"}
@@ -1010,9 +1007,8 @@ export function PatientDashboard() {
                   disabled={!isEditingProfile}
                   value={profileForm.name}
                   onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                  className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${
-                    isEditingProfile ? "border-navy-500 bg-white focus:ring-2 focus:ring-navy-200" : "bg-slate-50 text-slate-700"
-                  }`}
+                  className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${isEditingProfile ? "border-navy-500 bg-white focus:ring-2 focus:ring-navy-200" : "bg-slate-50 text-slate-700"
+                    }`}
                 />
               </div>
               <div>
@@ -1022,9 +1018,8 @@ export function PatientDashboard() {
                   disabled={!isEditingProfile}
                   value={profileForm.email}
                   onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                  className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${
-                    isEditingProfile ? "border-navy-500 bg-white focus:ring-2 focus:ring-navy-200" : "bg-slate-50 text-slate-700"
-                  }`}
+                  className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${isEditingProfile ? "border-navy-500 bg-white focus:ring-2 focus:ring-navy-200" : "bg-slate-50 text-slate-700"
+                    }`}
                 />
               </div>
               <div>
@@ -1045,9 +1040,8 @@ export function PatientDashboard() {
                   disabled={!isEditingProfile}
                   value={profileForm.phone}
                   onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                  className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${
-                    isEditingProfile ? "border-navy-500 bg-white focus:ring-2 focus:ring-navy-200" : "bg-slate-50 text-slate-700"
-                  }`}
+                  className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${isEditingProfile ? "border-navy-500 bg-white focus:ring-2 focus:ring-navy-200" : "bg-slate-50 text-slate-700"
+                    }`}
                 />
               </div>
               <div>
@@ -1058,9 +1052,8 @@ export function PatientDashboard() {
                   value={profileForm.age}
                   onChange={(e) => setProfileForm({ ...profileForm, age: e.target.value })}
                   placeholder="e.g. 32"
-                  className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${
-                    isEditingProfile ? "border-navy-500 bg-white focus:ring-2 focus:ring-navy-200" : "bg-slate-50 text-slate-700"
-                  }`}
+                  className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${isEditingProfile ? "border-navy-500 bg-white focus:ring-2 focus:ring-navy-200" : "bg-slate-50 text-slate-700"
+                    }`}
                 />
               </div>
               <div>
@@ -1069,9 +1062,8 @@ export function PatientDashboard() {
                   disabled={!isEditingProfile}
                   value={profileForm.gender}
                   onChange={(e) => setProfileForm({ ...profileForm, gender: e.target.value })}
-                  className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${
-                    isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
-                  }`}
+                  className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
+                    }`}
                 >
                   {["Male", "Female", "Other"].map((g) => (
                     <option key={g} value={g}>{g}</option>
@@ -1084,9 +1076,8 @@ export function PatientDashboard() {
                   disabled={!isEditingProfile}
                   value={profileForm.bloodGroup}
                   onChange={(e) => setProfileForm({ ...profileForm, bloodGroup: e.target.value })}
-                  className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${
-                    isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
-                  }`}
+                  className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
+                    }`}
                 >
                   {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bg) => (
                     <option key={bg} value={bg}>{bg}</option>
@@ -1100,9 +1091,8 @@ export function PatientDashboard() {
                   disabled={!isEditingProfile}
                   value={profileForm.allergies}
                   onChange={(e) => setProfileForm({ ...profileForm, allergies: e.target.value })}
-                  className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${
-                    isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
-                  }`}
+                  className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
+                    }`}
                 />
               </div>
               <div className="md:col-span-2">
@@ -1112,9 +1102,8 @@ export function PatientDashboard() {
                   disabled={!isEditingProfile}
                   value={profileForm.address}
                   onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
-                  className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${
-                    isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
-                  }`}
+                  className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
+                    }`}
                 />
               </div>
             </div>
@@ -1132,9 +1121,8 @@ export function PatientDashboard() {
                     disabled={!isEditingProfile}
                     value={profileForm.emergencyContactName}
                     onChange={(e) => setProfileForm({ ...profileForm, emergencyContactName: e.target.value })}
-                    className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${
-                      isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
-                    }`}
+                    className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
+                      }`}
                   />
                 </div>
                 <div>
@@ -1144,9 +1132,8 @@ export function PatientDashboard() {
                     disabled={!isEditingProfile}
                     value={profileForm.emergencyContactPhone}
                     onChange={(e) => setProfileForm({ ...profileForm, emergencyContactPhone: e.target.value })}
-                    className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${
-                      isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
-                    }`}
+                    className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
+                      }`}
                   />
                 </div>
                 <div>
@@ -1157,9 +1144,8 @@ export function PatientDashboard() {
                     value={profileForm.emergencyContactRelation}
                     onChange={(e) => setProfileForm({ ...profileForm, emergencyContactRelation: e.target.value })}
                     placeholder="e.g. Spouse, Parent, Brother"
-                    className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${
-                      isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
-                    }`}
+                    className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
+                      }`}
                   />
                 </div>
               </div>
@@ -1178,9 +1164,8 @@ export function PatientDashboard() {
                     disabled={!isEditingProfile}
                     value={profileForm.insuranceProvider}
                     onChange={(e) => setProfileForm({ ...profileForm, insuranceProvider: e.target.value })}
-                    className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${
-                      isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
-                    }`}
+                    className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
+                      }`}
                   />
                 </div>
                 <div>
@@ -1190,9 +1175,8 @@ export function PatientDashboard() {
                     disabled={!isEditingProfile}
                     value={profileForm.insurancePolicyNumber}
                     onChange={(e) => setProfileForm({ ...profileForm, insurancePolicyNumber: e.target.value })}
-                    className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${
-                      isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
-                    }`}
+                    className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
+                      }`}
                   />
                 </div>
               </div>
@@ -1237,11 +1221,10 @@ export function PatientDashboard() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setApptSubTab("book")}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all ${
-                  apptSubTab === "book"
+                className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all ${apptSubTab === "book"
                     ? "bg-emerald-600 text-white shadow-md"
                     : "bg-navy-700 text-white hover:bg-navy-800 shadow"
-                }`}
+                  }`}
               >
                 <Plus className="h-4 w-4" /> Book New Appointment
               </button>
@@ -1263,11 +1246,10 @@ export function PatientDashboard() {
                   <button
                     key={st.id}
                     onClick={() => setApptSubTab(st.id as any)}
-                    className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${
-                      isActive
+                    className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${isActive
                         ? "bg-navy-800 text-white shadow"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800"
-                    }`}
+                      }`}
                   >
                     <Icon className={`h-4 w-4 ${isActive ? "text-indigo-200" : "text-slate-400"}`} />
                     <span>{st.label}</span>
@@ -1429,7 +1411,7 @@ export function PatientDashboard() {
           {apptSubTab === "book" && (
             <form onSubmit={handleBookAppointment} className="space-y-6">
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 items-start">
-                
+
                 {/* LEFT COLUMN: FORM STEPS (2 Columns Wide) */}
                 <div className="lg:col-span-2 space-y-6">
                   {/* Step 1: Department Selection Pills */}
@@ -1452,11 +1434,10 @@ export function PatientDashboard() {
                           key={dept.id}
                           type="button"
                           onClick={() => setSelectedDeptFilter(dept.id)}
-                          className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
-                            selectedDeptFilter === dept.id
+                          className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${selectedDeptFilter === dept.id
                               ? "bg-navy-800 text-white shadow"
                               : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                          }`}
+                            }`}
                         >
                           {dept.label}
                         </button>
@@ -1483,11 +1464,10 @@ export function PatientDashboard() {
                             <div
                               key={doc._id}
                               onClick={() => setSelectedDoctorId(doc._id)}
-                              className={`relative cursor-pointer rounded-2xl border p-4 transition-all ${
-                                isSelected
+                              className={`relative cursor-pointer rounded-2xl border p-4 transition-all ${isSelected
                                   ? "border-navy-700 bg-indigo-50/40 ring-2 ring-navy-600 shadow-md scale-[1.02]"
                                   : "border-slate-200 bg-white hover:border-navy-300 hover:shadow-sm"
-                              }`}
+                                }`}
                             >
                               <div className="flex items-start gap-3">
                                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-navy-700 to-indigo-800 text-white font-extrabold text-lg shadow-sm shrink-0">
@@ -1506,13 +1486,12 @@ export function PatientDashboard() {
                               <div className="mt-3 flex items-center justify-between border-t pt-2 text-[11px] font-semibold">
                                 <span className="text-slate-600">Fee: ₹{(doc.consultationSettings as any)?.fee || doc.fee || 500}</span>
                                 <span
-                                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                                    status === "on_duty"
+                                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${status === "on_duty"
                                       ? "bg-emerald-100 text-emerald-800"
                                       : status === "on_leave"
-                                      ? "bg-rose-100 text-rose-800"
-                                      : "bg-slate-100 text-slate-700"
-                                  }`}
+                                        ? "bg-rose-100 text-rose-800"
+                                        : "bg-slate-100 text-slate-700"
+                                    }`}
                                 >
                                   <span className={`h-1.5 w-1.5 rounded-full ${status === "on_duty" ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
                                   {status === "on_duty" ? "On Duty" : status === "on_leave" ? "On Leave" : "Available"}
@@ -1593,11 +1572,10 @@ export function PatientDashboard() {
                                   key={slot}
                                   type="button"
                                   onClick={() => setBookingTime(slot)}
-                                  className={`rounded-xl border py-2.5 text-center text-xs font-bold transition-all ${
-                                    isSelected
+                                  className={`rounded-xl border py-2.5 text-center text-xs font-bold transition-all ${isSelected
                                       ? "border-emerald-600 bg-emerald-400 text-slate-950 font-black ring-2 ring-emerald-400 shadow-md scale-105"
                                       : "border-emerald-200 bg-emerald-50/50 text-emerald-800 hover:bg-emerald-100 hover:border-emerald-400"
-                                  }`}
+                                    }`}
                                 >
                                   {slot}
                                 </button>
@@ -1841,9 +1819,8 @@ export function PatientDashboard() {
                             setSelectedCalendarDayAppts({ day, appts: dayAppts });
                           }
                         }}
-                        className={`h-24 rounded-xl border p-2 flex flex-col justify-between transition-all ${
-                          dayAppts.length > 0 ? "cursor-pointer hover:border-navy-600 hover:shadow-md" : ""
-                        } ${isToday ? "bg-indigo-50/50 border-indigo-300 ring-2 ring-indigo-200" : "bg-white border-slate-200"}`}
+                        className={`h-24 rounded-xl border p-2 flex flex-col justify-between transition-all ${dayAppts.length > 0 ? "cursor-pointer hover:border-navy-600 hover:shadow-md" : ""
+                          } ${isToday ? "bg-indigo-50/50 border-indigo-300 ring-2 ring-indigo-200" : "bg-white border-slate-200"}`}
                       >
                         <div className="flex justify-between items-center">
                           <span className={`text-xs font-extrabold ${isToday ? "text-indigo-700" : "text-slate-700"}`}>{day}</span>
@@ -2457,9 +2434,8 @@ export function PatientDashboard() {
               <button
                 key={f}
                 onClick={() => setNotificationFilter(f)}
-                className={`px-3 py-1.5 rounded-lg uppercase tracking-wider text-[10px] ${
-                  notificationFilter === f ? "bg-navy-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
+                className={`px-3 py-1.5 rounded-lg uppercase tracking-wider text-[10px] ${notificationFilter === f ? "bg-navy-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
               >
                 {f}
               </button>
@@ -2472,9 +2448,8 @@ export function PatientDashboard() {
               .map((n) => (
                 <div
                   key={n.id}
-                  className={`rounded-xl p-4 border transition-all flex items-start justify-between ${
-                    n.read ? "bg-slate-50 border-slate-200" : "bg-gradient-to-r from-amber-50/60 to-orange-50/30 border-amber-200 shadow-sm"
-                  }`}
+                  className={`rounded-xl p-4 border transition-all flex items-start justify-between ${n.read ? "bg-slate-50 border-slate-200" : "bg-gradient-to-r from-amber-50/60 to-orange-50/30 border-amber-200 shadow-sm"
+                    }`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
@@ -2518,18 +2493,16 @@ export function PatientDashboard() {
                   <button
                     type="button"
                     onClick={() => setBookingType("Appointment")}
-                    className={`p-2.5 rounded-lg border text-center font-bold transition-all ${
-                      bookingType === "Appointment" ? "border-navy-700 bg-navy-50 text-navy-800" : "border-slate-200 text-slate-600"
-                    }`}
+                    className={`p-2.5 rounded-lg border text-center font-bold transition-all ${bookingType === "Appointment" ? "border-navy-700 bg-navy-50 text-navy-800" : "border-slate-200 text-slate-600"
+                      }`}
                   >
                     In-Person Hospital Visit
                   </button>
                   <button
                     type="button"
                     onClick={() => setBookingType("Video Consultation")}
-                    className={`p-2.5 rounded-lg border text-center font-bold transition-all ${
-                      bookingType === "Video Consultation" ? "border-indigo-600 bg-indigo-50 text-indigo-800" : "border-slate-200 text-slate-600"
-                    }`}
+                    className={`p-2.5 rounded-lg border text-center font-bold transition-all ${bookingType === "Video Consultation" ? "border-indigo-600 bg-indigo-50 text-indigo-800" : "border-slate-200 text-slate-600"
+                      }`}
                   >
                     Online Video Consult
                   </button>
@@ -2586,11 +2559,10 @@ export function PatientDashboard() {
                             key={slot}
                             type="button"
                             onClick={() => setBookingTime(slot)}
-                            className={`rounded-lg border py-1.5 text-center text-xs font-bold transition-all ${
-                              isSelected
+                            className={`rounded-lg border py-1.5 text-center text-xs font-bold transition-all ${isSelected
                                 ? "border-emerald-600 bg-emerald-400 text-slate-950 font-black shadow"
                                 : "border-emerald-200 bg-white text-emerald-800 hover:bg-emerald-100"
-                            }`}
+                              }`}
                           >
                             {slot}
                           </button>
@@ -2859,27 +2831,24 @@ export function PatientDashboard() {
                   <button
                     type="button"
                     onClick={() => setPaymentMethod("upi")}
-                    className={`p-2.5 rounded-lg border text-center font-bold ${
-                      paymentMethod === "upi" ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-slate-200"
-                    }`}
+                    className={`p-2.5 rounded-lg border text-center font-bold ${paymentMethod === "upi" ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-slate-200"
+                      }`}
                   >
                     <QrCode className="h-4 w-4 mx-auto mb-1" /> UPI QR
                   </button>
                   <button
                     type="button"
                     onClick={() => setPaymentMethod("card")}
-                    className={`p-2.5 rounded-lg border text-center font-bold ${
-                      paymentMethod === "card" ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-slate-200"
-                    }`}
+                    className={`p-2.5 rounded-lg border text-center font-bold ${paymentMethod === "card" ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-slate-200"
+                      }`}
                   >
                     <CreditCard className="h-4 w-4 mx-auto mb-1" /> Card
                   </button>
                   <button
                     type="button"
                     onClick={() => setPaymentMethod("netbanking")}
-                    className={`p-2.5 rounded-lg border text-center font-bold ${
-                      paymentMethod === "netbanking" ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-slate-200"
-                    }`}
+                    className={`p-2.5 rounded-lg border text-center font-bold ${paymentMethod === "netbanking" ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-slate-200"
+                      }`}
                   >
                     <Building className="h-4 w-4 mx-auto mb-1" /> NetBank
                   </button>
@@ -3235,7 +3204,7 @@ export function PatientDashboard() {
 
               return (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                  
+
                   {/* LEFT SIDE: INVOICE & PATIENT SUMMARY (Matching Receptionist Billing Screenshot) */}
                   <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5 space-y-4 text-xs font-semibold">
                     <div className="flex justify-between items-start border-b border-slate-200 pb-3">
@@ -3261,7 +3230,7 @@ export function PatientDashboard() {
 
                     <div className="space-y-2 pt-1">
                       <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Item Description & Breakdown</p>
-                      
+
                       <div className="rounded-xl border bg-white overflow-hidden text-[11px]">
                         <div className="grid grid-cols-4 bg-slate-100 p-2 font-bold text-slate-500 border-b">
                           <span className="col-span-2">Description</span>
@@ -3352,7 +3321,7 @@ export function PatientDashboard() {
                             {/* Simulated QR Code */}
                             <div className="flex flex-col items-center justify-center p-3 bg-white rounded-xl border border-indigo-100">
                               <div className="h-28 w-28 border-4 border-indigo-600 p-1 rounded-xl flex items-center justify-center bg-slate-900 text-white font-mono text-[9px] text-center leading-tight shadow-inner">
-                                [ QR CODE ]<br/>
+                                [ QR CODE ]<br />
                                 SCAN VIA GPAY / PHONEPE / PAYTM
                               </div>
                               <span className="text-[10px] font-bold text-slate-500 mt-2">Amount: ₹{finalFee}.00</span>

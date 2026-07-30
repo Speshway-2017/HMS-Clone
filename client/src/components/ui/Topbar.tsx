@@ -6,7 +6,7 @@ export function Topbar() {
   const { user, logout } = useAuth();
 
   // Master display name based on logged-in user or role (e.g., 'receptionist', 'doctor', 'nurse', 'admin')
-  const displayName = user?.name || user?.username || user?.role || "user";
+  const displayName = user?.name || (user as any)?.username || user?.role || "user";
   const userInitial = displayName.charAt(0).toUpperCase();
 
   return (

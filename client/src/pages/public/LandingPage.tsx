@@ -309,10 +309,15 @@ export function LandingPage() {
           </nav>
 
           {/* Nav Actions */}
-          <div className="hidden items-center gap-4 shrink-0 lg:flex">
+          <div className="hidden items-center gap-3 shrink-0 lg:flex">
             <Link to="/login">
               <button className="text-sm font-bold text-slate-700 transition-colors hover:text-navy-700">
                 Login
+              </button>
+            </Link>
+            <Link to="/register">
+              <button className="rounded-lg border border-navy-700 bg-navy-50 px-4 py-2.5 text-sm font-bold text-navy-800 transition-all hover:bg-navy-100 shadow-sm">
+                Patient Registration
               </button>
             </Link>
             <button
@@ -403,6 +408,13 @@ export function LandingPage() {
                       Book Appointment Online
                       <ArrowRight className="h-5 w-5" />
                     </button>
+                    <Link to="/register" className="w-full sm:w-auto">
+                      <button
+                        className="flex w-full items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 px-6 py-4 text-base font-bold text-indigo-900 shadow-sm hover:bg-indigo-100 sm:w-auto active:scale-95 transition-all duration-300 ease-in-out"
+                      >
+                        Register as Patient
+                      </button>
+                    </Link>
                     <button
                       onClick={() => changeTab("about")}
                       className="flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-4 text-base font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto active:scale-95 transition-all duration-300 ease-in-out"

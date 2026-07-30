@@ -19,10 +19,29 @@ const loginSchema = z.object({
 });
 
 const registerSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
-  password: z.string().min(6),
-  phone: z.string().optional().default(""),
+  // Section 1: Account & Security (Mandatory)
+  name: z.string().min(2, "Full Name is required"),
+  email: z.string().email("Valid email is required"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+
+  // Section 2: Demographics & Contact (Mandatory)
+  phone: z.string().min(5, "Phone Number is required"),
+  age: z.coerce.number({ invalid_type_error: "Age is required" }).min(0, "Age must be valid").max(120, "Age must be valid"),
+  gender: z.string().min(1, "Gender is required"),
+  bloodGroup: z.string().min(1, "Blood Group is required"),
+  address: z.string().min(3, "Residential Address is required"),
+
+  // Section 3: Emergency Contact (Mandatory)
+  emergencyContact: z.object({
+    name: z.string().min(1, "Emergency Contact Name is required"),
+    phone: z.string().min(1, "Emergency Contact Phone is required"),
+    relation: z.string().min(1, "Emergency Contact Relationship is required"),
+  }),
+
+  // Section 4: Allergies & Insurance Details (Optional)
+  allergies: z.string().optional().default(""),
+  insuranceProvider: z.string().optional().default(""),
+  insurancePolicyNumber: z.string().optional().default(""),
 });
 
 function sanitizeUser(user: UserDocument) {
@@ -43,7 +62,20 @@ function hashToken(token: string): string {
 }
 
 export const register = catchAsync(async (req: Request, res: Response) => {
-  const { name, email, password, phone } = registerSchema.parse(req.body);
+  const {
+    name,
+    email,
+    password,
+    phone,
+    age,
+    gender,
+    bloodGroup,
+    address,
+    allergies,
+    insuranceProvider,
+    insurancePolicyNumber,
+    emergencyContact,
+  } = registerSchema.parse(req.body);
 
   const existingUser = await User.findOne({ email });
   if (existingUser) {
@@ -65,6 +97,7 @@ export const register = catchAsync(async (req: Request, res: Response) => {
     hospital: hospitalId,
   });
 
+  let createdPatient = null;
   // If a hospital is available, also register this patient in the patients registry collection
   if (hospitalId) {
     const generateDigits = (length: number): string => {
@@ -79,7 +112,7 @@ export const register = catchAsync(async (req: Request, res: Response) => {
     const patientCode = `PAT-${generateDigits(6)}`;
     const qrCode = `HMS|${uhid}|${name}|${phone}`;
 
-    await Patient.create({
+    createdPatient = await Patient.create({
       hospital: hospitalId,
       uhid,
       patientCode,
@@ -87,6 +120,14 @@ export const register = catchAsync(async (req: Request, res: Response) => {
       name,
       email,
       phone,
+      age: age || undefined,
+      gender: gender || "",
+      bloodGroup: bloodGroup || "",
+      address: address || "",
+      allergies: allergies || "",
+      insuranceProvider: insuranceProvider || "",
+      insurancePolicyNumber: insurancePolicyNumber || "",
+      emergencyContact: emergencyContact || { name: "", phone: "", relation: "" },
       status: "opd",
       isActive: true,
     });
@@ -120,6 +161,7 @@ export const register = catchAsync(async (req: Request, res: Response) => {
     status: "success",
     data: {
       user: sanitizeUser(user),
+      patient: createdPatient,
       token: accessToken,
       refreshToken: refreshToken,
     },

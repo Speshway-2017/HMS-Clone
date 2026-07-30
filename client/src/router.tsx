@@ -3,6 +3,7 @@ import { PublicLayout } from "./layouts/PublicLayout";
 import { DashboardLayout } from "./layouts/DashboardLayout";
 import { LandingPage } from "./pages/public/LandingPage";
 import { LoginPage } from "./pages/auth/LoginPage";
+import { RegisterPage } from "./pages/auth/RegisterPage";
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -144,6 +145,7 @@ export const router = createBrowserRouter([
     children: [
       { path: "/", element: <LandingPage /> },
       { path: "/login", element: <LoginPage /> },
+      { path: "/register", element: <RegisterPage /> },
       { path: "/forgot-password", element: <ForgotPasswordPage /> },
       { path: "/reset-password/:token", element: <ResetPasswordPage /> },
       { path: "/verify-prescription/:id", element: <VerifyPrescriptionPage /> },
