@@ -17,6 +17,7 @@ const medicalHistoryEntrySchema = new Schema(
 
 const patientSchema = new Schema(
   {
+    user: { type: Schema.Types.ObjectId, ref: "User", default: null },
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
     uhid: { type: String, unique: true, sparse: true },
     patientCode: { type: String, unique: true, sparse: true },

@@ -27,7 +27,7 @@ export function LoginPage() {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +67,7 @@ export function LoginPage() {
     setError(null);
     setIsSubmitting(true);
     try {
-      const loggedInUser = await login(email, password);
+      const loggedInUser = await login(identifier.trim(), password);
       navigate(ROLE_HOME_PATH[loggedInUser.role] ?? "/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");
@@ -159,27 +159,27 @@ export function LoginPage() {
                 Sign In to Dashboard
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                Enter your credentials registered by the Super Administrator.
+                Enter your credentials or mobile number to access your account.
               </p>
             </div>
 
             {/* Login Card */}
             <div className="rounded-2xl border border-slate-200/80 bg-white p-8 shadow-xl">
               <form onSubmit={handleSubmit} className="space-y-5 text-xs font-semibold text-slate-700">
-                {/* Email input */}
+                {/* Email / Phone input in one single field */}
                 <div>
-                  <label htmlFor="email" className="block mb-1 text-xs text-slate-600">
-                    Email
+                  <label htmlFor="identifier" className="block mb-1 text-xs text-slate-600 font-bold">
+                    Email Address or Phone Number
                   </label>
                   <input
-                    id="email"
-                    type="email"
+                    id="identifier"
+                    type="text"
                     required
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="username"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
                     className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500 font-medium transition-all text-sm"
-                    placeholder="name@hospital.com"
+                    placeholder="Email address or phone number (e.g. 9876543210)"
                   />
                 </div>
 

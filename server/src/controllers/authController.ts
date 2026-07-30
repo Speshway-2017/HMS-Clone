@@ -14,8 +14,9 @@ import { Staff } from "../models/Staff";
 import { sendEmail } from "../services/emailService";
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  identifier: z.string().optional(),
+  email: z.string().optional(),
+  password: z.string().min(1, "Password is required"),
 });
 
 const registerSchema = z.object({
@@ -77,60 +78,108 @@ export const register = catchAsync(async (req: Request, res: Response) => {
     emergencyContact,
   } = registerSchema.parse(req.body);
 
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    throw new AppError("Email is already registered.", 400);
+  const emailClean = (email || "").trim().toLowerCase();
+  const phoneClean = (phone || "").replace(/\D/g, "").slice(-10);
+
+  // Check if a user account already exists by email or phone
+  const userConds: any[] = [];
+  if (emailClean) userConds.push({ email: { $regex: `^${emailClean.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+  if (phoneClean && phoneClean.length >= 7) userConds.push({ phone: { $regex: `${phoneClean}$` } });
+
+  let user = await User.findOne({ $or: userConds.length > 0 ? userConds : [{ email: emailClean }] });
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  if (user) {
+    if (user.role !== "patient") {
+      throw new AppError("An administrative user account already exists with this email or phone number.", 400);
+    }
+    // Patient account exists (e.g. created by receptionist or previous draft): update password and profile details
+    user.passwordHash = passwordHash;
+    if (name) user.name = name;
+    if (emailClean) user.email = emailClean;
+    if (phone) user.phone = phone;
+    await user.save();
+  } else {
+    // Find the first active/existing hospital in the database
+    const hospital = await Hospital.findOne();
+    const hospitalId = hospital ? hospital._id : null;
+
+    user = await User.create({
+      name,
+      email: emailClean,
+      passwordHash,
+      role: "patient",
+      status: "active",
+      phone,
+      hospital: hospitalId,
+    });
   }
 
-  // Find the first active/existing hospital in the database
+  // Find hospital ID if user has no assigned hospital
   const hospital = await Hospital.findOne();
-  const hospitalId = hospital ? hospital._id : null;
-
-  const passwordHash = await bcrypt.hash(password, 10);
-  const user = await User.create({
-    name,
-    email,
-    passwordHash,
-    role: "patient",
-    status: "active",
-    phone,
-    hospital: hospitalId,
-  });
+  const hospitalId = user.hospital || (hospital ? hospital._id : null);
 
   let createdPatient = null;
-  // If a hospital is available, also register this patient in the patients registry collection
   if (hospitalId) {
-    const generateDigits = (length: number): string => {
-      let result = "";
-      const characters = "0123456789";
-      for (let i = 0; i < length; i++) {
-        result += characters.charAt(Math.floor(Math.random() * characters.length));
-      }
-      return result;
-    };
-    const uhid = `UHID-${generateDigits(10)}`;
-    const patientCode = `PAT-${generateDigits(6)}`;
-    const qrCode = `HMS|${uhid}|${name}|${phone}`;
+    const existingPatientConds: any[] = [];
+    if (emailClean) existingPatientConds.push({ email: { $regex: `^${emailClean.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+    if (phoneClean && phoneClean.length >= 7) existingPatientConds.push({ phone: { $regex: `${phoneClean}$` } });
+    if (name) existingPatientConds.push({ name: { $regex: `^${name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+    if (user._id) existingPatientConds.push({ user: user._id });
 
-    createdPatient = await Patient.create({
-      hospital: hospitalId,
-      uhid,
-      patientCode,
-      qrCode,
-      name,
-      email,
-      phone,
-      age: age || undefined,
-      gender: gender || "",
-      bloodGroup: bloodGroup || "",
-      address: address || "",
-      allergies: allergies || "",
-      insuranceProvider: insuranceProvider || "",
-      insurancePolicyNumber: insurancePolicyNumber || "",
-      emergencyContact: emergencyContact || { name: "", phone: "", relation: "" },
-      status: "opd",
-      isActive: true,
-    });
+    let existingPatientDoc = await Patient.findOne({ $or: existingPatientConds });
+
+    if (existingPatientDoc) {
+      // Reuse existing patient record registered by receptionist — DO NOT create a duplicate Patient document!
+      existingPatientDoc.user = user._id;
+      if (name) existingPatientDoc.name = name;
+      if (emailClean) existingPatientDoc.email = emailClean;
+      if (phone) existingPatientDoc.phone = phone;
+      if (age) existingPatientDoc.age = age;
+      if (gender) existingPatientDoc.gender = gender;
+      if (bloodGroup) existingPatientDoc.bloodGroup = bloodGroup;
+      if (address) existingPatientDoc.address = address;
+      if (allergies) existingPatientDoc.allergies = allergies;
+      if (insuranceProvider) existingPatientDoc.insuranceProvider = insuranceProvider;
+      if (insurancePolicyNumber) existingPatientDoc.insurancePolicyNumber = insurancePolicyNumber;
+      if (emergencyContact) existingPatientDoc.emergencyContact = emergencyContact;
+      await existingPatientDoc.save();
+      createdPatient = existingPatientDoc;
+    } else {
+      // Create new Patient record only if no existing record was found in MongoDB
+      const generateDigits = (length: number): string => {
+        let result = "";
+        const characters = "0123456789";
+        for (let i = 0; i < length; i++) {
+          result += characters.charAt(Math.floor(Math.random() * characters.length));
+        }
+        return result;
+      };
+      const uhid = `UHID-${generateDigits(10)}`;
+      const patientCode = `PAT-${generateDigits(6)}`;
+      const qrCode = `HMS|${uhid}|${name}|${phone}`;
+
+      createdPatient = await Patient.create({
+        user: user._id,
+        hospital: hospitalId,
+        uhid,
+        patientCode,
+        qrCode,
+        name,
+        email: emailClean,
+        phone,
+        age: age || undefined,
+        gender: gender || "",
+        bloodGroup: bloodGroup || "",
+        address: address || "",
+        allergies: allergies || "",
+        insuranceProvider: insuranceProvider || "",
+        insurancePolicyNumber: insurancePolicyNumber || "",
+        emergencyContact: emergencyContact || { name: "", phone: "", relation: "" },
+        status: "opd",
+        isActive: true,
+      });
+    }
   }
 
   const accessToken = signAccessToken({ id: user._id.toString(), role: user.role });
@@ -169,18 +218,46 @@ export const register = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const login = catchAsync(async (req: Request, res: Response) => {
-  const { email, password } = loginSchema.parse(req.body);
+  const body = loginSchema.parse(req.body);
+  const input = (body.identifier || body.email || "").trim();
+  const password = body.password;
 
-  const user = await User.findOne({ email }).select("+passwordHash");
+  if (!input) {
+    throw new AppError("Please enter your email address or phone number.", 400);
+  }
+
+  const cleanPhone = input.replace(/\D/g, "").slice(-10);
+  const isEmail = input.includes("@");
+
+  let query: any = {};
+  if (isEmail) {
+    query = { email: { $regex: `^${input.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } };
+  } else if (cleanPhone && cleanPhone.length >= 7) {
+    query = {
+      $or: [
+        { phone: { $regex: `${cleanPhone}$` } },
+        { email: input.toLowerCase() }
+      ]
+    };
+  } else {
+    query = {
+      $or: [
+        { email: { $regex: `^${input.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } },
+        { phone: input }
+      ]
+    };
+  }
+
+  const user = await User.findOne(query).select("+passwordHash");
   if (!user || !(await user.comparePassword(password))) {
     await logAudit({
       req,
-      userEmail: email,
+      userEmail: input,
       action: "LOGIN_FAILED",
       entity: "User",
       details: { reason: "Invalid credentials" },
     });
-    throw new AppError("Incorrect email or password.", 401);
+    throw new AppError("Incorrect email/phone number or password.", 401);
   }
   if (user.status !== "active") {
     await logAudit({

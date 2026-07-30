@@ -368,7 +368,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const { data: bookedSlots } = useBookedSlots(selectedDoctorId, selectedDate);
 
   const isWithinRevisitWindow = () => {
-    if (!selectedDoc || !patientDetail?.patient?.medicalHistory || !selectedDate) return false;
+    if (!selectedDoc || !selectedDate) return false;
     
     const limitDays = hospital?.opExpiryLimit ?? 10;
     
@@ -376,24 +376,41 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
     const appointmentDate = new Date(selectedDate);
     appointmentDate.setHours(0, 0, 0, 0);
 
-    return patientDetail.patient.medicalHistory.some((history: any) => {
-      const isCompleted = 
-        String(history.status).toLowerCase() === "completed" || 
-        String(history.visitType).toLowerCase().includes("consultation");
-      if (!isCompleted) return false;
+    const selectedDocName = String(selectedDoc.name || "").toLowerCase().replace(/dr\.?\s*/g, "").trim();
+    const selectedDocId = String(selectedDoc._id || "");
 
-      const cleanHistoryDoc = String(history.doctorName).toLowerCase().replace("dr. ", "").replace("dr", "").trim();
-      const cleanSelectedDoc = String(selectedDoc.name).toLowerCase().replace("dr. ", "").replace("dr", "").trim();
-      if (cleanHistoryDoc !== cleanSelectedDoc) return false;
+    // 1. Check recentAppointments from backend patientDetail
+    const recent = (patientDetail as any)?.recentAppointments || [];
+    const matchRecent = recent.some((app: any) => {
+      const docName = String(app.doctorName || "").toLowerCase().replace(/dr\.?\s*/g, "").trim();
+      const docId = String(app.doctorId || "");
+      const isSameDoctor = (selectedDocId && docId === selectedDocId) || (selectedDocName && docName === selectedDocName) || (docName && selectedDocName && (docName.includes(selectedDocName) || selectedDocName.includes(docName)));
+      if (!isSameDoctor) return false;
+
+      const appDate = new Date(app.date);
+      appDate.setHours(0, 0, 0, 0);
+
+      const diffTime = appointmentDate.getTime() - appDate.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      return diffDays >= 0 && diffDays <= limitDays;
+    });
+
+    if (matchRecent) return true;
+
+    // 2. Check patient medicalHistory array if present
+    const medHistory = patientDetail?.patient?.medicalHistory || [];
+    return medHistory.some((history: any) => {
+      const docName = String(history.doctorName || "").toLowerCase().replace(/dr\.?\s*/g, "").trim();
+      const isSameDoctor = docName === selectedDocName || (docName && selectedDocName && (docName.includes(selectedDocName) || selectedDocName.includes(docName)));
+      if (!isSameDoctor) return false;
 
       const historyDate = new Date(history.date);
       historyDate.setHours(0, 0, 0, 0);
 
-      // Diff in days
       const diffTime = appointmentDate.getTime() - historyDate.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      // Return true if the new appointment date is on/after the history date AND within the limit
       return diffDays >= 0 && diffDays <= limitDays;
     });
   };
@@ -946,15 +963,25 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                   <h4 className="font-bold text-xs uppercase tracking-wider text-slate-500 border-b pb-1.5 flex items-center gap-1.5">
                     <FolderHeart className="h-4 w-4 text-navy-600" /> Previous Visits & Appointments
                   </h4>
-                  {patientDetail.patient.medicalHistory && patientDetail.patient.medicalHistory.length > 0 ? (
+                  {((patientDetail as any)?.recentAppointments?.length > 0 || (patientDetail.patient.medicalHistory && patientDetail.patient.medicalHistory.length > 0)) ? (
                     <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
-                      {patientDetail.patient.medicalHistory.map((item: any, idx: number) => (
-                        <div key={idx} className="border-b border-slate-100 pb-2 last:border-0 last:pb-0 text-xs">
-                          <div className="flex justify-between text-slate-400 font-semibold">
+                      {((patientDetail as any)?.recentAppointments || []).map((item: any, idx: number) => (
+                        <div key={`rec-${idx}`} className="border-b border-slate-100 pb-2 last:border-0 last:pb-0 text-xs">
+                          <div className="flex justify-between text-slate-500 font-semibold">
+                            <span>{new Date(item.date).toLocaleDateString("en-IN")} — {item.visitType || "Consultation"}</span>
+                            <span className="font-bold text-slate-600 uppercase text-[10px]">{item.status}</span>
+                          </div>
+                          <div className="mt-0.5 text-slate-800 font-bold">Dr. {item.doctorName}</div>
+                          {item.notes && <div className="text-[10px] text-slate-500 mt-1 bg-slate-50 p-1.5 rounded border border-slate-100 leading-snug">{item.notes}</div>}
+                        </div>
+                      ))}
+                      {(patientDetail.patient.medicalHistory || []).map((item: any, idx: number) => (
+                        <div key={`med-${idx}`} className="border-b border-slate-100 pb-2 last:border-0 last:pb-0 text-xs">
+                          <div className="flex justify-between text-slate-500 font-semibold">
                             <span>{new Date(item.date).toLocaleDateString("en-IN")} — {item.visitType}</span>
                             <span className="font-bold text-slate-600 uppercase text-[10px]">{item.status}</span>
                           </div>
-                          <div className="mt-0.5 text-slate-700 font-bold">{item.diagnosis}</div>
+                          <div className="mt-0.5 text-slate-800 font-bold">{item.diagnosis}</div>
                           {item.notes && <div className="text-[10px] text-slate-500 mt-1 bg-slate-50 p-1.5 rounded border border-slate-100 leading-snug">{item.notes}</div>}
                         </div>
                       ))}
