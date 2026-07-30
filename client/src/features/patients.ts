@@ -4,6 +4,7 @@ import { Patient, Paginated, Invoice } from "../types/domain";
 
 interface PatientListParams {
   page?: number;
+  limit?: number;
   status?: string;
   search?: string;
 }

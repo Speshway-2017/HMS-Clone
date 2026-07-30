@@ -70,15 +70,11 @@ import {
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 
-import { NurseDashboardPage } from "./DashboardPage";
-
 interface NurseDashboardProps {
   activeTab?: string;
 }
 
 export function NurseDashboard({ activeTab }: NurseDashboardProps) {
-  return <NurseDashboardPage />;
-}
   const { user, logout } = useAuth();
   const { data: staff } = useStaffProfileMe();
   const navigate = useNavigate();
