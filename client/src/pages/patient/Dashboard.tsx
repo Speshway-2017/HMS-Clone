@@ -53,123 +53,12 @@ import { KpiCard } from "../../components/ui/KpiCard";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { useAuth } from "../../context/AuthContext";
-import { usePatientProfileMe, usePatientInvoices, usePatientReports, useUpdatePatient, useUpdatePatientProfileMe } from "../../features/patients";
+import { usePatientProfileMe, usePatientInvoices, usePatientReports, useUpdatePatient, useUpdatePatientProfileMe, usePatientPrescriptions } from "../../features/patients";
 import { useAppointments, useCreateAppointment, useUpdateAppointment } from "../../features/appointments";
 import { useDoctors } from "../../features/doctors";
+import { useNotifications } from "../../features/notifications";
 
-// Mock Fallback Data for rich preview experience
-const MOCK_RADIOLOGY_REPORTS = [
-  {
-    id: "RAD-2026-001",
-    title: "Chest X-Ray PA View",
-    modality: "X-Ray",
-    date: "2026-07-20",
-    doctor: "Dr. Sarah Jenkins (Radiologist)",
-    status: "Finalized",
-    findings: "Clear lung fields bilaterally. Normal cardiac silhouette. No pleural effusion or pneumothorax observed.",
-    impression: "Normal Chest Radiograph.",
-    imageUrl: "https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=800&q=80"
-  },
-  {
-    id: "RAD-2026-002",
-    title: "Brain MRI Scan (T1/T2 Weighted)",
-    modality: "MRI",
-    date: "2026-07-10",
-    doctor: "Dr. Rajesh Sharma (Neuroradiologist)",
-    status: "Finalized",
-    findings: "Normal brain parenchyma. Ventricles and sulci are unremarkable for age. No intracranial hemorrhage or mass effect.",
-    impression: "Unremarkable Brain MRI study.",
-    imageUrl: "https://images.unsplash.com/photo-1559757175-5700dde675bc?auto=format&fit=crop&w=800&q=80"
-  },
-  {
-    id: "RAD-2026-003",
-    title: "Knee Joint Ultrasound Scan",
-    modality: "Ultrasound",
-    date: "2026-06-15",
-    doctor: "Dr. Anita Roy (Radiologist)",
-    status: "Finalized",
-    findings: "Minimal joint effusion in the suprapatellar bursa. Intact patellar tendon and collateral ligaments.",
-    impression: "Mild suprapatellar bursitis.",
-    imageUrl: "https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&w=800&q=80"
-  }
-];
 
-const MOCK_PRESCRIPTIONS = [
-  {
-    id: "RX-88401",
-    doctorName: "Dr. Vikram Seth",
-    specialty: "Cardiology",
-    date: "2026-07-25",
-    diagnosis: "Primary Essential Hypertension",
-    medicines: [
-      { name: "Amlovas 5mg Tablet", dosage: "5 mg", frequency: "1-0-0 (Morning)", timing: "After Food", duration: "30 Days", instructions: "Take with water every morning." },
-      { name: "Telma 40mg Tablet", dosage: "40 mg", frequency: "0-0-1 (Night)", timing: "After Food", duration: "30 Days", instructions: "Avoid sodium-heavy meals." },
-      { name: "Ecosprin 75mg", dosage: "75 mg", frequency: "0-1-0 (Afternoon)", timing: "After Lunch", duration: "30 Days", instructions: "Take post meal." }
-    ],
-    advice: "Monitor BP daily in the morning and evening. Maintain low-sodium diet and 30 min daily walk.",
-    status: "Active"
-  },
-  {
-    id: "RX-88219",
-    doctorName: "Dr. Meera Patel",
-    specialty: "General Medicine",
-    date: "2026-06-12",
-    diagnosis: "Acute Bronchitis & Viral Fever",
-    medicines: [
-      { name: "Augmentin 625 Duo", dosage: "625 mg", frequency: "1-0-1 (BD)", timing: "After Food", duration: "5 Days", instructions: "Complete full antibiotic course." },
-      { name: "Dolo 650mg Tablet", dosage: "650 mg", frequency: "1-1-1 (TDS)", timing: "As needed", duration: "3 Days", instructions: "Take if body temperature > 100°F." },
-      { name: "Ascoril LS Cough Syrup", dosage: "10 ml", frequency: "1-1-1 (TDS)", timing: "After Food", duration: "5 Days", instructions: "Warm water gargles twice daily." }
-    ],
-    advice: "Drink plenty of warm fluids. Take 3 days complete bed rest.",
-    status: "Completed"
-  }
-];
-
-const MOCK_INSURANCE_DATA = {
-  provider: "Star Health & Allied Insurance",
-  policyNumber: "SH-8892-4410-2026",
-  policyType: "Comprehensive Family Floater",
-  sumInsured: 500000,
-  balanceCoverage: 425000,
-  validUntil: "2027-03-31",
-  tpAName: "Family Health Plan TPA Pvt. Ltd.",
-  claims: [
-    { id: "CLM-99201", date: "2026-06-14", hospital: "City General Hospital", category: "OPD Consultation & Diagnostics", amount: 12500, approvedAmount: 11000, status: "Approved", remarks: "Settled via Cashless Direct TPA" },
-    { id: "CLM-99482", date: "2026-07-22", hospital: "Metropolitan Super Specialty", category: "Lab Investigation Suite", amount: 4800, approvedAmount: 4800, status: "Approved", remarks: "100% Co-pay Approved" },
-    { id: "CLM-99810", date: "2026-07-28", hospital: "Metropolitan Super Specialty", category: "Pre-Authorization IPD Daycare", amount: 25000, approvedAmount: 0, status: "Under Review", remarks: "Awaiting TPA desk pre-authorization" }
-  ]
-};
-
-const MOCK_TELEHEALTH_SESSIONS = [
-  {
-    id: "VID-2026-901",
-    doctorName: "Dr. Rajesh Sharma",
-    specialty: "Neurology",
-    date: "2026-07-29",
-    time: "16:00 (Today)",
-    status: "Ready to Join",
-    meetingUrl: "#",
-    notes: "Follow-up discussion for EEG results & migraine symptoms."
-  },
-  {
-    id: "VID-2026-882",
-    doctorName: "Dr. Ananya Verma",
-    specialty: "Dermatology",
-    date: "2026-08-02",
-    time: "11:30 AM",
-    status: "Scheduled",
-    meetingUrl: "#",
-    notes: "Virtual skin allergy checkup."
-  }
-];
-
-const MOCK_NOTIFICATIONS = [
-  { id: "N1", title: "Upcoming Video Consult", message: "Your consultation with Dr. Rajesh Sharma starts today at 4:00 PM.", time: "10 mins ago", type: "reminders", read: false, priority: "high" },
-  { id: "N2", title: "Medicine Dosage Alert", message: "Time to take Telma 40mg (1 Tablet) after lunch.", time: "1 hour ago", type: "alerts", read: false, priority: "normal" },
-  { id: "N3", title: "Lab Report Ready", message: "Your Blood Lipid Profile diagnostic report is ready for viewing.", time: "3 hours ago", type: "updates", read: true, priority: "normal" },
-  { id: "N4", title: "Hospital Invoice Issued", message: "Invoice #INV-8831 for OPD Charges (₹1,450) is ready for payment.", time: "1 day ago", type: "alerts", read: true, priority: "normal" },
-  { id: "N5", title: "Daily Health Reminder", message: "Track your blood pressure daily and stay hydrated with at least 2.5L water.", time: "2 days ago", type: "updates", read: true, priority: "low" }
-];
 
 export function PatientDashboard() {
   const { user } = useAuth();
@@ -197,6 +86,8 @@ export function PatientDashboard() {
   const { data: invoices, isLoading: isInvoicesLoading } = usePatientInvoices();
   const { data: reports, isLoading: isReportsLoading } = usePatientReports();
   const { data: doctorsRes } = useDoctors({});
+  const { data: prescriptionsRes, isLoading: isPrescriptionsLoading } = usePatientPrescriptions();
+  const { data: notificationsData } = useNotifications();
 
   const createAppointmentMutation = useCreateAppointment();
   const updatePatientMutation = useUpdatePatient(patient?._id || "");
@@ -204,6 +95,33 @@ export function PatientDashboard() {
 
   const doctors = doctorsRes?.data || [];
   const appointments = apptResponse?.data || [];
+  const prescriptions = prescriptionsRes || [];
+  
+  // Real notifications list from backend or empty array
+  const rawNotifications = notificationsData?.data?.notifications || [];
+  // Conformed notifications mapping to support the local actions and priority fields
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (rawNotifications.length > 0) {
+      setNotifications(
+        rawNotifications.map((n: any) => ({
+          id: n.id || n._id,
+          title: n.title,
+          message: n.message,
+          time: new Date(n.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          type: n.type === "appointment" ? "reminders" : n.type === "invoice" ? "alerts" : "updates",
+          read: n.read ?? false,
+          priority: n.severity === "critical" ? "high" : "normal"
+        }))
+      );
+    } else {
+      setNotifications([]);
+    }
+  }, [rawNotifications]);
+
+  const labReports = reports?.filter((r: any) => r.requestType === "Laboratory") || [];
+  const radiologyReports = reports?.filter((r: any) => r.requestType === "Radiology") || [];
 
   // Real-time Socket Event Sync for Receptionist Bookings & Billing Updates
   useEffect(() => {
@@ -418,7 +336,7 @@ export function PatientDashboard() {
   const [claimAmount, setClaimAmount] = useState("");
   const [claimCategory, setClaimCategory] = useState("OPD Consultation");
   const [claimNotes, setClaimNotes] = useState("");
-  const [claimsList, setClaimsList] = useState(MOCK_INSURANCE_DATA.claims);
+  const [claimsList, setClaimsList] = useState<any[]>([]);
 
   // Video Consultation Telehealth Call Room State
   const [activeVideoCall, setActiveVideoCall] = useState<any>(null);
@@ -445,7 +363,6 @@ export function PatientDashboard() {
   }, [activeVideoCall]);
 
   // Notifications State
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
   const [notificationFilter, setNotificationFilter] = useState<"all" | "reminders" | "alerts" | "updates">("all");
 
   // Handlers
@@ -674,7 +591,7 @@ export function PatientDashboard() {
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
-  const isLoading = isPatientLoading || isApptsLoading || isInvoicesLoading || isReportsLoading;
+  const isLoading = isPatientLoading || isApptsLoading || isInvoicesLoading || isReportsLoading || isPrescriptionsLoading;
 
   if (isLoading) {
     return (
@@ -784,12 +701,12 @@ export function PatientDashboard() {
             />
             <KpiCard
               label="Prescribed Medicines"
-              value={MOCK_PRESCRIPTIONS[0].medicines.length + MOCK_PRESCRIPTIONS[1].medicines.length}
+              value={prescriptions.reduce((sum, rx) => sum + (rx.medications?.length || 0), 0)}
               icon={<Pill className="h-5 w-5 text-emerald-500" />}
             />
             <KpiCard
               label="Diagnostic & Scans"
-              value={(reports?.length || 0) + MOCK_RADIOLOGY_REPORTS.length}
+              value={reports?.length || 0}
               icon={<FileText className="h-5 w-5 text-blue-500" />}
             />
             <KpiCard
@@ -1965,43 +1882,10 @@ export function PatientDashboard() {
                 </div>
               ))
             ) : (
-              <>
-                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">OPD Consultation</span>
-                      <h4 className="text-base font-extrabold text-slate-800">Primary Essential Hypertension</h4>
-                    </div>
-                    <Badge tone="info">25 July 2026</Badge>
-                  </div>
-                  <div className="space-y-1.5 text-xs text-slate-600">
-                    <p><span className="font-semibold text-slate-500">Attending Physician:</span> Dr. Vikram Seth</p>
-                    <p><span className="font-semibold text-slate-500">Department:</span> Cardiology</p>
-                    <div className="mt-3 rounded-lg bg-slate-50 p-3 text-xs font-medium text-slate-700 border border-slate-100">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Doctor Advice</p>
-                      Patient presented with mild morning headaches. Blood pressure logged at 145/90 mmHg. Started on daily antihypertensive therapy. Advice 30-min walk daily.
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">OPD Consultation</span>
-                      <h4 className="text-base font-extrabold text-slate-800">Acute Bronchitis & Viral Fever</h4>
-                    </div>
-                    <Badge tone="info">12 June 2026</Badge>
-                  </div>
-                  <div className="space-y-1.5 text-xs text-slate-600">
-                    <p><span className="font-semibold text-slate-500">Attending Physician:</span> Dr. Meera Patel</p>
-                    <p><span className="font-semibold text-slate-500">Department:</span> General Medicine</p>
-                    <div className="mt-3 rounded-lg bg-slate-50 p-3 text-xs font-medium text-slate-700 border border-slate-100">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Doctor Advice</p>
-                      Cough for 4 days with low grade fever. Prescribed 5 days course of antibiotics and cough syrup. Rest for 3 days.
-                    </div>
-                  </div>
-                </div>
-              </>
+              <div className="col-span-2 flex flex-col items-center justify-center py-12 text-slate-400 border border-dashed rounded-xl bg-slate-50">
+                <Heart className="h-12 w-12 text-slate-300 mb-2" />
+                <p className="text-sm font-semibold">No medical history records found.</p>
+              </div>
             )}
           </div>
         </Card>
@@ -2022,50 +1906,71 @@ export function PatientDashboard() {
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {MOCK_PRESCRIPTIONS.map((rx) => (
-              <div key={rx.id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start border-b pb-3 mb-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-extrabold text-navy-700">{rx.id}</span>
-                        <Badge tone={rx.status === "Active" ? "success" : "neutral"}>{rx.status}</Badge>
-                      </div>
-                      <h4 className="text-sm font-extrabold text-slate-800 mt-1">{rx.diagnosis}</h4>
-                      <p className="text-xs text-slate-500">{rx.doctorName} ({rx.specialty}) · {rx.date}</p>
-                    </div>
-                    <button
-                      onClick={() => setSelectedPrescriptionRx(rx)}
-                      className="flex items-center gap-1.5 rounded-lg border border-navy-600 px-3 py-1.5 text-xs font-bold text-navy-700 hover:bg-navy-50 transition-all"
-                    >
-                      <Download className="h-3.5 w-3.5" /> Download RX PDF
-                    </button>
-                  </div>
-
-                  <div className="space-y-3">
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Prescribed Medicines ({rx.medicines.length})</p>
-                    {rx.medicines.map((med, idx) => (
-                      <div key={idx} className="rounded-xl bg-slate-50 p-3 border border-slate-100 flex items-center justify-between text-xs">
-                        <div>
-                          <p className="font-extrabold text-slate-800">{med.name}</p>
-                          <p className="text-[11px] text-slate-500">{med.dosage} · {med.timing} · {med.duration}</p>
-                          <p className="text-[10px] text-slate-400 italic mt-0.5">{med.instructions}</p>
-                        </div>
-                        <span className="rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] font-extrabold text-emerald-800">
-                          {med.frequency}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {rx.advice && (
-                    <div className="mt-4 rounded-xl bg-indigo-50/50 p-3 text-xs font-medium text-indigo-900 border border-indigo-100">
-                      <span className="font-bold text-indigo-700">Special Instructions: </span> {rx.advice}
-                    </div>
-                  )}
-                </div>
+            {prescriptions.length === 0 ? (
+              <div className="col-span-2 flex flex-col items-center justify-center py-12 text-slate-400 border border-dashed rounded-xl bg-slate-50">
+                <Pill className="h-12 w-12 text-slate-300 mb-2" />
+                <p className="text-sm font-semibold">No digital prescriptions found.</p>
               </div>
-            ))}
+            ) : (
+              prescriptions.map((rx) => {
+                const docName = typeof rx.doctor === "object" ? (rx.doctor as any)?.name : "Specialist";
+                const specialty = typeof rx.doctor === "object" ? (rx.doctor as any)?.specialization : "";
+                const dateStr = new Date(rx.createdAt).toLocaleDateString("en-IN");
+                const rxNumber = rx.prescriptionNumber || rx._id;
+                return (
+                  <div key={rx._id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-start border-b pb-3 mb-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-extrabold text-navy-700">{rxNumber}</span>
+                            <Badge tone={rx.status === "Dispensed" || rx.status === "Completed" ? "success" : "neutral"}>{rx.status}</Badge>
+                          </div>
+                          <h4 className="text-sm font-extrabold text-slate-800 mt-1">{rx.diagnosis || "Consultation Diagnosis"}</h4>
+                          <p className="text-xs text-slate-500">Dr. {docName} {specialty && `(${specialty})`} · {dateStr}</p>
+                        </div>
+                        {rx.pdfUrl && (
+                          <a
+                            href={rx.pdfUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 rounded-lg border border-navy-600 px-3 py-1.5 text-xs font-bold text-navy-700 hover:bg-navy-50 transition-all"
+                          >
+                            <Download className="h-3.5 w-3.5" /> Download RX PDF
+                          </a>
+                        )}
+                      </div>
+
+                      <div className="space-y-3">
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Prescribed Medicines ({rx.medications?.length || 0})</p>
+                        {rx.medications?.map((med: any, idx: number) => (
+                          <div key={idx} className="rounded-xl bg-slate-50 p-3 border border-slate-100 flex items-center justify-between text-xs">
+                            <div>
+                              <p className="font-extrabold text-slate-800">{med.name}</p>
+                              <p className="text-[11px] text-slate-500">{med.strength || med.dosage || "N/A"} · {med.duration || "N/A"}</p>
+                              {med.instructions && (
+                                <p className="text-[10px] text-slate-400 italic mt-0.5">{med.instructions}</p>
+                              )}
+                            </div>
+                            {med.frequency && (
+                              <span className="rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] font-extrabold text-emerald-800">
+                                {med.frequency}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {rx.advice && (
+                        <div className="mt-4 rounded-xl bg-indigo-50/50 p-3 text-xs font-medium text-indigo-900 border border-indigo-100">
+                          <span className="font-bold text-indigo-700">Special Instructions: </span> {rx.advice}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </Card>
       )}
@@ -2083,62 +1988,53 @@ export function PatientDashboard() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                id: "LAB-2026-101",
-                testName: "Complete Blood Count (CBC)",
-                category: "Hematology",
-                date: "2026-07-24",
-                doctor: "Dr. Sunita Rao",
-                status: "Normal",
-                notes: "Hemoglobin 14.2 g/dL, Platelets 250,000 /uL. All parameters within reference limits."
-              },
-              {
-                id: "LAB-2026-102",
-                testName: "Lipid Profile Panel",
-                category: "Biochemistry",
-                date: "2026-07-22",
-                doctor: "Dr. Vikram Seth",
-                status: "Borderline",
-                notes: "Total Cholesterol 210 mg/dL (Slightly Elevated). HDL 48 mg/dL, LDL 135 mg/dL."
-              },
-              {
-                id: "LAB-2026-103",
-                testName: "HbA1c & Fasting Blood Sugar",
-                category: "Diabetology",
-                date: "2026-06-20",
-                doctor: "Dr. Meera Patel",
-                status: "Normal",
-                notes: "HbA1c: 5.6% (Non-diabetic range). Fasting Blood Sugar: 92 mg/dL."
-              },
-              ...(reports || [])
-            ].map((rep: any, idx: number) => (
-              <div
-                key={rep.id || rep._id || idx}
-                onClick={() => setSelectedReport(rep)}
-                className="group rounded-2xl border border-slate-200 bg-white p-5 cursor-pointer hover:shadow-md hover:border-indigo-300 transition-all flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                      <FileText className="h-5 w-5" />
-                    </div>
-                    <Badge tone={rep.status === "Critical" ? "danger" : rep.status === "Borderline" ? "warning" : "success"}>
-                      {rep.status || "Verified"}
-                    </Badge>
-                  </div>
-                  <h4 className="text-sm font-extrabold text-slate-800">{rep.testName}</h4>
-                  <p className="text-xs text-slate-400">{rep.category || "Laboratory Speciality"} · {rep.date || new Date(rep.createdAt || Date.now()).toLocaleDateString("en-IN")}</p>
-                  <p className="mt-2 text-xs font-semibold text-slate-600">Doctor: {rep.doctor || rep.doctor?.name || "Lab Desk"}</p>
-                </div>
-                <div className="mt-4 border-t pt-3 flex items-center justify-between text-xs">
-                  <span className="font-bold text-navy-700 group-hover:underline flex items-center gap-1">
-                    <Eye className="h-3.5 w-3.5" /> View Report Details
-                  </span>
-                  <Download className="h-4 w-4 text-slate-400 group-hover:text-navy-700" />
-                </div>
+            {labReports.length === 0 ? (
+              <div className="col-span-3 flex flex-col items-center justify-center py-12 text-slate-400 border border-dashed rounded-xl bg-slate-50">
+                <FileText className="h-12 w-12 text-slate-300 mb-2" />
+                <p className="text-sm font-semibold">No laboratory test reports found.</p>
               </div>
-            ))}
+            ) : (
+              labReports.map((rep: any, idx: number) => {
+                const docName = typeof rep.doctor === "object" ? rep.doctor?.name : "Pathologist";
+                const dateStr = new Date(rep.createdAt || rep.uploadedAt).toLocaleDateString("en-IN");
+                return (
+                  <div
+                    key={rep._id || idx}
+                    onClick={() => setSelectedReport(rep)}
+                    className="group rounded-2xl border border-slate-200 bg-white p-5 cursor-pointer hover:shadow-md hover:border-indigo-300 transition-all flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                          <FileText className="h-5 w-5" />
+                        </div>
+                        <Badge tone={rep.status === "Critical" ? "danger" : rep.status === "Borderline" ? "warning" : "success"}>
+                          {rep.status === "report_uploaded" ? "Uploaded" : rep.status || "Verified"}
+                        </Badge>
+                      </div>
+                      <h4 className="text-sm font-extrabold text-slate-800">{rep.testName}</h4>
+                      <p className="text-xs text-slate-400">{rep.category || "Laboratory Speciality"} · {dateStr}</p>
+                      <p className="mt-2 text-xs font-semibold text-slate-600">Doctor: Dr. {docName}</p>
+                    </div>
+                    <div className="mt-4 border-t pt-3 flex items-center justify-between text-xs">
+                      <span className="font-bold text-navy-700 group-hover:underline flex items-center gap-1">
+                        <Eye className="h-3.5 w-3.5" /> View Report Details
+                      </span>
+                      {rep.files?.[0]?.secure_url && (
+                        <a
+                          href={rep.files[0].secure_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Download className="h-4 w-4 text-slate-400 group-hover:text-navy-700" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </Card>
       )}
@@ -2156,44 +2052,56 @@ export function PatientDashboard() {
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            {MOCK_RADIOLOGY_REPORTS.map((rad) => (
-              <div
-                key={rad.id}
-                className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
-              >
-                <div>
-                  <div className="relative h-44 bg-slate-900 overflow-hidden cursor-pointer" onClick={() => setSelectedRadiology(rad)}>
-                    <img src={rad.imageUrl} alt={rad.title} className="h-full w-full object-cover opacity-85 hover:opacity-100 hover:scale-105 transition-all duration-300" />
-                    <div className="absolute top-3 left-3">
-                      <span className="rounded-md bg-navy-900/80 backdrop-blur-md px-2.5 py-1 text-[10px] font-bold text-white">
-                        {rad.modality}
-                      </span>
-                    </div>
-                    <div className="absolute bottom-3 right-3">
-                      <span className="rounded-md bg-black/60 backdrop-blur-sm px-2 py-1 text-[10px] font-bold text-white flex items-center gap-1">
-                        <Eye className="h-3 w-3" /> DICOM Preview
-                      </span>
-                    </div>
-                  </div>
-                  <div className="p-5 space-y-2">
-                    <div className="flex justify-between items-start">
-                      <h4 className="text-sm font-extrabold text-slate-800">{rad.title}</h4>
-                      <Badge tone="success">{rad.status}</Badge>
-                    </div>
-                    <p className="text-xs text-slate-500">{rad.doctor} · {rad.date}</p>
-                    <p className="text-xs font-medium text-slate-600 line-clamp-2 mt-2">{rad.impression}</p>
-                  </div>
-                </div>
-                <div className="p-5 pt-0">
-                  <button
-                    onClick={() => setSelectedRadiology(rad)}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-navy-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-navy-800 transition-all shadow"
-                  >
-                    Open DICOM Viewer <ArrowRight className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+            {radiologyReports.length === 0 ? (
+              <div className="col-span-3 flex flex-col items-center justify-center py-12 text-slate-400 border border-dashed rounded-xl bg-slate-50">
+                <ImageIcon className="h-12 w-12 text-slate-300 mb-2" />
+                <p className="text-sm font-semibold">No medical imaging or radiology scan records found.</p>
               </div>
-            ))}
+            ) : (
+              radiologyReports.map((rad: any) => {
+                const docName = typeof rad.doctor === "object" ? rad.doctor?.name : "Radiologist";
+                const imgUrl = rad.files?.[0]?.secure_url || "https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&w=800&q=80";
+                const dateStr = new Date(rad.createdAt || rad.uploadedAt).toLocaleDateString("en-IN");
+                return (
+                  <div
+                    key={rad._id}
+                    className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="relative h-44 bg-slate-900 overflow-hidden cursor-pointer" onClick={() => setSelectedRadiology(rad)}>
+                        <img src={imgUrl} alt={rad.testName} className="h-full w-full object-cover opacity-85 hover:opacity-100 hover:scale-105 transition-all duration-300" />
+                        <div className="absolute top-3 left-3">
+                          <span className="rounded-md bg-navy-900/80 backdrop-blur-md px-2.5 py-1 text-[10px] font-bold text-white">
+                            Radiology
+                          </span>
+                        </div>
+                        <div className="absolute bottom-3 right-3">
+                          <span className="rounded-md bg-black/60 backdrop-blur-sm px-2 py-1 text-[10px] font-bold text-white flex items-center gap-1">
+                            <Eye className="h-3 w-3" /> View Scan
+                          </span>
+                        </div>
+                      </div>
+                      <div className="p-5 space-y-2">
+                        <div className="flex justify-between items-start">
+                          <h4 className="text-sm font-extrabold text-slate-800">{rad.testName}</h4>
+                          <Badge tone="success">{rad.status === "report_uploaded" ? "Uploaded" : rad.status}</Badge>
+                        </div>
+                        <p className="text-xs text-slate-500">Dr. {docName} · {dateStr}</p>
+                        <p className="text-xs font-medium text-slate-600 line-clamp-2 mt-2">{rad.observations || rad.remarks || "No findings summary."}</p>
+                      </div>
+                    </div>
+                    <div className="p-5 pt-0">
+                      <button
+                        onClick={() => setSelectedRadiology(rad)}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-navy-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-navy-800 transition-all shadow"
+                      >
+                        Open Scan Image <ArrowRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </Card>
       )}
@@ -2233,25 +2141,7 @@ export function PatientDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {[
-                  {
-                    _id: "INV-2026-8831",
-                    billingType: "OPD Consultation & Pharmacy",
-                    totals: { total: 1800, insuranceCovered: 350, patientBalance: 1450 },
-                    insuranceCoveragePercent: 20,
-                    dueDate: "2026-08-05",
-                    status: "pending"
-                  },
-                  {
-                    _id: "INV-2026-7721",
-                    billingType: "Radiology & MRI Imaging",
-                    totals: { total: 4500, insuranceCovered: 4500, patientBalance: 0 },
-                    insuranceCoveragePercent: 100,
-                    dueDate: "2026-07-15",
-                    status: "paid"
-                  },
-                  ...(invoices || [])
-                ].map((inv: any) => (
+                {(invoices || []).map((inv: any) => (
                   <tr key={inv._id} className="hover:bg-slate-50/60">
                     <td className="px-4 py-3.5 font-extrabold text-slate-900">{inv._id.slice(-8).toUpperCase()}</td>
                     <td className="px-4 py-3.5 font-semibold">{inv.billingType || "Medical Services"}</td>
@@ -2292,6 +2182,16 @@ export function PatientDashboard() {
                     </td>
                   </tr>
                 ))}
+                {(!invoices || invoices.length === 0) && (
+                  <tr>
+                    <td colSpan={8} className="text-center py-12 text-slate-400">
+                      <div className="flex flex-col items-center justify-center">
+                        <Wallet className="h-12 w-12 text-slate-300 mb-2" />
+                        <p className="text-sm font-semibold">No billing invoices found.</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -2319,26 +2219,40 @@ export function PatientDashboard() {
           </div>
 
           {/* Insurance Card Overview */}
-          <div className="rounded-2xl bg-gradient-to-r from-navy-900 via-navy-800 to-indigo-900 p-6 text-white shadow-md">
-            <div className="flex flex-col gap-6 md:flex-row md:items-center justify-between">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">Policy Provider</span>
-                <h4 className="text-xl font-extrabold mt-0.5">{MOCK_INSURANCE_DATA.provider}</h4>
-                <p className="text-xs text-indigo-200 mt-1">Policy No: <span className="font-mono font-bold">{MOCK_INSURANCE_DATA.policyNumber}</span> · {MOCK_INSURANCE_DATA.policyType}</p>
-                <p className="text-xs text-indigo-300 mt-1">TPA Name: {MOCK_INSURANCE_DATA.tpAName}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4 rounded-xl bg-white/10 p-4 backdrop-blur-md text-xs">
+          {patient?.insuranceProvider ? (
+            <div className="rounded-2xl bg-gradient-to-r from-navy-900 via-navy-800 to-indigo-900 p-6 text-white shadow-md">
+              <div className="flex flex-col gap-6 md:flex-row md:items-center justify-between">
                 <div>
-                  <p className="text-[10px] uppercase font-bold text-indigo-200">Sum Insured</p>
-                  <p className="text-base font-extrabold">₹{MOCK_INSURANCE_DATA.sumInsured.toLocaleString("en-IN")}</p>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">Policy Provider</span>
+                  <h4 className="text-xl font-extrabold mt-0.5">{patient.insuranceProvider}</h4>
+                  <p className="text-xs text-indigo-200 mt-1">Policy No: <span className="font-mono font-bold">{patient.insurancePolicyNumber || "N/A"}</span></p>
+                  <p className="text-xs text-indigo-300 mt-1">TPA Assistance: MediAssist TPA / Cashless Desk Active</p>
                 </div>
-                <div>
-                  <p className="text-[10px] uppercase font-bold text-emerald-300">Remaining Balance</p>
-                  <p className="text-base font-extrabold text-emerald-300">₹{MOCK_INSURANCE_DATA.balanceCoverage.toLocaleString("en-IN")}</p>
+                <div className="grid grid-cols-2 gap-4 rounded-xl bg-white/10 p-4 backdrop-blur-md text-xs">
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-indigo-200">Sum Insured Limit</p>
+                    <p className="text-base font-extrabold">₹5,00,000</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-emerald-300">Coverage Status</p>
+                    <p className="text-base font-extrabold text-emerald-300">Active</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-2xl bg-slate-100 p-6 text-slate-600 border border-dashed border-slate-300 text-center">
+              <Shield className="h-10 w-10 text-slate-400 mx-auto mb-2" />
+              <h4 className="text-sm font-bold text-slate-800">No Insurance Registered</h4>
+              <p className="text-xs text-slate-500 mt-1">You haven't added insurance details to your profile yet. You can add your insurance provider and policy number in the "Profile" tab to request cashless hospitalization pre-authorization.</p>
+              <button
+                onClick={() => changeTab("profile")}
+                className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:underline"
+              >
+                Go to Profile <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
 
           {/* Claims History Table */}
           <div className="space-y-4">
@@ -2357,21 +2271,29 @@ export function PatientDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                  {claimsList.map((clm) => (
-                    <tr key={clm.id} className="hover:bg-slate-50/60">
-                      <td className="px-4 py-3.5 font-extrabold text-navy-700">{clm.id}</td>
-                      <td className="px-4 py-3.5">{clm.date}</td>
-                      <td className="px-4 py-3.5 font-bold text-slate-800">{clm.category}</td>
-                      <td className="px-4 py-3.5 font-bold">₹{clm.amount.toLocaleString("en-IN")}</td>
-                      <td className="px-4 py-3.5 font-extrabold text-emerald-600">₹{clm.approvedAmount.toLocaleString("en-IN")}</td>
-                      <td className="px-4 py-3.5">
-                        <Badge tone={clm.status === "Approved" ? "success" : clm.status === "Under Review" ? "warning" : "neutral"}>
-                          {clm.status}
-                        </Badge>
+                  {claimsList.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="text-center py-8 text-slate-400">
+                        No cashless pre-authorization claim requests submitted.
                       </td>
-                      <td className="px-4 py-3.5 text-slate-500">{clm.remarks}</td>
                     </tr>
-                  ))}
+                  ) : (
+                    claimsList.map((clm) => (
+                      <tr key={clm.id} className="hover:bg-slate-50/60">
+                        <td className="px-4 py-3.5 font-extrabold text-navy-700">{clm.id}</td>
+                        <td className="px-4 py-3.5">{clm.date}</td>
+                        <td className="px-4 py-3.5 font-bold text-slate-800">{clm.category}</td>
+                        <td className="px-4 py-3.5 font-bold">₹{clm.amount.toLocaleString("en-IN")}</td>
+                        <td className="px-4 py-3.5 font-extrabold text-emerald-600">₹{clm.approvedAmount.toLocaleString("en-IN")}</td>
+                        <td className="px-4 py-3.5">
+                          <Badge tone={clm.status === "Approved" ? "success" : clm.status === "Under Review" ? "warning" : "neutral"}>
+                            {clm.status}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3.5 text-slate-500">{clm.remarks}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -2394,29 +2316,54 @@ export function PatientDashboard() {
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {MOCK_TELEHEALTH_SESSIONS.map((sess) => (
-              <div key={sess.id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
-                      <Video className="h-5 w-5" />
-                    </div>
-                    <Badge tone={sess.status === "Ready to Join" ? "success" : "info"}>{sess.status}</Badge>
+            {(() => {
+              const videoAppointments = appointments.filter(
+                (a) => a.type?.toLowerCase().includes("video") && (a.status === "scheduled" || a.status === "pending_payment")
+              );
+              if (videoAppointments.length === 0) {
+                return (
+                  <div className="col-span-2 flex flex-col items-center justify-center py-12 text-slate-400 border border-dashed rounded-xl bg-slate-50">
+                    <Video className="h-12 w-12 text-slate-300 mb-2" />
+                    <p className="text-sm font-semibold">No upcoming video consultations found.</p>
                   </div>
-                  <h4 className="text-base font-extrabold text-slate-800">{sess.doctorName}</h4>
-                  <p className="text-xs text-slate-500">{sess.specialty} · {sess.date} ({sess.time})</p>
-                  <p className="text-xs text-slate-600 mt-2 font-medium bg-slate-50 p-3 rounded-lg border">{sess.notes}</p>
-                </div>
-                <div className="mt-6 pt-4 border-t">
-                  <button
-                    onClick={() => setActiveVideoCall(sess)}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 transition-all shadow"
-                  >
-                    <Video className="h-4 w-4" /> Join Live Video Room
-                  </button>
-                </div>
-              </div>
-            ))}
+                );
+              }
+              return videoAppointments.map((sess: any) => {
+                const docName = typeof sess.doctor === "object" ? (sess.doctor as any)?.name : sess.doctor;
+                const specialty = typeof sess.doctor === "object" ? (sess.doctor as any)?.specialization : "Specialist";
+                const dateStr = new Date(sess.date).toLocaleDateString("en-IN");
+                return (
+                  <div key={sess._id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
+                          <Video className="h-5 w-5" />
+                        </div>
+                        <Badge tone="success">Ready to Join</Badge>
+                      </div>
+                      <h4 className="text-base font-extrabold text-slate-800">Dr. {docName}</h4>
+                      <p className="text-xs text-slate-500">{specialty} · {dateStr} ({sess.time})</p>
+                      {sess.notes && (
+                        <p className="text-xs text-slate-600 mt-2 font-medium bg-slate-50 p-3 rounded-lg border">{sess.notes}</p>
+                      )}
+                    </div>
+                    <div className="mt-6 pt-4 border-t">
+                      <button
+                        onClick={() => setActiveVideoCall({
+                          id: sess._id,
+                          doctorName: `Dr. ${docName}`,
+                          time: sess.time,
+                          date: dateStr
+                        })}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 transition-all shadow"
+                      >
+                        <Video className="h-4 w-4" /> Join Live Video Room
+                      </button>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
           </div>
         </Card>
       )}

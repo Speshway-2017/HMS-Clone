@@ -42,11 +42,13 @@ export interface AccountantDashboardData {
   };
   charts: {
     daily: { date: string; label: string; revenue: number }[];
-    monthly: { month: string; label: string; revenue: number }[];
+    monthly: { month: string; label: string; revenue: number; expenses?: number; profit?: number }[];
     paymentMethodDistribution: { method: string; amount: number }[];
     billingTypeDistribution: { type: string; amount: number }[];
     claimsStatusDistribution?: { status: string; count: number }[];
     expenseCategoryDistribution?: { category: string; amount: number }[];
+    doctorRevenueDistribution?: { name: string; amount: number }[];
+    taxComplianceSeries?: { month: string; subtotal: number; serviceFee: number; taxCollected: number; total: number }[];
   };
   recentTransactions: {
     _id: string;

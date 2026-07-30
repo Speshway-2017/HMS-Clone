@@ -132,3 +132,13 @@ export function usePatientReports() {
     },
   });
 }
+
+export function usePatientPrescriptions() {
+  return useQuery({
+    queryKey: ["patients", "prescriptions"],
+    queryFn: async () => {
+      const res = await api.get("/prescriptions/patient");
+      return res.data.data as any[];
+    },
+  });
+}

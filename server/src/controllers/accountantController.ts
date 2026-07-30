@@ -226,6 +226,12 @@ export const getAccountantDashboard = catchAsync(async (req: Request, res: Respo
     claimsStatusCounts,
     // 15. Expense categories
     expenseCategoryAgg,
+    // 16. Monthly expenses trend
+    expenseMonthlyAgg,
+    // 17. Doctor revenue distribution
+    doctorRevenueAgg,
+    // 18. Monthly tax compliance summary
+    taxComplianceAgg,
   ] = await Promise.all([
     // 1. OP Payments with billingType lookup
     Payment.aggregate([
@@ -527,6 +533,88 @@ export const getAccountantDashboard = catchAsync(async (req: Request, res: Respo
     Expense.aggregate([
       { $match: { ...matchFilter, status: "Paid" } },
       { $group: { _id: "$category", amount: { $sum: "$amount" } } }
+    ]),
+
+    // 16. Monthly paid expenses for profit/loss trend
+    Expense.aggregate([
+      {
+        $match: {
+          ...matchFilter,
+          status: "Paid",
+          date: { $gte: new Date(new Date().getFullYear(), new Date().getMonth() - 6, 1).toISOString().split("T")[0] }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $substr: ["$date", 0, 7]
+          },
+          expenses: { $sum: "$amount" }
+        }
+      }
+    ]),
+
+    // 17. Doctor Consultation Revenue share
+    Payment.aggregate([
+      { $match: matchFilter },
+      {
+        $lookup: {
+          from: "invoices",
+          localField: "invoice",
+          foreignField: "_id",
+          as: "inv"
+        }
+      },
+      { $unwind: { path: "$inv", preserveNullAndEmptyArrays: false } },
+      {
+        $lookup: {
+          from: "appointments",
+          localField: "inv.appointment",
+          foreignField: "_id",
+          as: "appt"
+        }
+      },
+      { $unwind: { path: "$appt", preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          resolvedDoctorId: { $ifNull: ["$inv.provisionalData.doctorId", "$appt.doctor"] }
+        }
+      },
+      { $match: { resolvedDoctorId: { $ne: null } } },
+      {
+        $lookup: {
+          from: "doctors",
+          localField: "resolvedDoctorId",
+          foreignField: "_id",
+          as: "doc"
+        }
+      },
+      { $unwind: { path: "$doc", preserveNullAndEmptyArrays: false } },
+      {
+        $group: {
+          _id: "$resolvedDoctorId",
+          doctorName: { $first: "$doc.name" },
+          amount: { $sum: "$amount" }
+        }
+      },
+      { $project: { _id: 0, name: "$doctorName", amount: 1 } }
+    ]),
+
+    // 18. Monthly tax compliance (live summary)
+    Invoice.aggregate([
+      { $match: matchFilter },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m", date: "$issuedAt" }
+          },
+          subtotal: { $sum: "$totals.subtotal" },
+          serviceFee: { $sum: "$totals.serviceFee" },
+          taxCollected: { $sum: "$totals.taxAmount" },
+          total: { $sum: "$totals.total" }
+        }
+      },
+      { $sort: { _id: 1 } }
     ])
   ]);
 
@@ -658,16 +746,35 @@ export const getAccountantDashboard = catchAsync(async (req: Request, res: Respo
   for (const m of opMonthlyAgg) { opMonthlyMap[m._id] = m.revenue; }
   const ipMonthlyMap: Record<string, number> = {};
   for (const m of ipMonthlyAgg) { ipMonthlyMap[m._id] = m.revenue; }
+  const expenseMonthlyMap: Record<string, number> = {};
+  for (const e of expenseMonthlyAgg) { expenseMonthlyMap[e._id] = e.expenses; }
 
-  const monthlySeries: { month: string; label: string; revenue: number }[] = [];
+  const monthlySeries: { month: string; label: string; revenue: number; expenses: number; profit: number }[] = [];
   const now = new Date();
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const label = d.toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
     const revenue = r2((opMonthlyMap[key] || 0) + (ipMonthlyMap[key] || 0));
-    monthlySeries.push({ month: key, label, revenue });
+    const expenses = r2(expenseMonthlyMap[key] || 0);
+    const profit = r2(revenue - expenses);
+    monthlySeries.push({ month: key, label, revenue, expenses, profit });
   }
+
+  // ── Build live monthly tax compliance series ──────────────────────────────
+  const taxComplianceSeries = taxComplianceAgg.map((tc: any) => {
+    if (!tc._id) return null;
+    const [year, month] = tc._id.split("-");
+    const d = new Date(parseInt(year), parseInt(month) - 1, 1);
+    const monthLabel = d.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
+    return {
+      month: monthLabel,
+      subtotal: r2(tc.subtotal),
+      serviceFee: r2(tc.serviceFee),
+      taxCollected: r2(tc.taxCollected),
+      total: r2(tc.total)
+    };
+  }).filter(Boolean);
 
   // ── Payment method distribution (all-time) ────────────────────────────────
   const paymentMethodDistribution = [
@@ -780,6 +887,8 @@ export const getAccountantDashboard = catchAsync(async (req: Request, res: Respo
         billingTypeDistribution,
         claimsStatusDistribution: claimsStatusChart,
         expenseCategoryDistribution: expenseCategoryChart,
+        doctorRevenueDistribution: doctorRevenueAgg,
+        taxComplianceSeries,
       },
       recentTransactions,
       recentExpenses: recentExpensesList,
