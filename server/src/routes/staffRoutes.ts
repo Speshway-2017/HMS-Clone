@@ -7,7 +7,7 @@ const router = Router();
 
 router.get("/me", protect, restrictTo("nurse"), getStaffProfileMe);
 
-router.use(protect, restrictTo("hospital_admin", "receptionist", "accountant", "pharmacist", "laboratory"), scopeToHospital);
+router.use(protect, restrictTo("hospital_admin", "receptionist", "accountant", "pharmacist", "laboratory", "nurse"), scopeToHospital);
 
 router.get("/top", getTopStaff);
 router.route("/").get(listStaff).post(createStaff);

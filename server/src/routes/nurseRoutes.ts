@@ -13,6 +13,7 @@ import {
   saveNurseInpatientBedsideChecks,
   saveShiftHandover,
   getShiftHandovers,
+  completeShiftHandover,
   saveNurseInpatientDischargePrep,
   getNurseNotifications,
   markNurseNotificationRead,
@@ -40,6 +41,7 @@ router.delete("/inpatients/:id/nursing-notes/:noteId", deleteNurseInpatientNote)
 router.post("/inpatients/:id/bedside-checks", saveNurseInpatientBedsideChecks);
 router.post("/inpatients/:id/discharge-prep", saveNurseInpatientDischargePrep);
 router.post("/handovers", saveShiftHandover);
+router.post("/handovers/complete", completeShiftHandover);
 router.get("/handovers", getShiftHandovers);
 
 // Notifications routes

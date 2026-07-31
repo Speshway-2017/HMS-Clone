@@ -229,6 +229,7 @@ export interface ShiftHandoverReport {
   remarks: string;
   nurseSignature: string;
   loggedByName: string;
+  incomingNurseName?: string;
   timestamp: string;
   createdAt?: string;
 }
@@ -242,6 +243,33 @@ export function useSaveShiftHandover() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["nurse", "handovers"] });
+    },
+  });
+}
+
+export function useCompleteShiftHandover() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      incomingNurseId: string;
+      currentShift: string;
+      nextShift: string;
+      patientsHandedOverCount: number;
+      patientsHandedOverDetails: string;
+      pendingMedication?: string;
+      pendingProcedures?: string;
+      criticalPatients?: string;
+      specialInstructions?: string;
+      remarks?: string;
+      nurseSignature: string;
+      selectedAdmissionIds?: string[];
+    }) => {
+      const res = await api.post("/nurse/handovers/complete", payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["nurse", "handovers"] });
+      queryClient.invalidateQueries({ queryKey: ["nurse", "inpatients"] });
     },
   });
 }

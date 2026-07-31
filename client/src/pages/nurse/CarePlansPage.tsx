@@ -73,13 +73,6 @@ export function CarePlansPage() {
           <h1 className="mt-1 text-2xl font-black text-slate-900">Nursing Care Plans & Bedside Checks</h1>
           <p className="text-xs text-slate-500">Execute daily nursing interventions, hygiene checks, and patient bedside care plans.</p>
         </div>
-
-        <button
-          onClick={() => refetch()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50"
-        >
-          <RefreshCw className="h-4 w-4" /> Refresh Care Plans
-        </button>
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">

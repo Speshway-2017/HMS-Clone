@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
-import { FileText, Search, RefreshCw } from "lucide-react";
+import { FileText, Search, RefreshCw, AlertTriangle } from "lucide-react";
 import { useNurseInpatients, useSaveNurseNote } from "../../features/nurse";
 import { DataTable, Column } from "../../components/ui/DataTable";
+import { useStaffProfileMe } from "../../features/staff";
 
 export function NursingNotesPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -15,7 +16,10 @@ export function NursingNotesPage() {
   });
 
   const { data: inpatients = [], isLoading, refetch } = useNurseInpatients();
-  const saveNoteMutation = useSaveNurseNote(noteModalPatient?._id || noteModalPatient?.patient?._id || "");
+  const { data: staffMe } = useStaffProfileMe();
+  const isReadOnly = localStorage.getItem("nurse_shift_completed") === "true" || staffMe?.dutyStatus === "off_duty";
+
+  const saveNoteMutation = useSaveNurseNote(noteModalPatient?.patient?._id || (typeof noteModalPatient?.patient === 'string' ? noteModalPatient.patient : '') || noteModalPatient?._id || "");
 
   const notesList = useMemo(() => {
     const list: any[] = [];
@@ -94,6 +98,17 @@ export function NursingNotesPage() {
 
   return (
     <div className="space-y-6">
+      {/* Read-Only Status Banner */}
+      {isReadOnly && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs font-semibold text-amber-800 flex items-center gap-2 mb-4 animate-fadeIn">
+          <AlertTriangle className="h-4.5 w-4.5 text-amber-600 shrink-0 animate-pulse" />
+          <div>
+            <p className="font-bold text-amber-900">Shift Handed Over / Completed</p>
+            <p className="text-[11px] text-amber-705 mt-0.5">Your shift has been successfully completed. You are now in read-only mode. Recording new patient clinical observations is disabled.</p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4">
         <div>
@@ -104,15 +119,6 @@ export function NursingNotesPage() {
           </div>
           <h1 className="mt-1 text-2xl font-black text-slate-900">Nursing Clinical Notes</h1>
           <p className="text-xs text-slate-500">Log daily nursing observations, care progress notes, and doctor order reviews.</p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => refetch()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50"
-          >
-            <RefreshCw className="h-4 w-4" /> Refresh Feed
-          </button>
         </div>
       </div>
 

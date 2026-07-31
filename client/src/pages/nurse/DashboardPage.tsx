@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Users,
@@ -14,15 +14,49 @@ import {
   RefreshCw,
   ShieldAlert,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Filter,
-  User
+  User,
+  BarChart3,
+  X
 } from "lucide-react";
-import { useNurseInpatients, useNurseNotifications, useNurseBeds, useNurseWards } from "../../features/nurse";
+import { useNurseInpatients, useNurseNotifications, useNurseBeds, useNurseWards, useCompleteShiftHandover } from "../../features/nurse";
 import { useDoctors } from "../../features/doctors";
+import { useStaffProfileMe, useStaffList } from "../../features/staff";
+import { useAuth } from "../../context/AuthContext";
+import { tokenStorage } from "../../lib/tokenStorage";
+import toast from "react-hot-toast";
 import { DataTable, Column } from "../../components/ui/DataTable";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
+import { ChartCard } from "../../components/ui/ChartCard";
 
 export function NurseDashboardPage() {
   const navigate = useNavigate();
+  const { user, refreshUser } = useAuth();
+  
+  // Handover Dialog and input states
+  const [isHandoverDialogOpen, setIsHandoverDialogOpen] = useState(false);
+  const [selectedIncomingNurseId, setSelectedIncomingNurseId] = useState("");
+  const [currentShift, setCurrentShift] = useState("Morning");
+  const [nextShift, setNextShift] = useState("Evening");
+
+  // Enforce rotation cycle: Morning -> Evening -> Night -> Morning
+  useEffect(() => {
+    if (currentShift === "Morning") {
+      setNextShift("Evening");
+    } else if (currentShift === "Evening") {
+      setNextShift("Night");
+    } else if (currentShift === "Night") {
+      setNextShift("Morning");
+    }
+  }, [currentShift]);
+
+  const [remarks, setRemarks] = useState("");
+  const [nurseSignature, setNurseSignature] = useState("");
+  const [submittingHandover, setSubmittingHandover] = useState(false);
+
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedWard, setSelectedWard] = useState("all");
   const [selectedDoctor, setSelectedDoctor] = useState("all");
@@ -30,7 +64,35 @@ export function NurseDashboardPage() {
   const [taskTab, setTaskTab] = useState<"high" | "medium" | "completed">("high");
 
   const { data: inpatients = [], isLoading: loadingPatients, refetch: refetchPatients } = useNurseInpatients();
+  const [selectedAdmissionIds, setSelectedAdmissionIds] = useState<string[]>([]);
+  const [showPatientDropdown, setShowPatientDropdown] = useState(false);
+
+  // Initialize selected patient IDs when roster loads
+  useEffect(() => {
+    if (inpatients && inpatients.length > 0) {
+      setSelectedAdmissionIds(inpatients.map((pt: any) => pt._id));
+    }
+  }, [inpatients]);
+
   const { data: notifications = [] } = useNurseNotifications();
+  const { data: staffMe } = useStaffProfileMe();
+  const { data: staffListResponse } = useStaffList({ role: "nurse" });
+  
+  const staffList = useMemo(() => {
+    return Array.isArray(staffListResponse)
+      ? staffListResponse
+      : (staffListResponse as any)?.data || [];
+  }, [staffListResponse]);
+
+  const availableNurses = useMemo(() => {
+    return staffList.filter((n: any) => n.email !== user?.email);
+  }, [staffList, user]);
+
+  const isReadOnly = useMemo(() => {
+    return localStorage.getItem("nurse_shift_completed") === "true" || staffMe?.dutyStatus === "off_duty";
+  }, [staffMe]);
+
+  const completeHandoverMutation = useCompleteShiftHandover();
   const { data: beds = [] } = useNurseBeds();
   const { data: wards = [] } = useNurseWards();
   const { data: doctorsResponse } = useDoctors({ limit: 100 });
@@ -68,6 +130,49 @@ export function NurseDashboardPage() {
       alertsCount: notifications.length,
     };
   }, [inpatients, notifications]);
+
+  // Compute Analytics data for the chart and progress bars
+  const completionAnalytics = useMemo(() => {
+    const total = inpatients.length;
+    if (total === 0) {
+      return {
+        vitalsRate: 0,
+        medsRate: 0,
+        notesRate: 0,
+        overallRate: 0,
+        vitalsDoneCount: 0,
+        medsDoneCount: 0,
+        notesDoneCount: 0,
+        chartData: []
+      };
+    }
+
+    const vitalsDoneCount = inpatients.filter((pt: any) => pt.latestVitals && pt.vitalsRecordedToday).length;
+    const medsDoneCount = inpatients.filter((pt: any) => pt.dueMedicationsCount === 0).length;
+    const notesDoneCount = inpatients.filter((pt: any) => pt.notesRecordedToday).length;
+
+    const vitalsRate = Math.round((vitalsDoneCount / total) * 100);
+    const medsRate = Math.round((medsDoneCount / total) * 100);
+    const notesRate = Math.round((notesDoneCount / total) * 100);
+    const overallRate = Math.round((vitalsRate + medsRate + notesRate) / 3);
+
+    const chartData = [
+      { name: "Vitals Checks", Completed: vitalsDoneCount, Pending: Math.max(0, total - vitalsDoneCount) },
+      { name: "Medications", Completed: medsDoneCount, Pending: Math.max(0, total - medsDoneCount) },
+      { name: "Clinical Notes", Completed: notesDoneCount, Pending: Math.max(0, total - notesDoneCount) }
+    ];
+
+    return {
+      vitalsRate,
+      medsRate,
+      notesRate,
+      overallRate,
+      vitalsDoneCount,
+      medsDoneCount,
+      notesDoneCount,
+      chartData
+    };
+  }, [inpatients]);
 
   // Compute Task Priorities
   const tasks = useMemo(() => {
@@ -157,6 +262,90 @@ export function NurseDashboardPage() {
       return matchesSearch && matchesWard && matchesDoctor && matchesPriority;
     });
   }, [inpatients, searchTerm, selectedWard, selectedDoctor, priorityFilter]);
+
+  const handleCompleteHandover = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedIncomingNurseId) {
+      toast.error("Please select an incoming nurse to transfer duties.");
+      return;
+    }
+    if (!nurseSignature.trim()) {
+      toast.error("Handover sign-off requires signature");
+      return;
+    }
+
+    setSubmittingHandover(true);
+    const loadingToastId = toast.loading("Processing shift handover...");
+
+    try {
+      // Filter inpatients to only include those selected for handover
+      const handoverPatients = inpatients.filter((pt: any) => selectedAdmissionIds.includes(pt._id));
+      if (handoverPatients.length === 0) {
+        toast.error("Please select at least one patient to hand over.");
+        setSubmittingHandover(false);
+        toast.dismiss(loadingToastId);
+        return;
+      }
+
+      // Auto compile handover context
+      const patientsCount = handoverPatients.length;
+      const patientsHandedOverDetails = handoverPatients.map((item: any, idx: number) => {
+        const name = item.patientName || item.patient?.name || "Unknown Patient";
+        const room = item.room?.roomNumber || "N/A";
+        const bed = item.bed?.bedNumber || "N/A";
+        return `${idx + 1}. ${name} (Room ${room}, Bed ${bed})`;
+      }).join("\n");
+
+      const criticalPatients = handoverPatients
+        .filter((item: any) => item.isCritical || item.priority === "Emergency" || item.priority === "Urgent")
+        .map((item: any) => `${item.patientName || item.patient?.name || "Patient"} (Room ${item.room?.roomNumber || "N/A"}) - ${item.priority || "Routine"}`)
+        .join("\n") || "None flagged today.";
+
+      const pendingMedication = handoverPatients.map((item: any) => {
+        const activeMeds = (item.medicationOrders || [])
+          .filter((m: any) => m.status === "active")
+          .map((m: any) => m.drugName)
+          .join(", ");
+        return activeMeds ? `${item.patientName || item.patient?.name || "Patient"}: ${activeMeds}` : null;
+      }).filter(Boolean).join("\n") || "No active pending prescriptions today.";
+
+      const pendingProcedures = "Routine patient checks & bedside vitals monitoring.";
+      const specialInstructions = handoverPatients.map((item: any) => {
+        return item.specialInstructions ? `${item.patientName || item.patient?.name || "Patient"}: ${item.specialInstructions}` : null;
+      }).filter(Boolean).join("\n") || "No special instructions flagged.";
+
+      const res = await completeHandoverMutation.mutateAsync({
+        incomingNurseId: selectedIncomingNurseId,
+        currentShift,
+        nextShift,
+        patientsHandedOverCount: patientsCount,
+        patientsHandedOverDetails,
+        pendingMedication,
+        pendingProcedures,
+        criticalPatients,
+        specialInstructions,
+        remarks: remarks || "None",
+        nurseSignature,
+        selectedAdmissionIds
+      });
+
+      // Save shift completed flag to local storage to trigger read-only state for current nurse
+      localStorage.setItem("nurse_shift_completed", "true");
+
+      toast.success("Shift handover completed successfully.", { id: loadingToastId });
+      
+      // Reset & close dialog
+      setIsHandoverDialogOpen(false);
+      setSelectedIncomingNurseId("");
+      setRemarks("");
+      setNurseSignature("");
+      refetchPatients();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to process shift handover.", { id: loadingToastId });
+    } finally {
+      setSubmittingHandover(false);
+    }
+  };
 
   // Roster Columns
   const columns: Column<any>[] = [
@@ -292,6 +481,17 @@ export function NurseDashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Read-Only Status Banner */}
+      {isReadOnly && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs font-semibold text-amber-800 flex items-center gap-2 mb-4 animate-fadeIn">
+          <AlertTriangle className="h-4.5 w-4.5 text-amber-600 shrink-0 animate-pulse" />
+          <div>
+            <p className="font-bold text-amber-900">Shift Handed Over / Completed</p>
+            <p className="text-[11px] text-amber-750 mt-0.5">Your shift has been successfully completed. You are now in read-only mode. Editing features and new patient brief entries are disabled.</p>
+          </div>
+        </div>
+      )}
+
       {/* 1. Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4">
         <div>
@@ -308,16 +508,15 @@ export function NurseDashboardPage() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => refetchPatients()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+            onClick={() => setIsHandoverDialogOpen(true)}
+            disabled={isReadOnly}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold text-white shadow-sm transition-all ${
+              isReadOnly 
+                ? "bg-slate-300 cursor-not-allowed opacity-60 text-slate-500" 
+                : "bg-red-650 hover:bg-red-700 text-white"
+            }`}
           >
-            <RefreshCw className="h-4 w-4" /> Refresh Roster
-          </button>
-          <button
-            onClick={() => navigate("/nurse/shift-handover")}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-navy-900 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-navy-800"
-          >
-            <FileText className="h-4 w-4" /> Shift Handover
+            <Clock className="h-4 w-4" /> {isReadOnly ? "Shift Completed" : "End Shift"}
           </button>
         </div>
       </div>
@@ -390,12 +589,22 @@ export function NurseDashboardPage() {
         </div>
 
         <div
-          onClick={() => navigate("/nurse/shift-handover")}
-          className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md flex flex-col justify-between h-full hover:border-emerald-300"
+          onClick={() => {
+            if (!isReadOnly) {
+              setIsHandoverDialogOpen(true);
+            }
+          }}
+          className={`rounded-xl border p-4 shadow-sm transition hover:shadow-md flex flex-col justify-between h-full ${
+            isReadOnly 
+              ? "border-slate-200 bg-slate-50 cursor-not-allowed" 
+              : "cursor-pointer border-slate-200 bg-white hover:border-emerald-300"
+          }`}
         >
           <p className="text-[11.5px] font-semibold text-slate-500 truncate tracking-tight" title="Shift Status">Shift Status</p>
-          <p className="mt-2 text-2xl font-extrabold text-emerald-600 truncate">{currentShiftName}</p>
-          <span className="mt-1 inline-block text-[11px] text-slate-400 truncate">Click to Handover →</span>
+          <p className="mt-2 text-lg sm:text-xl md:text-2xl font-extrabold text-emerald-600 leading-tight">{currentShiftName}</p>
+          <span className="mt-1 inline-block text-[11px] text-slate-400 truncate">
+            {isReadOnly ? "Handover Completed" : "Click to End Shift →"}
+          </span>
         </div>
 
         <div
@@ -405,6 +614,126 @@ export function NurseDashboardPage() {
           <p className="text-[11.5px] font-semibold text-slate-500 truncate tracking-tight" title="Nurse Alerts">Nurse Alerts</p>
           <p className="mt-2 text-2xl font-extrabold text-purple-600">{metrics.alertsCount}</p>
           <span className="mt-1 inline-block text-[11px] text-slate-400 truncate">Click to Alarms →</span>
+        </div>
+      </div>
+
+      {/* 3.5 Shift Productivity & Process Analytics */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Left Column: Progress Bars & Summary */}
+        <div className="lg:col-span-1">
+          <ChartCard title="Shift Completion Progress" subtitle="Real-time status of your assigned tasks">
+            <div className="space-y-4 pt-2">
+              {/* Overall progress indicator */}
+              <div className="flex items-center justify-between border-b pb-3 mb-2">
+                <span className="text-xs font-bold text-slate-700">Overall Process Completion</span>
+                <span className={`text-sm font-extrabold rounded-full px-2.5 py-0.5 ${
+                  completionAnalytics.overallRate >= 80 ? 'bg-emerald-100 text-emerald-800' :
+                  completionAnalytics.overallRate >= 50 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'
+                }`}>
+                  {completionAnalytics.overallRate}%
+                </span>
+              </div>
+
+              {/* Vitals Progress */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="text-slate-600">Vitals Monitoring</span>
+                  <span className="text-slate-900 font-bold">{completionAnalytics.vitalsDoneCount} / {inpatients.length} Checked</span>
+                </div>
+                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-600 transition-all duration-500 ease-in-out" 
+                    style={{ width: `${completionAnalytics.vitalsRate}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Medications Progress */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="text-slate-650">Medication Administration</span>
+                  <span className="text-slate-900 font-bold">{completionAnalytics.medsDoneCount} / {inpatients.length} Completed</span>
+                </div>
+                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-amber-500 transition-all duration-500 ease-in-out" 
+                    style={{ width: `${completionAnalytics.medsRate}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Progress Notes Progress */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="text-slate-650">Nursing Notes Entry</span>
+                  <span className="text-slate-900 font-bold">{completionAnalytics.notesDoneCount} / {inpatients.length} Logged</span>
+                </div>
+                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-teal-650 transition-all duration-500 ease-in-out" 
+                    style={{ width: `${completionAnalytics.notesRate}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="text-[11px] text-slate-400 font-medium italic pt-2 border-t border-slate-100">
+                * Complete all pending vitals, medicines, and notes to wrap up your shift roster.
+              </div>
+            </div>
+          </ChartCard>
+        </div>
+
+        {/* Right Column: Recharts Chart */}
+        <div className="lg:col-span-2">
+          <ChartCard title="Task Completion Analysis" subtitle="Process breakdown by status (Completed vs Pending)">
+            <div className="h-64 w-full pt-2">
+              {inpatients.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                  No active patients on roster to display process analytics.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={completionAnalytics.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="completedGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#1e3a8a" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#1e3a8a" stopOpacity={0.0} />
+                      </linearGradient>
+                      <linearGradient id="pendingGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.15} />
+                        <stop offset="95%" stopColor="#94a3b8" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="name" stroke="#94a3b8" fontSize={9} tickLine={false} axisLine={false} dy={8} />
+                    <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} axisLine={false} dx={-8} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", color: "#fff", fontSize: "12px" }}
+                    />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: 11, fontWeight: 600, paddingTop: 10 }} />
+                    <Area
+                      type="monotone"
+                      dataKey="Completed"
+                      stroke="#1e3a8a"
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#completedGrad)"
+                      activeDot={{ r: 6 }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="Pending"
+                      stroke="#94a3b8"
+                      strokeWidth={2}
+                      fillOpacity={1}
+                      fill="url(#pendingGrad)"
+                      activeDot={{ r: 5 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </ChartCard>
         </div>
       </div>
 
@@ -561,6 +890,244 @@ export function NurseDashboardPage() {
           emptyMessage="No patients assigned during this shift matching criteria."
         />
       </div>
+
+      {/* 5. Custom Shift Handover Confirmation Modal Dialog */}
+      {isHandoverDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-4xl rounded-2xl bg-white p-6 shadow-2xl my-8 flex flex-col border border-slate-100 max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between pb-3 border-b mb-4 shrink-0">
+              <div>
+                <h3 className="text-base font-bold text-slate-800 flex items-center gap-1.5 font-sans">
+                  <Clock className="h-5 w-5 text-red-600 animate-pulse" /> Shift Handover & End Shift Confirmation
+                </h3>
+                <p className="text-xs text-slate-400 font-sans">Specify incoming nurse and signature to complete shift handoff audit logs.</p>
+              </div>
+              <button 
+                onClick={() => setIsHandoverDialogOpen(false)}
+                className="p-1 rounded-md text-slate-400 hover:bg-slate-100 transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCompleteHandover} className="flex-1 overflow-y-auto pr-1 space-y-5 text-xs font-semibold text-slate-600">
+              
+              {/* Part A: Incoming Nurse Selection Table */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-2">
+                  Select Incoming Nurse for Next Shift (Required)
+                </label>
+                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm max-h-[220px] overflow-y-auto bg-slate-50/30">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-550 border-b border-slate-200 text-[10px] uppercase font-bold">
+                        <th className="p-3 text-center w-12">Select</th>
+                        <th className="p-3">Nurse Name</th>
+                        <th className="p-3">Emp ID</th>
+                        <th className="p-3">Department</th>
+                        <th className="p-3">Next Shift</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3 text-center">Patients</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {availableNurses.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="p-8 text-center text-slate-400 font-medium">
+                            No incoming nurses available on rosters today.
+                          </td>
+                        </tr>
+                      ) : (
+                        availableNurses.map((nurse: any) => {
+                          const isSelected = selectedIncomingNurseId === nurse._id;
+                          return (
+                            <tr 
+                              key={nurse._id}
+                              onClick={() => setSelectedIncomingNurseId(nurse._id)}
+                              className={`hover:bg-slate-50/80 cursor-pointer transition ${
+                                isSelected ? "bg-navy-50/60" : ""
+                              }`}
+                            >
+                              <td className="p-3 text-center">
+                                <input
+                                  type="radio"
+                                  name="incomingNurse"
+                                  checked={isSelected}
+                                  onChange={() => setSelectedIncomingNurseId(nurse._id)}
+                                  className="h-3.5 w-3.5 text-navy-900 border-slate-300 focus:ring-navy-950"
+                                />
+                              </td>
+                              <td className="p-3 font-bold text-slate-800 flex items-center gap-2">
+                                <div className="h-6 w-6 rounded-full bg-slate-100 font-extrabold text-[10px] text-slate-600 flex items-center justify-center border">
+                                  {nurse.name.charAt(0)}
+                                </div>
+                                {nurse.name}
+                              </td>
+                              <td className="p-3 text-slate-500 font-medium">{nurse.employeeId || "N/A"}</td>
+                              <td className="p-3 text-slate-550 font-medium">
+                                {typeof nurse.department === "object" ? nurse.department?.name : (nurse.department || "General Ward")}
+                              </td>
+                              <td className="p-3">
+                                <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 border border-indigo-100">
+                                  {nurse.shift || "Evening"}
+                                </span>
+                              </td>
+                              <td className="p-3 font-medium">
+                                <span className={`h-2 w-2 rounded-full inline-block mr-1.5 ${
+                                  nurse.dutyStatus === "on_duty" ? "bg-emerald-500 animate-pulse" : "bg-slate-300"
+                                }`} />
+                                <span className="capitalize">{nurse.dutyStatus?.replace("_", " ") || "Off Duty"}</span>
+                              </td>
+                              <td className="p-3 text-center font-bold text-slate-700">
+                                {nurse.assignedPatientCount ?? 0}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {/* Part A2: Patient Assignment Checklist Selector (Collapsible Dropdown) */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">
+                  Select Assigned Patients to Hand Over (Required)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowPatientDropdown(!showPatientDropdown)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 bg-white text-slate-700 font-bold text-xs flex justify-between items-center cursor-pointer shadow-sm hover:border-slate-300 transition-all"
+                >
+                  <span>
+                    {selectedAdmissionIds.length === 0 
+                      ? "Select Patients (0 Selected)" 
+                      : `Select Patients (${selectedAdmissionIds.length} of ${inpatients?.length || 0} Selected)`}
+                  </span>
+                  {showPatientDropdown ? (
+                    <ChevronUp className="h-4 w-4 text-slate-400" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-slate-400" />
+                  )}
+                </button>
+
+                {showPatientDropdown && (
+                  <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/30 max-h-[180px] overflow-y-auto space-y-2 mt-2 animate-fadeIn">
+                    {inpatients.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic">No assigned patients to transfer.</p>
+                    ) : (
+                      inpatients.map((pt: any) => {
+                        const isChecked = selectedAdmissionIds.includes(pt._id);
+                        const name = pt.patientName || pt.patient?.name || "Inpatient";
+                        const room = pt.roomNumber || pt.room?.roomNumber || "N/A";
+                        const bed = pt.bedNumber || pt.bed?.bedNumber || "N/A";
+                        return (
+                          <label 
+                            key={pt._id}
+                            className="flex items-center gap-2.5 p-2 rounded-lg bg-white border border-slate-150 hover:bg-slate-50 transition cursor-pointer select-none"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                if (isChecked) {
+                                  setSelectedAdmissionIds(selectedAdmissionIds.filter(id => id !== pt._id));
+                                } else {
+                                  setSelectedAdmissionIds([...selectedAdmissionIds, pt._id]);
+                                }
+                              }}
+                              className="h-4 w-4 rounded border-slate-300 text-indigo-655 focus:ring-indigo-500 cursor-pointer"
+                            />
+                            <div className="flex-1 flex justify-between items-center text-xs">
+                              <span className="font-bold text-slate-800">{name}</span>
+                              <span className="text-[10px] text-slate-500 font-medium">Room {room}, Bed {bed}</span>
+                            </div>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Part B: Shift Handover Form Data */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Current Shift</label>
+                  <select
+                    value={currentShift}
+                    onChange={(e) => setCurrentShift(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 p-2.5 outline-none focus:border-indigo-500 bg-white"
+                  >
+                    <option value="Morning">Morning Shift</option>
+                    <option value="Evening">Evening Shift</option>
+                    <option value="Night">Night Shift</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Incoming Shift (Auto-calculated)</label>
+                  <select
+                    value={nextShift}
+                    disabled={true}
+                    className="w-full rounded-lg border border-slate-200 p-2.5 outline-none bg-slate-50 text-slate-500 cursor-not-allowed"
+                  >
+                    <option value="Morning">Morning Shift</option>
+                    <option value="Evening">Evening Shift</option>
+                    <option value="Night">Night Shift</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Handoff Remarks & Special Roster Notes (Optional)</label>
+                <textarea
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  placeholder="Enter details on patient updates, clinical checkpoints, or tasks to flag..."
+                  rows={3}
+                  className="w-full rounded-lg border border-slate-200 p-2.5 outline-none focus:border-indigo-500 bg-white text-xs font-semibold text-slate-700"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                  Outgoing Nurse Signature Sign-off (Required)
+                </label>
+                <input
+                  type="text"
+                  value={nurseSignature}
+                  onChange={(e) => setNurseSignature(e.target.value)}
+                  placeholder="Type your name (e.g. Sarah Connor, RN) to sign off..."
+                  className="w-full rounded-lg border border-slate-200 p-2.5 outline-none focus:border-indigo-500 bg-white font-bold text-slate-700"
+                />
+              </div>
+
+              {/* Part C: Action Control Buttons */}
+              <div className="flex justify-end gap-3 pt-3 border-t shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsHandoverDialogOpen(false)}
+                  className="px-4 py-2 border rounded-xl text-slate-650 hover:bg-slate-50 cursor-pointer font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!selectedIncomingNurseId || !nurseSignature.trim() || submittingHandover}
+                  className={`px-5 py-2 rounded-xl text-white font-bold cursor-pointer transition flex items-center gap-1.5 ${
+                    !selectedIncomingNurseId || !nurseSignature.trim() || submittingHandover
+                      ? "bg-slate-300 cursor-not-allowed opacity-60 text-slate-500"
+                      : "bg-red-650 hover:bg-red-700 shadow-md shadow-red-200"
+                  }`}
+                >
+                  {submittingHandover ? "Ending Shift..." : "Complete Handover"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
