@@ -9,6 +9,20 @@ import { InputField, SelectField } from "../../components/ui/Field";
 import { FileUpload } from "../../components/ui/FileUpload";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
+import { api } from "../../lib/api";
+
+function getRolePrefix(role: string): string {
+  const clean = (role || "").toLowerCase().trim();
+  if (clean.includes("doc")) return "DOC";
+  if (clean.includes("nur")) return "NUR";
+  if (clean.includes("recep")) return "REC";
+  if (clean.includes("lab")) return "LAB";
+  if (clean.includes("radio")) return "RAD";
+  if (clean.includes("account")) return "ACC";
+  if (clean.includes("pharm")) return "PHA";
+  if (clean.includes("admin")) return "ADM";
+  return clean.substring(0, 3).toUpperCase() || "EMP";
+}
 
 export function StaffFormPage() {
   const { id } = useParams();
@@ -32,7 +46,7 @@ export function StaffFormPage() {
     dutyStatus: "on_duty" as "on_duty" | "late" | "off_duty" | "on_leave",
   });
   const [error, setError] = useState<string | null>(null);
-  const [created, setCreated] = useState<{ name: string; email: string; tempPassword: string } | null>(null);
+  const [created, setCreated] = useState<{ name: string; email: string; tempPassword: string; role: string } | null>(null);
 
   useEffect(() => {
     if (staff) {
@@ -50,6 +64,23 @@ export function StaffFormPage() {
     }
   }, [staff]);
 
+  const handleRoleChange = async (selectedRole: string) => {
+    setForm((prev) => ({ ...prev, role: selectedRole }));
+    if (!isEdit && selectedRole) {
+      try {
+        const res = await api.get("/staff/next-employee-id", { params: { role: selectedRole } });
+        const nextId = res.data.data?.employeeId;
+        if (nextId) {
+          setForm((prev) => ({ ...prev, role: selectedRole, employeeId: nextId }));
+        }
+      } catch {
+        const prefix = getRolePrefix(selectedRole);
+        const year = new Date().getFullYear();
+        setForm((prev) => ({ ...prev, role: selectedRole, employeeId: `${prefix}-${year}-0001` }));
+      }
+    }
+  };
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -61,7 +92,7 @@ export function StaffFormPage() {
       } else {
         const result = await createStaff.mutateAsync(payload);
         if (result.tempPassword) {
-          setCreated({ name: form.name, email: form.email, tempPassword: result.tempPassword });
+          setCreated({ name: form.name, email: form.email, tempPassword: result.tempPassword, role: form.role });
         } else {
           navigate("/admin/staff");
         }
@@ -109,7 +140,9 @@ export function StaffFormPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Role</span>
-              <span className="font-medium text-slate-800 capitalize">Receptionist</span>
+              <span className="font-medium text-slate-800 capitalize">
+                {roles?.find((r) => r.role === created.role)?.label || created.role || "Receptionist"}
+              </span>
             </div>
           </div>
           <p className="mt-3 text-center text-xs text-amber-600">
@@ -143,7 +176,7 @@ export function StaffFormPage() {
         <p className="text-sm text-slate-500">
           {isEdit
             ? "Update the staff member's profile and operational details."
-            : "Fill in the details below. A receptionist login account with a temporary password will be created automatically."}
+            : `Fill in the details below. A login account for the selected role (${form.role ? (roles?.find(r => r.role === form.role)?.label || form.role) : "staff"}) will be automatically created with a temporary password.`}
         </p>
       </div>
 
@@ -182,17 +215,11 @@ export function StaffFormPage() {
         </FormSection>
 
         <FormSection icon={Briefcase} title="Professional Details">
-          <InputField
-            label="Employee ID"
-            value={form.employeeId}
-            onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
-            placeholder="EMP-2024-0892"
-          />
           <SelectField
             label="Role / Designation"
             required
             value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
+            onChange={(e) => handleRoleChange(e.target.value)}
           >
             <option value="">Select Role</option>
             {roles?.map((r) => (
@@ -201,6 +228,13 @@ export function StaffFormPage() {
               </option>
             ))}
           </SelectField>
+          <InputField
+            label="Employee ID (Auto-Generated)"
+            value={form.employeeId}
+            onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
+            placeholder={form.role ? `${getRolePrefix(form.role)}-2026-0001` : "Select a role to auto-generate ID"}
+            hint={form.role ? `Role prefix: ${getRolePrefix(form.role)} (Unique role-based ID)` : "Selecting a role above automatically generates a unique role-prefixed Employee ID"}
+          />
           <SelectField
             label="Department"
             value={form.department}
@@ -235,7 +269,7 @@ export function StaffFormPage() {
 
         {!isEdit && (
           <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-            <strong>Note:</strong> A receptionist dashboard login account will be automatically created using the email address above. A temporary password will be shown after submission.
+            <strong>Note:</strong> A login account for the selected role ({form.role ? (roles?.find(r => r.role === form.role)?.label || form.role) : "staff"}) will be automatically created using the email address above. A temporary password will be shown after submission.
           </div>
         )}
 

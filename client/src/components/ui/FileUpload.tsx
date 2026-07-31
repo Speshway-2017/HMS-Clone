@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from "react";
 import { UploadCloud, FileText, X, Camera, Loader2 } from "lucide-react";
 import { api, getApiErrorMessage } from "../../lib/api";
 
-type UploadFolder = "hospital-logos" | "hospital-licenses" | "admin-avatars" | "doctor-photos" | "staff-photos" | "patient-photos";
+type UploadFolder = "hospital-logos" | "hospital-licenses" | "admin-avatars" | "doctor-photos" | "staff-photos" | "patient-photos" | "blog-covers";
 
 interface FileUploadProps {
   label: string;

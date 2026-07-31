@@ -38,6 +38,7 @@ import { AppointmentsPage } from "./pages/hospital-admin/AppointmentsPage";
 import { AppointmentDetailsPage } from "./pages/hospital-admin/AppointmentDetailsPage";
 import { StaffPage } from "./pages/hospital-admin/StaffPage";
 import { StaffFormPage } from "./pages/hospital-admin/StaffFormPage";
+import { StaffDetailsPage } from "./pages/hospital-admin/StaffDetailsPage";
 import { FinancePage } from "./pages/hospital-admin/FinancePage";
 import { PatientInvoicePage } from "./pages/hospital-admin/PatientInvoicePage";
 import { InventoryPage } from "./pages/hospital-admin/InventoryPage";
@@ -46,6 +47,8 @@ import { InventoryItemDetailsPage } from "./pages/hospital-admin/InventoryItemDe
 import { BedsPage } from "./pages/hospital-admin/BedsPage";
 import { HospitalInfoPage } from "./pages/hospital-admin/HospitalInfoPage";
 import { EnquiriesPage } from "./pages/hospital-admin/EnquiriesPage";
+import { BlogsPage } from "./pages/hospital-admin/BlogsPage";
+import { BlogFormPage } from "./pages/hospital-admin/BlogFormPage";
 
 // Accountant module
 import { AccountantDashboard } from "./pages/accountant/Dashboard";
@@ -202,6 +205,7 @@ export const router = createBrowserRouter([
           { path: "appointments/:id", element: <AppointmentDetailsPage /> },
           { path: "staff", element: <StaffPage /> },
           { path: "staff/new", element: <StaffFormPage /> },
+          { path: "staff/:id", element: <StaffDetailsPage /> },
           { path: "staff/:id/edit", element: <StaffFormPage /> },
           { path: "departments", element: <DepartmentsPage /> },
           { path: "departments/new", element: <DepartmentFormPage /> },
@@ -219,6 +223,9 @@ export const router = createBrowserRouter([
           { path: "beds", element: <BedsPage /> },
           { path: "hospital-info", element: <HospitalInfoPage /> },
           { path: "enquiries", element: <EnquiriesPage /> },
+          { path: "blogs", element: <BlogsPage /> },
+          { path: "blogs/new", element: <BlogFormPage /> },
+          { path: "blogs/edit/:id", element: <BlogFormPage /> },
           { path: "settings", element: <SettingsPage /> },
         ],
       },

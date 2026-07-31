@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { UserPlus, UserCheck, UserX, Clock, CalendarOff, Star, Pencil, Trash2 } from "lucide-react";
+import { UserPlus, UserCheck, UserX, Clock, CalendarOff, Star, Pencil, Trash2, Eye } from "lucide-react";
 import { useStaffList, useTopStaff, useDeleteStaff } from "../../features/staff";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -31,11 +31,14 @@ export function StaffPage() {
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-700">
             {s.name.slice(0, 2).toUpperCase()}
           </div>
-          <span className="font-semibold text-slate-800">{s.name}</span>
+          <div>
+            <span className="font-semibold text-slate-800 block">{s.name}</span>
+            {s.employeeId && <span className="text-[10px] text-slate-400 font-mono">{s.employeeId}</span>}
+          </div>
         </div>
       ),
     },
-    { header: "Role", render: (s) => <span className="text-slate-600">{s.role || "—"}</span> },
+    { header: "Role", render: (s) => <span className="text-slate-600 font-medium capitalize">{s.role || "—"}</span> },
     { header: "Check-in", render: (s) => <span className="text-slate-600">{s.checkInTime || "--"}</span> },
     { header: "Duty Status", render: (s) => <Badge tone={DUTY_TONE[s.dutyStatus]}>{s.dutyStatus.replace("_", " ")}</Badge> },
     {
@@ -49,15 +52,19 @@ export function StaffPage() {
     {
       header: "Actions",
       render: (s) => (
-        <div className="flex items-center gap-2 text-slate-400">
-          <Link to={`/admin/staff/${s._id}/edit`} className="hover:text-navy-700">
+        <div className="flex items-center gap-3 text-slate-400">
+          <Link to={`/admin/staff/${s._id}`} className="hover:text-navy-700 p-1" title="View Staff Profile">
+            <Eye className="h-4 w-4 text-slate-600 hover:text-navy-700" />
+          </Link>
+          <Link to={`/admin/staff/${s._id}/edit`} className="hover:text-navy-700 p-1" title="Edit Staff Details">
             <Pencil className="h-4 w-4" />
           </Link>
           <button
             onClick={() => {
               if (confirm(`Remove ${s.name}?`)) deleteStaff.mutate(s._id);
             }}
-            className="hover:text-red-600"
+            className="hover:text-red-600 p-1"
+            title="Delete Staff Member"
           >
             <Trash2 className="h-4 w-4" />
           </button>

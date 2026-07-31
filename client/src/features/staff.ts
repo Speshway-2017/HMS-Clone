@@ -86,3 +86,14 @@ export function useStaffProfileMe(options?: { enabled?: boolean }) {
     },
   });
 }
+
+export function useNextEmployeeId(role: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ["staff", "next-employee-id", role],
+    enabled: enabled && !!role,
+    queryFn: async () => {
+      const res = await api.get("/staff/next-employee-id", { params: { role } });
+      return res.data.data.employeeId as string;
+    },
+  });
+}

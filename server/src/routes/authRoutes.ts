@@ -1,10 +1,11 @@
 import { Router } from "express";
-import { login, register, refresh, logout, getMe, changePassword, forgotPassword, resetPassword, updateProfile } from "../controllers/authController";
+import { login, register, checkPhone, refresh, logout, getMe, changePassword, forgotPassword, resetPassword, updateProfile } from "../controllers/authController";
 import { protect } from "../middleware/auth";
 import { authLimiter, forgotPasswordLimiter } from "../middleware/rateLimiter";
 
 const router = Router();
 
+router.get("/check-phone", checkPhone);
 router.post("/login", authLimiter, login);
 router.post("/register", authLimiter, register);
 router.post("/refresh", refresh);

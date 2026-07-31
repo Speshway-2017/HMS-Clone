@@ -3,7 +3,7 @@ import { cloudinary } from "../config/cloudinary";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 
-const ALLOWED_FOLDERS = new Set(["hospital-logos", "hospital-licenses", "admin-avatars", "doctor-photos", "staff-photos"]);
+const ALLOWED_FOLDERS = new Set(["hospital-logos", "hospital-licenses", "admin-avatars", "doctor-photos", "staff-photos", "blog-covers"]);
 
 export const uploadFile = catchAsync(async (req: Request, res: Response) => {
   if (!req.file) {

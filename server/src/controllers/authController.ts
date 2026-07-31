@@ -217,6 +217,62 @@ export const register = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+export const checkPhone = catchAsync(async (req: Request, res: Response) => {
+  const phone = req.query.phone;
+  if (!phone || typeof phone !== "string") {
+    throw new AppError("Phone number is required.", 400);
+  }
+
+  const phoneClean = phone.replace(/\D/g, "").slice(-10);
+  if (phoneClean.length < 7) {
+    return res.json({
+      status: "success",
+      exists: false,
+    });
+  }
+
+  // Find a patient with this phone number
+  const patient = await Patient.findOne({
+    phone: { $regex: `${phoneClean}$` }
+  });
+
+  if (!patient) {
+    return res.json({
+      status: "success",
+      exists: false,
+    });
+  }
+
+  // Check if they already have a user account
+  let hasPassword = false;
+  if (patient.user) {
+    const user = await User.findById(patient.user);
+    if (user && user.passwordHash) {
+      hasPassword = true;
+    }
+  }
+
+  res.json({
+    status: "success",
+    exists: true,
+    hasPassword,
+    patient: {
+      name: patient.name,
+      email: patient.email,
+      age: patient.age,
+      gender: patient.gender,
+      bloodGroup: patient.bloodGroup,
+      address: patient.address,
+      allergies: patient.allergies,
+      insuranceProvider: patient.insuranceProvider,
+      insurancePolicyNumber: patient.insurancePolicyNumber,
+      emergencyName: patient.emergencyContact?.name || "",
+      emergencyPhone: patient.emergencyContact?.phone || "",
+      emergencyRelation: patient.emergencyContact?.relation || "",
+    }
+  });
+});
+
 export const login = catchAsync(async (req: Request, res: Response) => {
   const body = loginSchema.parse(req.body);
   const input = (body.identifier || body.email || "").trim();
