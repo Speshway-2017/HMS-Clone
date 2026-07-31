@@ -5,6 +5,7 @@ import { ChartCard } from "../ui/ChartCard";
 interface BedStaffEmergencySectionProps {
   beds: any[];
   staff: any[];
+  admissions?: any[];
   hospitalCounts?: any;
 }
 

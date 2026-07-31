@@ -23,7 +23,9 @@ import {
   Shield,
   Clock3,
   Award,
-  FileText
+  FileText,
+  Search,
+  Star
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
@@ -160,7 +162,34 @@ export function LandingPage() {
   });
   const [bookingSuccessData, setBookingSuccessData] = useState<any | null>(null);
 
-  // Filter doctors based on selected department
+  const [selectedSpecialization, setSelectedSpecialization] = useState<string>("all");
+  const [doctorSearchQuery, setDoctorSearchQuery] = useState<string>("");
+  const [selectedDoctorForProfile, setSelectedDoctorForProfile] = useState<any | null>(null);
+
+  // Extract unique specializations
+  const doctorSpecializations = Array.from(
+    new Set(
+      doctors
+        .map((d: any) => d.specialization || (typeof d.department === "object" && d.department ? d.department.name : null))
+        .filter(Boolean)
+    )
+  ) as string[];
+
+  // Filter doctors based on specialization & search query
+  const catalogDoctors = doctors.filter((doc: any) => {
+    const spec = doc.specialization || (typeof doc.department === "object" && doc.department ? doc.department.name : "");
+    const specMatch =
+      selectedSpecialization === "all" ||
+      spec.toLowerCase() === selectedSpecialization.toLowerCase();
+    const queryMatch =
+      !doctorSearchQuery ||
+      doc.name?.toLowerCase().includes(doctorSearchQuery.toLowerCase()) ||
+      spec.toLowerCase().includes(doctorSearchQuery.toLowerCase()) ||
+      doc.qualifications?.toLowerCase().includes(doctorSearchQuery.toLowerCase());
+    return specMatch && queryMatch;
+  });
+
+  // Filter doctors based on selected department for booking form
   const filteredDoctors = bookingForm.departmentId
     ? doctors.filter((doc) => doc.department?._id === bookingForm.departmentId)
     : doctors;
@@ -325,7 +354,7 @@ export function LandingPage() {
               </button>
             </Link>
             <button
-              onClick={() => changeTab("book")}
+              onClick={() => changeTab("doctors")}
               className="flex items-center gap-1.5 rounded-lg bg-navy-700 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-all duration-300 hover:bg-navy-800 hover:shadow-md active:scale-95 whitespace-nowrap"
             >
               Book Appointment
@@ -350,7 +379,9 @@ export function LandingPage() {
                 { id: "home", label: "Home" },
                 { id: "about", label: "About Us" },
                 { id: "departments", label: "Departments" },
+                { id: "doctors", label: "Doctors" },
                 { id: "services", label: "Services" },
+                { id: "blog", label: "Blog" },
                 { id: "contact", label: "Contact Us" }
               ].map((nav) => (
                 <button
@@ -370,7 +401,7 @@ export function LandingPage() {
                     Login
                   </Button>
                 </Link>
-                <Button onClick={() => changeTab("book")} variant="primary" className="w-full py-2.5 bg-navy-700">
+                <Button onClick={() => changeTab("doctors")} variant="primary" className="w-full py-2.5 bg-navy-700">
                   Book Appointment
                 </Button>
               </div>
@@ -405,7 +436,7 @@ export function LandingPage() {
                   </p>
                   <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row lg:justify-start">
                     <button
-                      onClick={() => changeTab("book")}
+                      onClick={() => changeTab("doctors")}
                       className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-navy-700 to-navy-900 px-7 py-4 text-base font-bold text-white shadow-lg hover:from-navy-800 hover:to-navy-950 hover:shadow-xl sm:w-auto active:scale-95 transition-all duration-300 ease-in-out"
                     >
                       Book Appointment Online
@@ -799,7 +830,7 @@ export function LandingPage() {
         {/* --- VIEW: DOCTORS --- */}
         {activeTab === "doctors" && (
           <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-white">
-            <div className="mx-auto max-w-[1600px] space-y-12">
+            <div className="mx-auto max-w-[1600px] space-y-10">
               <div className="text-center space-y-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-navy-700">Clinical Practitioners</span>
                 <h1 className="text-4xl font-extrabold text-slate-900">
@@ -810,9 +841,49 @@ export function LandingPage() {
                 </p>
               </div>
 
+              {/* Specialization & Search Filter Bar */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="relative flex-1 max-w-md">
+                  <input
+                    type="text"
+                    value={doctorSearchQuery}
+                    onChange={(e) => setDoctorSearchQuery(e.target.value)}
+                    placeholder="Search doctor by name or specialization..."
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:border-navy-600 focus:outline-none shadow-sm"
+                  />
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                </div>
+
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+                  <button
+                    onClick={() => setSelectedSpecialization("all")}
+                    className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${
+                      selectedSpecialization === "all"
+                        ? "bg-navy-700 text-white shadow-sm"
+                        : "bg-white text-slate-600 border border-slate-200 hover:border-navy-300"
+                    }`}
+                  >
+                    All Specializations
+                  </button>
+                  {doctorSpecializations.map((spec: string) => (
+                    <button
+                      key={spec}
+                      onClick={() => setSelectedSpecialization(spec)}
+                      className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all whitespace-nowrap capitalize ${
+                        selectedSpecialization.toLowerCase() === spec.toLowerCase()
+                          ? "bg-navy-700 text-white shadow-sm"
+                          : "bg-white text-slate-600 border border-slate-200 hover:border-navy-300"
+                      }`}
+                    >
+                      {spec}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Doctors Grid */}
               <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-                {doctors.map((doc: any) => (
+                {catalogDoctors.map((doc: any) => (
                   <div key={doc._id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between hover:border-navy-200 transition-all hover:shadow-md">
                     <div className="space-y-4">
                       <div className="flex items-center gap-4">
@@ -853,33 +924,25 @@ export function LandingPage() {
                     </div>
 
                     <div className="pt-6 border-t border-slate-100 mt-6">
-                      <button
-                        onClick={() => {
-                          setBookingForm((prev) => ({
-                            ...prev,
-                            departmentId: doc.department?._id || "",
-                            doctorId: doc._id,
-                          }));
-                          changeTab("book");
-                        }}
+                      <Link
+                        to={`/doctors/${doc._id}`}
                         className="w-full flex items-center justify-center gap-2 rounded-xl bg-navy-700 py-3 text-xs font-bold text-white shadow-sm hover:bg-navy-800 active:scale-95 transition-all"
                       >
                         <Calendar className="h-4 w-4" /> Book Appointment
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 ))}
 
-                {doctors.length === 0 && (
+                {catalogDoctors.length === 0 && (
                   <div className="col-span-3 text-center py-20 text-slate-400 text-xs">
-                    No practicing doctors listed yet. They will appear dynamically once added in the Admin Dashboard.
+                    No doctors match the selected specialization or search filter.
                   </div>
                 )}
               </div>
             </div>
           </div>
         )}
-
         {/* --- VIEW: SERVICES --- */}
         {activeTab === "services" && (
           <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-white">

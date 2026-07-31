@@ -57,8 +57,55 @@ import { usePatientProfileMe, usePatientInvoices, usePatientReports, useUpdatePa
 import { useAppointments, useCreateAppointment, useUpdateAppointment } from "../../features/appointments";
 import { useDoctors } from "../../features/doctors";
 import { useNotifications } from "../../features/notifications";
+import { api } from "../../lib/api";
 
 
+
+function normalizeTime(t: string): string {
+  if (!t) return "";
+  const cleaned = t.trim();
+  const match12 = cleaned.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (match12) {
+    let hours = parseInt(match12[1], 10);
+    const minutes = match12[2];
+    const period = match12[3].toUpperCase();
+    if (period === "PM" && hours < 12) hours += 12;
+    if (period === "AM" && hours === 12) hours = 0;
+    return `${String(hours).padStart(2, "0")}:${minutes}`;
+  }
+  const match24 = cleaned.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24) {
+    const hours = parseInt(match24[1], 10);
+    const minutes = match24[2];
+    return `${String(hours).padStart(2, "0")}:${minutes}`;
+  }
+  return cleaned;
+}
+
+function findDoctorMatch(list: any[], draftObj: any) {
+  if (!list || list.length === 0 || !draftObj) return null;
+  const targetId = String(typeof draftObj === "object" ? (draftObj.doctorId || draftObj.userId || "") : draftObj).trim();
+  const rawTargetName = String(typeof draftObj === "object" ? (draftObj.doctorName || "") : "").toLowerCase().trim();
+  const targetName = rawTargetName.replace(/^dr\.\s*/i, "").trim();
+
+  if (!targetId && !targetName) return null;
+
+  return list.find((d: any) => {
+    const dId = String(d._id || "");
+    const dAltId = String(d.id || "");
+    const uId = String(typeof d.user === "object" ? d.user?._id : (d.user || ""));
+    const dNameRaw = String(d.name || "").toLowerCase().trim();
+    const dName = dNameRaw.replace(/^dr\.\s*/i, "").trim();
+
+    if (targetId && (dId === targetId || dAltId === targetId || uId === targetId)) {
+      return true;
+    }
+    if (targetName && dName && (dName === targetName || dName.includes(targetName) || targetName.includes(dName))) {
+      return true;
+    }
+    return false;
+  }) || null;
+}
 
 export function PatientDashboard() {
   const { user } = useAuth();
@@ -119,6 +166,57 @@ export function PatientDashboard() {
       setNotifications([]);
     }
   }, [rawNotifications]);
+
+  const [draftNotice, setDraftNotice] = useState<string | null>(null);
+
+  // Load pending appointment draft selected from public doctor profile onto Patient Dashboard form
+  useEffect(() => {
+    const pendingDraftStr = sessionStorage.getItem("pendingAppointmentDraft");
+    if (pendingDraftStr && user && doctors.length > 0) {
+      try {
+        const draft = JSON.parse(pendingDraftStr);
+        sessionStorage.removeItem("pendingAppointmentDraft");
+
+        // Match exact doctor from available doctors list by ID or name
+        const matchedDoc = findDoctorMatch(doctors, draft);
+
+        if (matchedDoc) {
+          const docId = matchedDoc._id || matchedDoc.id || (typeof matchedDoc.user === "object" ? matchedDoc.user?._id : matchedDoc.user) || matchedDoc.name;
+          setSelectedDoctorId(String(docId));
+          const deptName = typeof matchedDoc.department === "object" && matchedDoc.department ? matchedDoc.department.name : (matchedDoc.department || matchedDoc.specialization);
+          if (deptName) {
+            setSelectedDeptFilter(deptName);
+          } else {
+            setSelectedDeptFilter("all");
+          }
+        } else if (draft.doctorId) {
+          setSelectedDoctorId(draft.doctorId);
+          setSelectedDeptFilter("all");
+        }
+
+        if (draft.date) {
+          setBookingDate(draft.date);
+        }
+        if (draft.time) {
+          setBookingTime(draft.time);
+        }
+        if (draft.chiefComplaint) {
+          setBookingNotes(draft.chiefComplaint);
+        }
+
+        setActiveTab("appointments");
+        setApptSubTab("book");
+        setSearchParams({ tab: "appointments" });
+
+        const docDisplayName = matchedDoc?.name || draft.doctorName || "Specialist";
+        setDraftNotice(`Pre-filled from public selection: Dr. ${docDisplayName} on ${draft.date || "selected date"} at ${draft.time || "slot"}.`);
+        toast.success(`Pre-filled consultation details for Dr. ${docDisplayName}.`);
+      } catch (err) {
+        console.error("Auto draft load error:", err);
+        sessionStorage.removeItem("pendingAppointmentDraft");
+      }
+    }
+  }, [user, doctors]);
 
   const labReports = reports?.filter((r: any) => r.requestType === "Laboratory") || [];
   const radiologyReports = reports?.filter((r: any) => r.requestType === "Radiology") || [];
@@ -191,10 +289,41 @@ export function PatientDashboard() {
   const [bookingType, setBookingType] = useState<"Appointment" | "Video Consultation" | "Walk-in">("Appointment");
   const [bookingNotes, setBookingNotes] = useState("");
 
+  // Helper to get currently selected doctor object from state
+  const getSelectedDoctor = () => {
+    if (!doctors || doctors.length === 0) return null;
+
+    if (selectedDoctorId) {
+      const target = String(selectedDoctorId).trim().toLowerCase();
+      const directMatch = doctors.find((d: any) => {
+        const dId = String(d._id || d.id || "").trim().toLowerCase();
+        const uId = String(typeof d.user === "object" ? d.user?._id : (d.user || "")).trim().toLowerCase();
+        const dName = String(d.name || "").trim().toLowerCase();
+        return dId === target || uId === target || dName === target || dName === `dr. ${target}` || dName.replace(/^dr\.\s*/i, "") === target;
+      });
+      if (directMatch) return directMatch;
+
+      const helperMatch = findDoctorMatch(doctors, selectedDoctorId);
+      if (helperMatch) return helperMatch;
+    }
+
+    // Fallback to department filter match if set and not 'all'
+    if (selectedDeptFilter && selectedDeptFilter !== "all") {
+      const deptDoc = doctors.find((d: any) => {
+        const deptName = typeof d.department === "object" && d.department ? d.department.name : d.department;
+        return deptName?.toLowerCase() === selectedDeptFilter.toLowerCase();
+      });
+      if (deptDoc) return deptDoc;
+    }
+
+    return doctors[0];
+  };
+
   // Auto-select first doctor if not selected
   useEffect(() => {
     if (doctors.length > 0 && !selectedDoctorId) {
-      setSelectedDoctorId(doctors[0]._id);
+      const firstDoc = doctors[0] as any;
+      setSelectedDoctorId(firstDoc._id || firstDoc.id || firstDoc.user?._id || firstDoc.user || "");
     }
   }, [doctors, selectedDoctorId]);
 
@@ -1350,6 +1479,16 @@ export function PatientDashboard() {
           {/* ========================================================================= */}
           {apptSubTab === "book" && (
             <form onSubmit={handleBookAppointment} className="space-y-6">
+              {draftNotice && (
+                <div className="rounded-2xl border border-indigo-200 bg-indigo-50/90 p-4 text-xs font-semibold text-indigo-950 flex items-start gap-3 shadow-sm">
+                  <Sparkles className="h-5 w-5 text-indigo-600 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h5 className="font-extrabold text-indigo-950 text-sm">Public Selection Pre-Filled</h5>
+                    <p className="text-indigo-800 text-xs mt-0.5">{draftNotice}</p>
+                  </div>
+                  <button type="button" onClick={() => setDraftNotice(null)} className="text-indigo-400 font-bold hover:text-indigo-700">✕</button>
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 items-start">
 
                 {/* LEFT COLUMN: FORM STEPS (2 Columns Wide) */}
@@ -1398,12 +1537,13 @@ export function PatientDashboard() {
                           return deptName?.toLowerCase() === selectedDeptFilter.toLowerCase();
                         })
                         .map((doc: any) => {
-                          const isSelected = selectedDoctorId === doc._id;
+                          const activeSelectedDoc = getSelectedDoctor();
+                          const isSelected = activeSelectedDoc ? (activeSelectedDoc._id === doc._id || activeSelectedDoc.id === doc.id || (activeSelectedDoc.user && (activeSelectedDoc.user._id === doc.user?._id || activeSelectedDoc.user === doc.user))) : false;
                           const status = doc.status || "on_duty";
                           return (
                             <div
-                              key={doc._id}
-                              onClick={() => setSelectedDoctorId(doc._id)}
+                              key={doc._id || doc.id}
+                              onClick={() => setSelectedDoctorId(doc._id || doc.id || doc.user?._id || doc.user)}
                               className={`relative cursor-pointer rounded-2xl border p-4 transition-all ${isSelected
                                   ? "border-navy-700 bg-indigo-50/40 ring-2 ring-navy-600 shadow-md scale-[1.02]"
                                   : "border-slate-200 bg-white hover:border-navy-300 hover:shadow-sm"
@@ -1506,7 +1646,7 @@ export function PatientDashboard() {
                         return (
                           <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5 pt-1">
                             {slots.map((slot) => {
-                              const isSelected = bookingTime === slot;
+                              const isSelected = bookingTime === slot || (!!bookingTime && !!slot && normalizeTime(bookingTime) === normalizeTime(slot));
                               return (
                                 <button
                                   key={slot}
@@ -1559,7 +1699,7 @@ export function PatientDashboard() {
                     </div>
 
                     {(() => {
-                      const activeDoc = doctors.find((d: any) => d._id === selectedDoctorId);
+                      const activeDoc = getSelectedDoctor();
                       const baseFee = (activeDoc?.consultationSettings as any)?.fee || (activeDoc as any)?.fee || 500;
                       const isRevisit = isWithinOpLimit(selectedDoctorId, bookingDate);
                       const finalFee = isRevisit ? 0 : baseFee;
@@ -3163,7 +3303,7 @@ export function PatientDashboard() {
             </div>
 
             {(() => {
-              const activeDoc = doctors.find((d: any) => d._id === selectedDoctorId) || doctors[0];
+              const activeDoc = doctors.find((d: any) => d._id === selectedDoctorId || d.id === selectedDoctorId || d.user?._id === selectedDoctorId || d.user === selectedDoctorId) || doctors[0];
               const baseFee = (activeDoc?.consultationSettings as any)?.fee || (activeDoc as any)?.fee || 500;
               const isRevisit = isWithinOpLimit(selectedDoctorId, bookingDate);
               const finalFee = isRevisit ? 0 : baseFee;

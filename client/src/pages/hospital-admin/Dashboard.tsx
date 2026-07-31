@@ -314,7 +314,7 @@ export function HospitalAdminDashboard() {
       {(activeTab === "overview" || activeTab === "diagnostics") && (
         <div className="space-y-8 pt-4">
           <LabRadiologyPharmacySection labRequests={labRequestsList} inventory={inventoryList} />
-          {(BedStaffEmergencySection as any)({ beds: bedsList, staff: staffList, admissions: admissionsList, hospitalCounts: counts })}
+          <BedStaffEmergencySection beds={bedsList} staff={staffList} admissions={admissionsList} hospitalCounts={counts} />
         </div>
       )}
 
