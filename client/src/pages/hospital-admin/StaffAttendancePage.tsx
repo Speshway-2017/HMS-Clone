@@ -43,8 +43,8 @@ export function StaffAttendancePage() {
 
   // Modals
   const [isBulkOpen, setIsBulkOpen] = useState(false);
-  const [bulkStatus, setBulkStatus] = useState<"Present" | "Absent" | "Weekly Off" | "Holiday">("Present");
-  const [bulkShift, setBulkShift] = useState<"Morning" | "Evening" | "Night" | "General">("General");
+  const [bulkStatus, setBulkStatus] = useState<string>("Present");
+  const [bulkShift, setBulkShift] = useState<string>("General");
 
   // Manual Correction Dialog
   const [correctionRecord, setCorrectionRecord] = useState<AttendanceRecord | null>(null);
@@ -99,10 +99,14 @@ export function StaffAttendancePage() {
   const allEmployees: any[] = [];
   if (docRes?.data) {
     docRes.data.forEach((doc: any) => {
+      // Visiting Consultants and On-Call Doctors must NOT appear in Staff Attendance
+      if (doc.doctorType === "Visiting" || doc.doctorType === "On-Call") return;
+
       allEmployees.push({
         _id: doc._id,
         employeeId: doc.licenseNo || `DOC-${doc._id.slice(-5).toUpperCase()}`,
         name: doc.name,
+        role: "Doctor",
         designation: doc.specialization ? `Doctor (${doc.specialization})` : "Doctor",
         department: doc.department?.name || "Medical",
         departmentId: doc.department?._id || doc.department,
@@ -134,12 +138,15 @@ export function StaffAttendancePage() {
     });
   }
 
+  const [selectedRole, setSelectedRole] = useState("");
+
   // Filtered employees for daily marking view with active KPI Card filtering
   const filteredEmployees = allEmployees.filter((emp) => {
     const rec = recordMap.get(emp.employeeId);
     const matchesSearch = emp.name.toLowerCase().includes(search.toLowerCase()) || emp.employeeId.toLowerCase().includes(search.toLowerCase());
     const matchesDept = !selectedDept || emp.departmentId === selectedDept;
     const matchesShift = !selectedShift || emp.shift === selectedShift;
+    const matchesRole = !selectedRole || (emp.role && emp.role.toLowerCase().includes(selectedRole.toLowerCase())) || (emp.designation && emp.designation.toLowerCase().includes(selectedRole.toLowerCase())) || (emp.type && emp.type.toLowerCase() === selectedRole.toLowerCase());
 
     let matchesKpi = true;
     if (activeKpiFilter === "present") {
@@ -158,7 +165,7 @@ export function StaffAttendancePage() {
       matchesKpi = rec?.status === selectedStatus;
     }
 
-    return matchesSearch && matchesDept && matchesShift && matchesKpi;
+    return matchesSearch && matchesDept && matchesShift && matchesRole && matchesKpi;
   });
 
   const toggleKpiFilter = (filter: typeof activeKpiFilter) => {
@@ -216,8 +223,8 @@ export function StaffAttendancePage() {
     const bulkRecords = filteredEmployees.map((emp) => ({
       employeeId: emp.employeeId,
       employeeType: emp.type as "Staff" | "Doctor",
-      status: bulkStatus,
-      shift: bulkShift,
+      status: bulkStatus as any,
+      shift: bulkShift as any,
       checkInTime: bulkStatus === "Present" ? "09:00 AM" : "-",
       checkOutTime: bulkStatus === "Present" ? "05:00 PM" : "-",
       workingHours: bulkStatus === "Present" ? 8 : 0,
@@ -232,18 +239,26 @@ export function StaffAttendancePage() {
     switch (status) {
       case "Present":
         return <Badge tone="success">Present</Badge>;
-      case "Absent":
-        return <Badge tone="danger">Absent</Badge>;
       case "Half Day":
         return <Badge tone="warning">Half Day</Badge>;
+      case "Absent":
+        return <Badge tone="danger">Absent</Badge>;
       case "Paid Leave":
-        return <Badge tone="info">Paid Leave</Badge>;
+      case "Sick Leave":
+      case "Casual Leave":
+      case "Earned Leave":
+      case "Maternity Leave":
+      case "Paternity Leave":
+      case "Emergency Leave":
+        return <Badge tone="info">{status}</Badge>;
       case "Unpaid Leave (LOP)":
         return <Badge tone="danger">Unpaid Leave (LOP)</Badge>;
       case "Weekly Off":
-        return <Badge tone="neutral">Weekly Off</Badge>;
       case "Holiday":
-        return <Badge tone="neutral">Holiday</Badge>;
+        return <Badge tone="neutral">{status}</Badge>;
+      case "Training":
+      case "Official Duty":
+        return <Badge tone="info">{status}</Badge>;
       default:
         return <Badge tone="neutral">{status || "Not Marked"}</Badge>;
     }
@@ -447,6 +462,22 @@ export function StaffAttendancePage() {
           </SelectField>
 
           <SelectField
+            label="Role"
+            value={selectedRole}
+            onChange={(e) => setSelectedRole(e.target.value)}
+          >
+            <option value="">All Applicable Roles</option>
+            <option value="Doctor">Doctor (Regular)</option>
+            <option value="Nurse">Nurse</option>
+            <option value="Receptionist">Receptionist</option>
+            <option value="Pharmacist">Pharmacist</option>
+            <option value="Laboratory Technician">Laboratory Technician</option>
+            <option value="Radiology Technician">Radiology Technician</option>
+            <option value="Accountant">Accountant</option>
+            <option value="Admin Staff">Admin Staff</option>
+          </SelectField>
+
+          <SelectField
             label="Shift"
             value={selectedShift}
             onChange={(e) => setSelectedShift(e.target.value)}
@@ -456,6 +487,7 @@ export function StaffAttendancePage() {
             <option value="Morning">Morning (07:00 AM - 03:00 PM)</option>
             <option value="Evening">Evening (03:00 PM - 11:00 PM)</option>
             <option value="Night">Night (11:00 PM - 07:00 AM)</option>
+            <option value="Custom Shift">Custom Shift</option>
           </SelectField>
 
           {activeTab === "daily" && (
@@ -464,14 +496,22 @@ export function StaffAttendancePage() {
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
             >
-              <option value="">All Statuses</option>
+              <option value="">All Statuses (15 Options)</option>
               <option value="Present">Present</option>
-              <option value="Absent">Absent</option>
               <option value="Half Day">Half Day</option>
+              <option value="Absent">Absent</option>
               <option value="Paid Leave">Paid Leave</option>
+              <option value="Sick Leave">Sick Leave</option>
+              <option value="Casual Leave">Casual Leave</option>
+              <option value="Earned Leave">Earned Leave</option>
+              <option value="Maternity Leave">Maternity Leave</option>
+              <option value="Paternity Leave">Paternity Leave</option>
+              <option value="Emergency Leave">Emergency Leave</option>
               <option value="Unpaid Leave (LOP)">Unpaid Leave (LOP)</option>
-              <option value="Weekly Off">Weekly Off</option>
               <option value="Holiday">Holiday</option>
+              <option value="Weekly Off">Weekly Off</option>
+              <option value="Training">Training</option>
+              <option value="Official Duty">Official Duty</option>
             </SelectField>
           )}
 
@@ -499,25 +539,28 @@ export function StaffAttendancePage() {
                 <tr>
                   <th className="py-3 px-4 whitespace-nowrap">Employee ID</th>
                   <th className="py-3 px-4 whitespace-nowrap">Employee Name</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Role</th>
                   <th className="py-3 px-4 whitespace-nowrap">Department</th>
                   <th className="py-3 px-4 whitespace-nowrap">Shift</th>
-                  <th className="py-3 px-4 whitespace-nowrap">Check In / Out</th>
-                  <th className="py-3 px-4 whitespace-nowrap">Late Mark</th>
-                  <th className="py-3 px-4 whitespace-nowrap">OT Hours</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Check In</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Check Out</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Working Hours</th>
+                  <th className="py-3 px-4 whitespace-nowrap">OT</th>
                   <th className="py-3 px-4 whitespace-nowrap">Attendance Status</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Remarks</th>
                   <th className="py-3 px-4 whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {dailyLoading ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-500">
+                    <td colSpan={12} className="py-8 text-center text-slate-500">
                       Loading attendance records...
                     </td>
                   </tr>
                 ) : filteredEmployees.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-500">
+                    <td colSpan={12} className="py-8 text-center text-slate-500">
                       No staff members match the selected filters.
                     </td>
                   </tr>
@@ -525,7 +568,6 @@ export function StaffAttendancePage() {
                   filteredEmployees.map((emp) => {
                     const record = recordMap.get(emp.employeeId);
                     const currentStatus = record?.status || "Not Marked";
-                    const isLate = record?.isLate;
 
                     return (
                       <tr key={emp.employeeId} className={`hover:bg-slate-50 ${record?.isManuallyCorrected ? "bg-amber-50/40" : ""}`}>
@@ -544,38 +586,27 @@ export function StaffAttendancePage() {
                             </div>
                           )}
                         </td>
-                        <td className="py-3 px-4 text-slate-600">{emp.department}</td>
+                        <td className="py-3 px-4 text-xs text-slate-700 font-medium">{emp.role || emp.designation || "Staff"}</td>
+                        <td className="py-3 px-4 text-xs text-slate-600">{emp.department}</td>
                         <td className="py-3 px-4">
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200">
-                            {record?.shift || emp.shift}
+                            {record?.shift || emp.shift || "General"}
                           </span>
                         </td>
+                        <td className="py-3 px-4 text-xs font-mono">{record?.checkInTime || "-"}</td>
+                        <td className="py-3 px-4 text-xs font-mono">{record?.checkOutTime || "-"}</td>
+                        <td className="py-3 px-4 text-xs font-semibold text-slate-900">
+                          {record?.workingHours !== undefined ? `${record.workingHours} hrs` : "-"}
+                        </td>
                         <td className="py-3 px-4 text-xs font-mono">
-                          {record?.checkInTime || "09:00 AM"} - {record?.checkOutTime || "05:00 PM"}
-                        </td>
-                        <td className="py-3 px-4">
-                          {isLate ? (
-                            <Badge tone="danger">Late ({record?.lateMinutes || 15}m)</Badge>
+                          {record?.overtimeHours || record?.overtimeMinutes ? (
+                            <span className="text-indigo-700 font-semibold">
+                              {record.overtimeHours || 0}h {record.overtimeMinutes || 0}m
+                              {record.overtimeReason ? ` (${record.overtimeReason})` : ""}
+                            </span>
                           ) : (
-                            <Badge tone="success">On Time</Badge>
+                            <span className="text-slate-400">0h</span>
                           )}
-                        </td>
-                        <td className="py-3 px-4">
-                          <input
-                            type="number"
-                            min="0"
-                            max="12"
-                            defaultValue={record?.overtimeHours || 0}
-                            onBlur={(e) =>
-                              handleTimeChange(
-                                emp,
-                                record?.checkInTime || "09:00 AM",
-                                record?.checkOutTime || "05:00 PM",
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            className="w-16 px-2 py-1 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-navy-500"
-                          />
                         </td>
                         <td className="py-3 px-4">
                           <select
@@ -586,20 +617,31 @@ export function StaffAttendancePage() {
                                 ? "bg-emerald-50 text-emerald-700 border-emerald-300"
                                 : currentStatus === "Absent" || currentStatus === "Unpaid Leave (LOP)"
                                 ? "bg-rose-50 text-rose-700 border-rose-300"
-                                : currentStatus === "Paid Leave"
-                                ? "bg-sky-50 text-sky-700 border-sky-300"
+                                : currentStatus === "Half Day"
+                                ? "bg-amber-50 text-amber-700 border-amber-300"
                                 : "bg-slate-50 text-slate-700 border-slate-300"
                             }`}
                           >
                             <option value="Not Marked">Select Status...</option>
                             <option value="Present">Present</option>
-                            <option value="Absent">Absent</option>
                             <option value="Half Day">Half Day</option>
-                            <option value="Weekly Off">Weekly Off</option>
-                            <option value="Holiday">Holiday</option>
+                            <option value="Absent">Absent</option>
                             <option value="Paid Leave">Paid Leave</option>
+                            <option value="Sick Leave">Sick Leave</option>
+                            <option value="Casual Leave">Casual Leave</option>
+                            <option value="Earned Leave">Earned Leave</option>
+                            <option value="Maternity Leave">Maternity Leave</option>
+                            <option value="Paternity Leave">Paternity Leave</option>
+                            <option value="Emergency Leave">Emergency Leave</option>
                             <option value="Unpaid Leave (LOP)">Unpaid Leave (LOP)</option>
+                            <option value="Holiday">Holiday</option>
+                            <option value="Weekly Off">Weekly Off</option>
+                            <option value="Training">Training</option>
+                            <option value="Official Duty">Official Duty</option>
                           </select>
+                        </td>
+                        <td className="py-3 px-4 text-xs text-slate-500 max-w-[150px] truncate" title={record?.remarks || ""}>
+                          {record?.remarks || "-"}
                         </td>
                         {/* Correct Attendance — Admin Only */}
                         <td className="py-3 px-4">
@@ -609,14 +651,39 @@ export function StaffAttendancePage() {
                                 setCorrectionRecord(record as AttendanceRecord);
                                 setIsCorrectionOpen(true);
                               }}
-                              title="Manually correct this attendance record"
+                              title="Manually edit / correct this attendance record"
                               className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded-md hover:bg-amber-100 transition-colors"
                             >
                               <PencilLine className="h-3 w-3" />
-                              Correct
+                              Edit
                             </button>
                           ) : (
-                            <span className="text-xs text-slate-400">No record</span>
+                            <button
+                              onClick={() => {
+                                const newDraft: any = {
+                                  hospital: "",
+                                  employeeRef: emp._id,
+                                  employeeType: emp.type,
+                                  employeeId: emp.employeeId,
+                                  employeeName: emp.name,
+                                  designation: emp.role || emp.designation,
+                                  shift: emp.shift || "General",
+                                  date: selectedDate,
+                                  checkInTime: "09:00 AM",
+                                  checkOutTime: "05:00 PM",
+                                  workingHours: 8,
+                                  overtimeHours: 0,
+                                  status: "Present",
+                                  isLate: false,
+                                  isEarlyExit: false,
+                                };
+                                setCorrectionRecord(newDraft);
+                                setIsCorrectionOpen(true);
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-navy-700 bg-navy-50 border border-navy-300 rounded-md hover:bg-navy-100 transition-colors"
+                            >
+                              + Mark
+                            </button>
                           )}
                         </td>
                       </tr>
@@ -825,9 +892,20 @@ export function StaffAttendancePage() {
             onChange={(e) => setBulkStatus(e.target.value as any)}
           >
             <option value="Present">Present</option>
+            <option value="Half Day">Half Day</option>
             <option value="Absent">Absent</option>
-            <option value="Weekly Off">Weekly Off</option>
+            <option value="Paid Leave">Paid Leave</option>
+            <option value="Sick Leave">Sick Leave</option>
+            <option value="Casual Leave">Casual Leave</option>
+            <option value="Earned Leave">Earned Leave</option>
+            <option value="Maternity Leave">Maternity Leave</option>
+            <option value="Paternity Leave">Paternity Leave</option>
+            <option value="Emergency Leave">Emergency Leave</option>
+            <option value="Unpaid Leave (LOP)">Unpaid Leave (LOP)</option>
             <option value="Holiday">Holiday</option>
+            <option value="Weekly Off">Weekly Off</option>
+            <option value="Training">Training</option>
+            <option value="Official Duty">Official Duty</option>
           </SelectField>
 
           <SelectField
@@ -839,6 +917,7 @@ export function StaffAttendancePage() {
             <option value="Morning">Morning Shift</option>
             <option value="Evening">Evening Shift</option>
             <option value="Night">Night Shift</option>
+            <option value="Custom Shift">Custom Shift</option>
           </SelectField>
 
           <div className="p-3 bg-slate-100 rounded-md text-xs text-slate-700 flex items-center justify-between">

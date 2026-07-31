@@ -61,11 +61,54 @@ export const getDailyAttendance = catchAsync(async (req: Request, res: Response)
 });
 
 /**
+ * Helper to calculate working hours from checkIn, checkOut, and breakMinutes
+ */
+function calculateWorkingHours(checkIn?: string, checkOut?: string, breakMins: number = 0): number {
+  if (!checkIn || !checkOut || checkIn === "-" || checkOut === "-") return 0;
+
+  const parseTime = (t: string): number => {
+    const cleaned = t.trim();
+    // Check 12-hour format e.g. "09:00 AM"
+    const match12 = cleaned.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (match12) {
+      let h = parseInt(match12[1], 10);
+      const m = parseInt(match12[2], 10);
+      const p = match12[3].toUpperCase();
+      if (p === "PM" && h !== 12) h += 12;
+      if (p === "AM" && h === 12) h = 0;
+      return h * 60 + m;
+    }
+    // Check 24-hour format e.g. "09:00"
+    const match24 = cleaned.match(/^(\d{1,2}):(\d{2})$/);
+    if (match24) {
+      const h = parseInt(match24[1], 10);
+      const m = parseInt(match24[2], 10);
+      return h * 60 + m;
+    }
+    return -1;
+  };
+
+  const inMins = parseTime(checkIn);
+  const outMins = parseTime(checkOut);
+
+  if (inMins === -1 || outMins === -1) return 0;
+  let diff = outMins - inMins;
+  if (diff < 0) {
+    // Over-night shift adjustment (e.g. 10:00 PM to 06:00 AM)
+    diff += 24 * 60;
+  }
+
+  const netMins = Math.max(0, diff - Math.max(0, breakMins));
+  return Number((netMins / 60).toFixed(2));
+}
+
+/**
  * Mark or update attendance for a single employee
  */
 export const markSingleAttendance = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter?.hospital;
   const userId = req.user?._id;
+  const userName = req.user?.name || "Admin";
 
   if (!hospitalId) {
     throw new AppError("Hospital context is required.", 400);
@@ -78,16 +121,24 @@ export const markSingleAttendance = catchAsync(async (req: Request, res: Respons
     shift,
     checkInTime,
     checkOutTime,
+    breakMinutes,
     workingHours,
     overtimeHours,
+    overtimeMinutes,
+    overtimeReason,
     status,
     isLate,
     isEarlyExit,
     remarks,
+    reason,
   } = req.body;
 
   if (!employeeId || !date || !status) {
     throw new AppError("Employee ID, date, and status are required.", 400);
+  }
+
+  if (!ATTENDANCE_STATUSES.includes(status as any)) {
+    throw new AppError(`Invalid attendance status: ${status}`, 400);
   }
 
   const empType = employeeType === "Doctor" ? "Doctor" : "Staff";
@@ -95,6 +146,9 @@ export const markSingleAttendance = catchAsync(async (req: Request, res: Respons
 
   if (empType === "Doctor") {
     empObj = await Doctor.findOne({ _id: employeeId, hospital: hospitalId }) || await Doctor.findOne({ licenseNo: employeeId, hospital: hospitalId });
+    if (empObj && (empObj.doctorType === "Visiting" || empObj.doctorType === "On-Call")) {
+      throw new AppError("Visiting Consultants and On-Call Doctors must NOT appear in Staff Attendance.", 400);
+    }
   } else {
     empObj = await Staff.findOne({ _id: employeeId, hospital: hospitalId }) || await Staff.findOne({ employeeId: employeeId, hospital: hospitalId });
   }
@@ -103,11 +157,60 @@ export const markSingleAttendance = catchAsync(async (req: Request, res: Respons
     throw new AppError("Employee not found.", 404);
   }
 
+  const empIdStr = empObj.employeeId || empObj.licenseNo || String(empObj._id);
+
   const existingRecord = await Attendance.findOne({
     hospital: hospitalId,
-    employeeId: empObj.employeeId || empObj.licenseNo || String(empObj._id),
+    employeeId: empIdStr,
     date,
   });
+
+  const breakMins = Number(breakMinutes || 0);
+  const calculatedWorkingHours = (checkInTime && checkOutTime && checkInTime !== "-" && checkOutTime !== "-")
+    ? calculateWorkingHours(checkInTime, checkOutTime, breakMins)
+    : (workingHours !== undefined ? Number(workingHours) : status === "Present" ? 8 : status === "Half Day" ? 4 : 0);
+
+  if (calculatedWorkingHours < 0) {
+    throw new AppError("Working Hours cannot be negative.", 400);
+  }
+
+  const otHours = Number(overtimeHours || 0);
+  const otMins = Number(overtimeMinutes || 0);
+
+  const previousValues = existingRecord ? {
+    status: existingRecord.status,
+    shift: existingRecord.shift,
+    checkInTime: existingRecord.checkInTime,
+    checkOutTime: existingRecord.checkOutTime,
+    breakMinutes: existingRecord.breakMinutes,
+    workingHours: existingRecord.workingHours,
+    overtimeHours: existingRecord.overtimeHours,
+    overtimeMinutes: existingRecord.overtimeMinutes,
+    overtimeReason: existingRecord.overtimeReason,
+    remarks: existingRecord.remarks,
+  } : {};
+
+  const newValues = {
+    status,
+    shift: shift || empObj.shift || "General",
+    checkInTime: checkInTime || (status === "Present" ? "09:00 AM" : ""),
+    checkOutTime: checkOutTime || (status === "Present" ? "05:00 PM" : ""),
+    breakMinutes: breakMins,
+    workingHours: calculatedWorkingHours,
+    overtimeHours: otHours,
+    overtimeMinutes: otMins,
+    overtimeReason: overtimeReason || "",
+    remarks: remarks || "",
+  };
+
+  const auditEntry = {
+    updatedBy: userId || null,
+    updatedByName: userName,
+    timestamp: new Date(),
+    previousValues,
+    newValues,
+    reason: reason || (existingRecord ? "Manual Attendance Edit" : "Manual Attendance Creation"),
+  };
 
   const payload = {
     hospital: hospitalId,
@@ -115,47 +218,57 @@ export const markSingleAttendance = catchAsync(async (req: Request, res: Respons
     department: empObj.department || null,
     employeeRef: empObj._id,
     employeeType: empType,
-    employeeId: empObj.employeeId || empObj.licenseNo || String(empObj._id),
+    employeeId: empIdStr,
     employeeName: empObj.name,
     designation: empObj.role || empObj.specialization || "Employee",
-    shift: shift || empObj.shift || "General",
+    shift: newValues.shift,
     date,
-    checkInTime: checkInTime || (status === "Present" ? "09:00 AM" : ""),
-    checkOutTime: checkOutTime || (status === "Present" ? "05:00 PM" : ""),
-    workingHours: workingHours !== undefined ? Number(workingHours) : status === "Present" ? 8 : status === "Half Day" ? 4 : 0,
-    overtimeHours: overtimeHours !== undefined ? Number(overtimeHours) : 0,
+    checkInTime: newValues.checkInTime,
+    checkOutTime: newValues.checkOutTime,
+    breakMinutes: newValues.breakMinutes,
+    workingHours: newValues.workingHours,
+    overtimeHours: newValues.overtimeHours,
+    overtimeMinutes: newValues.overtimeMinutes,
+    overtimeReason: newValues.overtimeReason,
     isLate: Boolean(isLate),
     isEarlyExit: Boolean(isEarlyExit),
     status,
+    attendanceSource: "Manual Admin Entry",
     markedBy: userId || null,
-    remarks: remarks || "",
+    remarks: newValues.remarks,
   };
 
-  const updatedRecord = await Attendance.findOneAndUpdate(
-    { hospital: hospitalId, employeeId: payload.employeeId, date },
-    payload,
-    { new: true, upsert: true, runValidators: true }
-  );
+  let updatedRecord;
+  if (existingRecord) {
+    existingRecord.set(payload);
+    existingRecord.auditHistory.push(auditEntry as any);
+    updatedRecord = await existingRecord.save();
+  } else {
+    updatedRecord = await Attendance.create({
+      ...payload,
+      auditHistory: [auditEntry],
+    });
+  }
 
   // Mark Payroll Needs Recalculation
   await markPayrollNeedsRecalculation(hospitalId, payload.employeeId, date.slice(0, 7));
 
-  // Record Audit Log
+  // Record System Audit Log
   await AuditLog.create({
     hospital: hospitalId,
     user: userId || null,
-    userEmail: req.user?.email || "system",
+    userEmail: req.user?.email || "admin",
     userRole: req.user?.role || "hospital_admin",
-    action: "Attendance Marked",
-
+    action: existingRecord ? "Attendance Updated" : "Attendance Marked",
     entity: "Attendance",
     entityId: String(updatedRecord._id),
     details: {
       employeeId: payload.employeeId,
       employeeName: payload.employeeName,
       date,
-      oldValue: existingRecord ? existingRecord.status : "None",
-      newValue: status,
+      previousStatus: previousValues.status || "None",
+      newStatus: status,
+      reason: auditEntry.reason,
     },
   });
 
@@ -171,12 +284,13 @@ export const markSingleAttendance = catchAsync(async (req: Request, res: Respons
 export const bulkMarkAttendance = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter?.hospital;
   const userId = req.user?._id;
+  const userName = req.user?.name || "Admin";
 
   if (!hospitalId) {
     throw new AppError("Hospital context is required.", 400);
   }
 
-  const { date, records } = req.body; // records: Array of { employeeId, employeeType, status, shift, checkInTime, checkOutTime, workingHours, overtimeHours }
+  const { date, records } = req.body;
 
   if (!date || !Array.isArray(records) || records.length === 0) {
     throw new AppError("Date and an array of employee attendance records are required.", 400);
@@ -190,11 +304,50 @@ export const bulkMarkAttendance = catchAsync(async (req: Request, res: Response)
 
     if (empType === "Doctor") {
       empObj = await Doctor.findOne({ _id: item.employeeId, hospital: hospitalId }) || await Doctor.findOne({ licenseNo: item.employeeId, hospital: hospitalId });
+      if (empObj && (empObj.doctorType === "Visiting" || empObj.doctorType === "On-Call")) continue;
     } else {
       empObj = await Staff.findOne({ _id: item.employeeId, hospital: hospitalId }) || await Staff.findOne({ employeeId: item.employeeId, hospital: hospitalId });
     }
 
     if (!empObj) continue;
+
+    const empIdStr = empObj.employeeId || empObj.licenseNo || String(empObj._id);
+
+    const existingRecord = await Attendance.findOne({
+      hospital: hospitalId,
+      employeeId: empIdStr,
+      date,
+    });
+
+    const breakMins = Number(item.breakMinutes || 0);
+    const calculatedWorkingHours = (item.checkInTime && item.checkOutTime && item.checkInTime !== "-" && item.checkOutTime !== "-")
+      ? calculateWorkingHours(item.checkInTime, item.checkOutTime, breakMins)
+      : (item.workingHours !== undefined ? Number(item.workingHours) : item.status === "Present" ? 8 : item.status === "Half Day" ? 4 : 0);
+
+    const otHours = Number(item.overtimeHours || 0);
+    const otMins = Number(item.overtimeMinutes || 0);
+
+    const newValues = {
+      status: item.status || "Present",
+      shift: item.shift || empObj.shift || "General",
+      checkInTime: item.checkInTime || (item.status === "Present" ? "09:00 AM" : ""),
+      checkOutTime: item.checkOutTime || (item.status === "Present" ? "05:00 PM" : ""),
+      breakMinutes: breakMins,
+      workingHours: calculatedWorkingHours,
+      overtimeHours: otHours,
+      overtimeMinutes: otMins,
+      overtimeReason: item.overtimeReason || "",
+      remarks: item.remarks || "",
+    };
+
+    const auditEntry = {
+      updatedBy: userId || null,
+      updatedByName: userName,
+      timestamp: new Date(),
+      previousValues: existingRecord ? { status: existingRecord.status, checkInTime: existingRecord.checkInTime, checkOutTime: existingRecord.checkOutTime } : {},
+      newValues,
+      reason: "Bulk Attendance Marking",
+    };
 
     const payload = {
       hospital: hospitalId,
@@ -202,27 +355,38 @@ export const bulkMarkAttendance = catchAsync(async (req: Request, res: Response)
       department: empObj.department || null,
       employeeRef: empObj._id,
       employeeType: empType,
-      employeeId: empObj.employeeId || empObj.licenseNo || String(empObj._id),
+      employeeId: empIdStr,
       employeeName: empObj.name,
       designation: empObj.role || empObj.specialization || "Employee",
-      shift: item.shift || empObj.shift || "General",
+      shift: newValues.shift,
       date,
-      checkInTime: item.checkInTime || (item.status === "Present" ? "09:00 AM" : ""),
-      checkOutTime: item.checkOutTime || (item.status === "Present" ? "05:00 PM" : ""),
-      workingHours: item.workingHours !== undefined ? Number(item.workingHours) : item.status === "Present" ? 8 : item.status === "Half Day" ? 4 : 0,
-      overtimeHours: item.overtimeHours !== undefined ? Number(item.overtimeHours) : 0,
+      checkInTime: newValues.checkInTime,
+      checkOutTime: newValues.checkOutTime,
+      breakMinutes: newValues.breakMinutes,
+      workingHours: newValues.workingHours,
+      overtimeHours: newValues.overtimeHours,
+      overtimeMinutes: newValues.overtimeMinutes,
+      overtimeReason: newValues.overtimeReason,
       isLate: Boolean(item.isLate),
       isEarlyExit: Boolean(item.isEarlyExit),
-      status: item.status || "Present",
+      status: newValues.status,
+      attendanceSource: "Manual Admin Entry",
       markedBy: userId || null,
-      remarks: item.remarks || "",
+      remarks: newValues.remarks,
     };
 
-    const doc = await Attendance.findOneAndUpdate(
-      { hospital: hospitalId, employeeId: payload.employeeId, date },
-      payload,
-      { new: true, upsert: true, runValidators: true }
-    );
+    let doc;
+    if (existingRecord) {
+      existingRecord.set(payload);
+      existingRecord.auditHistory.push(auditEntry as any);
+      doc = await existingRecord.save();
+    } else {
+      doc = await Attendance.create({
+        ...payload,
+        auditHistory: [auditEntry],
+      });
+    }
+
     results.push(doc);
     await markPayrollNeedsRecalculation(hospitalId, payload.employeeId, date.slice(0, 7));
   }
@@ -278,7 +442,7 @@ export const getMonthlyAttendanceSummary = catchAsync(async (req: Request, res: 
         designation: { $first: "$designation" },
         department: { $first: "$department" },
         presentDays: {
-          $sum: { $cond: [{ $eq: ["$status", "Present"] }, 1, 0] },
+          $sum: { $cond: [{ $in: ["$status", ["Present", "Training", "Official Duty"]] }, 1, 0] },
         },
         absentDays: {
           $sum: { $cond: [{ $eq: ["$status", "Absent"] }, 1, 0] },
@@ -287,10 +451,10 @@ export const getMonthlyAttendanceSummary = catchAsync(async (req: Request, res: 
           $sum: { $cond: [{ $eq: ["$status", "Half Day"] }, 1, 0] },
         },
         paidLeaveDays: {
-          $sum: { $cond: [{ $eq: ["$status", "Paid Leave"] }, 1, 0] },
+          $sum: { $cond: [{ $in: ["$status", ["Paid Leave", "Sick Leave", "Casual Leave", "Earned Leave", "Maternity Leave", "Paternity Leave", "Emergency Leave"]] }, 1, 0] },
         },
         unpaidLeaveDays: {
-          $sum: { $cond: [{ $eq: ["$status", "Unpaid Leave (LOP)"] }, 1, 0] },
+          $sum: { $cond: [{ $in: ["$status", ["Unpaid Leave (LOP)", "Absent"]] }, 1, 0] },
         },
         weeklyOffs: {
           $sum: { $cond: [{ $eq: ["$status", "Weekly Off"] }, 1, 0] },
@@ -298,7 +462,9 @@ export const getMonthlyAttendanceSummary = catchAsync(async (req: Request, res: 
         holidays: {
           $sum: { $cond: [{ $eq: ["$status", "Holiday"] }, 1, 0] },
         },
-        overtimeHours: { $sum: "$overtimeHours" },
+        overtimeHours: {
+          $sum: { $add: [{ $ifNull: ["$overtimeHours", 0] }, { $divide: [{ $ifNull: ["$overtimeMinutes", 0] }, 60] }] },
+        },
         lateArrivals: {
           $sum: { $cond: ["$isLate", 1, 0] },
         },
