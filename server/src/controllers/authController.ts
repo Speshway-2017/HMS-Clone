@@ -12,6 +12,7 @@ import { Hospital } from "../models/Hospital";
 import { Patient } from "../models/Patient";
 import { Staff } from "../models/Staff";
 import { sendEmail } from "../services/emailService";
+import { handleAutoAttendanceOnLogin, handleAutoCheckoutOnLogout } from "../services/attendanceAutoService";
 
 const loginSchema = z.object({
   identifier: z.string().optional(),
@@ -356,6 +357,9 @@ export const login = catchAsync(async (req: Request, res: Response) => {
     entityId: user._id.toString(),
   });
 
+  // Automatically create today's attendance record for hospital employees on login
+  await handleAutoAttendanceOnLogin(user);
+
   res.status(200).json({
     status: "success",
     data: {
@@ -430,6 +434,9 @@ export const logout = catchAsync(async (req: Request, res: Response) => {
   }
 
   if (req.user) {
+    // Automatically record checkout time and calculate working hours
+    await handleAutoCheckoutOnLogout(req.user);
+
     await RefreshToken.updateMany({ user: req.user._id }, { isRevoked: true });
     await logAudit({
       req,
