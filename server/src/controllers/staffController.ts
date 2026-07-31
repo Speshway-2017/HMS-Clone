@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import { z } from "zod";
 import { Staff, STAFF_DUTY_STATUSES } from "../models/Staff";
 import { User } from "../models/User";
+import { Admission } from "../models/Admission";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { generateTempPassword, generateUniqueEmployeeId } from "../utils/idGenerator";
@@ -40,9 +41,27 @@ export const listStaff = catchAsync(async (req: Request, res: Response) => {
 
   const countByStatus = (key: string) => dutyCounts.find((c) => c._id === key)?.count ?? 0;
 
+  const staffWithPatients = await Promise.all(
+    staff.map(async (member) => {
+      if (member.role === "nurse") {
+        const activeAdmissionsStatuses = ["admitted", "Admitted", "Under Observation", "Under Treatment", "In Ward", "ICU", "Bed Allocated"];
+        const count = await Admission.countDocuments({
+          assignedNurse: member._id,
+          status: { $in: activeAdmissionsStatuses }
+        });
+        return {
+          ...member.toObject(),
+          assignedPatientCount: count,
+          shift: member.dutyStatus === "on_duty" ? "Evening" : "Morning"
+        };
+      }
+      return member.toObject();
+    })
+  );
+
   res.json({
     status: "success",
-    ...paginatedResponse(staff, total, { page, limit, skip }),
+    ...paginatedResponse(staffWithPatients, total, { page, limit, skip }),
     counts: {
       present: countByStatus("on_duty"),
       late: countByStatus("late"),

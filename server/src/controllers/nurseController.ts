@@ -5,6 +5,8 @@ import { Staff } from "../models/Staff";
 import { Bed } from "../models/Bed";
 import { ShiftHandover } from "../models/ShiftHandover";
 import { DbNotification } from "../models/DbNotification";
+import { User } from "../models/User";
+import { signAccessToken, signRefreshToken } from "../utils/token";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 
@@ -47,13 +49,13 @@ export const getNurseInpatientDetails = catchAsync(async (req: Request, res: Res
 export const saveNurseInpatientVitals = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const patientId = req.params.id;
-  const { 
-    vitalId, 
-    temperature, 
-    bloodPressure, 
-    pulseRate, 
-    respiratoryRate, 
-    oxygenSaturation, 
+  const {
+    vitalId,
+    temperature,
+    bloodPressure,
+    pulseRate,
+    respiratoryRate,
+    oxygenSaturation,
     weight,
     height,
     bmi,
@@ -83,7 +85,7 @@ export const saveNurseInpatientVitals = catchAsync(async (req: Request, res: Res
     if (!vital) {
       throw new AppError("Vital record not found.", 404);
     }
-    
+
     vital.temperature = temperature || "";
     vital.bloodPressure = bloodPressure || "";
     vital.pulseRate = pulseRate || "";
@@ -238,7 +240,7 @@ export const saveNurseInpatientNote = catchAsync(async (req: Request, res: Respo
     throw new AppError("Staff record not found.", 404);
   }
 
-  const { 
+  const {
     observationType,
     painAssessment,
     mobility,
@@ -249,7 +251,7 @@ export const saveNurseInpatientNote = catchAsync(async (req: Request, res: Respo
     diet,
     woundCare,
     treatmentProgress,
-    additionalNotes 
+    additionalNotes
   } = req.body;
 
   const activeAdmission = await Admission.findOne({
@@ -306,7 +308,7 @@ export const updateNurseInpatientNote = catchAsync(async (req: Request, res: Res
     throw new AppError("Staff record not found.", 404);
   }
 
-  const { 
+  const {
     observationType,
     painAssessment,
     mobility,
@@ -317,7 +319,7 @@ export const updateNurseInpatientNote = catchAsync(async (req: Request, res: Res
     diet,
     woundCare,
     treatmentProgress,
-    additionalNotes 
+    additionalNotes
   } = req.body;
 
   const activeAdmission = await Admission.findOne({
@@ -420,7 +422,7 @@ export const saveNurseInpatientBedsideChecks = catchAsync(async (req: Request, r
   const staff = await Staff.findOne({ email: req.user!.email });
   const recordedByName = staff?.name || req.user!.name || "Nurse";
 
-  const { 
+  const {
     bedPosition,
     patientHygiene,
     oralCare,
@@ -494,7 +496,7 @@ export const saveShiftHandover = catchAsync(async (req: Request, res: Response) 
     throw new AppError("Staff record not found.", 404);
   }
 
-  const { 
+  const {
     currentShift,
     nextShift,
     patientsHandedOverCount,
@@ -543,7 +545,7 @@ export const saveNurseInpatientDischargePrep = catchAsync(async (req: Request, r
   const staff = await Staff.findOne({ email: req.user!.email });
   const recordedByName = staff?.name || req.user!.name || "Nurse";
 
-  const { 
+  const {
     doctorApprovalStatus,
     finalVitalSigns,
     medicationCompleted,
@@ -607,7 +609,7 @@ export const saveNurseInpatientDischargePrep = catchAsync(async (req: Request, r
 // 13. Get Nurse Notifications with Auto-Seeding
 export const getNurseNotifications = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
-  
+
   let notifications = await DbNotification.find({
     hospital: hospitalId,
     recipientRole: "nurse"
@@ -875,4 +877,135 @@ export const dismissNurseNotification = catchAsync(async (req: Request, res: Res
 
   await DbNotification.deleteOne({ _id: notificationId });
   res.json({ status: "success", message: "Notification dismissed." });
+});
+
+// 18. Complete Shift Handover and Session Switch
+export const completeShiftHandover = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const outgoingStaff = await Staff.findOne({ email: req.user!.email });
+  if (!outgoingStaff) {
+    throw new AppError("Outgoing staff record not found.", 404);
+  }
+
+  const {
+    incomingNurseId,
+    currentShift,
+    nextShift,
+    patientsHandedOverCount,
+    patientsHandedOverDetails,
+    pendingMedication,
+    pendingProcedures,
+    criticalPatients,
+    specialInstructions,
+    remarks,
+    nurseSignature,
+    selectedAdmissionIds
+  } = req.body;
+
+  if (!incomingNurseId) {
+    throw new AppError("Incoming nurse selection is required.", 400);
+  }
+
+  const incomingStaff = await Staff.findById(incomingNurseId);
+  if (!incomingStaff) {
+    throw new AppError("Incoming nurse record not found.", 404);
+  }
+
+  // Find User record of incoming nurse to sign new JWT tokens
+  const incomingUser = await User.findOne({ email: incomingStaff.email });
+  if (!incomingUser) {
+    throw new AppError("Incoming nurse user account not found.", 404);
+  }
+
+  // 1. Save shift handover report for audit log history
+  const handover = await ShiftHandover.create({
+    hospital: hospitalId,
+    currentShift,
+    nextShift,
+    patientsHandedOverCount: Number(patientsHandedOverCount) || 0,
+    patientsHandedOverDetails: patientsHandedOverDetails || "",
+    pendingMedication: pendingMedication || "",
+    pendingProcedures: pendingProcedures || "",
+    criticalPatients: criticalPatients || "",
+    specialInstructions: specialInstructions || "",
+    remarks: remarks || "",
+    nurseSignature,
+    loggedBy: outgoingStaff._id,
+    loggedByName: outgoingStaff.name || req.user!.name || "Nurse",
+    incomingNurse: incomingStaff._id,
+    incomingNurseName: incomingStaff.name || "Incoming Nurse",
+    timestamp: new Date()
+  });
+
+  // 2. Transfer only selected patient admissions to the incoming nurse
+  const activeAdmissionsStatuses = ["admitted", "Admitted", "Under Observation", "Under Treatment", "In Ward", "ICU", "Bed Allocated"];
+  if (Array.isArray(selectedAdmissionIds) && selectedAdmissionIds.length > 0) {
+    await Admission.updateMany(
+      {
+        _id: { $in: selectedAdmissionIds },
+        hospital: hospitalId,
+        assignedNurse: outgoingStaff._id,
+        status: { $in: activeAdmissionsStatuses }
+      },
+      { assignedNurse: incomingStaff._id }
+    );
+  } else {
+    await Admission.updateMany(
+      {
+        hospital: hospitalId,
+        assignedNurse: outgoingStaff._id,
+        status: { $in: activeAdmissionsStatuses }
+      },
+      { assignedNurse: incomingStaff._id }
+    );
+  }
+
+  // 3. Mark outgoing nurse shift as completed (off_duty) and incoming nurse as on_duty
+  outgoingStaff.dutyStatus = "off_duty";
+  await outgoingStaff.save();
+
+  incomingStaff.dutyStatus = "on_duty";
+  await incomingStaff.save();
+
+  // Create DB notification for the incoming nurse (role-wide nurse dashboard notification)
+  await DbNotification.create({
+    hospital: hospitalId,
+    title: "Shift Handover Received",
+    message: `Incoming shift duties handed over to you from ${outgoingStaff.name || "Nurse"}. You are now the active duty nurse for ${patientsHandedOverCount || 0} patient(s).`,
+    type: "general",
+    severity: "info",
+    recipientRole: "nurse",
+    data: {
+      type: "shift_handover",
+      outgoingNurseId: outgoingStaff._id,
+      outgoingNurseName: outgoingStaff.name || "Nurse",
+      incomingNurseId: incomingStaff._id,
+      incomingNurseName: incomingStaff.name || "Incoming Nurse",
+      patientsCount: patientsHandedOverCount || 0,
+      patientsDetails: patientsHandedOverDetails || "",
+      pendingMedication: pendingMedication || "",
+      pendingProcedures: pendingProcedures || "",
+      criticalPatients: criticalPatients || "",
+      specialInstructions: specialInstructions || "",
+      remarks: remarks || "",
+      nurseSignature: nurseSignature || "",
+      currentShift: currentShift || "Morning",
+      nextShift: nextShift || "Evening"
+    }
+  });
+
+  // 4. Generate JWT tokens to activate the selected nurse's session
+  const payload = { id: incomingUser._id.toString(), role: incomingUser.role };
+  const accessToken = signAccessToken(payload);
+  const refreshToken = signRefreshToken(payload);
+
+  res.json({
+    status: "success",
+    message: "Shift handover completed successfully.",
+    data: {
+      handover,
+      token: accessToken,
+      refreshToken
+    }
+  });
 });

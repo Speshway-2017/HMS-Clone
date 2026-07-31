@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Sidebar } from "../components/ui/Sidebar";
@@ -11,6 +11,7 @@ import { useMyHospital } from "../features/hospitals";
 export function DashboardLayout() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const { data: doctorProfile } = useDoctorProfileMe();
   const { data: hospital } = useMyHospital({ enabled: !!user?.hospital });
@@ -77,9 +78,9 @@ export function DashboardLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
-      <Sidebar />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Topbar />
+        <Topbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 overflow-y-auto p-6">
           <Outlet />
         </main>

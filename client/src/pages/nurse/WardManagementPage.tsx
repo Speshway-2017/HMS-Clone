@@ -69,13 +69,6 @@ export function WardManagementPage() {
           <h1 className="mt-1 text-2xl font-black text-slate-900">Ward & Bed Management</h1>
           <p className="text-xs text-slate-500">Overview of ward capacity, bed allocations, and inpatient room management.</p>
         </div>
-
-        <button
-          onClick={() => refetchBeds()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50"
-        >
-          <RefreshCw className="h-4 w-4" /> Refresh Wards
-        </button>
       </div>
 
       {/* KPI Cards */}
