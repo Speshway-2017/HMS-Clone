@@ -47,6 +47,7 @@ const appointmentSchema = z.object({
   time: z.string().min(1),
   type: z.enum(APPOINTMENT_TYPES as unknown as [string, ...string[]]).optional().default("Appointment"),
   status: z.enum(APPOINTMENT_STATUSES).optional(),
+  meetingLink: z.string().optional().default(""),
   notes: z.string().optional().default(""),
   billingStatus: z.string().optional(),
   paymentMethod: z.string().optional(),
@@ -322,8 +323,9 @@ export const updateAppointment = catchAsync(async (req: Request, res: Response) 
     throw new AppError("Appointment not found or unauthorized.", 403);
   }
 
-  if (req.hospitalFilter?.hospital) {
-    emitToHospital(req.hospitalFilter.hospital, "appointment_updated", { appointmentId: appointment._id, status: appointment.status });
+  const targetHospital = req.hospitalFilter?.hospital || (appointment.hospital || "").toString();
+  if (targetHospital) {
+    emitToHospital(targetHospital, "appointment_updated", { appointmentId: appointment._id, status: appointment.status, meetingLink: appointment.meetingLink });
   }
 
   await logAudit({

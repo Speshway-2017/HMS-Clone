@@ -50,11 +50,16 @@ export function useCreateAppointment() {
   });
 }
 
-export function useUpdateAppointment(id: string) {
+export function useUpdateAppointment(id?: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: Partial<Appointment>) => {
-      const res = await api.patch(`/appointments/${id}`, payload);
+    mutationFn: async (payload: Partial<Appointment> & { id?: string }) => {
+      const targetId = payload.id || id;
+      if (!targetId) {
+        throw new Error("No appointment ID specified for update.");
+      }
+      const { id: _ignore, ...data } = payload;
+      const res = await api.patch(`/appointments/${targetId}`, data);
       return res.data.data.appointment as Appointment;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["appointments"] }),

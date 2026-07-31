@@ -156,8 +156,14 @@ function groupAndCombineHistory(historyList: any[]): CombinedConsultationGroup[]
   return Array.from(map.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
 }
 
-export function ConsultationWorkspacePage() {
-  const { id: appointmentId } = useParams<{ id: string }>();
+interface ConsultationWorkspaceProps {
+  appointmentIdOverride?: string;
+  isEmbedded?: boolean;
+}
+
+export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = false }: ConsultationWorkspaceProps = {}) {
+  const { id: paramId } = useParams<{ id: string }>();
+  const appointmentId = appointmentIdOverride || paramId;
   const navigate = useNavigate();
   const location = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
@@ -817,43 +823,45 @@ export function ConsultationWorkspacePage() {
   return (
     <div className="space-y-6">
       {/* Consultation Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-slate-900">Consultation Workspace</h1>
-            <Badge tone={appointment.status === "completed" ? "success" : appointment.status === "in_consultation" ? "warning" : "info"}>
-              {appointment.status === "in_consultation" ? "In Progress" : appointment.status === "completed" ? "Completed" : appointment.status.toUpperCase()}
-            </Badge>
-            {appointment.status === "in_consultation" && workspaceData?.draftSession && (
-              <span className="text-xs text-emerald-600 font-medium flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                {isSavingDraft ? "Saving..." : lastSavedTime ? `Draft saved at ${lastSavedTime}` : "Draft saved automatically"}
-              </span>
-            )}
+      {!isEmbedded && (
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-bold text-slate-900">Consultation Workspace</h1>
+              <Badge tone={appointment.status === "completed" ? "success" : appointment.status === "in_consultation" ? "warning" : "info"}>
+                {appointment.status === "in_consultation" ? "In Progress" : appointment.status === "completed" ? "Completed" : appointment.status.toUpperCase()}
+              </Badge>
+              {appointment.status === "in_consultation" && workspaceData?.draftSession && (
+                <span className="text-xs text-emerald-600 font-medium flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  {isSavingDraft ? "Saving..." : lastSavedTime ? `Draft saved at ${lastSavedTime}` : "Draft saved automatically"}
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-slate-500 mt-1">
+              Attending Patient: <span className="font-semibold text-slate-700">{patient.name}</span> (UHID: {patient.uhid})
+            </p>
           </div>
-          <p className="text-sm text-slate-500 mt-1">
-            Attending Patient: <span className="font-semibold text-slate-700">{patient.name}</span> (UHID: {patient.uhid})
-          </p>
-        </div>
 
-        <div className="flex gap-2">
-          {appointment.status === "checked_in" && (
-            <Button variant="primary" onClick={handleStartConsultation} disabled={startConsultationMutation.isPending}>
-              Start Consultation
+          <div className="flex gap-2">
+            {appointment.status === "checked_in" && (
+              <Button variant="primary" onClick={handleStartConsultation} disabled={startConsultationMutation.isPending}>
+                Start Consultation
+              </Button>
+            )}
+
+            {appointment.status === "in_consultation" && (
+              <Button variant="primary" onClick={handleCompleteConsultation} disabled={completeDraftMutation.isPending}>
+                Complete Consultation
+              </Button>
+            )}
+
+            <Button variant="secondary" onClick={() => navigate(-1)}>
+              Back to Dashboard
             </Button>
-          )}
-
-          {appointment.status === "in_consultation" && (
-            <Button variant="primary" onClick={handleCompleteConsultation} disabled={completeDraftMutation.isPending}>
-              Complete Consultation
-            </Button>
-          )}
-
-          <Button variant="secondary" onClick={() => navigate(-1)}>
-            Back to Dashboard
-          </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         {/* Left column: Patient quick details */}

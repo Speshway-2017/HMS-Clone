@@ -89,10 +89,10 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
 
   // Active drawer overlay controller
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
-  
+
   // Real-time dynamic ticking date and time clock
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
-  
+
   // Profile menu dropdown toggle
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
@@ -357,7 +357,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
       return;
     }
     setNurseNoteSubmitting(true);
-    
+
     const payload = {
       observationType: noteObservationType,
       painAssessment: notePainAssessment,
@@ -428,7 +428,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
     if (!val) return false;
     const num = parseFloat(val);
     if (isNaN(num)) return false;
-    
+
     switch (field) {
       case "temp":
         return num < 95 || num > 100.4;
@@ -478,7 +478,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
       toast.error("Please select a patient, medicine, and action.");
       return;
     }
-    
+
     if ((medAction === "Skipped" || medAction === "Rescheduled") && !medRemarks.trim()) {
       toast.error(`Please provide remarks detailing why this medicine is being ${medAction.toLowerCase()}.`);
       return;
@@ -499,7 +499,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
         remarks: medRemarks
       });
       toast.success(`Medication dose successfully logged as: ${medAction}`);
-      
+
       // Reset form states
       setSelectedMedOrderId(null);
       setMedAction(null);
@@ -696,10 +696,10 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
     const nurseId = staff?._id;
     const nurseEmail = staff?.email || user?.email;
     if (!item.assignedNurse) return false;
-    
+
     const matchId = item.assignedNurse === nurseId || (typeof item.assignedNurse === "object" && item.assignedNurse?._id === nurseId);
     const matchEmail = typeof item.assignedNurse === "object" && item.assignedNurse?.email === nurseEmail;
-    
+
     return matchId || matchEmail;
   });
 
@@ -806,17 +806,17 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
 
   // Calculate dynamic dashboard stats
   const totalAssignedCount = currentInpatients.length;
-  
+
   // Critical cases = priority is Emergency or Urgent
   const criticalCount = currentInpatients.filter((p: any) => p.priority === "Emergency" || p.priority === "Urgent").length;
-  
+
   // Pending vitals: patients who have NO vitals recorded yet
   const pendingVitalsCount = currentInpatients.filter((p: any) => !p.vitals || p.vitals.length === 0).length;
-  
+
   // Pending medications count: count of active medications across all inpatients
-  const pendingMedsCount = currentInpatients.reduce((acc: number, p: any) => 
+  const pendingMedsCount = currentInpatients.reduce((acc: number, p: any) =>
     acc + (p.medicationOrders?.filter((m: any) => m.status === "active").length || 0)
-  , 0);
+    , 0);
 
   // Emergency Alerts: count patients with priority === Emergency
   const emergencyAlertsCount = currentInpatients.filter((p: any) => p.priority === "Emergency").length;
@@ -901,7 +901,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
 
   return (
     <div className="space-y-8 pb-10 relative font-sans">
-      
+
       {viewingPatientDetailsId && isDetailInpatientLoading ? (
         <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
           <Loader2 className="h-10 w-10 text-navy-700 animate-spin" />
@@ -924,7 +924,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
         // PATIENT DETAILS READ-ONLY PAGE VIEW
         // ====================================================================
         <div className="space-y-6 animate-in fade-in duration-200">
-          
+
           {/* Top Header Card */}
           <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div className="flex items-center gap-4">
@@ -953,11 +953,10 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                   <h1 className="text-xl font-bold text-slate-800 tracking-tight">
                     {detailInpatient.patient?.name}
                   </h1>
-                  <span className={`text-[9px] font-extrabold uppercase border px-2 py-0.5 rounded-full tracking-wide ${
-                    detailInpatient.priority === "Emergency" || detailInpatient.priority === "Urgent"
+                  <span className={`text-[9px] font-extrabold uppercase border px-2 py-0.5 rounded-full tracking-wide ${detailInpatient.priority === "Emergency" || detailInpatient.priority === "Urgent"
                       ? "bg-rose-50 text-rose-700 border-rose-200 animate-pulse"
                       : "bg-slate-50 text-slate-700 border-slate-200"
-                  }`}>
+                    }`}>
                     {detailInpatient.priority} Priority
                   </span>
                 </div>
@@ -1022,10 +1021,10 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
 
           {/* Main details Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
+
             {/* Left and Middle Content Cards (8-span) */}
             <div className="lg:col-span-8 space-y-6">
-              
+
               {/* Current Diagnosis Card */}
               <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
                 <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
@@ -1148,9 +1147,8 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                             <td className="py-3 px-3 capitalize">{med.route}</td>
                             <td className="py-3 px-3 text-slate-500">{med.prescribingDoctorName}</td>
                             <td className="py-3 px-3">
-                              <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-md border ${
-                                med.status === "active" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-50 text-slate-400 border-slate-200"
-                              }`}>
+                              <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-md border ${med.status === "active" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-50 text-slate-400 border-slate-200"
+                                }`}>
                                 {med.status}
                               </span>
                             </td>
@@ -1202,7 +1200,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
 
             {/* Right Sidebar Content Cards (4-span) */}
             <div className="lg:col-span-4 space-y-6">
-              
+
               {/* Allergies Card (Alert Warning Style) */}
               <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-3 mb-3">
@@ -1324,7 +1322,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                   <ClipboardList className="h-4 w-4 text-navy-500" />
                   Recent Clinical Progress Notes
                 </h3>
-                
+
                 {detailInpatient.timeline && detailInpatient.timeline.length > 0 ? (
                   <div className="relative border-l border-slate-200 pl-4 space-y-4 max-h-[300px] overflow-y-auto pr-1">
                     {detailInpatient.timeline
@@ -1352,7 +1350,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
         </div>
       ) : activeTab === "inpatients" ? (
         <div className="space-y-6 animate-in fade-in duration-200">
-          
+
           {/* Header Card */}
           <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -1364,7 +1362,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                 <p className="text-xs text-slate-500 mt-0.5">Real-time clinical roster of admitted inpatients currently assigned to your care shifts.</p>
               </div>
             </div>
-            
+
             {/* Quick Metrics */}
             <div className="flex gap-4 self-start md:self-auto">
               <div className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5">
@@ -1383,7 +1381,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
           {/* Filtering Control Bar */}
           <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] space-y-4">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              
+
               {/* Search Patient */}
               <div className="relative flex-1">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -1398,7 +1396,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                   className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 text-sm outline-none transition focus:border-navy-500 focus:ring-2 focus:ring-navy-100"
                 />
                 {searchPatientQuery && (
-                  <button 
+                  <button
                     onClick={() => {
                       setSearchPatientQuery("");
                       setCurrentPage(1);
@@ -1419,7 +1417,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
 
             {/* Select Dropdown Filters Row */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-              
+
               {/* Ward Filter */}
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ward</label>
@@ -1540,7 +1538,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-bold text-slate-450 uppercase tracking-wider">
                     <th className="py-4 px-5">
-                      <button 
+                      <button
                         onClick={() => {
                           setSortField("uhid");
                           setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -1552,7 +1550,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                       </button>
                     </th>
                     <th className="py-4 px-5">
-                      <button 
+                      <button
                         onClick={() => {
                           setSortField("name");
                           setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -1567,7 +1565,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                     <th className="py-4 px-5">Blood</th>
                     <th className="py-4 px-5">Assigned Doctor</th>
                     <th className="py-4 px-5">
-                      <button 
+                      <button
                         onClick={() => {
                           setSortField("room");
                           setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -1580,7 +1578,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                     </th>
                     <th className="py-4 px-5 min-w-[130px]">Diagnosis (Read Only)</th>
                     <th className="py-4 px-5">
-                      <button 
+                      <button
                         onClick={() => {
                           setSortField("admissionDate");
                           setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -1592,7 +1590,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                       </button>
                     </th>
                     <th className="py-4 px-5">
-                      <button 
+                      <button
                         onClick={() => {
                           setSortField("status");
                           setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -1629,7 +1627,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                           <ClipboardList className="h-10 w-10 text-slate-300 mx-auto mb-2.5 animate-bounce" />
                           <h3 className="text-sm font-bold text-slate-700">No Patients Found</h3>
                           <p className="text-xs text-slate-450 mt-1">
-                            {assignedPatients.length === 0 
+                            {assignedPatients.length === 0
                               ? "No patients are currently assigned to your shift profile. Please verify assignments."
                               : "No patients match the search query or active filter settings."}
                           </p>
@@ -1675,8 +1673,8 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                       }
 
                       return (
-                        <tr 
-                          key={index} 
+                        <tr
+                          key={index}
                           className="hover:bg-slate-50 transition-colors border-b border-slate-100/50"
                         >
                           {/* Patient ID */}
@@ -1691,7 +1689,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                               <div className="h-8 w-8 rounded-full bg-navy-50 flex items-center justify-center text-navy-700 font-extrabold text-xs shrink-0">
                                 {patient.name?.charAt(0).toUpperCase() || "?"}
                               </div>
-                              <span 
+                              <span
                                 onClick={() => setViewingPatientDetailsId(patient._id)}
                                 className="font-bold text-slate-800 text-sm hover:text-navy-600 transition-colors cursor-pointer whitespace-nowrap"
                               >
@@ -1850,11 +1848,10 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                       <button
                         key={idx}
                         onClick={() => setCurrentPage(idx + 1)}
-                        className={`h-7.5 w-7.5 flex items-center justify-center rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          currentPage === idx + 1
+                        className={`h-7.5 w-7.5 flex items-center justify-center rounded-lg text-xs font-bold transition-all cursor-pointer ${currentPage === idx + 1
                             ? "bg-navy-700 text-white shadow-sm"
                             : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
-                        }`}
+                          }`}
                       >
                         {idx + 1}
                       </button>
@@ -1943,7 +1940,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                   })}
                 </p>
               </div>
-              
+
             </div>
           </div>
 
@@ -1968,7 +1965,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
             ) : (
               <>
                 {/* 1. Assigned Patients Card */}
-                <div 
+                <div
                   onClick={() => navigate("/nurse/inpatients")}
                   className="bg-navy-700 text-white rounded-2xl p-5 border border-navy-700 shadow-[0_4px_20px_rgba(0,0,0,0.02)] transition-all duration-300 cursor-pointer group"
                 >
@@ -1986,7 +1983,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                 </div>
 
                 {/* 2. Pending Vitals Card */}
-                <div 
+                <div
                   onClick={() => setActiveDrawer("vitals")}
                   className="bg-white rounded-2xl p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] transition-all duration-300 cursor-pointer group"
                 >
@@ -2013,7 +2010,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                 </div>
 
                 {/* 3. Pending Medications Card */}
-                <div 
+                <div
                   onClick={() => setActiveDrawer("meds")}
                   className="bg-white rounded-2xl p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] transition-all duration-300 cursor-pointer group"
                 >
@@ -2040,21 +2037,19 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                 </div>
 
                 {/* 4. Emergency Alerts Card */}
-                <div 
+                <div
                   onClick={() => setActiveDrawer("alerts")}
-                  className={`rounded-2xl p-5 border shadow-[0_4px_20px_rgba(0,0,0,0.02)] transition-all duration-300 cursor-pointer group ${
-                    emergencyAlertsCount > 0 
-                      ? "bg-rose-50/40 border-rose-200/80" 
+                  className={`rounded-2xl p-5 border shadow-[0_4px_20px_rgba(0,0,0,0.02)] transition-all duration-300 cursor-pointer group ${emergencyAlertsCount > 0
+                      ? "bg-rose-50/40 border-rose-200/80"
                       : "bg-white border-slate-100"
-                  }`}
+                    }`}
                 >
                   <div className="flex justify-between items-start">
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">Emergency Alerts</span>
-                    <div className={`p-2 rounded-xl ${
-                      emergencyAlertsCount > 0 
-                        ? "bg-rose-100 text-rose-700" 
+                    <div className={`p-2 rounded-xl ${emergencyAlertsCount > 0
+                        ? "bg-rose-100 text-rose-700"
                         : "bg-slate-100 text-slate-500"
-                    }`}>
+                      }`}>
                       <ShieldAlert className={`h-4.5 w-4.5 ${emergencyAlertsCount > 0 ? "animate-bounce" : ""}`} />
                     </div>
                   </div>
@@ -2085,9 +2080,9 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                   <p className="text-3xl font-extrabold text-slate-800 mt-2">{taskCompletionPercentage}%</p>
                   <div className="mt-3.5 space-y-1">
                     <div className="w-full bg-slate-100 rounded-full h-1.5">
-                      <div 
-                        className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500" 
-                        style={{ width: `${taskCompletionPercentage}%` }} 
+                      <div
+                        className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
+                        style={{ width: `${taskCompletionPercentage}%` }}
                       />
                     </div>
                     <span className="text-[9px] font-bold text-slate-400 mt-1 block">
@@ -2107,10 +2102,10 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
               <Grid className="h-4.5 w-4.5 text-navy-500" />
               Bedside Clinical Quick Actions
             </h2>
-            
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {/* 1. Assigned Patients */}
-              <div 
+              <div
                 onClick={() => navigate("/nurse/inpatients")}
                 className="bg-white rounded-2xl p-5 border border-slate-100 cursor-pointer flex flex-col justify-between h-32 group"
               >
@@ -2124,7 +2119,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
               </div>
 
               {/* 2. Record Vitals */}
-              <div 
+              <div
                 onClick={() => setActiveDrawer("vitals")}
                 className="bg-white rounded-2xl p-5 border border-slate-100 cursor-pointer flex flex-col justify-between h-32 group"
               >
@@ -2138,7 +2133,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
               </div>
 
               {/* 3. Medication Admin */}
-              <div 
+              <div
                 onClick={() => setActiveDrawer("meds")}
                 className="bg-white rounded-2xl p-5 border border-slate-100 cursor-pointer flex flex-col justify-between h-32 group"
               >
@@ -2152,7 +2147,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
               </div>
 
               {/* 4. Nursing Notes */}
-              <div 
+              <div
                 onClick={() => setActiveDrawer("notes")}
                 className="bg-white rounded-2xl p-5 border border-slate-100 cursor-pointer flex flex-col justify-between h-32 group"
               >
@@ -2166,7 +2161,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
               </div>
 
               {/* 5. Bedside Care */}
-              <div 
+              <div
                 onClick={() => setActiveDrawer("bedside")}
                 className="bg-white rounded-2xl p-5 border border-slate-100 cursor-pointer flex flex-col justify-between h-32 group"
               >
@@ -2180,7 +2175,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
               </div>
 
               {/* 6. Emergency Alerts */}
-              <div 
+              <div
                 onClick={() => setActiveDrawer("alerts")}
                 className="bg-white rounded-2xl p-5 border border-slate-100 cursor-pointer flex flex-col justify-between h-32 group"
               >
@@ -2194,7 +2189,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
               </div>
 
               {/* 7. Shift Handover */}
-              <div 
+              <div
                 onClick={() => {
                   setSelectedPatientId("");
                   setActiveDrawer("handover");
@@ -2211,7 +2206,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
               </div>
 
               {/* 8. Discharge Prep */}
-              <div 
+              <div
                 onClick={() => setActiveDrawer("discharge")}
                 className="bg-white rounded-2xl p-5 border border-slate-100 cursor-pointer flex flex-col justify-between h-32 group"
               >
@@ -2230,14 +2225,14 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
               BOTTOM GRID: SCHEDULE & RECENT ACTIVITIES
              ========================================== */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
+
             {/* Left Col: Today's Schedule Timeline (7-span) */}
             <div className="lg:col-span-7 space-y-4">
               <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                 <Calendar className="h-4 w-4 text-navy-500" />
                 Today's Schedule & Ward Activities
               </h2>
-              
+
               {showLoading ? (
                 <SkeletonTimeline />
               ) : showEmpty || databaseTimelineEvents.length === 0 ? (
@@ -2251,12 +2246,12 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                   <div className="relative border-l-2 border-slate-100 pl-6 space-y-6 max-h-[500px] overflow-y-auto pr-1">
                     {databaseTimelineEvents.map((item, idx) => (
                       <div key={idx} className="relative">
-                        
+
                         {/* Activity Bullet Node */}
                         <span className="absolute -left-[31px] top-0.5 rounded-full border-4 border-white p-1 shadow-sm shrink-0 bg-navy-500 text-white">
                           <Clock className="h-3 w-3" />
                         </span>
-                        
+
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs font-mono font-bold text-navy-600 bg-navy-50 border border-navy-100 px-2 py-0.5 rounded">
@@ -2266,13 +2261,13 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                               {item.patientName} (Room {item.roomNumber})
                             </h4>
                           </div>
-                          
+
                           {/* Event Type badge */}
                           <span className="self-start text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-navy-50 text-navy-700 border border-navy-100">
                             {item.eventType || "Care Entry"}
                           </span>
                         </div>
-                        
+
                         <p className="text-[11px] text-slate-500 mt-1 font-medium leading-relaxed max-w-xl">
                           {item.description}
                         </p>
@@ -2332,16 +2327,16 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
           ACTION OVERLAYS / DRAWERS
          ========================================== */}
       {activeDrawer && createPortal(
-        <div 
+        <div
           className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[999] transition-opacity duration-300 flex justify-end animate-in fade-in"
           onClick={() => setActiveDrawer(null)}
         >
           {/* Drawer Content Body */}
-          <div 
+          <div
             className="w-full max-w-md bg-white h-screen shadow-2xl p-5 overflow-y-auto flex flex-col justify-between animate-in slide-in-from-right duration-350 border-l border-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
-            
+
             {/* Drawer Header */}
             <div>
               <div className="flex justify-between items-center border-b border-slate-100 pb-4">
@@ -2360,8 +2355,8 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                     {activeDrawer === "discharge" && <><CheckCircle2 className="h-5 w-5 text-emerald-500" /> Inpatient Discharge Checklist</>}
                   </h3>
                 </div>
-                
-                <button 
+
+                <button
                   onClick={() => setActiveDrawer(null)}
                   className="p-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-500 hover:bg-slate-200 hover:text-slate-800 cursor-pointer transition-colors"
                 >
@@ -2397,41 +2392,39 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                           const isSelected = selectedPatientId === (patientData._id || item._id);
 
                           return (
-                            <div 
+                            <div
                               key={idx}
                               onClick={() => {
                                 setSelectedPatientId(patientData._id || item._id);
                                 toast.success(`Active selection: ${patientData.name}`);
                               }}
-                              className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                                isSelected
+                              className={`p-4 rounded-xl border transition-all cursor-pointer ${isSelected
                                   ? "bg-navy-50/50 border-navy-300 ring-1 ring-navy-300"
                                   : "bg-slate-50/50 border-slate-150 hover:bg-slate-55 hover:border-slate-350"
-                              }`}
+                                }`}
                             >
                               <div className="flex justify-between items-start">
                                 <div>
                                   <h4 className="text-xs font-bold text-slate-800">{patientData.name || "Unknown Patient"}</h4>
                                   <p className="text-[10px] text-slate-450 mt-0.5">UHID: {patientData.uhid || "—"} · {patientData.gender || "—"}, {patientData.age || "—"} yrs</p>
                                 </div>
-                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
-                                  item.priority === "Emergency" || item.priority === "Urgent"
-                                    ? "bg-rose-50 text-rose-700 border border-rose-100" 
+                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${item.priority === "Emergency" || item.priority === "Urgent"
+                                    ? "bg-rose-50 text-rose-700 border border-rose-100"
                                     : "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                                }`}>
+                                  }`}>
                                   {item.priority || "Routine"}
                                 </span>
                               </div>
-                              
+
                               <div className="border-t border-dashed border-slate-200 my-3" />
-                              
+
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px] font-semibold text-slate-550">
                                 <div>Room: <strong className="text-slate-700">{roomData.roomNumber || "N/A"}</strong></div>
                                 <div>Bed: <strong className="text-slate-700">{bedData.bedNumber || "N/A"}</strong></div>
                                 <div>Allergies: <strong className="text-rose-650">{patientData.allergies || "None"}</strong></div>
                                 <div>Blood: <strong className="text-slate-700">{patientData.bloodGroup || "N/A"}</strong></div>
                               </div>
-                              
+
                               <div className="mt-2 text-[10px]">
                                 <span className="text-slate-455">Admitting Doctor: </span>
                                 <strong className="text-slate-655 font-bold">{item.admittingDoctor?.name || "On Call Duty Doctor"}</strong>
@@ -2450,8 +2443,8 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                     const selectedAdmission = currentInpatients.find(
                       (item: any) => (item.patient?._id || item._id) === selectedPatientId
                     );
-                    const previousVitals = selectedAdmission?.vitals 
-                      ? [...selectedAdmission.vitals].reverse() 
+                    const previousVitals = selectedAdmission?.vitals
+                      ? [...selectedAdmission.vitals].reverse()
                       : [];
 
                     return (
@@ -2459,7 +2452,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                         <form onSubmit={handleSubmitVitals} className="space-y-4">
                           <div>
                             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Select Patient</label>
-                            <select 
+                            <select
                               required
                               value={selectedPatientId}
                               onChange={(e) => {
@@ -2486,9 +2479,8 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. 98.6"
                                 value={vitalsTemp}
                                 onChange={(e) => setVitalsTemp(e.target.value)}
-                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-navy-500 ${
-                                  isVitalAbnormal("temp", vitalsTemp) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
-                                }`}
+                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-navy-500 ${isVitalAbnormal("temp", vitalsTemp) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
+                                  }`}
                               />
                             </div>
                             {/* Pulse */}
@@ -2499,9 +2491,8 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. 72"
                                 value={vitalsPulse}
                                 onChange={(e) => setVitalsPulse(e.target.value)}
-                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-navy-500 ${
-                                  isVitalAbnormal("pulse", vitalsPulse) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
-                                }`}
+                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-navy-500 ${isVitalAbnormal("pulse", vitalsPulse) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
+                                  }`}
                               />
                             </div>
                             {/* BP */}
@@ -2512,9 +2503,8 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. 120/80"
                                 value={vitalsBp}
                                 onChange={(e) => setVitalsBp(e.target.value)}
-                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-navy-500 ${
-                                  isVitalAbnormal("bp", vitalsBp) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
-                                }`}
+                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-navy-500 ${isVitalAbnormal("bp", vitalsBp) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
+                                  }`}
                               />
                             </div>
                             {/* Resp */}
@@ -2525,9 +2515,8 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. 16"
                                 value={vitalsResp}
                                 onChange={(e) => setVitalsResp(e.target.value)}
-                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-navy-500 ${
-                                  isVitalAbnormal("resp", vitalsResp) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
-                                }`}
+                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-navy-500 ${isVitalAbnormal("resp", vitalsResp) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
+                                  }`}
                               />
                             </div>
                             {/* SpO2 */}
@@ -2538,9 +2527,8 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. 98"
                                 value={vitalsO2}
                                 onChange={(e) => setVitalsO2(e.target.value)}
-                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-navy-500 ${
-                                  isVitalAbnormal("spo2", vitalsO2) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
-                                }`}
+                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-navy-500 ${isVitalAbnormal("spo2", vitalsO2) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
+                                  }`}
                               />
                             </div>
                             {/* Sugar */}
@@ -2551,9 +2539,8 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. 110"
                                 value={vitalsBloodSugar}
                                 onChange={(e) => setVitalsBloodSugar(e.target.value)}
-                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-navy-500 ${
-                                  isVitalAbnormal("sugar", vitalsBloodSugar) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
-                                }`}
+                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-navy-500 ${isVitalAbnormal("sugar", vitalsBloodSugar) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
+                                  }`}
                               />
                             </div>
                             {/* Height */}
@@ -2642,7 +2629,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                           ) : (
                             <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
                               {previousVitals.map((v: any, vIdx: number) => (
-                                <div 
+                                <div
                                   key={v._id || vIdx}
                                   className="p-3.5 bg-slate-50 border border-slate-150 rounded-xl space-y-2.5 relative group hover:border-navy-200 transition-colors"
                                 >
@@ -2663,7 +2650,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                       <FileEdit className="h-3 w-3" /> Edit
                                     </button>
                                   </div>
-                                  
+
                                   <div className="grid grid-cols-3 gap-x-2 gap-y-1.5 text-[10px] font-semibold text-slate-500">
                                     <div>
                                       Temp: <span className={`font-bold ${isVitalAbnormal("temp", v.temperature) ? "text-red-650 font-bold bg-red-50 border border-red-200 px-1 rounded" : "text-slate-800"}`}>{v.temperature ? `${v.temperature}°F` : "—"}</span>
@@ -2718,7 +2705,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                         {/* Selected Patient Selector */}
                         <div>
                           <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Select Patient</label>
-                          <select 
+                          <select
                             required
                             value={selectedPatientId}
                             onChange={(e) => {
@@ -2791,11 +2778,11 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                       rows={2}
                                       required={medAction === "Skipped" || medAction === "Rescheduled"}
                                       placeholder={
-                                        medAction === "Skipped" 
-                                          ? "Detail why this dose is being skipped (e.g. patient sleeping, out for scan)..." 
-                                          : medAction === "Rescheduled" 
-                                          ? "Detail justification for schedule change (e.g. physician instruction)..." 
-                                          : "e.g. Well tolerated, taken with meals..."
+                                        medAction === "Skipped"
+                                          ? "Detail why this dose is being skipped (e.g. patient sleeping, out for scan)..."
+                                          : medAction === "Rescheduled"
+                                            ? "Detail justification for schedule change (e.g. physician instruction)..."
+                                            : "e.g. Well tolerated, taken with meals..."
                                       }
                                       value={medRemarks}
                                       onChange={(e) => setMedRemarks(e.target.value)}
@@ -2847,7 +2834,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                             <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
                               {prescriptions.map((med: any, idx: number) => (
                                 <div key={med._id || idx} className="p-3.5 bg-slate-50 border border-slate-155 rounded-xl space-y-3 hover:border-indigo-250 transition-colors">
-                                  
+
                                   {/* Medicine Card Metadata */}
                                   <div className="flex justify-between items-start gap-2">
                                     <div>
@@ -2856,11 +2843,10 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                         Route: <strong className="text-slate-700">{med.route || "Oral"}</strong> · Dose: <strong className="text-slate-700">{med.dosage}</strong>
                                       </p>
                                     </div>
-                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${
-                                      med.status === "active" || med.status === "resumed"
+                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${med.status === "active" || med.status === "resumed"
                                         ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
                                         : "bg-amber-50 text-amber-700 border border-amber-100"
-                                    }`}>
+                                      }`}>
                                       {med.status || "active"}
                                     </span>
                                   </div>
@@ -2918,13 +2904,12 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                         {med.administrationLogs.map((log: any, lIdx: number) => (
                                           <div key={log._id || lIdx} className="bg-white border border-slate-100 p-2 rounded-lg text-[9px] text-slate-500 space-y-1">
                                             <div className="flex justify-between items-center font-bold">
-                                              <span className={`px-1.5 py-0.2 rounded text-[8px] uppercase ${
-                                                log.action === "Administered" 
-                                                  ? "bg-emerald-50 text-emerald-700" 
+                                              <span className={`px-1.5 py-0.2 rounded text-[8px] uppercase ${log.action === "Administered"
+                                                  ? "bg-emerald-50 text-emerald-700"
                                                   : log.action === "Skipped"
-                                                  ? "bg-rose-50 text-rose-700"
-                                                  : "bg-amber-50 text-amber-700"
-                                              }`}>{log.action}</span>
+                                                    ? "bg-rose-50 text-rose-700"
+                                                    : "bg-amber-50 text-amber-700"
+                                                }`}>{log.action}</span>
                                               <span className="text-[8px] text-slate-400">
                                                 {new Date(log.timestamp).toLocaleString()}
                                               </span>
@@ -2962,7 +2947,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                     const selectedAdmission = currentInpatients.find(
                       (item: any) => (item.patient?._id || item._id) === selectedPatientId
                     );
-                    
+
                     const docNotes = (selectedAdmission?.progressNotes || []).map((n: any) => ({
                       ...n,
                       _id: n._id || n.id,
@@ -3002,7 +2987,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
 
                     return (
                       <div className="space-y-6">
-                        
+
                         {/* Selector and Main Form */}
                         <form onSubmit={handleSubmitNurseNote} className="space-y-4">
                           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
@@ -3024,7 +3009,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                           {/* Patient Selector */}
                           <div>
                             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Select Patient</label>
-                            <select 
+                            <select
                               required
                               value={selectedPatientId}
                               onChange={(e) => {
@@ -3237,23 +3222,21 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 const isOwnNurseNote = !isDoctor && staff && note.recordedBy?.toString() === staff._id?.toString();
 
                                 return (
-                                  <div 
+                                  <div
                                     key={note._id || idx}
-                                    className={`p-3.5 border rounded-xl space-y-2 relative transition-colors ${
-                                      isDoctor 
-                                        ? "bg-blue-50/40 border-blue-150" 
+                                    className={`p-3.5 border rounded-xl space-y-2 relative transition-colors ${isDoctor
+                                        ? "bg-blue-50/40 border-blue-150"
                                         : "bg-slate-50 border-slate-150 hover:border-violet-200"
-                                    }`}
+                                      }`}
                                   >
                                     {/* Note Metadata Header */}
                                     <div className="flex justify-between items-start gap-2">
                                       <div>
                                         <div className="flex items-center gap-2 flex-wrap">
-                                          <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded uppercase ${
-                                            isDoctor 
-                                              ? "bg-blue-100 text-blue-700 border border-blue-200" 
+                                          <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded uppercase ${isDoctor
+                                              ? "bg-blue-100 text-blue-700 border border-blue-200"
                                               : "bg-violet-100 text-violet-750 border border-violet-200"
-                                          }`}>
+                                            }`}>
                                             {isDoctor ? "Doctor Note" : `Nurse Note · ${note.observationType}`}
                                           </span>
                                           <span className="text-[10px] text-slate-450 font-bold">
@@ -3348,7 +3331,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
 
                     return (
                       <form onSubmit={(e) => handleSaveBedsideChecks(e)} className="space-y-5">
-                        
+
                         {/* Selector */}
                         <div>
                           <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Select Patient</label>
@@ -3374,7 +3357,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                             </span>
                           </div>
                           <div className="w-full bg-slate-150 h-2.5 rounded-full overflow-hidden mt-1">
-                            <div 
+                            <div
                               className="bg-pink-500 h-full rounded-full transition-all duration-300"
                               style={{ width: `${progressPercent}%` }}
                             />
@@ -3385,7 +3368,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                         <div className="space-y-2.5">
                           <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide">Daily Bedside Nursing Checklist</label>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50/50 border border-slate-150 rounded-2xl">
-                            
+
                             {[
                               { label: "Bed Position", val: bedsideBedPosition, set: setBedsideBedPosition },
                               { label: "Patient Hygiene", val: bedsidePatientHygiene, set: setBedsidePatientHygiene },
@@ -3402,7 +3385,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                               { label: "Fluid Intake", val: bedsideFluidIntake, set: setBedsideFluidIntake },
                               { label: "Output Monitoring", val: bedsideOutputMonitoring, set: setBedsideOutputMonitoring },
                             ].map((item, idx) => (
-                              <label 
+                              <label
                                 key={idx}
                                 className="flex items-center gap-2.5 bg-white border border-slate-150 p-2.5 rounded-xl cursor-pointer hover:border-pink-300 transition-colors select-none"
                               >
@@ -3508,13 +3491,12 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 return (
                                   <div key={log._id || lIdx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
                                     <div className="flex justify-between items-center text-[10px] font-bold">
-                                      <span className={`px-2 py-0.5 rounded text-[8px] uppercase ${
-                                        log.completionStatus === "Completed" 
+                                      <span className={`px-2 py-0.5 rounded text-[8px] uppercase ${log.completionStatus === "Completed"
                                           ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
                                           : log.completionStatus === "Partially Completed"
-                                          ? "bg-amber-50 text-amber-700 border border-amber-100"
-                                          : "bg-blue-50 text-blue-700 border border-blue-100"
-                                      }`}>
+                                            ? "bg-amber-50 text-amber-700 border border-amber-100"
+                                            : "bg-blue-50 text-blue-700 border border-blue-100"
+                                        }`}>
                                         {log.completionStatus}
                                       </span>
                                       <span className="text-[9px] text-slate-400 font-bold">
@@ -3564,14 +3546,14 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
 
                     <div className="space-y-3">
                       <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide">Emergency Priority Patients</label>
-                      
+
                       {criticalCount === 0 ? (
                         <p className="text-xs text-slate-455 text-center py-6">All admitted inpatients categorized as routine priority.</p>
                       ) : (
                         currentInpatients
                           .filter((item: any) => item.priority === "Emergency" || item.priority === "Urgent")
                           .map((item: any, idx: number) => (
-                            <div 
+                            <div
                               key={idx}
                               className="p-4 rounded-xl border border-red-150 bg-red-50/50"
                             >
@@ -3671,7 +3653,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                   <form onSubmit={handleSubmitHandover} className="space-y-4">
                     <div>
                       <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Select Patient context</label>
-                      <select 
+                      <select
                         required
                         value={selectedPatientId}
                         onChange={(e) => setSelectedPatientId(e.target.value)}
@@ -3688,16 +3670,15 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
 
                     <div className="space-y-2 border border-slate-150 rounded-xl p-3 bg-slate-50/50">
                       {handoverChecks.map((check) => (
-                        <div 
+                        <div
                           key={check.id}
                           onClick={() => {
                             setHandoverChecks(prev => prev.map(c => c.id === check.id ? { ...c, done: !c.done } : c));
                           }}
                           className="flex items-center gap-2 py-1.5 cursor-pointer"
                         >
-                          <span className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
-                            check.done ? "bg-amber-600 border-amber-600 text-white" : "border-slate-300 bg-white"
-                          }`}>
+                          <span className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${check.done ? "bg-amber-600 border-amber-600 text-white" : "border-slate-300 bg-white"
+                            }`}>
                             {check.done && <CheckCircle className="h-3 w-3" />}
                           </span>
                           <span className="text-xs font-semibold text-slate-705">{check.label}</span>
@@ -3740,7 +3721,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                 {/* 8. DISCHARGE PREPARATION CHECKLIST */}
                 {activeDrawer === "discharge" && (
                   <form onSubmit={handleDischargePrepSubmit} className="space-y-4 text-xs font-semibold text-slate-655">
-                    
+
                     {/* Clinical Alert Warning */}
                     <div className="bg-amber-50 border border-amber-200 text-amber-900 p-3 rounded-xl space-y-1">
                       <div className="flex items-center gap-1.5 font-bold text-[10px] uppercase">
@@ -3771,123 +3752,114 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
 
                     {selectedPatientId && (
                       <div className="space-y-4">
-                        
+
                         {/* Checklist Section */}
                         <div className="space-y-2.5 border border-slate-150 rounded-xl p-3 bg-slate-50/50">
                           <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Preparation Checklist</span>
-                          
+
                           {/* 1. Doctor Approval Status */}
-                          <div 
+                          <div
                             onClick={() => setPrepDoctorApproval(!prepDoctorApproval)}
                             className="flex items-center gap-2.5 py-1 cursor-pointer select-none"
                           >
-                            <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                              prepDoctorApproval ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 bg-white"
-                            }`}>
+                            <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${prepDoctorApproval ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 bg-white"
+                              }`}>
                               {prepDoctorApproval && <CheckCircle className="h-3 w-3" />}
                             </span>
                             <span className="text-xs font-semibold text-slate-700">Doctor Approval Status</span>
                           </div>
 
                           {/* 2. Final Vital Signs */}
-                          <div 
+                          <div
                             onClick={() => setPrepFinalVitals(!prepFinalVitals)}
                             className="flex items-center gap-2.5 py-1 cursor-pointer select-none"
                           >
-                            <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                              prepFinalVitals ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 bg-white"
-                            }`}>
+                            <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${prepFinalVitals ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 bg-white"
+                              }`}>
                               {prepFinalVitals && <CheckCircle className="h-3 w-3" />}
                             </span>
                             <span className="text-xs font-semibold text-slate-700">Final Vital Signs Recorded</span>
                           </div>
 
                           {/* 3. Medication Completed */}
-                          <div 
+                          <div
                             onClick={() => setPrepMedicationCompleted(!prepMedicationCompleted)}
                             className="flex items-center gap-2.5 py-1 cursor-pointer select-none"
                           >
-                            <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                              prepMedicationCompleted ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 bg-white"
-                            }`}>
+                            <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${prepMedicationCompleted ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 bg-white"
+                              }`}>
                               {prepMedicationCompleted && <CheckCircle className="h-3 w-3" />}
                             </span>
                             <span className="text-xs font-semibold text-slate-700">Medications Completed</span>
                           </div>
 
                           {/* 4. Patient Education Completed */}
-                          <div 
+                          <div
                             onClick={() => setPrepEducationCompleted(!prepEducationCompleted)}
                             className="flex items-center gap-2.5 py-1 cursor-pointer select-none"
                           >
-                            <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                              prepEducationCompleted ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 bg-white"
-                            }`}>
+                            <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${prepEducationCompleted ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 bg-white"
+                              }`}>
                               {prepEducationCompleted && <CheckCircle className="h-3 w-3" />}
                             </span>
                             <span className="text-xs font-semibold text-slate-700">Patient Education Completed</span>
                           </div>
 
                           {/* 5. Pending Nursing Tasks */}
-                          <div 
+                          <div
                             onClick={() => setPrepPendingNursingTasks(!prepPendingNursingTasks)}
                             className="flex items-center gap-2.5 py-1 cursor-pointer select-none"
                           >
-                            <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                              prepPendingNursingTasks ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 bg-white"
-                            }`}>
+                            <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${prepPendingNursingTasks ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 bg-white"
+                              }`}>
                               {prepPendingNursingTasks && <CheckCircle className="h-3 w-3" />}
                             </span>
                             <span className="text-xs font-semibold text-slate-700">All Nursing Tasks Completed</span>
                           </div>
 
                           {/* 6. Medical Equipment Returned */}
-                          <div 
+                          <div
                             onClick={() => setPrepEquipmentReturned(!prepEquipmentReturned)}
                             className="flex items-center gap-2.5 py-1 cursor-pointer select-none"
                           >
-                            <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                              prepEquipmentReturned ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 bg-white"
-                            }`}>
+                            <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${prepEquipmentReturned ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 bg-white"
+                              }`}>
                               {prepEquipmentReturned && <CheckCircle className="h-3 w-3" />}
                             </span>
                             <span className="text-xs font-semibold text-slate-700">Medical Equipment Returned</span>
                           </div>
 
                           {/* 7. Discharge Documents Ready */}
-                          <div 
+                          <div
                             onClick={() => setPrepDocsReady(!prepDocsReady)}
                             className="flex items-center gap-2.5 py-1 cursor-pointer select-none"
                           >
-                            <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                              prepDocsReady ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 bg-white"
-                            }`}>
+                            <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${prepDocsReady ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 bg-white"
+                              }`}>
                               {prepDocsReady && <CheckCircle className="h-3 w-3" />}
                             </span>
                             <span className="text-xs font-semibold text-slate-700">Discharge Summaries/Docs Ready</span>
                           </div>
 
                           {/* 8. Wheelchair Required */}
-                          <div 
+                          <div
                             onClick={() => setPrepWheelchairRequired(!prepWheelchairRequired)}
                             className="flex items-center gap-2.5 py-1 cursor-pointer select-none"
                           >
-                            <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                              prepWheelchairRequired ? "bg-blue-600 border-blue-600 text-white" : "border-slate-300 bg-white"
-                            }`}>
+                            <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${prepWheelchairRequired ? "bg-blue-600 border-blue-600 text-white" : "border-slate-300 bg-white"
+                              }`}>
                               {prepWheelchairRequired && <CheckCircle className="h-3 w-3" />}
                             </span>
                             <span className="text-xs font-semibold text-slate-700 font-bold text-blue-700">Wheelchair Required for Transit</span>
                           </div>
 
                           {/* 9. Transport Required */}
-                          <div 
+                          <div
                             onClick={() => setPrepTransportRequired(!prepTransportRequired)}
                             className="flex items-center gap-2.5 py-1 cursor-pointer select-none"
                           >
-                            <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                              prepTransportRequired ? "bg-indigo-600 border-indigo-600 text-white" : "border-slate-300 bg-white"
-                            }`}>
+                            <span className={`h-4.5 w-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${prepTransportRequired ? "bg-indigo-600 border-indigo-600 text-white" : "border-slate-300 bg-white"
+                              }`}>
                               {prepTransportRequired && <CheckCircle className="h-3 w-3" />}
                             </span>
                             <span className="text-xs font-semibold text-slate-700 font-bold text-indigo-700">Special Transport/Ambulance Booked</span>
@@ -3926,7 +3898,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                           disabled={prepSubmitting}
                           className="w-full py-2.5 bg-emerald-655 hover:bg-emerald-700 text-white font-bold rounded-xl flex items-center justify-center gap-1.5 text-xs shadow-sm cursor-pointer transition-all active:scale-98"
                         >
-                          <CheckCircle2 className="h-4.5 w-4.5" /> 
+                          <CheckCircle2 className="h-4.5 w-4.5" />
                           {prepSubmitting ? "Saving Checklist..." : "Save Discharge Prep Data"}
                         </button>
 
@@ -3940,14 +3912,14 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
 
             {/* Drawer Footer Actions */}
             <div className="border-t border-slate-100 pt-4 mt-6 flex justify-end gap-2">
-              <button 
+              <button
                 onClick={() => setActiveDrawer(null)}
                 className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-650 hover:bg-slate-50 cursor-pointer"
               >
                 Close Drawer
               </button>
             </div>
-            
+
           </div>
         </div>,
         document.body

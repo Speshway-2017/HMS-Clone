@@ -208,6 +208,7 @@ export interface Appointment {
   time: string;
   type: string;
   status: "pending_payment" | "scheduled" | "checked_in" | "in_consultation" | "completed" | "cancelled" | "no_show";
+  meetingLink?: string;
   notes: string;
   chiefComplaint?: string;
   symptoms?: string;
