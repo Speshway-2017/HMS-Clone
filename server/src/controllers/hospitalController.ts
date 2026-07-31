@@ -207,8 +207,29 @@ export const getPublicHospitalDoctors = catchAsync(async (_req: Request, res: Re
     return res.json({ status: "success", data: { doctors: [] } });
   }
   const doctors = await Doctor.find({ hospital: hospital._id, isActive: { $ne: false } })
-    .populate("department", "name");
+    .populate("department", "name consultationFee");
   res.json({ status: "success", data: { doctors } });
+});
+
+export const getPublicBookedSlots = catchAsync(async (req: Request, res: Response) => {
+  const { doctorId, date } = req.query as Record<string, string>;
+  if (!doctorId || !date) {
+    return res.json({ status: "success", data: { bookedSlots: [] } });
+  }
+  const parsedDate = new Date(date);
+  const startOfDay = new Date(parsedDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(parsedDate);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const appointments = await Appointment.find({
+    doctor: doctorId,
+    date: { $gte: startOfDay, $lte: endOfDay },
+    status: { $nin: ["cancelled", "no_show"] }
+  }).select("time");
+
+  const bookedSlots = appointments.map(appt => appt.time?.trim()).filter(Boolean);
+  res.json({ status: "success", data: { bookedSlots } });
 });
 
 export const createPublicAppointment = catchAsync(async (req: Request, res: Response) => {

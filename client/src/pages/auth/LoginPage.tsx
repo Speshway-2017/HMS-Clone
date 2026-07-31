@@ -5,6 +5,8 @@ import { Button } from "../../components/ui/Button";
 import { ROLE_HOME_PATH } from "../../types/auth";
 import { usePublicHospital } from "../../features/hospitals";
 import { ShieldCheck, Lock, Activity, ArrowLeft, CheckCircle2, ChevronRight, Eye, EyeOff } from "lucide-react";
+import toast from "react-hot-toast";
+import { api } from "../../lib/api";
 
 export function LoginPage() {
   const { user, login } = useAuth();
@@ -57,8 +59,11 @@ export function LoginPage() {
     return () => clearInterval(timer);
   }, []);
 
+  const searchParams = new URLSearchParams(location.search);
+  const redirectParam = searchParams.get("redirect");
+
   if (user) {
-    const redirectTo = (location.state as { from?: string })?.from ?? ROLE_HOME_PATH[user.role] ?? "/";
+    const redirectTo = redirectParam || (location.state as { from?: string })?.from || ROLE_HOME_PATH[user.role] || "/";
     return <Navigate to={redirectTo} replace />;
   }
 
@@ -68,7 +73,14 @@ export function LoginPage() {
     setIsSubmitting(true);
     try {
       const loggedInUser = await login(identifier.trim(), password);
-      navigate(ROLE_HOME_PATH[loggedInUser.role] ?? "/", { replace: true });
+
+      if (sessionStorage.getItem("pendingAppointmentDraft") && loggedInUser.role === "patient") {
+        navigate("/patient?tab=appointments", { replace: true });
+        return;
+      }
+
+      const targetPath = redirectParam || (location.state as { from?: string })?.from || ROLE_HOME_PATH[loggedInUser.role] || "/";
+      navigate(targetPath, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");
     } finally {
