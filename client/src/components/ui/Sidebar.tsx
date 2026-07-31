@@ -55,7 +55,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             const isActive = item.path.includes("?")
               ? currentFullPath === item.path
               : item.label === "Dashboard"
-              ? (location.pathname === item.path && (!location.search || location.search === "?tab=overview"))
+              ? (location.pathname === item.path && (!location.search || location.search === "?tab=overview" || location.search === "?tab=dashboard"))
               : location.pathname === item.path || location.pathname.startsWith(item.path + "/");
 
             return (
