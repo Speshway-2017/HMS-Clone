@@ -37,12 +37,6 @@ import { PatientsPage } from "./pages/hospital-admin/PatientsPage";
 import { PatientDetailsPage } from "./pages/hospital-admin/PatientDetailsPage";
 import { AppointmentsPage } from "./pages/hospital-admin/AppointmentsPage";
 import { AppointmentDetailsPage } from "./pages/hospital-admin/AppointmentDetailsPage";
-import { StaffPage } from "./pages/hospital-admin/StaffPage";
-import { StaffFormPage } from "./pages/hospital-admin/StaffFormPage";
-import { StaffDetailsPage } from "./pages/hospital-admin/StaffDetailsPage";
-import { StaffAttendancePage } from "./pages/hospital-admin/StaffAttendancePage";
-import { LeaveManagementPage } from "./pages/hospital-admin/LeaveManagementPage";
-import { ShiftManagementPage } from "./pages/hospital-admin/ShiftManagementPage";
 import { FinancePage } from "./pages/hospital-admin/FinancePage";
 import { PatientInvoicePage } from "./pages/hospital-admin/PatientInvoicePage";
 import { InventoryPage } from "./pages/hospital-admin/InventoryPage";
@@ -208,13 +202,6 @@ export const router = createBrowserRouter([
           { path: "patients/:id", element: <PatientDetailsPage /> },
           { path: "appointments", element: <AppointmentsPage /> },
           { path: "appointments/:id", element: <AppointmentDetailsPage /> },
-          { path: "staff", element: <StaffPage /> },
-          { path: "staff/new", element: <StaffFormPage /> },
-          { path: "staff/:id", element: <StaffDetailsPage /> },
-          { path: "staff/:id/edit", element: <StaffFormPage /> },
-          { path: "staff-attendance", element: <StaffAttendancePage /> },
-          { path: "leave-management", element: <LeaveManagementPage /> },
-          { path: "shift-management", element: <ShiftManagementPage /> },
           { path: "departments", element: <DepartmentsPage /> },
           { path: "departments/new", element: <DepartmentFormPage /> },
           { path: "departments/:id/edit", element: <DepartmentFormPage /> },

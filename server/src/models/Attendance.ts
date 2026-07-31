@@ -2,15 +2,41 @@ import { Schema, model, InferSchemaType, Types } from "mongoose";
 
 export const ATTENDANCE_STATUSES = [
   "Present",
-  "Absent",
   "Half Day",
-  "Weekly Off",
-  "Holiday",
+  "Absent",
   "Paid Leave",
+  "Sick Leave",
+  "Casual Leave",
+  "Earned Leave",
+  "Maternity Leave",
+  "Paternity Leave",
+  "Emergency Leave",
   "Unpaid Leave (LOP)",
+  "Holiday",
+  "Weekly Off",
+  "Training",
+  "Official Duty",
 ] as const;
 
-export const SHIFTS = ["Morning", "Evening", "Night", "General"] as const;
+export const SHIFTS = [
+  "Morning",
+  "General",
+  "Evening",
+  "Night",
+  "Custom Shift",
+] as const;
+
+const auditHistorySchema = new Schema(
+  {
+    updatedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    updatedByName: { type: String, default: "Admin" },
+    timestamp: { type: Date, default: Date.now },
+    previousValues: { type: Schema.Types.Mixed, default: {} },
+    newValues: { type: Schema.Types.Mixed, default: {} },
+    reason: { type: String, default: "Manual Entry / Update" },
+  },
+  { _id: true }
+);
 
 const attendanceSchema = new Schema(
   {
@@ -26,26 +52,31 @@ const attendanceSchema = new Schema(
     date: { type: String, required: true }, // Format: YYYY-MM-DD
     checkInTime: { type: String, default: "" },
     checkOutTime: { type: String, default: "" },
+    breakMinutes: { type: Number, default: 0, min: 0 },
     workingHours: { type: Number, default: 8, min: 0 },
     overtimeHours: { type: Number, default: 0, min: 0 },
+    overtimeMinutes: { type: Number, default: 0, min: 0 },
+    overtimeReason: { type: String, default: "" },
     isLate: { type: Boolean, default: false },
     lateMinutes: { type: Number, default: 0, min: 0 },
     isEarlyExit: { type: Boolean, default: false },
     earlyExitMinutes: { type: Number, default: 0, min: 0 },
-    attendanceSource: { type: String, default: "Automatic Login" },
+    attendanceSource: { type: String, default: "Manual Admin Entry" },
     shiftRef: { type: Schema.Types.ObjectId, ref: "Shift", default: null },
     status: { type: String, enum: ATTENDANCE_STATUSES, required: true, default: "Present" },
     leaveRef: { type: Schema.Types.ObjectId, ref: "LeaveRequest", default: null },
     markedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     remarks: { type: String, default: "" },
 
-    // ── Manual Correction Fields (Admin-only, append-only history) ──────────
+    // ── Audit History Log (Every manual entry & modification) ──────────────────
+    auditHistory: [auditHistorySchema],
+
+    // ── Manual Correction Fields ──────────────────
     isManuallyCorrected: { type: Boolean, default: false },
-    correctionReason: { type: String, default: "" },   // e.g. "Login Failure"
-    correctionNote: { type: String, default: "" },      // Admin free-text note
+    correctionReason: { type: String, default: "" },
+    correctionNote: { type: String, default: "" },
     correctedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     correctedAt: { type: Date, default: null },
-    // Previous-value snapshot (set only on first correction; never overwritten)
     previousStatus: { type: String, default: "" },
     previousCheckIn: { type: String, default: "" },
     previousCheckOut: { type: String, default: "" },

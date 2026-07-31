@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   X,
   AlertTriangle,
@@ -26,13 +26,23 @@ interface Props {
 
 const STATUS_OPTIONS = [
   "Present",
-  "Absent",
   "Half Day",
-  "Weekly Off",
-  "Holiday",
+  "Absent",
   "Paid Leave",
+  "Sick Leave",
+  "Casual Leave",
+  "Earned Leave",
+  "Maternity Leave",
+  "Paternity Leave",
+  "Emergency Leave",
   "Unpaid Leave (LOP)",
+  "Holiday",
+  "Weekly Off",
+  "Training",
+  "Official Duty",
 ] as const;
+
+const SHIFT_OPTIONS = ["Morning", "General", "Evening", "Night", "Custom Shift"] as const;
 
 type AttendanceStatus = typeof STATUS_OPTIONS[number];
 

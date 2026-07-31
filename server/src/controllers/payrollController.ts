@@ -283,14 +283,14 @@ export const getPayrollSummary = catchAsync(async (req: Request, res: Response) 
         {
           $group: {
             _id: "$employeeId",
-            presentDays: { $sum: { $cond: [{ $eq: ["$status", "Present"] }, 1, 0] } },
+            presentDays: { $sum: { $cond: [{ $in: ["$status", ["Present", "Training", "Official Duty"]] }, 1, 0] } },
             absentDays: { $sum: { $cond: [{ $eq: ["$status", "Absent"] }, 1, 0] } },
             halfDays: { $sum: { $cond: [{ $eq: ["$status", "Half Day"] }, 1, 0] } },
-            paidLeaveDays: { $sum: { $cond: [{ $eq: ["$status", "Paid Leave"] }, 1, 0] } },
-            unpaidLeaveDays: { $sum: { $cond: [{ $eq: ["$status", "Unpaid Leave (LOP)"] }, 1, 0] } },
+            paidLeaveDays: { $sum: { $cond: [{ $in: ["$status", ["Paid Leave", "Sick Leave", "Casual Leave", "Earned Leave", "Maternity Leave", "Paternity Leave", "Emergency Leave"]] }, 1, 0] } },
+            unpaidLeaveDays: { $sum: { $cond: [{ $in: ["$status", ["Unpaid Leave (LOP)", "Absent"]] }, 1, 0] } },
             weeklyOffs: { $sum: { $cond: [{ $eq: ["$status", "Weekly Off"] }, 1, 0] } },
             holidays: { $sum: { $cond: [{ $eq: ["$status", "Holiday"] }, 1, 0] } },
-            overtimeHours: { $sum: "$overtimeHours" },
+            overtimeHours: { $sum: { $add: [{ $ifNull: ["$overtimeHours", 0] }, { $divide: [{ $ifNull: ["$overtimeMinutes", 0] }, 60] }] } },
           },
         },
       ]);

@@ -214,9 +214,8 @@ export function HospitalAdminDashboard() {
       </div>
 
       {/* Preserved Secondary KPI Grid & Quick Actions */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <KpiCard label="Doctors" value={counts?.totalDoctors ?? 0} icon={<Stethoscope className="h-5 w-5" />} to="/admin/doctors" />
-        <KpiCard label="Staff" value={counts?.totalStaff ?? 0} icon={<Users2 className="h-5 w-5" />} to="/admin/staff" />
         <KpiCard label="Patients" value={counts?.totalPatients ?? 0} icon={<Users2 className="h-5 w-5" />} to="/admin/patients" />
 
         <Card className="flex items-center justify-between p-4">

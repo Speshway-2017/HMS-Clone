@@ -357,8 +357,8 @@ export const login = catchAsync(async (req: Request, res: Response) => {
     entityId: user._id.toString(),
   });
 
-  // Automatically create today's attendance record for hospital employees on login
-  await handleAutoAttendanceOnLogin(user);
+  // Auto-attendance on login disabled per system design (Manual Admin Attendance only)
+  // await handleAutoAttendanceOnLogin(user);
 
   res.status(200).json({
     status: "success",

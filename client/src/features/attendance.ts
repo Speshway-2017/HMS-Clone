@@ -1,6 +1,35 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 
+export type AttendanceStatus =
+  | "Present"
+  | "Half Day"
+  | "Absent"
+  | "Paid Leave"
+  | "Sick Leave"
+  | "Casual Leave"
+  | "Earned Leave"
+  | "Maternity Leave"
+  | "Paternity Leave"
+  | "Emergency Leave"
+  | "Unpaid Leave (LOP)"
+  | "Holiday"
+  | "Weekly Off"
+  | "Training"
+  | "Official Duty";
+
+export type ShiftType = "Morning" | "General" | "Evening" | "Night" | "Custom Shift";
+
+export interface AttendanceAuditLog {
+  _id?: string;
+  updatedBy?: any;
+  updatedByName?: string;
+  timestamp?: string;
+  previousValues?: Record<string, any>;
+  newValues?: Record<string, any>;
+  reason?: string;
+}
+
 export interface AttendanceRecord {
   _id?: string;
   hospital: string;
@@ -11,21 +40,25 @@ export interface AttendanceRecord {
   employeeId: string;
   employeeName: string;
   designation: string;
-  shift: "Morning" | "Evening" | "Night" | "General";
+  shift: ShiftType;
   date: string;
   checkInTime: string;
   checkOutTime: string;
+  breakMinutes?: number;
   workingHours: number;
   overtimeHours: number;
+  overtimeMinutes?: number;
+  overtimeReason?: string;
   isLate: boolean;
   lateMinutes?: number;
   isEarlyExit: boolean;
   earlyExitMinutes?: number;
-  status: "Present" | "Absent" | "Half Day" | "Weekly Off" | "Holiday" | "Paid Leave" | "Unpaid Leave (LOP)";
+  status: AttendanceStatus;
   leaveRef?: string;
   markedBy?: any;
   remarks?: string;
   attendanceSource?: string;
+  auditHistory?: AttendanceAuditLog[];
   // Manual Correction Fields
   isManuallyCorrected?: boolean;
   correctionReason?: string;
@@ -41,11 +74,16 @@ export interface AttendanceRecord {
 }
 
 export interface AttendanceCorrectionPayload {
-  status?: AttendanceRecord["status"];
+  status?: AttendanceStatus;
+  shift?: ShiftType;
   checkInTime?: string;
   checkOutTime?: string;
+  breakMinutes?: number;
   workingHours?: number;
   overtimeHours?: number;
+  overtimeMinutes?: number;
+  overtimeReason?: string;
+  remarks?: string;
   isLate?: boolean;
   isEarlyExit?: boolean;
   correctionReason: string;   // required
