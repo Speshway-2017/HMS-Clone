@@ -33,9 +33,11 @@ import {
   User,
   Heart,
   Bell,
-  type LucideIcon,
+  Clock,
 } from "lucide-react";
 import { Role } from "../types/auth";
+import type { ComponentType } from "react";
+export type LucideIcon = ComponentType<any>;
 
 export interface NavItem {
   label: string;
@@ -62,6 +64,9 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "Patients", path: "/admin/patients", icon: Users },
     { label: "Appointments", path: "/admin/appointments", icon: CalendarClock },
     { label: "Staff", path: "/admin/staff", icon: UserCheck },
+    { label: "Staff Attendance", path: "/admin/staff-attendance", icon: CalendarClock },
+    { label: "Leave Management", path: "/admin/leave-management", icon: ClipboardCheck },
+    { label: "Shift Management", path: "/admin/shift-management", icon: Clock },
     { label: "Departments", path: "/admin/departments", icon: FolderTree },
     { label: "Revenue Analytics", path: "/admin/finance", icon: Wallet },
     { label: "Inventory", path: "/admin/inventory", icon: Boxes },
