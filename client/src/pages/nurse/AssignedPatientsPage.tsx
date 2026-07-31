@@ -1,8 +1,9 @@
 import { useState, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Users, Search, RefreshCw, Activity, Pill, FileText, Plus, Shield, Clock } from "lucide-react";
-import { useNurseInpatients, useSaveNurseVitals, useAddNurseNotes } from "../../features/nurse";
+import { Users, Search, RefreshCw, Activity, Pill, FileText, Plus, Shield, Clock, AlertTriangle } from "lucide-react";
+import { useNurseInpatients, useSaveNurseVitals, useSaveNurseNote } from "../../features/nurse";
 import { DataTable, Column } from "../../components/ui/DataTable";
+import { useStaffProfileMe } from "../../features/staff";
 
 export function AssignedPatientsPage() {
   const navigate = useNavigate();
@@ -28,8 +29,11 @@ export function AssignedPatientsPage() {
   const [noteFormText, setNoteFormText] = useState("");
 
   const { data: inpatients = [], isLoading, refetch } = useNurseInpatients();
-  const saveVitalsMutation = useSaveNurseVitals(vitalsModalPatient?._id || vitalsModalPatient?.patient?._id || "");
-  const saveNotesMutation = useAddNurseNotes(notesModalPatient?._id || notesModalPatient?.patient?._id || "");
+  const { data: staffMe } = useStaffProfileMe();
+  const isReadOnly = localStorage.getItem("nurse_shift_completed") === "true" || staffMe?.dutyStatus === "off_duty";
+
+  const saveVitalsMutation = useSaveNurseVitals(vitalsModalPatient?.patient?._id || (typeof vitalsModalPatient?.patient === 'string' ? vitalsModalPatient.patient : '') || vitalsModalPatient?._id || "");
+  const saveNotesMutation = useSaveNurseNote(notesModalPatient?.patient?._id || (typeof notesModalPatient?.patient === 'string' ? notesModalPatient.patient : '') || notesModalPatient?._id || "");
 
   const filteredPatients = useMemo(() => {
     return inpatients.filter((pt: any) => {
@@ -64,7 +68,10 @@ export function AssignedPatientsPage() {
     e.preventDefault();
     if (!notesModalPatient || !noteFormText.trim()) return;
     try {
-      await saveNotesMutation.mutateAsync({ notes: noteFormText });
+      await saveNotesMutation.mutateAsync({
+        observationType: "Shift Assessment",
+        additionalNotes: noteFormText,
+      });
       setNotesModalPatient(null);
       setNoteFormText("");
       refetch();
@@ -134,14 +141,24 @@ export function AssignedPatientsPage() {
       render: (row) => (
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setVitalsModalPatient(row)}
-            className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100"
+            onClick={() => !isReadOnly && setVitalsModalPatient(row)}
+            disabled={isReadOnly}
+            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+              isReadOnly 
+                ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-60" 
+                : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+            }`}
           >
             <Activity className="h-3.5 w-3.5" /> Log Vitals
           </button>
           <button
-            onClick={() => setNotesModalPatient(row)}
-            className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-200"
+            onClick={() => !isReadOnly && setNotesModalPatient(row)}
+            disabled={isReadOnly}
+            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+              isReadOnly 
+                ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-60" 
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
           >
             <FileText className="h-3.5 w-3.5" /> Add Note
           </button>
@@ -152,6 +169,17 @@ export function AssignedPatientsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Read-Only Status Banner */}
+      {isReadOnly && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs font-semibold text-amber-800 flex items-center gap-2 mb-4 animate-fadeIn">
+          <AlertTriangle className="h-4.5 w-4.5 text-amber-600 shrink-0 animate-pulse" />
+          <div>
+            <p className="font-bold text-amber-900">Shift Handed Over / Completed</p>
+            <p className="text-[11px] text-amber-705 mt-0.5">Your shift has been successfully completed. You are now in read-only mode. Recording new patient vitals and timeline notes is disabled.</p>
+          </div>
+        </div>
+      )}
+
       {/* Breadcrumb & Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4">
         <div>
@@ -163,13 +191,6 @@ export function AssignedPatientsPage() {
           <h1 className="mt-1 text-2xl font-black text-slate-900">Assigned Inpatients</h1>
           <p className="text-xs text-slate-500">Manage patients assigned to your active shift and monitor nursing activities.</p>
         </div>
-
-        <button
-          onClick={() => refetch()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50"
-        >
-          <RefreshCw className="h-4 w-4" /> Refresh Roster
-        </button>
       </div>
 
       {/* Main Table Container */}

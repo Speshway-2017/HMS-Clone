@@ -15,6 +15,8 @@ const shiftHandoverSchema = new Schema(
     nurseSignature: { type: String, required: true },
     loggedBy: { type: Schema.Types.ObjectId, ref: "Staff", required: true },
     loggedByName: { type: String, required: true },
+    incomingNurse: { type: Schema.Types.ObjectId, ref: "Staff" },
+    incomingNurseName: { type: String, default: "" },
     timestamp: { type: Date, default: Date.now }
   },
   { timestamps: true }

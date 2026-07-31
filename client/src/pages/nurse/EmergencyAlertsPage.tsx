@@ -145,13 +145,6 @@ export function EmergencyAlertsPage() {
           <h1 className="mt-1 text-2xl font-black text-slate-900">Emergency & Critical Alarms</h1>
           <p className="text-xs text-slate-500">Real-time clinical alarms, vitals notifications, and call bell responses.</p>
         </div>
-
-        <button
-          onClick={() => refetch()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
-        >
-          <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin text-navy-800" : ""}`} /> Refresh Alerts
-        </button>
       </div>
 
       {/* 13. KPI Cards on Top */}

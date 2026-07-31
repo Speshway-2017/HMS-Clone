@@ -28,6 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       tokenStorage.clear();
       tokenStorage.broadcastSessionEvent("LOGOUT");
+      localStorage.removeItem("nurse_shift_completed");
       setUser(null);
     }
   }, []);
@@ -109,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const loggedUser = res.data.data.user;
       tokenStorage.set(res.data.data.token, res.data.data.refreshToken);
       tokenStorage.broadcastSessionEvent("LOGIN", loggedUser.id);
+      localStorage.removeItem("nurse_shift_completed");
       setUser(loggedUser);
       return loggedUser;
     } catch (error) {

@@ -34,6 +34,104 @@ export function initSocket(server: HTTPServer, _clientUrl: string) {
       }
     });
 
+    // Telemedicine Consultation Room handlers
+    socket.on("join_consultation_room", (roomId: string) => {
+      if (roomId) {
+        socket.join(`telemedicine:${roomId}`);
+        console.log(`Socket ${socket.id} joined telemedicine room: telemedicine:${roomId}`);
+      }
+    });
+
+    socket.on("start_telemedicine_session", (data: { roomId: string; appointmentId: string; doctorName: string; meetUrl?: string }) => {
+      if (data?.roomId) {
+        io?.to(`telemedicine:${data.roomId}`).emit("telemedicine_session_started", data);
+        io?.to(`telemedicine:${data.roomId}`).emit("google_meet_session_started", data);
+        io?.emit("telemedicine_session_started", data);
+        io?.emit("google_meet_session_started", data);
+      }
+    });
+
+    socket.on("start_google_meet_session", (data: { roomId: string; appointmentId: string; doctorName: string; meetUrl: string }) => {
+      if (data?.roomId) {
+        io?.to(`telemedicine:${data.roomId}`).emit("google_meet_session_started", data);
+        io?.emit("google_meet_session_started", data);
+        io?.emit("start_google_meet_session", data);
+        io?.emit("meeting:created", data);
+        io?.emit("appointment_updated", { appointmentId: data.appointmentId || data.roomId, meetingLink: data.meetUrl });
+      }
+    });
+
+    socket.on("end_telemedicine_session", (data: { roomId: string; appointmentId: string }) => {
+      if (data?.roomId) {
+        io?.to(`telemedicine:${data.roomId}`).emit("telemedicine_session_ended", data);
+        io?.emit("telemedicine_session_ended", data);
+        io?.emit("appointment_updated", { appointmentId: data.appointmentId || data.roomId, status: "completed" });
+      }
+    });
+
+    socket.on("send_telemedicine_chat", (data: { roomId: string; sender: string; text: string; time: string }) => {
+      if (data?.roomId) {
+        io?.to(`telemedicine:${data.roomId}`).emit("telemedicine_chat_received", data);
+      }
+    });
+
+    // Enterprise Meeting & WebRTC Signaling Events
+    socket.on("meeting:create", (data: { roomId: string; appointmentId: string; doctorName: string; patientId?: string }) => {
+      if (data?.roomId) {
+        socket.join(`telemedicine:${data.roomId}`);
+        io?.to(`telemedicine:${data.roomId}`).emit("meeting:created", data);
+        io?.emit("telemedicine_session_started", data);
+        io?.emit("meeting:created", data);
+      }
+    });
+
+    socket.on("meeting:join", (data: { roomId: string; participantId?: string; role?: string }) => {
+      if (data?.roomId) {
+        socket.join(`telemedicine:${data.roomId}`);
+        socket.to(`telemedicine:${data.roomId}`).emit("meeting:joined", data);
+      }
+    });
+
+    socket.on("meeting:offer", (data: { roomId: string; offer: any; sender: string }) => {
+      if (data?.roomId) {
+        socket.to(`telemedicine:${data.roomId}`).emit("meeting:offer", data);
+      }
+    });
+
+    socket.on("meeting:answer", (data: { roomId: string; answer: any; sender: string }) => {
+      if (data?.roomId) {
+        socket.to(`telemedicine:${data.roomId}`).emit("meeting:answer", data);
+      }
+    });
+
+    socket.on("meeting:ice-candidate", (data: { roomId: string; candidate: any; sender: string }) => {
+      if (data?.roomId) {
+        socket.to(`telemedicine:${data.roomId}`).emit("meeting:ice-candidate", data);
+      }
+    });
+
+    socket.on("meeting:leave", (data: { roomId: string; sender: string }) => {
+      if (data?.roomId) {
+        socket.to(`telemedicine:${data.roomId}`).emit("meeting:left", data);
+      }
+    });
+
+    socket.on("meeting:end", (data: { roomId: string; appointmentId: string }) => {
+      if (data?.roomId) {
+        io?.to(`telemedicine:${data.roomId}`).emit("meeting:ended", data);
+        io?.to(`telemedicine:${data.roomId}`).emit("telemedicine_session_ended", data);
+        io?.emit("telemedicine_session_ended", data);
+      }
+    });
+
+    socket.on("consultation:update", (data: { roomId: string; status: string; appointmentId: string }) => {
+      if (data?.roomId) {
+        io?.to(`telemedicine:${data.roomId}`).emit("consultation:updated", data);
+        io?.emit("appointment_updated", data);
+        io?.emit("dashboard_update", data);
+      }
+    });
+
     socket.on("disconnect", () => {
       console.log(`Socket disconnected: ${socket.id}`);
     });

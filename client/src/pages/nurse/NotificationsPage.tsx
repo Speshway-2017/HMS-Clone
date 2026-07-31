@@ -76,6 +76,7 @@ export default function NotificationsPage() {
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
+  const [selectedHandover, setSelectedHandover] = useState<any | null>(null);
 
   // Keep track of previously known notifications to trigger chimes/toasts on new arrivals
   const prevNotifsRef = useRef<string[]>([]);
@@ -226,7 +227,7 @@ export default function NotificationsPage() {
   const unreadCount = activeNotifications.filter(n => !n.isRead).length;
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="flex flex-col space-y-6 pb-10 lg:pb-0 lg:h-[calc(100vh-120px)] lg:overflow-hidden">
       
       {/* Top Header Card */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
@@ -241,29 +242,6 @@ export default function NotificationsPage() {
         </div>
         
         <div className="flex gap-2">
-          {/* Sound toggle controls */}
-          <button
-            type="button"
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className={`px-3 py-1.5 border rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-all ${
-              soundEnabled 
-                ? "bg-emerald-50 border-emerald-200 text-emerald-700" 
-                : "bg-slate-50 border-slate-200 text-slate-500"
-            }`}
-          >
-            {soundEnabled ? (
-              <>
-                <Volume2 className="h-4 w-4 text-emerald-600" />
-                Chimes On
-              </>
-            ) : (
-              <>
-                <VolumeX className="h-4 w-4 text-slate-400" />
-                Silent Mode
-              </>
-            )}
-          </button>
-
           <button
             type="button"
             onClick={handleMarkAllRead}
@@ -276,10 +254,10 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 min-h-0 lg:overflow-hidden">
         
         {/* Left Filters Layout Column (3 Cols) */}
-        <div className="lg:col-span-3 space-y-4">
+        <div className="lg:col-span-3 space-y-4 lg:h-full lg:overflow-y-auto">
           <Card className="p-4 border border-slate-100 shadow-sm bg-white space-y-3">
             <div className="flex items-center gap-1.5 text-xs text-slate-450 font-bold uppercase tracking-wider mb-2">
               <SlidersHorizontal className="h-4 w-4 text-navy-500" />
@@ -321,10 +299,10 @@ export default function NotificationsPage() {
         </div>
 
         {/* Right Search and Cards List Layout Column (9 Cols) */}
-        <div className="lg:col-span-9 space-y-4">
+        <div className="lg:col-span-9 flex flex-col lg:h-full lg:overflow-hidden space-y-4">
           
           {/* Search bar */}
-          <div className="relative">
+          <div className="relative shrink-0">
             <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
             <input
               type="text"
@@ -337,19 +315,19 @@ export default function NotificationsPage() {
 
           {/* Cards List Container */}
           {isLoading ? (
-            <div className="space-y-4">
+            <div className="space-y-4 flex-1 min-h-0 overflow-y-auto pr-1">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="h-28 bg-white border border-slate-100 rounded-2xl animate-pulse" />
               ))}
             </div>
           ) : activeNotifications.length === 0 ? (
-            <div className="bg-white rounded-2xl p-12 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] text-center py-20">
+            <div className="bg-white rounded-2xl p-12 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] text-center py-20 flex-1 flex flex-col justify-center items-center">
               <Bell className="h-12 w-12 text-slate-300 mx-auto mb-3" />
               <h3 className="text-sm font-bold text-slate-700">No nursing notifications available.</h3>
               <p className="text-xs text-slate-400 mt-1">There are no pending alerts or reminder checkpoints logged.</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4 flex-1 min-h-0 overflow-y-auto pr-1">
               {activeNotifications.map((notif) => {
                 const actualType = notif.data?.type || notif.type;
                 const typeMeta = getNotificationTypeMeta(actualType);
@@ -366,7 +344,7 @@ export default function NotificationsPage() {
                     
                     {/* Unread Indicator dot */}
                     {!notif.isRead && (
-                      <span className="absolute left-1.5 top-1.5 h-2 w-2 rounded-full bg-indigo-500 animate-ping" />
+                      <span className="absolute left-1.5 top-1.5 h-2 w-2 rounded-full bg-indigo-500" />
                     )}
 
                     <div className="flex gap-4">
@@ -376,7 +354,17 @@ export default function NotificationsPage() {
                       </div>
 
                       {/* Content details */}
-                      <div className="space-y-1 text-xs">
+                      <div 
+                        className={`space-y-1 text-xs ${actualType === "shift_handover" ? "cursor-pointer hover:opacity-85 active:scale-[0.99] transition-all" : ""}`}
+                        onClick={() => {
+                          if (actualType === "shift_handover" && notif.data) {
+                            setSelectedHandover(notif.data);
+                            if (!notif.isRead) {
+                              handleMarkRead(notif._id);
+                            }
+                          }
+                        }}
+                      >
                         <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="font-extrabold text-slate-800 text-sm leading-snug">{notif.title}</h4>
                           <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold uppercase border tracking-wider ${priority.bg}`}>
@@ -429,6 +417,23 @@ export default function NotificationsPage() {
                         </button>
                       )}
 
+                      {/* View Shift Handover Details */}
+                      {actualType === "shift_handover" && notif.data && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedHandover(notif.data);
+                            if (!notif.isRead) {
+                              handleMarkRead(notif._id);
+                            }
+                          }}
+                          className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-655 hover:text-slate-800 font-bold text-[10px] flex items-center gap-1 cursor-pointer transition-colors shadow-sm bg-white"
+                        >
+                          <Eye className="h-3 w-3" />
+                          View Report
+                        </button>
+                      )}
+
                       {/* Mark read/unread */}
                       {!notif.isRead && (
                         <button
@@ -472,6 +477,92 @@ export default function NotificationsPage() {
           )}
 
         </div>
+      {/* Handover Details Modal */}
+      {selectedHandover && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl border border-slate-100 overflow-hidden text-xs">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-navy-800 to-navy-950 p-4 text-white flex justify-between items-center shrink-0">
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wide">Shift Handover Details</h3>
+                <p className="text-[10px] opacity-80 mt-0.5">Received from Outgoing Nurse Roster</p>
+              </div>
+              <button 
+                onClick={() => setSelectedHandover(null)}
+                className="rounded-lg p-1.5 hover:bg-white/10 transition cursor-pointer text-white font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content (Scrollable) */}
+            <div className="p-6 overflow-y-auto space-y-5 text-slate-655 font-semibold leading-relaxed">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-50 p-3 rounded-lg border">
+                  <p className="text-[9px] uppercase font-bold text-slate-400">Outgoing Nurse</p>
+                  <p className="font-bold text-slate-700">{selectedHandover.outgoingNurseName}</p>
+                  <p className="text-[9px] text-slate-500 mt-1">Shift: {selectedHandover.currentShift || "Morning"}</p>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-lg border">
+                  <p className="text-[9px] uppercase font-bold text-slate-400">Incoming Nurse</p>
+                  <p className="font-bold text-navy-700">{selectedHandover.incomingNurseName}</p>
+                  <p className="text-[9px] text-slate-500 mt-1">Shift: {selectedHandover.nextShift || "Evening"}</p>
+                </div>
+              </div>
+
+              <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white">
+                <div>
+                  <h4 className="font-bold text-slate-700 text-[10px] uppercase border-b pb-1">Patients Handed Over ({selectedHandover.patientsCount})</h4>
+                  <p className="whitespace-pre-line text-slate-550 mt-1.5 font-medium">{selectedHandover.patientsDetails || "No details provided."}</p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <h4 className="font-bold text-navy-800 text-[10px] uppercase border-b pb-1">Pending Medication</h4>
+                    <p className="whitespace-pre-line text-slate-550 mt-1.5 font-medium">{selectedHandover.pendingMedication || "None recorded."}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-rose-700 text-[10px] uppercase border-b pb-1">Pending Procedures</h4>
+                    <p className="whitespace-pre-line text-slate-550 mt-1.5 font-medium">{selectedHandover.pendingProcedures || "None recorded."}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  <div className="bg-amber-50/50 p-3 border border-amber-100 rounded-lg">
+                    <h4 className="font-bold text-amber-800 text-[10px] uppercase border-b pb-1">Critical Patients</h4>
+                    <p className="whitespace-pre-line text-amber-900 mt-1.5 font-medium">{selectedHandover.criticalPatients || "None flagged."}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-navy-700 text-[10px] uppercase border-b pb-1">Special Instructions</h4>
+                    <p className="whitespace-pre-line text-slate-550 mt-1.5 font-medium">{selectedHandover.specialInstructions || "None recorded."}</p>
+                  </div>
+                </div>
+
+                {selectedHandover.remarks && (
+                  <div className="pt-2">
+                    <h4 className="font-bold text-slate-700 text-[10px] uppercase border-b pb-1">Remarks</h4>
+                    <p className="text-slate-500 italic mt-1 font-medium">{selectedHandover.remarks}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-between items-center text-[10px] text-slate-400 border-t pt-4">
+                <span>Handover Signature Validation: <strong className="text-slate-600 font-bold">{selectedHandover.nurseSignature}</strong></span>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-slate-50 border-t px-4 py-3 flex justify-end shrink-0">
+              <button 
+                onClick={() => setSelectedHandover(null)}
+                className="bg-navy-900 hover:bg-navy-950 px-4 py-1.5 text-xs font-bold text-white rounded-lg cursor-pointer transition-colors shadow-sm"
+              >
+                Close Report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       </div>
 

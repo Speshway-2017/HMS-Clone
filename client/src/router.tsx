@@ -8,6 +8,7 @@ import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { VerifyPrescriptionPage } from "./pages/public/VerifyPrescriptionPage";
+import { PublicDoctorProfilePage } from "./pages/public/PublicDoctorProfilePage";
 
 // Super Admin module
 import { SuperAdminDashboard } from "./pages/super-admin/Dashboard";
@@ -155,6 +156,7 @@ export const router = createBrowserRouter([
       { path: "/forgot-password", element: <ForgotPasswordPage /> },
       { path: "/reset-password/:token", element: <ResetPasswordPage /> },
       { path: "/verify-prescription/:id", element: <VerifyPrescriptionPage /> },
+      { path: "/doctors/:id", element: <PublicDoctorProfilePage /> },
     ],
   },
   {
