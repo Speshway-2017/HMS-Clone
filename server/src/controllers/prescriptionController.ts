@@ -815,17 +815,38 @@ export const dispensePrescription = catchAsync(async (req: Request, res: Respons
  * Controller endpoint: Get Patient Prescriptions (Patient Portal API support)
  */
 export const getPatientPrescriptions = catchAsync(async (req: Request, res: Response) => {
-  // Read patient ID from JWT (if logged as patient) or query param
-  const patientId = req.user?._id || req.query.patientId;
-  
-  if (!patientId) {
+  const patientIds: any[] = [];
+
+  if (req.query.patientId) {
+    patientIds.push(req.query.patientId);
+  }
+
+  if (req.user) {
+    patientIds.push(req.user._id);
+
+    // Look up the corresponding Patient model document
+    const patientDoc = await Patient.findOne({
+      $or: [
+        { _id: req.user._id },
+        { user: req.user._id },
+        { email: req.user.email },
+        { phone: req.user.phone },
+      ],
+    });
+
+    if (patientDoc) {
+      patientIds.push(patientDoc._id);
+    }
+  }
+
+  if (patientIds.length === 0) {
     throw new AppError("Patient identification is required.", 400);
   }
 
-  const prescriptions = await Prescription.find({ patient: patientId })
-    .populate("doctor")
-    .populate("department")
-    .populate("hospital")
+  const prescriptions = await Prescription.find({ patient: { $in: patientIds } })
+    .populate("doctor", "name specialization department avatar")
+    .populate("department", "name")
+    .populate("hospital", "name")
     .sort({ createdAt: -1 });
 
   res.json({ status: "success", data: prescriptions });
