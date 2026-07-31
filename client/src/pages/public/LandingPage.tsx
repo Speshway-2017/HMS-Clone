@@ -22,10 +22,13 @@ import {
   Heart,
   Shield,
   Clock3,
-  Award
+  Award,
+  FileText
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
+import { Modal } from "../../components/ui/Modal";
 import { usePublicHospital } from "../../features/hospitals";
+import { useBlogs, BlogPost } from "../../features/blogs";
 import { api } from "../../lib/api";
 
 function getEmbeddableMapUrl(url: string, fallbackAddress: string): string {
@@ -127,6 +130,9 @@ export function LandingPage() {
     }
   });
 
+  const { data: publicBlogs = [] } = useBlogs({ publishedOnly: true });
+  const [selectedBlogModal, setSelectedBlogModal] = useState<BlogPost | null>(null);
+
   // Extract all services dynamically
   const dynamicServices = departments.reduce((acc: { service: string; deptName: string }[], dept) => {
     if (dept.services && Array.isArray(dept.services)) {
@@ -176,7 +182,9 @@ export function LandingPage() {
         "home",
         "about",
         "departments",
+        "doctors",
         "services",
+        "blog",
         "book",
         "contact",
         "privacy",
@@ -290,8 +298,9 @@ export function LandingPage() {
               { id: "home", label: "Home" },
               { id: "about", label: "About Us" },
               { id: "departments", label: "Departments" },
+              { id: "doctors", label: "Doctors" },
               { id: "services", label: "Services" },
-              { id: "book", label: "Book Appointment" },
+              { id: "blog", label: "Blog" },
               { id: "contact", label: "Contact Us" }
             ].map((nav) => (
               <button
@@ -315,16 +324,11 @@ export function LandingPage() {
                 Login
               </button>
             </Link>
-            <Link to="/register">
-              <button className="rounded-lg border border-navy-700 bg-navy-50 px-4 py-2.5 text-sm font-bold text-navy-800 transition-all hover:bg-navy-100 shadow-sm">
-                Patient Registration
-              </button>
-            </Link>
             <button
               onClick={() => changeTab("book")}
               className="flex items-center gap-1.5 rounded-lg bg-navy-700 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-all duration-300 hover:bg-navy-800 hover:shadow-md active:scale-95 whitespace-nowrap"
             >
-              Book OPD Slot
+              Book Appointment
             </button>
           </div>
 
@@ -347,7 +351,6 @@ export function LandingPage() {
                 { id: "about", label: "About Us" },
                 { id: "departments", label: "Departments" },
                 { id: "services", label: "Services" },
-                { id: "book", label: "Book Appointment" },
                 { id: "contact", label: "Contact Us" }
               ].map((nav) => (
                 <button
@@ -403,24 +406,18 @@ export function LandingPage() {
                   <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row lg:justify-start">
                     <button
                       onClick={() => changeTab("book")}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-navy-700 px-6 py-4 text-base font-bold text-white shadow-md hover:bg-navy-800 hover:shadow-lg sm:w-auto active:scale-95 transition-all duration-300 ease-in-out"
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-navy-700 to-navy-900 px-7 py-4 text-base font-bold text-white shadow-lg hover:from-navy-800 hover:to-navy-950 hover:shadow-xl sm:w-auto active:scale-95 transition-all duration-300 ease-in-out"
                     >
                       Book Appointment Online
                       <ArrowRight className="h-5 w-5" />
                     </button>
                     <Link to="/register" className="w-full sm:w-auto">
                       <button
-                        className="flex w-full items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 px-6 py-4 text-base font-bold text-indigo-900 shadow-sm hover:bg-indigo-100 sm:w-auto active:scale-95 transition-all duration-300 ease-in-out"
+                        className="flex w-full items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50/80 px-7 py-4 text-base font-bold text-indigo-950 shadow-sm hover:bg-indigo-100 sm:w-auto active:scale-95 transition-all duration-300 ease-in-out"
                       >
                         Register as Patient
                       </button>
                     </Link>
-                    <button
-                      onClick={() => changeTab("about")}
-                      className="flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-4 text-base font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto active:scale-95 transition-all duration-300 ease-in-out"
-                    >
-                      Learn More About Us
-                    </button>
                   </div>
 
                   <div className="pt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-xs lg:text-sm font-semibold text-slate-500 lg:justify-start">
@@ -433,48 +430,35 @@ export function LandingPage() {
                   </div>
                 </div>
 
-                {/* Hero Banner / Clinical Illustration */}
+                {/* Hero Banner / 3D Clinical Illustration */}
                 <div className="lg:col-span-6">
                   {heroBannerUrl ? (
                     <div className="relative overflow-hidden rounded-3xl border border-slate-200 shadow-2xl">
                       <img src={heroBannerUrl} alt={hospitalName} className="w-full aspect-[4/3] object-cover" />
                     </div>
                   ) : (
-                    <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-xl">
-                      <div className="bg-gradient-to-br from-navy-700 to-navy-900 rounded-2xl p-8 text-white space-y-6 aspect-[4/3] flex flex-col justify-between">
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 backdrop-blur-sm">
-                              <Activity className="h-5 w-5 text-emerald-400" />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-bold">{hospitalName}</h4>
-                              <span className="text-[10px] text-slate-300">OPD & IPD Medical Center</span>
-                            </div>
-                          </div>
-                          <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-[10px] font-bold text-emerald-400 border border-emerald-500/30">24/7 OPEN</span>
+                    <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-gradient-to-b from-slate-50 to-white p-3 shadow-2xl group">
+                      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-navy-900 via-slate-900 to-navy-950 aspect-[4/3] flex items-center justify-center">
+                        <img
+                          src="/3d_doctors.png"
+                          alt="3D Doctors Illustration"
+                          className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                        />
+                        <div className="absolute top-4 right-4 rounded-full bg-emerald-500/20 backdrop-blur-md px-3.5 py-1 text-[11px] font-bold text-emerald-300 border border-emerald-400/30 flex items-center gap-1.5 shadow-sm">
+                          <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                          24/7 OPEN
                         </div>
-                        
-                        <div className="space-y-3">
-                          <h3 className="text-xl font-bold">Compassionate care with advanced technology</h3>
-                          <p className="text-xs text-slate-350 leading-relaxed">
-                            Our hospital integrates patient electronic scheduling, diagnostic labs, and critical inpatient ward telemetry under a unified healthcare framework.
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-4 border-t border-white/10 pt-6 text-center">
+                        <div className="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur-md rounded-xl p-3 border border-white/40 shadow-lg flex justify-between items-center text-navy-900">
                           <div>
-                            <div className="text-base font-extrabold text-white">{departments.length || 6}</div>
-                            <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Departments</div>
+                            <h4 className="text-xs font-extrabold">{hospitalName}</h4>
+                            <p className="text-[10px] text-slate-500 font-semibold">Specialized OPD & Trauma Center</p>
                           </div>
-                          <div>
-                            <div className="text-base font-extrabold text-white">{doctors.length || 12}</div>
-                            <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Practitioners</div>
-                          </div>
-                          <div>
-                            <div className="text-base font-extrabold text-white">100%</div>
-                            <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Patient Focus</div>
-                          </div>
+                          <button
+                            onClick={() => changeTab("doctors")}
+                            className="rounded-lg bg-navy-700 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-navy-800 transition-colors"
+                          >
+                            View Doctors
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -812,6 +796,90 @@ export function LandingPage() {
           </div>
         )}
 
+        {/* --- VIEW: DOCTORS --- */}
+        {activeTab === "doctors" && (
+          <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-white">
+            <div className="mx-auto max-w-[1600px] space-y-12">
+              <div className="text-center space-y-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-navy-700">Clinical Practitioners</span>
+                <h1 className="text-4xl font-extrabold text-slate-900">
+                  Meet Our Specialist Doctors
+                </h1>
+                <p className="text-slate-600 text-sm max-w-md mx-auto">
+                  Find expert doctors across key medical departments and schedule online OPD consultations directly.
+                </p>
+              </div>
+
+              {/* Doctors Grid */}
+              <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+                {doctors.map((doc: any) => (
+                  <div key={doc._id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between hover:border-navy-200 transition-all hover:shadow-md">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-4">
+                        {doc.photoUrl ? (
+                          <img src={doc.photoUrl} alt={doc.name} className="h-16 w-16 rounded-full object-cover border border-slate-200 shadow-sm" />
+                        ) : (
+                          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-navy-50 text-navy-700 font-bold border border-navy-100 shadow-sm">
+                            <Stethoscope className="h-8 w-8" />
+                          </div>
+                        )}
+                        <div>
+                          <span className="inline-block rounded-full bg-navy-50 px-2.5 py-0.5 text-[9px] font-bold text-navy-700 uppercase">
+                            {doc.department?.name || "Specialist"}
+                          </span>
+                          <h3 className="text-lg font-bold text-slate-850 mt-1">{doc.name}</h3>
+                          <span className="block text-xs font-semibold text-slate-500">{doc.specialization || "Attending Doctor"}</span>
+                        </div>
+                      </div>
+
+                      <hr className="border-slate-100" />
+
+                      <div className="space-y-2 text-xs text-slate-600">
+                        {doc.qualifications && (
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Qualifications:</span>
+                            <span className="font-bold text-slate-700">{doc.qualifications}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Department:</span>
+                          <span className="font-bold text-slate-700">{doc.department?.name || "General"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">OPD Consultation Fee:</span>
+                          <span className="font-bold text-navy-700 text-sm">₹{doc.consultationFee || 300}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-6 border-t border-slate-100 mt-6">
+                      <button
+                        onClick={() => {
+                          setBookingForm((prev) => ({
+                            ...prev,
+                            departmentId: doc.department?._id || "",
+                            doctorId: doc._id,
+                          }));
+                          changeTab("book");
+                        }}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-navy-700 py-3 text-xs font-bold text-white shadow-sm hover:bg-navy-800 active:scale-95 transition-all"
+                      >
+                        <Calendar className="h-4 w-4" /> Book Appointment
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {doctors.length === 0 && (
+                  <div className="col-span-3 text-center py-20 text-slate-400 text-xs">
+                    No practicing doctors listed yet. They will appear dynamically once added in the Admin Dashboard.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* --- VIEW: SERVICES --- */}
         {activeTab === "services" && (
           <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-white">
@@ -856,6 +924,77 @@ export function LandingPage() {
                 {dynamicServices.length === 0 && (
                   <div className="col-span-3 text-center py-20 text-slate-400 text-xs">
                     No services have been defined in clinical department configurations.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- VIEW: BLOG --- */}
+        {activeTab === "blog" && (
+          <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-white">
+            <div className="mx-auto max-w-[1600px] space-y-12">
+              <div className="text-center space-y-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-navy-700">Health & Clinical Insights</span>
+                <h1 className="text-4xl font-extrabold text-slate-900">
+                  Hospital News & Articles
+                </h1>
+                <p className="text-slate-600 text-sm max-w-md mx-auto">
+                  Stay informed with health recommendations, medical breakthroughs, and operational updates from our practitioners.
+                </p>
+              </div>
+
+              {/* Blog Feed Grid */}
+              <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+                {publicBlogs.map((post) => (
+                  <div
+                    key={post._id}
+                    onClick={() => setSelectedBlogModal(post)}
+                    className="rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col justify-between overflow-hidden cursor-pointer hover:shadow-md hover:border-navy-200 transition-all group"
+                  >
+                    {post.coverImageUrl ? (
+                      <img src={post.coverImageUrl} alt={post.title} className="h-48 w-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    ) : (
+                      <div className="h-48 w-full bg-slate-100 flex items-center justify-center text-slate-300">
+                        <FileText className="h-12 w-12" />
+                      </div>
+                    )}
+
+                    <div className="p-6 space-y-3 flex-1">
+                      <div className="flex justify-between items-center text-[10px] font-bold text-slate-450 uppercase">
+                        <span>{post.author || "Hospital Admin"}</span>
+                        <span>{new Date(post.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+                      </div>
+
+                      <h3 className="text-lg font-bold text-slate-850 group-hover:text-navy-700 transition-colors line-clamp-2">
+                        {post.title}
+                      </h3>
+
+                      <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">
+                        {post.content}
+                      </p>
+
+                      {post.tags && post.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-2">
+                          {post.tags.map((t, idx) => (
+                            <span key={idx} className="text-[10px] font-bold bg-navy-50 text-navy-700 rounded px-2 py-0.5">
+                              #{t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="px-6 pb-6 pt-2 flex items-center gap-1 text-xs font-bold text-navy-700 group-hover:underline">
+                      Read Full Article <ArrowRight className="h-3.5 w-3.5" />
+                    </div>
+                  </div>
+                ))}
+
+                {publicBlogs.length === 0 && (
+                  <div className="col-span-3 text-center py-20 text-slate-400 text-xs">
+                    No articles published yet. New articles will appear here as soon as they are added in the Admin Dashboard.
                   </div>
                 )}
               </div>
@@ -1357,8 +1496,18 @@ export function LandingPage() {
                 </button>
               </li>
               <li>
+                <button onClick={() => changeTab("doctors")} className="hover:text-navy-700 text-left">
+                  Doctors Directory
+                </button>
+              </li>
+              <li>
                 <button onClick={() => changeTab("services")} className="hover:text-navy-700 text-left">
                   Clinical Services
+                </button>
+              </li>
+              <li>
+                <button onClick={() => changeTab("blog")} className="hover:text-navy-700 text-left">
+                  Health Blog
                 </button>
               </li>
             </ul>
@@ -1397,6 +1546,47 @@ export function LandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* Blog Article Reader Modal */}
+      {selectedBlogModal && (
+        <Modal
+          title={selectedBlogModal.title}
+          isOpen={!!selectedBlogModal}
+          onClose={() => setSelectedBlogModal(null)}
+        >
+          <div className="space-y-4 text-slate-700">
+            {selectedBlogModal.coverImageUrl && (
+              <img
+                src={selectedBlogModal.coverImageUrl}
+                alt={selectedBlogModal.title}
+                className="w-full max-h-64 object-cover rounded-xl border border-slate-200"
+              />
+            )}
+            <div className="flex items-center justify-between text-xs font-bold text-slate-400 border-b border-slate-100 pb-2">
+              <span>Author: {selectedBlogModal.author}</span>
+              <span>
+                {new Date(selectedBlogModal.createdAt).toLocaleDateString("en-IN", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </span>
+            </div>
+            <div className="text-xs leading-relaxed space-y-3 whitespace-pre-line text-slate-650">
+              {selectedBlogModal.content}
+            </div>
+            {selectedBlogModal.tags && selectedBlogModal.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-3 border-t border-slate-100">
+                {selectedBlogModal.tags.map((t, idx) => (
+                  <span key={idx} className="text-[10px] font-bold bg-slate-100 text-slate-600 rounded px-2 py-0.5">
+                    #{t}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

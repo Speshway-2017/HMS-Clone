@@ -39,6 +39,7 @@ import laboratoryRoutes from "./routes/laboratoryRoutes";
 import consultationRoutes from "./routes/consultationRoutes";
 import diagnosticReportRoutes from "./routes/diagnosticReportRoutes";
 import nurseRoutes from "./routes/nurseRoutes";
+import blogRoutes from "./routes/blogRoutes";
 import { getPatientPrescriptions } from "./controllers/prescriptionController";
 import { protect } from "./middleware/auth";
 import { getMongoStatus } from "./config/db";
@@ -148,6 +149,7 @@ app.use("/api/v1/accountant", accountantRoutes);
 app.use("/api/v1/laboratory", laboratoryRoutes);
 app.use("/api/v1/consultations", consultationRoutes);
 app.use("/api/v1/diagnostic-reports", diagnosticReportRoutes);
+app.use("/api/v1/blogs", blogRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

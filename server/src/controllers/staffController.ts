@@ -5,7 +5,7 @@ import { Staff, STAFF_DUTY_STATUSES } from "../models/Staff";
 import { User } from "../models/User";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
-import { generateTempPassword } from "../utils/idGenerator";
+import { generateTempPassword, generateUniqueEmployeeId } from "../utils/idGenerator";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 
 const staffSchema = z.object({
@@ -59,11 +59,23 @@ export const getTopStaff = catchAsync(async (req: Request, res: Response) => {
   res.json({ status: "success", data: { staff } });
 });
 
+export const getNextEmployeeId = catchAsync(async (req: Request, res: Response) => {
+  const role = (req.query.role as string) || "staff";
+  const hospitalId = req.hospitalFilter!.hospital;
+  const employeeId = await generateUniqueEmployeeId(role, hospitalId);
+  res.json({ status: "success", data: { employeeId } });
+});
+
 export const createStaff = catchAsync(async (req: Request, res: Response) => {
   const body = staffSchema.parse(req.body);
   const hospitalId = req.hospitalFilter!.hospital;
 
-  const staff = await Staff.create({ ...body, hospital: hospitalId });
+  let employeeId = body.employeeId?.trim();
+  if (!employeeId) {
+    employeeId = await generateUniqueEmployeeId(body.role || "staff", hospitalId);
+  }
+
+  const staff = await Staff.create({ ...body, employeeId, hospital: hospitalId });
 
   // Auto-create a login User account for staff members with an email
   let tempPassword: string | undefined;
@@ -78,10 +90,10 @@ export const createStaff = catchAsync(async (req: Request, res: Response) => {
       email: body.email,
       passwordHash,
       role: userRole,
+      employeeId,
       hospital: hospitalId,
     });
   }
-
 
   res.status(201).json({
     status: "success",

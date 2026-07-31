@@ -22,9 +22,11 @@ import {
   MapPin,
   ShieldAlert,
   FileText,
-  UserPlus
+  UserPlus,
+  Loader2
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { api } from "../../lib/api";
 
 export function RegisterPage() {
   const { data: hospital } = usePublicHospital();
@@ -60,6 +62,49 @@ export function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchingPhone, setSearchingPhone] = useState(false);
+
+  useEffect(() => {
+    const cleanPhone = formData.phone.replace(/\D/g, "");
+    if (cleanPhone.length === 10) {
+      const checkPhone = async () => {
+        setSearchingPhone(true);
+        setError(null);
+        try {
+          const res = await api.get(`/auth/check-phone?phone=${cleanPhone}`);
+          if (res.data.exists) {
+            if (res.data.hasPassword) {
+              toast.error("This phone number is already registered. Please log in.");
+              setError("This phone number is already registered. Please log in.");
+            } else {
+              toast.success("Existing patient profile found! Pre-populating details.");
+              const p = res.data.patient;
+              setFormData((prev) => ({
+                ...prev,
+                name: p.name || prev.name,
+                email: p.email || prev.email,
+                age: p.age !== null && p.age !== undefined ? String(p.age) : prev.age,
+                gender: p.gender || prev.gender,
+                bloodGroup: p.bloodGroup || prev.bloodGroup,
+                address: p.address || prev.address,
+                allergies: p.allergies || prev.allergies,
+                insuranceProvider: p.insuranceProvider || prev.insuranceProvider,
+                insurancePolicyNumber: p.insurancePolicyNumber || prev.insurancePolicyNumber,
+                emergencyName: p.emergencyName || prev.emergencyName,
+                emergencyPhone: p.emergencyPhone || prev.emergencyPhone,
+                emergencyRelation: p.emergencyRelation || prev.emergencyRelation,
+              }));
+            }
+          }
+        } catch (err: any) {
+          console.error("Failed to check phone registration status", err);
+        } finally {
+          setSearchingPhone(false);
+        }
+      };
+      checkPhone();
+    }
+  }, [formData.phone]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -363,9 +408,12 @@ export function RegisterPage() {
                         value={formData.phone}
                         onChange={handleChange}
                         placeholder="+91 98765 43210"
-                        className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2 text-xs font-medium outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                        className="w-full rounded-lg border border-slate-300 pl-9 pr-9 py-2 text-xs font-medium outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
                       />
                       <Phone className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                      {searchingPhone && (
+                        <Loader2 className="absolute right-3 top-2.5 h-3.5 w-3.5 animate-spin text-indigo-600" />
+                      )}
                     </div>
                   </div>
 
