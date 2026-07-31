@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
+import { socket } from "../../lib/socket";
 import {
-  Video, Phone, Clock, User, FileText, Mic, MicOff,
-  VideoOff, PhoneOff, MessageSquare, Monitor, CheckCircle2, CalendarClock,
+  Video, Phone, Clock, User, CheckCircle2, Search
 } from "lucide-react";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
@@ -9,6 +10,7 @@ import { Button } from "../../components/ui/Button";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { useDoctorProfileMe } from "../../features/doctors";
 import { useAppointments, useUpdateAppointment, mapAppointmentTypeForDisplay } from "../../features/appointments";
+import { ConsultationWorkspacePage } from "./ConsultationWorkspacePage";
 
 const STATUS_BADGE: Record<string, { tone: "success" | "warning" | "info" | "neutral" | "danger"; label: string }> = {
   in_call:   { tone: "success",  label: "In Call"   },
@@ -19,78 +21,173 @@ const STATUS_BADGE: Record<string, { tone: "success" | "warning" | "info" | "neu
 
 export function TelemedicinePage() {
   const { data: doctorProfile } = useDoctorProfileMe();
-  const todayStr = new Date().toISOString().split("T")[0];
 
   const { data: appointmentsData, isLoading } = useAppointments(
-    { doctor: doctorProfile?._id, from: todayStr, to: todayStr },
+    { doctor: doctorProfile?._id },
     { enabled: !!doctorProfile?._id }
   );
 
   const appointments = appointmentsData?.data || [];
 
-  const teleQueue = appointments.map((a, index) => {
+  // Filter all online / video consultation appointments
+  const videoConsultationAppointments = appointments.filter((a: any) => {
+    const t = String(a.type || "").toLowerCase();
+    return t.includes("video") || t.includes("online") || t === "video consultation";
+  });
+
+  // Search & Queue Filter State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [queueTab, setQueueTab] = useState<"active" | "completed">("active");
+
+  const allTeleConsultations = videoConsultationAppointments.map((a, index) => {
     const p = a.patient as any;
     const isFirst = index === 0;
 
     return {
       id: a._id,
       name: p?.name || "Unknown Patient",
+      uhid: p?.uhid || "HMS-PT-100",
       age: p?.age || 35,
       gender: p?.gender || "—",
+      phone: p?.phone || "—",
       waitTime: isFirst ? "Now" : `${index * 15} min`,
-      status: isFirst ? "in_call" : "waiting",
+      status: a.status === "completed" ? "completed" : isFirst ? "in_call" : "waiting",
       type: mapAppointmentTypeForDisplay(a.type),
       chief: a.notes || "Tele-consultation check-up",
       location: p?.address ? p.address.split(",").slice(-1)[0].trim() : "Local",
       scheduled: a.time,
+      dateStr: new Date(a.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
       duration: "15 min",
-      platform: "Video"
+      platform: "Video",
+      meetingLink: a.meetingLink || ""
     };
   });
 
+  const activeQueue = allTeleConsultations.filter((t) => t.status !== "completed");
+  const completedQueue = allTeleConsultations.filter((t) => t.status === "completed");
+
+  const currentList = queueTab === "active" ? activeQueue : completedQueue;
+
+  const filteredQueue = currentList.filter((item) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      item.name.toLowerCase().includes(q) ||
+      item.uhid.toLowerCase().includes(q) ||
+      item.chief.toLowerCase().includes(q) ||
+      item.type.toLowerCase().includes(q) ||
+      item.phone.toLowerCase().includes(q)
+    );
+  });
+
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
-  const [inCall, setInCall] = useState(false);
-  const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(true);
-  const [notes, setNotes] = useState("");
+
+  // Google Meet Consultation Link State
+  const [googleMeetUrl, setGoogleMeetUrl] = useState("");
+  const [submittedMeetUrl, setSubmittedMeetUrl] = useState("");
+  const [isLinkSubmitted, setIsLinkSubmitted] = useState(false);
 
   useEffect(() => {
-    if (teleQueue.length > 0 && !selectedPatientId) {
-      setSelectedPatientId(teleQueue[0].id);
-      setNotes(teleQueue[0].chief);
+    if (activeQueue.length > 0 && !selectedPatientId) {
+      setSelectedPatientId(activeQueue[0].id);
+    } else if (allTeleConsultations.length > 0 && !selectedPatientId) {
+      setSelectedPatientId(allTeleConsultations[0].id);
     }
-  }, [teleQueue, selectedPatientId]);
+  }, [allTeleConsultations, activeQueue, selectedPatientId]);
 
-  const selectedPatient = teleQueue.find((p) => p.id === selectedPatientId) || teleQueue[0];
+  const selectedPatient = allTeleConsultations.find((p) => p.id === selectedPatientId) || activeQueue[0] || allTeleConsultations[0];
   const updateAppointment = useUpdateAppointment(selectedPatient?.id || "");
+
+  useEffect(() => {
+    if (selectedPatient) {
+      const link = (selectedPatient as any).meetingLink || "";
+      if (link) {
+        setGoogleMeetUrl(link);
+        setSubmittedMeetUrl(link);
+        setIsLinkSubmitted(true);
+      } else {
+        setGoogleMeetUrl("");
+        setSubmittedMeetUrl("");
+        setIsLinkSubmitted(false);
+      }
+    }
+  }, [selectedPatient?.id]);
+
+  const handleLinkSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!googleMeetUrl.trim()) {
+      toast.error("Please enter a valid Google Meet link.");
+      return;
+    }
+    const formattedUrl = googleMeetUrl.startsWith("http") ? googleMeetUrl.trim() : `https://${googleMeetUrl.trim()}`;
+
+    try {
+      if (selectedPatient?.id) {
+        await updateAppointment.mutateAsync({
+          id: selectedPatient.id,
+          meetingLink: formattedUrl,
+          notes: `[Google Meet Link]: ${formattedUrl}\n${selectedPatient.chief || ""}`
+        } as any);
+        const doctorName = doctorProfile?.name ? `Dr. ${doctorProfile.name}` : "Doctor";
+        socket.emit("start_google_meet_session", {
+          roomId: selectedPatient.id,
+          appointmentId: selectedPatient.id,
+          doctorName: doctorName,
+          meetUrl: formattedUrl
+        });
+      }
+      setSubmittedMeetUrl(formattedUrl);
+      setIsLinkSubmitted(true);
+      toast.success("Google Meet link submitted!");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to submit meeting link.");
+    }
+  };
+
+  const handleEndMeeting = async () => {
+    if (!selectedPatient?.id) return;
+    try {
+      await updateAppointment.mutateAsync({
+        id: selectedPatient.id,
+        status: "completed"
+      } as any);
+
+      socket.emit("end_telemedicine_session", {
+        roomId: selectedPatient.id,
+        appointmentId: selectedPatient.id
+      });
+
+      toast.success(`Consultation for ${selectedPatient.name} marked as completed!`);
+      setIsLinkSubmitted(false);
+      setGoogleMeetUrl("");
+      setSubmittedMeetUrl("");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to complete consultation.");
+    }
+  };
+
+  const handleStartMeeting = () => {
+    const targetUrl = submittedMeetUrl || googleMeetUrl;
+    if (!targetUrl) {
+      toast.error("Please enter and submit a meeting link first.");
+      return;
+    }
+    if (selectedPatient) {
+      const doctorName = doctorProfile?.name ? `Dr. ${doctorProfile.name}` : "Doctor";
+      socket.emit("start_google_meet_session", {
+        roomId: selectedPatient.id,
+        appointmentId: selectedPatient.id,
+        doctorName: doctorName,
+        meetUrl: targetUrl
+      });
+    }
+    toast.success("Redirecting to Google Meet...");
+    window.open(targetUrl, "_blank");
+  };
 
   const handleSelect = (patient: any) => {
     setSelectedPatientId(patient.id);
-    setNotes(patient.chief);
-    setInCall(false);
   };
-
-  const handleSaveNotes = async () => {
-    if (!selectedPatient) return;
-    try {
-      await updateAppointment.mutateAsync({ notes, status: "completed" });
-      setInCall(false);
-    } catch (err) {
-      console.error("Failed to save telemedicine notes", err);
-    }
-  };
-
-  const pastConsultations = appointments
-    .filter((a) => a.status === "completed")
-    .map((a) => {
-      const p = a.patient as any;
-      return {
-        date: new Date(a.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
-        patient: p?.name || "Unknown Patient",
-        diagnosis: a.notes || "Check-up",
-        duration: "15 min"
-      };
-    });
 
   if (isLoading) {
     return (
@@ -101,228 +198,215 @@ export function TelemedicinePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-12">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Telemedicine</h1>
-        <p className="text-sm text-slate-500">Video consultations, remote patient management and teleconsultation notes.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Telemedicine & Video Consultations</h1>
+          <p className="text-xs text-slate-500 mt-1">Conduct live HD video consultations, manage patient queues, and write e-prescriptions & clinical notes in real time.</p>
+        </div>
       </div>
 
-      {teleQueue.length === 0 ? (
-        <Card className="flex h-64 flex-col items-center justify-center p-6 text-center border-dashed border-slate-200 bg-slate-50">
-          <Video className="mb-2 h-10 w-10 text-slate-400" />
-          <h3 className="text-sm font-semibold text-slate-600">No Telemedicine Calls</h3>
-          <p className="text-xs text-slate-400">There are no tele-consultation appointments scheduled for you today.</p>
-        </Card>
-      ) : (
-        <>
-          {/* KPIs */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <KpiCard label="Today's Sessions"  value={teleQueue.length}                                          icon={<Video className="h-5 w-5" />} emphasis />
-            <KpiCard label="In Call"           value={inCall ? 1 : 0}                                              icon={<Phone className="h-5 w-5" />} />
-            <KpiCard label="Waiting"           value={teleQueue.filter(t => t.status === "waiting").length}      icon={<Clock className="h-5 w-5" />} />
-            <KpiCard label="Completed Today"   value={pastConsultations.length}                                  icon={<CheckCircle2 className="h-5 w-5" />} />
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <KpiCard label="Total Sessions" value={allTeleConsultations.length} icon={<Video className="h-5 w-5 text-indigo-600" />} emphasis />
+        <KpiCard label="In Call" value={activeQueue.filter((t) => t.status === "in_call").length} icon={<Phone className="h-5 w-5 text-emerald-600" />} />
+        <KpiCard label="Waiting" value={activeQueue.filter((t) => t.status === "waiting").length} icon={<Clock className="h-5 w-5 text-amber-600" />} />
+        <KpiCard label="Completed Today" value={completedQueue.length} icon={<CheckCircle2 className="h-5 w-5 text-blue-600" />} />
+      </div>
+
+      {/* Queue Search & Selection Workspace Bar */}
+      <Card className="p-5 border border-slate-200 bg-white shadow-sm rounded-2xl space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          {/* Sub Tabs: Active Queue vs Completed */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setQueueTab("active")}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+                queueTab === "active"
+                  ? "bg-navy-700 text-white shadow"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              <Video className="h-4 w-4" /> Active Patient Queue ({activeQueue.length})
+            </button>
+            <button
+              onClick={() => setQueueTab("completed")}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+                queueTab === "completed"
+                  ? "bg-navy-700 text-white shadow"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Previous / Completed ({completedQueue.length})
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {/* Patient Queue */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-slate-700">Today's Queue</h3>
-              {teleQueue.map((patient) => {
-                const isSelected = selectedPatient?.id === patient.id;
-                return (
-                  <div
-                    key={patient.id}
-                    onClick={() => handleSelect(patient)}
-                    className={`cursor-pointer rounded-xl border p-3.5 transition-all hover:shadow-sm ${
-                      isSelected
-                        ? "border-navy-400 bg-navy-50 shadow-sm"
-                        : patient.status === "in_call" && inCall
-                        ? "border-emerald-200 bg-emerald-50"
-                        : "border-slate-100 bg-white hover:bg-slate-50"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="relative">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-navy-100 text-sm font-bold text-navy-700">
-                          {patient.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
-                        </div>
-                        {patient.id === selectedPatient?.id && inCall && (
-                          <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 border-2 border-white" />
-                        )}
+          {/* Search Bar */}
+          <div className="relative w-full md:w-80">
+            <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by patient name, UHID, or complaint..."
+              className="w-full rounded-xl border border-slate-200 pl-10 pr-4 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-400 bg-slate-50/50"
+            />
+          </div>
+        </div>
+
+        {/* Patient Queue Cards */}
+        {filteredQueue.length === 0 ? (
+          <div className="flex h-32 flex-col items-center justify-center text-center text-slate-400">
+            <User className="h-8 w-8 text-slate-300 mb-1" />
+            <p className="text-xs font-semibold">No consultations found matching "{searchQuery}".</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-64 overflow-y-auto pr-1">
+            {filteredQueue.map((patient) => {
+              const isSelected = selectedPatient?.id === patient.id;
+              return (
+                <div
+                  key={patient.id}
+                  onClick={() => handleSelect(patient)}
+                  className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
+                    isSelected
+                      ? "border-navy-600 bg-navy-50/80 shadow-md ring-2 ring-navy-500/30"
+                      : "border-slate-200 bg-white hover:bg-slate-50/80 hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <div className="flex items-center gap-2 truncate">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-navy-800 text-xs font-bold text-white shadow-sm shrink-0">
+                        {patient.name.charAt(0).toUpperCase()}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-800 truncate">{patient.name}</p>
-                        <p className="text-xs text-slate-400">{patient.age}y · {patient.type}</p>
+                      <div className="truncate">
+                        <p className="text-xs font-bold text-slate-800 truncate">{patient.name}</p>
+                        <p className="text-[10px] text-slate-500 font-medium">{patient.age}y · {patient.gender}</p>
                       </div>
-                      <Badge tone={STATUS_BADGE[patient.status]?.tone || "neutral"}>
-                        {STATUS_BADGE[patient.status]?.label || patient.status}
-                      </Badge>
                     </div>
-                    <p className="text-xs text-slate-500 truncate mb-1">{patient.chief}</p>
-                    <div className="flex items-center justify-between text-xs text-slate-400">
-                      <span className="flex items-center gap-1">
-                        {patient.platform === "Video" ? <Video className="h-3 w-3" /> : <Phone className="h-3 w-3" />}
-                        {patient.platform}
-                      </span>
-                      <span>{patient.scheduled} · {patient.duration}</span>
-                    </div>
+                    <Badge tone={STATUS_BADGE[patient.status]?.tone || "neutral"}>
+                      {STATUS_BADGE[patient.status]?.label || patient.status}
+                    </Badge>
                   </div>
-                );
-              })}
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
+                    <span className="font-semibold text-indigo-600">{patient.scheduled || patient.dateStr}</span>
+                    <span className="text-slate-400 font-mono text-[10px] truncate max-w-[100px]">{patient.uhid}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
+      {/* Main Selected Patient Workspace (Full Width) */}
+      {selectedPatient ? (
+        <div className="space-y-6">
+          {/* Google Meet Consultation Link Card */}
+          <Card className="p-5 border border-slate-200 bg-white shadow-sm rounded-2xl">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-sm">
+                  <Video className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Google Meet Consultation Room</h3>
+                  <p className="text-[11px] text-slate-500">
+                    Attending Patient: <span className="font-bold text-slate-800">{selectedPatient.name}</span> ({selectedPatient.age}y · {selectedPatient.gender} · {selectedPatient.uhid})
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <a
+                  href="https://meet.google.com/new"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs font-bold text-indigo-600 hover:text-indigo-700 underline flex items-center gap-1"
+                >
+                  + Generate Link on Google Meet
+                </a>
+                {selectedPatient && selectedPatient.status !== "completed" && (
+                  <button
+                    onClick={handleEndMeeting}
+                    className="flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 px-3.5 py-1.5 text-xs font-extrabold text-white transition-all shadow-sm active:scale-95 whitespace-nowrap"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" /> End Meeting
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* Main Panel — Video + Notes */}
-            {selectedPatient && (
-              <div className="space-y-4 lg:col-span-2">
-                {/* Video Screen */}
-                <Card className="p-0 overflow-hidden">
-                  {/* Video Area */}
-                  <div className="relative h-72 bg-slate-900 flex items-center justify-center">
-                    {inCall ? (
-                      <>
-                        <div className="text-center">
-                          <div className="flex h-20 w-20 mx-auto items-center justify-center rounded-full bg-navy-700 text-3xl font-bold text-white mb-3">
-                            {selectedPatient.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
-                          </div>
-                          <p className="text-white font-semibold">{selectedPatient.name}</p>
-                          <p className="text-slate-400 text-sm">{selectedPatient.location} · Connected</p>
-                          <p className="text-emerald-400 text-xs mt-1 flex items-center justify-center gap-1">
-                            <span className="animate-pulse">●</span> 03:42 — In Call
-                          </p>
-                        </div>
-                        {/* Self-video */}
-                        <div className="absolute bottom-3 right-3 h-20 w-28 rounded-lg bg-slate-700 flex items-center justify-center">
-                          <User className="h-8 w-8 text-slate-500" />
-                          <span className="absolute bottom-1 right-1 text-xs text-slate-400">You</span>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-center">
-                        <div className="flex h-20 w-20 mx-auto items-center justify-center rounded-full bg-navy-900 mb-3">
-                          <Video className="h-10 w-10 text-slate-600" />
-                        </div>
-                        <p className="text-slate-400">Click &quot;Start Call&quot; to begin the session</p>
-                        <p className="text-slate-500 text-sm mt-1">Patient: {selectedPatient.name} · {selectedPatient.scheduled}</p>
-                      </div>
-                    )}
-                  </div>
+            {/* Form: Input Field & Submit Button */}
+            <form onSubmit={handleLinkSubmit} className="flex gap-2">
+              <input
+                type="text"
+                value={googleMeetUrl}
+                onChange={(e) => {
+                  setGoogleMeetUrl(e.target.value);
+                  if (isLinkSubmitted) setIsLinkSubmitted(false);
+                }}
+                placeholder="Paste Google Meet URL (e.g. https://meet.google.com/abc-defg-hij)"
+                className="flex-1 rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-400 bg-slate-50/50"
+              />
+              <Button
+                type="submit"
+                variant="primary"
+                className="px-6 text-xs font-bold whitespace-nowrap rounded-xl bg-navy-700 hover:bg-navy-800 text-white shadow-sm"
+              >
+                Submit
+              </Button>
+            </form>
 
-                  {/* Controls */}
-                  <div className="flex items-center justify-between px-5 py-3 bg-slate-800">
-                    <div className="flex items-center gap-1">
-                      <Badge tone={STATUS_BADGE[selectedPatient.status]?.tone || "neutral"}>{selectedPatient.name}</Badge>
-                      <span className="text-xs text-slate-400 ml-2">{selectedPatient.type}</span>
-                    </div>
+            {/* Display Option After Submitting: Start Meeting Option */}
+            {isLinkSubmitted && submittedMeetUrl && (
+              <div className="mt-3.5 p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in duration-200">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-white shadow-md">
+                    <Video className="h-5 w-5" />
+                  </div>
+                  <div>
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setMicOn(!micOn)}
-                        className={`rounded-full p-2 transition-colors ${micOn ? "bg-slate-700 hover:bg-slate-600" : "bg-red-600 hover:bg-red-700"}`}
-                      >
-                        {micOn ? <Mic className="h-4 w-4 text-white" /> : <MicOff className="h-4 w-4 text-white" />}
-                      </button>
-                      <button
-                        onClick={() => setCamOn(!camOn)}
-                        className={`rounded-full p-2 transition-colors ${camOn ? "bg-slate-700 hover:bg-slate-600" : "bg-red-600 hover:bg-red-700"}`}
-                      >
-                        {camOn ? <Video className="h-4 w-4 text-white" /> : <VideoOff className="h-4 w-4 text-white" />}
-                      </button>
-                      <button className="rounded-full bg-slate-700 p-2 hover:bg-slate-600">
-                        <Monitor className="h-4 w-4 text-white" />
-                      </button>
-                      <button className="rounded-full bg-slate-700 p-2 hover:bg-slate-600">
-                        <MessageSquare className="h-4 w-4 text-white" />
-                      </button>
-                      {inCall ? (
-                        <button
-                          onClick={() => setInCall(false)}
-                          className="flex items-center gap-1.5 rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-                        >
-                          <PhoneOff className="h-4 w-4" /> End Call
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setInCall(true)}
-                          className="flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-                        >
-                          <Video className="h-4 w-4" /> Start Call
-                        </button>
-                      )}
+                      <span className="text-xs font-extrabold text-emerald-950">Google Meet Link Ready for Patient</span>
+                      <Badge tone="success">LIVE SESSION READY</Badge>
                     </div>
+                    <p className="text-[11px] text-emerald-800 font-mono mt-0.5 truncate max-w-md">
+                      {submittedMeetUrl}
+                    </p>
                   </div>
-                </Card>
-
-                {/* Consultation Notes & Patient Info */}
-                <div className="grid grid-cols-2 gap-4">
-                  <Card>
-                    <h3 className="mb-3 text-sm font-semibold text-slate-700 flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-navy-700" /> Consultation Notes
-                    </h3>
-                    <textarea
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      rows={5}
-                      placeholder={`Notes for ${selectedPatient.name}...`}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-navy-200"
-                    />
-                    <div className="mt-2 flex gap-2">
-                      <Button variant="primary" className="text-xs py-1.5" onClick={handleSaveNotes}>
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Save Notes
-                      </Button>
-                    </div>
-                  </Card>
-
-                  <Card>
-                    <h3 className="mb-3 text-sm font-semibold text-slate-700">Patient Details</h3>
-                    <div className="space-y-2">
-                      {[
-                        { label: "Name",         value: selectedPatient.name },
-                        { label: "Age/Gender",   value: `${selectedPatient.age}y · ${selectedPatient.gender}` },
-                        { label: "Location",     value: selectedPatient.location },
-                        { label: "Appointment",  value: selectedPatient.scheduled },
-                        { label: "Type",         value: selectedPatient.type },
-                        { label: "Chief Complaint", value: selectedPatient.chief },
-                      ].map((f) => (
-                        <div key={f.label} className="flex justify-between text-xs">
-                          <span className="text-slate-400 font-medium">{f.label}</span>
-                          <span className="text-slate-700 font-semibold text-right max-w-32 truncate">{f.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </Card>
                 </div>
 
-                {/* Past Tele-consultations */}
-                <Card>
-                  <h3 className="mb-3 text-sm font-semibold text-slate-700">Recent Tele-consultations</h3>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-100">
-                        <th className="pb-2 text-left text-xs font-semibold uppercase text-slate-400">Date</th>
-                        <th className="pb-2 text-left text-xs font-semibold uppercase text-slate-400">Patient</th>
-                        <th className="pb-2 text-left text-xs font-semibold uppercase text-slate-400">Diagnosis</th>
-                        <th className="pb-2 text-left text-xs font-semibold uppercase text-slate-400">Duration</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pastConsultations.map((c, i) => (
-                        <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
-                          <td className="py-2.5 text-slate-500">{c.date}</td>
-                          <td className="py-2.5 font-medium text-slate-800">{c.patient}</td>
-                          <td className="py-2.5 text-slate-600 max-w-32 truncate">{c.diagnosis}</td>
-                          <td className="py-2.5 text-slate-500">{c.duration}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {pastConsultations.length === 0 && (
-                    <p className="text-xs text-slate-400 text-center py-4">No completed sessions today.</p>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    onClick={handleStartMeeting}
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 px-5 py-2.5 text-xs font-black text-white transition-all shadow-md active:scale-95 whitespace-nowrap"
+                  >
+                    <Video className="h-4 w-4" /> Start Meeting
+                  </button>
+                  {selectedPatient && selectedPatient.status !== "completed" && (
+                    <button
+                      onClick={handleEndMeeting}
+                      className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-xl bg-rose-600 hover:bg-rose-700 px-5 py-2.5 text-xs font-black text-white transition-all shadow-md active:scale-95 whitespace-nowrap"
+                    >
+                      <CheckCircle2 className="h-4 w-4" /> End Meeting
+                    </button>
                   )}
-                </Card>
+                </div>
               </div>
             )}
+          </Card>
+
+          {/* Full Width Consultation Workspace Container */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-2 shadow-sm">
+            <ConsultationWorkspacePage appointmentIdOverride={selectedPatient.id} isEmbedded={true} />
           </div>
-        </>
+        </div>
+      ) : (
+        <Card className="flex h-64 flex-col items-center justify-center p-6 text-center border-dashed border-slate-200 bg-slate-50">
+          <Video className="mb-2 h-10 w-10 text-slate-400" />
+          <h3 className="text-sm font-semibold text-slate-600">No Telemedicine Consultations Found</h3>
+          <p className="text-xs text-slate-400">There are no tele-consultation appointments scheduled for you right now.</p>
+        </Card>
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { socket } from "../../lib/socket";
@@ -340,14 +340,129 @@ export function PatientDashboard() {
 
   // Video Consultation Telehealth Call Room State
   const [activeVideoCall, setActiveVideoCall] = useState<any>(null);
+  const [incomingCallData, setIncomingCallData] = useState<any>(null);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [callTimer, setCallTimer] = useState(0);
   const [chatMessages, setChatMessages] = useState<Array<{ sender: string; text: string; time: string }>>([
-    { sender: "Dr. Rajesh Sharma", text: "Hello! Welcome to our telehealth session. How are you feeling today?", time: "16:00" }
+    { sender: "System", text: "Welcome to the secure online video consultation room.", time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }
   ]);
   const [chatInput, setChatInput] = useState("");
+
+  const patientLocalVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [patientStream, setPatientStream] = useState<MediaStream | null>(null);
+
+  // Incoming Doctor Video Call Listener (Google Meet & In-App)
+  useEffect(() => {
+    const handleCallStarted = (data: any) => {
+      setIncomingCallData(data);
+      refetchAppts();
+      const docName = data.doctorName || "Doctor";
+      toast.success(`🚨 Dr. ${docName} has started your online Google Meet video consultation!`, { duration: 8000 });
+    };
+
+    socket.on("telemedicine_session_started", handleCallStarted);
+    socket.on("google_meet_session_started", handleCallStarted);
+    socket.on("start_google_meet_session", handleCallStarted);
+    socket.on("meeting:created", handleCallStarted);
+    return () => {
+      socket.off("telemedicine_session_started", handleCallStarted);
+      socket.off("google_meet_session_started", handleCallStarted);
+      socket.off("start_google_meet_session", handleCallStarted);
+      socket.off("meeting:created", handleCallStarted);
+    };
+  }, [refetchAppts]);
+
+  // WebRTC Patient Camera Stream Handler
+  useEffect(() => {
+    let sObj: MediaStream | null = null;
+    if (activeVideoCall && !isVideoOff) {
+      navigator.mediaDevices?.getUserMedia({ video: true, audio: true })
+        .then((s) => {
+          sObj = s;
+          setPatientStream(s);
+          if (patientLocalVideoRef.current) {
+            patientLocalVideoRef.current.srcObject = s;
+          }
+        })
+        .catch((err) => console.warn("Patient camera inaccessible:", err));
+    } else if (isVideoOff && patientStream) {
+      patientStream.getTracks().forEach((t) => t.stop());
+      setPatientStream(null);
+    }
+    return () => {
+      if (sObj) sObj.getTracks().forEach((t) => t.stop());
+    };
+  }, [activeVideoCall, isVideoOff]);
+
+  // Remote Doctor Video Stream Frame
+  const [remoteDoctorVideoFrame, setRemoteDoctorVideoFrame] = useState<string | null>(null);
+
+  // Video Consultation Socket Room, Chat & Doctor Frame Listeners
+  useEffect(() => {
+    if (activeVideoCall?.id) {
+      socket.emit("join_consultation_room", activeVideoCall.id);
+
+      const handleChat = (data: any) => {
+        if (data?.roomId === activeVideoCall.id) {
+          setChatMessages((prev) => [...prev, { sender: data.sender, text: data.text, time: data.time }]);
+        }
+      };
+
+      const handleFrame = (data: any) => {
+        if (data?.roomId === activeVideoCall.id && data?.sender === "doctor" && data?.frame) {
+          setRemoteDoctorVideoFrame(data.frame);
+        }
+      };
+
+      const handleEnded = (data: any) => {
+        if (data?.roomId === activeVideoCall.id) {
+          toast.success("Doctor has ended the video consultation.");
+          setActiveVideoCall(null);
+        }
+      };
+
+      socket.on("telemedicine_chat_received", handleChat);
+      socket.on("telemedicine_video_frame", handleFrame);
+      socket.on("telemedicine_session_ended", handleEnded);
+
+      return () => {
+        socket.off("telemedicine_chat_received", handleChat);
+        socket.off("telemedicine_video_frame", handleFrame);
+        socket.off("telemedicine_session_ended", handleEnded);
+      };
+    } else {
+      setRemoteDoctorVideoFrame(null);
+    }
+  }, [activeVideoCall?.id]);
+
+  // Stream Patient's Local Camera Frame to Doctor every 150ms over Socket
+  useEffect(() => {
+    let frameInterval: any = null;
+    if (activeVideoCall?.id && !isVideoOff && patientLocalVideoRef.current) {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      canvas.width = 320;
+      canvas.height = 240;
+
+      frameInterval = setInterval(() => {
+        if (patientLocalVideoRef.current && patientLocalVideoRef.current.readyState === 4 && ctx) {
+          ctx.drawImage(patientLocalVideoRef.current, 0, 0, canvas.width, canvas.height);
+          const frameData = canvas.toDataURL("image/jpeg", 0.5);
+          socket.emit("telemedicine_video_frame", {
+            roomId: activeVideoCall.id,
+            frame: frameData,
+            sender: "patient"
+          });
+        }
+      }, 150);
+    }
+
+    return () => {
+      if (frameInterval) clearInterval(frameInterval);
+    };
+  }, [activeVideoCall?.id, isVideoOff, patientStream]);
 
   // Video call timer effect
   useEffect(() => {
@@ -575,13 +690,16 @@ export function PatientDashboard() {
 
   const handleSendChatMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatInput.trim()) return;
-    const newMsg = {
-      sender: patient?.name || "Patient",
-      text: chatInput,
+    if (!chatInput.trim() || !activeVideoCall) return;
+    const patientName = patient?.name || user?.name || "Patient";
+    const msg = {
+      roomId: activeVideoCall.id,
+      sender: patientName,
+      text: chatInput.trim(),
       time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     };
-    setChatMessages([...chatMessages, newMsg]);
+    socket.emit("send_telemedicine_chat", msg);
+    setChatMessages((prev) => [...prev, { sender: patientName, text: msg.text, time: msg.time }]);
     setChatInput("");
   };
 
@@ -609,8 +727,89 @@ export function PatientDashboard() {
   const nextAppointment = scheduledAppointments[0];
   const unreadNotificationsCount = notifications.filter((n) => !n.read).length;
 
+  const getAppointmentMeetUrl = (a: any): string | null => {
+    if (!a) return incomingCallData?.meetUrl ? (incomingCallData.meetUrl.startsWith("http") ? incomingCallData.meetUrl : `https://${incomingCallData.meetUrl}`) : null;
+
+    // 1. Direct meetingLink property from backend Appointment object
+    if (a.meetingLink && typeof a.meetingLink === "string" && a.meetingLink.trim().length > 0) {
+      const raw = a.meetingLink.trim();
+      return raw.startsWith("http") ? raw : `https://${raw}`;
+    }
+
+    // 2. Look inside notes string for any google meet URL (e.g. https://meet.google.com/abc-defg-hij)
+    if (a.notes && typeof a.notes === "string") {
+      const match = a.notes.match(/https?:\/\/(?:[a-zA-Z0-9-]+\.)*google\.com\/[^\s]+/i) || a.notes.match(/https?:\/\/meet\.google\.com\/[^\s]+/i);
+      if (match && match[0]) {
+        return match[0].trim();
+      }
+    }
+
+    // 3. Look inside incomingCallData if available
+    if (incomingCallData?.meetUrl && typeof incomingCallData.meetUrl === "string" && incomingCallData.meetUrl.trim().length > 0) {
+      const raw = incomingCallData.meetUrl.trim();
+      return raw.startsWith("http") ? raw : `https://${raw}`;
+    }
+
+    return null;
+  };
+
+  const handleJoinGoogleMeet = (a: any) => {
+    const meetUrl = getAppointmentMeetUrl(a) || (incomingCallData?.meetUrl ? (incomingCallData.meetUrl.startsWith("http") ? incomingCallData.meetUrl : `https://${incomingCallData.meetUrl}`) : null);
+
+    if (meetUrl) {
+      toast.success("Opening Google Meet consultation...");
+      window.open(meetUrl, "_blank");
+    } else {
+      toast.error("Doctor has not added or submitted the Google Meet link yet. Please ask your doctor to start the meeting.", {
+        duration: 5000
+      });
+    }
+  };
+
   return (
     <div className="space-y-6 pb-12">
+      {/* Incoming Doctor Video Call Banner Alert */}
+      {incomingCallData && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-800 p-4 px-6 text-white shadow-xl animate-bounce border-2 border-emerald-400">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/20 text-white shadow">
+              <Video className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-base font-black">Dr. {incomingCallData.doctorName} Started Video Consultation!</h4>
+                <span className="rounded-full bg-emerald-400/30 px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">GOOGLE MEET READY</span>
+              </div>
+              <p className="text-xs text-emerald-100 mt-0.5">Click below to open Google Meet & connect live with your doctor.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const url = incomingCallData.meetUrl || "https://meet.google.com";
+                window.open(url, "_blank");
+                setActiveVideoCall({
+                  id: incomingCallData.roomId || incomingCallData.appointmentId,
+                  doctorName: `Dr. ${incomingCallData.doctorName || "Consultant"}`,
+                  time: "Now",
+                  date: "Today"
+                });
+                setIncomingCallData(null);
+              }}
+              className="flex items-center gap-2 rounded-xl bg-white px-6 py-2.5 text-xs font-black text-emerald-900 hover:bg-emerald-50 transition-all shadow-md active:scale-95 transform hover:scale-105"
+            >
+              <Video className="h-4 w-4 text-emerald-700" /> Join Google Meet Now
+            </button>
+            <button
+              onClick={() => setIncomingCallData(null)}
+              className="rounded-xl bg-black/20 hover:bg-black/30 px-3.5 py-2.5 text-xs font-bold text-white transition-all"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="flex flex-col gap-4 rounded-2xl bg-gradient-to-r from-navy-800 via-navy-700 to-indigo-900 p-6 text-white shadow-lg sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -817,7 +1016,7 @@ export function PatientDashboard() {
                   </button>
                 </div>
                 {nextAppointment ? (
-                  <div className="flex items-center justify-between rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/50 to-blue-50/30 p-5 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/50 via-blue-50/30 to-emerald-50/30 p-5 shadow-sm">
                     <div className="flex items-center gap-4">
                       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white shadow">
                         <Calendar className="h-6 w-6" />
@@ -832,12 +1031,23 @@ export function PatientDashboard() {
                         <p className="text-[11px] font-semibold text-indigo-700 mt-1">Ref: {nextAppointment.referenceId || "REF-1009"}</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-base font-extrabold text-navy-700">
-                        {new Date(nextAppointment.date).toLocaleDateString("en-IN", { month: "short", day: "numeric" })}
-                      </p>
-                      <p className="text-xs font-bold text-slate-500">{nextAppointment.time}</p>
-                      <Badge tone="info" className="mt-1">Confirmed</Badge>
+
+                    <div className="flex items-center gap-3">
+                      {((nextAppointment as any).meetingLink || nextAppointment.type?.toLowerCase().includes("video")) && (
+                        <button
+                          onClick={() => handleJoinGoogleMeet(nextAppointment)}
+                          className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 px-4 py-2.5 text-xs font-black text-white transition-all shadow-md active:scale-95 transform hover:scale-105"
+                        >
+                          <Video className="h-4 w-4" /> Join Google Meet Now
+                        </button>
+                      )}
+                      <div className="text-right">
+                        <p className="text-base font-extrabold text-navy-700">
+                          {new Date(nextAppointment.date).toLocaleDateString("en-IN", { month: "short", day: "numeric" })}
+                        </p>
+                        <p className="text-xs font-bold text-slate-500">{nextAppointment.time}</p>
+                        <Badge tone="info" className="mt-1">Confirmed</Badge>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -1320,20 +1530,20 @@ export function PatientDashboard() {
                                 </button>
                               </>
                             )}
-                            {a.type?.toLowerCase().includes("video") && isUpcoming && (
-                              <button
-                                onClick={() => {
-                                  setActiveVideoCall({
-                                    id: a._id,
-                                    doctorName: docName,
-                                    time: a.time,
-                                    date: new Date(a.date).toLocaleDateString("en-IN")
-                                  });
-                                }}
-                                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition-all flex items-center gap-1 shadow-sm"
-                              >
-                                <Video className="h-3.5 w-3.5" /> Join Call
-                              </button>
+                            {isUpcoming && (a.type?.toLowerCase().includes("video") || (a as any).meetingLink) && (
+                              <div className="flex flex-col items-end gap-1">
+                                <button
+                                  onClick={() => handleJoinGoogleMeet(a)}
+                                  className="rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-3.5 py-1.5 text-xs font-black text-white hover:from-emerald-700 hover:to-teal-700 transition-all flex items-center gap-1.5 shadow-md active:scale-95"
+                                >
+                                  <Video className="h-3.5 w-3.5" /> Join Google Meet Now
+                                </button>
+                                {getAppointmentMeetUrl(a) && (
+                                  <span className="text-[10px] font-mono text-emerald-700 font-bold truncate max-w-[220px]">
+                                    {getAppointmentMeetUrl(a)}
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
                         </div>
@@ -2317,9 +2527,12 @@ export function PatientDashboard() {
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {(() => {
-              const videoAppointments = appointments.filter(
-                (a) => a.type?.toLowerCase().includes("video") && (a.status === "scheduled" || a.status === "pending_payment")
-              );
+              const videoAppointments = appointments.filter((a: any) => {
+                const t = String(a.type || "").toLowerCase();
+                const isVideo = t.includes("video") || t.includes("online") || t.includes("tele") || !!a.meetingLink;
+                const isActive = a.status === "scheduled" || a.status === "pending_payment" || a.status === "checked_in" || a.status === "in_consultation";
+                return isVideo && isActive;
+              });
               if (videoAppointments.length === 0) {
                 return (
                   <div className="col-span-2 flex flex-col items-center justify-center py-12 text-slate-400 border border-dashed rounded-xl bg-slate-50">
@@ -2347,18 +2560,22 @@ export function PatientDashboard() {
                         <p className="text-xs text-slate-600 mt-2 font-medium bg-slate-50 p-3 rounded-lg border">{sess.notes}</p>
                       )}
                     </div>
-                    <div className="mt-6 pt-4 border-t">
+                    <div className="mt-6 pt-4 border-t space-y-2">
                       <button
-                        onClick={() => setActiveVideoCall({
-                          id: sess._id,
-                          doctorName: `Dr. ${docName}`,
-                          time: sess.time,
-                          date: dateStr
-                        })}
-                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 transition-all shadow"
+                        onClick={() => handleJoinGoogleMeet(sess)}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 px-4 py-2.5 text-xs font-extrabold text-white transition-all shadow-md active:scale-95"
                       >
-                        <Video className="h-4 w-4" /> Join Live Video Room
+                        <Video className="h-4 w-4" /> Join Google Meet Now
                       </button>
+                      {getAppointmentMeetUrl(sess) ? (
+                        <p className="text-[11px] font-mono text-emerald-700 text-center font-bold truncate">
+                          Link: {getAppointmentMeetUrl(sess)}
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-amber-600 text-center font-semibold italic">
+                          Waiting for doctor to provide Google Meet link...
+                        </p>
+                      )}
                     </div>
                   </div>
                 );
@@ -2951,125 +3168,7 @@ export function PatientDashboard() {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL 9: LIVE VIDEO CONSULTATION ROOM OVERLAY */}
-      {/* ========================================================================= */}
-      {activeVideoCall && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4">
-          <div className="w-full max-w-5xl rounded-3xl bg-slate-900 p-6 text-white shadow-2xl border border-slate-800 flex flex-col h-[85vh]">
-            {/* Call Header */}
-            <div className="flex justify-between items-center border-b border-slate-800 pb-4 mb-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                  <Video className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-white">Live Telehealth Session with {activeVideoCall.doctorName}</h3>
-                  <p className="text-xs text-slate-400">Secure End-to-End Encrypted Consultation · Duration: <span className="font-mono text-emerald-400 font-bold">{formatTimer(callTimer)}</span></p>
-                </div>
-              </div>
-              <button
-                onClick={() => setActiveVideoCall(null)}
-                className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold hover:bg-rose-700 transition-all flex items-center gap-1.5"
-              >
-                <PhoneOff className="h-4 w-4" /> End Call
-              </button>
-            </div>
 
-            {/* Video Main Grid */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 flex-1 overflow-hidden">
-              {/* Main Doctor Screen */}
-              <div className="lg:col-span-2 relative rounded-2xl bg-slate-950 overflow-hidden border border-slate-800 flex items-center justify-center">
-                {!isVideoOff ? (
-                  <img
-                    src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=1200&q=80"
-                    alt="Doctor Video"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center text-slate-500">
-                    <VideoOff className="h-16 w-16 mb-2" />
-                    <p className="text-xs font-bold">Your Video is Turned Off</p>
-                  </div>
-                )}
-                {/* Doctor Name Badge */}
-                <div className="absolute top-4 left-4 rounded-lg bg-black/60 backdrop-blur-md px-3 py-1.5 text-xs font-bold text-white flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                  {activeVideoCall.doctorName} (HD)
-                </div>
-
-                {/* Self View PIP Thumbnail */}
-                <div className="absolute bottom-4 right-4 h-32 w-48 rounded-xl bg-slate-800 border-2 border-slate-700 overflow-hidden shadow-lg">
-                  <div className="h-full w-full bg-slate-900 flex items-center justify-center text-slate-400 text-xs font-bold">
-                    <span>You ({patient?.name?.split(" ")[0] || "Patient"})</span>
-                  </div>
-                </div>
-
-                {/* Floating Call Controls Bar */}
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 rounded-2xl bg-slate-900/90 backdrop-blur-md px-5 py-2.5 border border-slate-700 shadow-xl">
-                  <button
-                    onClick={() => setIsMicMuted(!isMicMuted)}
-                    className={`p-3 rounded-full transition-all ${isMicMuted ? "bg-rose-600 text-white" : "bg-slate-800 text-slate-200 hover:bg-slate-700"}`}
-                  >
-                    {isMicMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-                  </button>
-                  <button
-                    onClick={() => setIsVideoOff(!isVideoOff)}
-                    className={`p-3 rounded-full transition-all ${isVideoOff ? "bg-rose-600 text-white" : "bg-slate-800 text-slate-200 hover:bg-slate-700"}`}
-                  >
-                    {isVideoOff ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsScreenSharing(!isScreenSharing);
-                      toast.success(isScreenSharing ? "Stopped screen share" : "Sharing screen with doctor");
-                    }}
-                    className={`p-3 rounded-full transition-all ${isScreenSharing ? "bg-indigo-600 text-white" : "bg-slate-800 text-slate-200 hover:bg-slate-700"}`}
-                  >
-                    <Sparkles className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={() => setActiveVideoCall(null)}
-                    className="p-3 rounded-full bg-rose-600 text-white hover:bg-rose-700 transition-all"
-                  >
-                    <PhoneOff className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Doctor Chatbox Side Panel */}
-              <div className="flex flex-col rounded-2xl bg-slate-950 border border-slate-800 p-4">
-                <h4 className="text-xs font-extrabold text-slate-300 border-b border-slate-800 pb-3 mb-3 flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4 text-emerald-400" /> Consultation Live Chat
-                </h4>
-                <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
-                  {chatMessages.map((m, idx) => (
-                    <div key={idx} className={`rounded-xl p-3 ${m.sender === (patient?.name || "Patient") ? "bg-indigo-600/40 ml-4 border border-indigo-500/30" : "bg-slate-800 mr-4"}`}>
-                      <div className="flex justify-between text-[10px] text-slate-400 mb-1">
-                        <span className="font-bold text-slate-200">{m.sender}</span>
-                        <span>{m.time}</span>
-                      </div>
-                      <p className="text-slate-200 font-medium">{m.text}</p>
-                    </div>
-                  ))}
-                </div>
-                <form onSubmit={handleSendChatMessage} className="mt-3 flex gap-2 border-t border-slate-800 pt-3">
-                  <input
-                    type="text"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="Type message to doctor..."
-                    className="flex-1 rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-white outline-none focus:border-indigo-500 font-medium"
-                  />
-                  <button type="submit" className="rounded-xl bg-indigo-600 px-3 py-2 text-white hover:bg-indigo-700">
-                    <Send className="h-4 w-4" />
-                  </button>
-                </form>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* MODAL 10: OFFICIAL APPOINTMENT SLIP MODAL */}
