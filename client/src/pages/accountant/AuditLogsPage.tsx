@@ -1,15 +1,57 @@
 import { useState } from "react";
 import { 
-  History, 
   Search, 
   Clock, 
-  ShieldAlert, 
-  CheckCircle,
-  Calendar
 } from "lucide-react";
 import { useAuditLogs } from "../../features/receptionist";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
+
+function formatAuditDetails(details: any): string {
+  if (details === null || details === undefined) return "-";
+
+  let parsed = details;
+
+  if (typeof details === "string") {
+    const trimmed = details.trim();
+    if ((trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch (e) {
+        return details;
+      }
+    } else {
+      return details;
+    }
+  }
+
+  if (typeof parsed !== "object" || parsed === null) {
+    return String(parsed);
+  }
+
+  if (typeof parsed.message === "string" && parsed.message.trim() !== "") {
+    return parsed.message;
+  }
+
+  if (typeof parsed.description === "string" && parsed.description.trim() !== "") {
+    return parsed.description;
+  }
+
+  if (typeof parsed.note === "string" && parsed.note.trim() !== "") {
+    return parsed.note;
+  }
+
+  const parts: string[] = [];
+  Object.entries(parsed).forEach(([key, val]) => {
+    if (val === null || val === undefined || val === "") return;
+    if (typeof val === "object") return;
+    const formattedKey = key.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase()).trim();
+    const formattedVal = typeof val === "number" && key.toLowerCase().includes("total") ? `₹${val.toLocaleString("en-IN")}` : String(val);
+    parts.push(`${formattedKey}: ${formattedVal}`);
+  });
+
+  return parts.length > 0 ? parts.join(" · ") : JSON.stringify(parsed);
+}
 
 export function AccountantAuditLogsPage() {
   const [search, setSearch] = useState("");
@@ -20,7 +62,7 @@ export function AccountantAuditLogsPage() {
     const actionMatch = log.action?.toLowerCase().includes(searchLower);
     const userMatch = (log.performedBy?.name || log.user?.name || log.userEmail)?.toLowerCase().includes(searchLower);
     const entityMatch = (log.resource || log.entity)?.toLowerCase().includes(searchLower);
-    const detailsStr = typeof log.details === "object" ? JSON.stringify(log.details) : String(log.details || "");
+    const detailsStr = formatAuditDetails(log.details);
     const detailsMatch = detailsStr.toLowerCase().includes(searchLower);
     return actionMatch || userMatch || entityMatch || detailsMatch;
   });
@@ -75,33 +117,37 @@ export function AccountantAuditLogsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log) => (
-                  <tr key={log._id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 whitespace-nowrap text-slate-500 font-mono text-xs">
-                      <span className="flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5 text-slate-400" />
-                        {new Date(log.createdAt || log.timestamp || Date.now()).toLocaleString()}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-semibold text-slate-800">
-                      {log.performedBy?.name || log.user?.name || log.userEmail || "System"}
-                      <span className="block text-[10px] text-slate-400 uppercase font-bold tracking-wider">
-                        {(log.performedBy?.role || log.user?.role || log.userRole || "Daemon").replace("_", " ")}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <Badge tone={log.action?.toLowerCase().includes("create") || log.action?.toLowerCase().includes("payment") || log.action?.toLowerCase().includes("login") ? "success" : "neutral"}>
-                        {log.action}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                      {log.resource || log.entity || "-"}
-                    </td>
-                    <td className="px-4 py-3 text-xs font-mono max-w-sm truncate text-slate-600" title={typeof log.details === "object" ? JSON.stringify(log.details) : String(log.details || "")}>
-                      {typeof log.details === "object" ? JSON.stringify(log.details) : String(log.details || "-")}
-                    </td>
-                  </tr>
-                ))
+                filteredLogs.map((log) => {
+                  const formattedDetails = formatAuditDetails(log.details);
+
+                  return (
+                    <tr key={log._id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-500 font-mono text-xs">
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5 text-slate-400" />
+                          {new Date(log.createdAt || log.timestamp || Date.now()).toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-slate-800">
+                        {log.performedBy?.name || log.user?.name || log.userEmail || "System"}
+                        <span className="block text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                          {(log.performedBy?.role || log.user?.role || log.userRole || "Daemon").replace("_", " ")}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <Badge tone={log.action?.toLowerCase().includes("create") || log.action?.toLowerCase().includes("payment") || log.action?.toLowerCase().includes("login") ? "success" : "neutral"}>
+                          {log.action}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                        {log.resource || log.entity || "-"}
+                      </td>
+                      <td className="px-4 py-3 text-xs max-w-sm text-slate-700 font-medium" title={formattedDetails}>
+                        {formattedDetails}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

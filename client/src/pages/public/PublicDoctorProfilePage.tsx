@@ -659,7 +659,7 @@ export function PublicDoctorProfilePage() {
                           onClick={handleRegisterWithDraft}
                           className="w-full sm:w-auto text-xs px-6 py-2.5 font-bold"
                         >
-                          Create Patient Account
+                          Register as a Patient
                         </Button>
                       </div>
                     </div>
