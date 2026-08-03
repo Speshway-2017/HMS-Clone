@@ -6,10 +6,12 @@ import { LabOrder } from "../models/LabOrder";
 import { RadiologyOrder } from "../models/RadiologyOrder";
 import { DiagnosticReport } from "../models/DiagnosticReport";
 import { DbNotification } from "../models/DbNotification";
+import { Patient } from "../models/Patient";
 import { emitToDoctor, emitToHospital } from "../config/socket";
 import { logAudit } from "../utils/auditLogger";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
+import { notifyAssignedDoctorForPatient } from "../utils/autoNotifyAssignedDoctor";
 
 async function findOrder(requestId: string) {
   let order: any = await LabOrder.findById(requestId).populate("patient").populate("doctor");
@@ -353,7 +355,7 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
         }
 
         // Determine if it is Lab or Radiology
-        const isRadiology = radTests.includes(rep.testName);
+        const isRadiology = type === "Radiology" || radTests.includes(rep.testName) || /mri|x-ray|xray|ct|ultrasound|scan|mammogram|pet|echo|ecg|radiology|usg/i.test(rep.testName);
         const requestType = isRadiology ? "Radiology" : "Laboratory";
 
         const report = await DiagnosticReport.create(
@@ -401,6 +403,25 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
 
       if (order.hospital) {
         emitToHospital(order.hospital, "lab_report_uploaded", { requestId: order._id });
+      }
+
+      if (order.patient) {
+        const ptName = (order.patient as any).name || "Patient";
+        const ptUhid = (order.patient as any).uhid || "";
+        await notifyAssignedDoctorForPatient({
+          hospitalId: order.hospital,
+          patientId: (order.patient as any)._id || order.patient,
+          patientName: ptName,
+          uhid: ptUhid,
+          nurseName: (req.user as any)?.name || "Nurse",
+          title: "New Patient Report Uploaded",
+          message: `A new report has been uploaded for Patient ${ptName}.`,
+          severity: "info",
+          extraData: {
+            type: "patient_report",
+            reportType: type || "Clinical Report"
+          }
+        });
       }
 
       await logAudit({
@@ -731,15 +752,25 @@ export const downloadReport = catchAsync(async (req: Request, res: Response) => 
 
 export const getPatientReports = catchAsync(async (req: Request, res: Response) => {
   const { patientId } = req.query;
+  let resolvedPatientId = patientId;
   const hospitalId = req.hospitalFilter!.hospital;
 
-  if (!patientId) {
+  if (req.user!.role === "patient") {
+    const patientDoc = await Patient.findOne({ email: req.user!.email });
+    if (patientDoc) {
+      resolvedPatientId = patientDoc._id.toString();
+    } else {
+      return res.json({ status: "success", data: [] });
+    }
+  }
+
+  if (!resolvedPatientId) {
     throw new AppError("Patient ID is required.", 400);
   }
 
   const reports = await DiagnosticReport.find({
     hospital: hospitalId,
-    patient: patientId,
+    patient: resolvedPatientId,
     status: { $in: ["report_uploaded", "verified", "completed"] }
   })
     .sort({ uploadedAt: -1 })

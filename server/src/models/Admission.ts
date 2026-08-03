@@ -95,6 +95,68 @@ const admissionSchema = new Schema(
       ],
       default: []
     },
+    nursingNotes: {
+      type: [
+        {
+          observationType: { type: String, required: true },
+          painAssessment: { type: String, default: "" },
+          mobility: { type: String, default: "" },
+          mentalStatus: { type: String, default: "" },
+          skinCondition: { type: String, default: "" },
+          fluidIntake: { type: String, default: "" },
+          output: { type: String, default: "" },
+          diet: { type: String, default: "" },
+          woundCare: { type: String, default: "" },
+          treatmentProgress: { type: String, default: "" },
+          additionalNotes: { type: String, default: "" },
+          recordedBy: { type: Schema.Types.ObjectId, ref: "Staff", required: true },
+          recordedByName: { type: String, required: true },
+          recordedAt: { type: Date, required: true },
+          modifiedAt: { type: Date, default: null }
+        }
+      ],
+      default: []
+    },
+    bedsideCareLogs: {
+      type: [
+        {
+          bedPosition: { type: Boolean, default: false },
+          patientHygiene: { type: Boolean, default: false },
+          oralCare: { type: Boolean, default: false },
+          bathGiven: { type: Boolean, default: false },
+          dressingChanged: { type: Boolean, default: false },
+          ivLineChecked: { type: Boolean, default: false },
+          catheterCare: { type: Boolean, default: false },
+          pressureUlcerPrevention: { type: Boolean, default: false },
+          fallPrevention: { type: Boolean, default: false },
+          mobilityAssistance: { type: Boolean, default: false },
+          oxygenSupport: { type: Boolean, default: false },
+          nutrition: { type: Boolean, default: false },
+          fluidIntake: { type: Boolean, default: false },
+          outputMonitoring: { type: Boolean, default: false },
+          remarks: { type: String, default: "" },
+          completionStatus: { type: String, required: true },
+          completedBy: { type: String, required: true },
+          completedTime: { type: Date, required: true }
+        }
+      ],
+      default: []
+    },
+    dischargePreparation: {
+      doctorApprovalStatus: { type: Boolean, default: false },
+      finalVitalSigns: { type: Boolean, default: false },
+      medicationCompleted: { type: Boolean, default: false },
+      patientEducationCompleted: { type: Boolean, default: false },
+      pendingNursingTasks: { type: Boolean, default: false },
+      medicalEquipmentReturned: { type: Boolean, default: false },
+      dischargeDocumentsReady: { type: Boolean, default: false },
+      wheelchairRequired: { type: Boolean, default: false },
+      transportRequired: { type: Boolean, default: false },
+      remarks: { type: String, default: "" },
+      status: { type: String, enum: ["Pending", "Ready for Doctor Review", "Completed"], default: "Pending" },
+      updatedBy: { type: String, default: "" },
+      updatedAt: { type: Date, default: Date.now }
+    },
     medicationOrders: {
       type: [
         {
@@ -104,6 +166,7 @@ const admissionSchema = new Schema(
           duration: { type: String, required: true },
           route: { type: String, default: "Oral" },
           status: { type: String, enum: ["active", "modified", "stopped", "resumed"], default: "active" },
+          scheduledTime: { type: String, default: "" },
           prescribingDoctor: { type: Schema.Types.ObjectId, ref: "Doctor", required: true },
           prescribingDoctorName: { type: String, required: true },
           orderedAt: { type: Date, required: true },
@@ -117,6 +180,19 @@ const admissionSchema = new Schema(
                 timestamp: { type: Date, required: true },
                 doctorName: { type: String, required: true },
                 details: { type: String, default: "" }
+              }
+            ],
+            default: []
+          },
+          administrationLogs: {
+            type: [
+              {
+                action: { type: String, required: true },
+                scheduledTime: { type: String, default: "" },
+                administrationTime: { type: String, default: "" },
+                remarks: { type: String, default: "" },
+                nurseName: { type: String, required: true },
+                timestamp: { type: Date, required: true }
               }
             ],
             default: []
@@ -134,6 +210,11 @@ const admissionSchema = new Schema(
           respiratoryRate: { type: String, default: "" },
           oxygenSaturation: { type: String, default: "" },
           weight: { type: String, default: "" },
+          height: { type: String, default: "" },
+          bmi: { type: String, default: "" },
+          painScore: { type: String, default: "" },
+          bloodSugar: { type: String, default: "" },
+          observationNotes: { type: String, default: "" },
           recordedAt: { type: Date, required: true },
           recordedBy: { type: String, required: true }
         }

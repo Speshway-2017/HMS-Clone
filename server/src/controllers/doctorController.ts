@@ -24,6 +24,7 @@ const doctorSchema = z.object({
   bio: z.string().optional().default(""),
   status: z.enum(DOCTOR_STATUSES).optional(),
   rating: z.coerce.number().min(0).max(100).optional(),
+  opExpiryLimit: z.coerce.number().min(0).optional(),
 });
 
 export const listDoctors = catchAsync(async (req: Request, res: Response) => {
@@ -35,11 +36,12 @@ export const listDoctors = catchAsync(async (req: Request, res: Response) => {
   if (status) filter.status = status;
   if (search) filter.name = new RegExp(search, "i");
 
-  const busyDoctorIds = await getBusyDoctorIds(req.hospitalFilter!.hospital as any);
+  const hospitalId = req.hospitalFilter?.hospital;
+  const busyDoctorIds = await getBusyDoctorIds(hospitalId as any);
 
   const [doctors, allHospitalDoctors] = await Promise.all([
     Doctor.find(filter).populate("department", "name").sort({ createdAt: -1 }).skip(skip).limit(limit),
-    Doctor.find(req.hospitalFilter as Record<string, unknown>),
+    Doctor.find(filter),
   ]);
 
   const resolvedPaginated = doctors.map(d => {
@@ -236,6 +238,7 @@ const updateDoctorMeSchema = z.object({
   bio: z.string().optional(),
   languages: z.string().optional(),
   consultationFee: z.string().optional(),
+  opExpiryLimit: z.coerce.number().min(0).optional(),
   workingHours: z.array(z.object({
     day: z.string(),
     from: z.string(),

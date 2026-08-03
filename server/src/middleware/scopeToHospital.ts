@@ -8,7 +8,10 @@ import { AppError } from "../utils/AppError";
  */
 export function scopeToHospital(req: Request, _res: Response, next: NextFunction) {
   if (!req.user) {
-    throw new AppError("You are not logged in.", 401);
+    const hospitalId = req.query.hospitalId as string | undefined;
+    req.hospitalFilter = hospitalId ? { hospital: hospitalId } : {};
+    req.hospitalFilter = {};
+    return next();
   }
 
   if (req.user.role === "super_admin") {
@@ -18,6 +21,10 @@ export function scopeToHospital(req: Request, _res: Response, next: NextFunction
   }
 
   if (!req.user.hospital) {
+    if (req.user.role === "patient") {
+      req.hospitalFilter = {};
+      return next();
+    }
     throw new AppError("This account is not assigned to a hospital.", 403);
   }
 

@@ -149,6 +149,7 @@ export function DoctorSettingsPage() {
     bio:            "",
     consultationFee:"₹500",
     languages:      "English, Hindi",
+    opExpiryLimit:  10,
   });
 
   // Notification state
@@ -223,6 +224,7 @@ export function DoctorSettingsPage() {
         bio: doctorProfile.bio || "",
         consultationFee: doctorProfile.consultationFee || "₹500",
         languages: doctorProfile.languages || "English, Hindi",
+        opExpiryLimit: doctorProfile.opExpiryLimit ?? 10,
       });
       if (doctorProfile.workingHours && doctorProfile.workingHours.length > 0) {
         setHours(doctorProfile.workingHours);
@@ -259,6 +261,7 @@ export function DoctorSettingsPage() {
         bio: profileForm.bio,
         consultationFee: profileForm.consultationFee,
         languages: profileForm.languages,
+        opExpiryLimit: Number(profileForm.opExpiryLimit),
       });
       showToast("success", "Profile updated successfully!");
     } catch (err: any) {
@@ -398,6 +401,7 @@ export function DoctorSettingsPage() {
                 { label: "Qualification",     key: "qualification"  },
                 { label: "License Number",    key: "licenseNo"      },
                 { label: "Consultation Fee",  key: "consultationFee"},
+                { label: "OP Consultation Expiry Limit (Days)", key: "opExpiryLimit"},
               ].map((f) => (
                 <div key={f.key} className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold uppercase text-slate-400">{f.label}</label>

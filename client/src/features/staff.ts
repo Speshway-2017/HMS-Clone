@@ -75,3 +75,25 @@ export function useDeleteStaff() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["staff"] }),
   });
 }
+
+export function useStaffProfileMe(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ["staff", "me"],
+    enabled: options?.enabled ?? true,
+    queryFn: async () => {
+      const res = await api.get("/staff/me");
+      return res.data.data.staff as Staff;
+    },
+  });
+}
+
+export function useNextEmployeeId(role: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ["staff", "next-employee-id", role],
+    enabled: enabled && !!role,
+    queryFn: async () => {
+      const res = await api.get("/staff/next-employee-id", { params: { role } });
+      return res.data.data.employeeId as string;
+    },
+  });
+}

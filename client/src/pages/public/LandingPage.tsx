@@ -22,10 +22,15 @@ import {
   Heart,
   Shield,
   Clock3,
-  Award
+  Award,
+  FileText,
+  Search,
+  Star
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
+import { Modal } from "../../components/ui/Modal";
 import { usePublicHospital } from "../../features/hospitals";
+import { useBlogs, BlogPost } from "../../features/blogs";
 import { api } from "../../lib/api";
 
 function getEmbeddableMapUrl(url: string, fallbackAddress: string): string {
@@ -95,11 +100,11 @@ export function LandingPage() {
   const whyChooseUs = hospital?.whyChooseUs && hospital.whyChooseUs.length > 0
     ? hospital.whyChooseUs
     : [
-        { title: "Compassionate Care", desc: "Every patient is treated with dignity, kindness, and individualized clinical attention." },
-        { title: "Clinical Integrity", desc: "Highest patient safety standards, strict sanitization protocols, and medical safety regulations." },
-        { title: "24/7 Availability", desc: "Round-the-clock emergency support, trauma services, ambulance, and diagnostic test labs." },
-        { title: "Specialized Doctors", desc: "Attending consultants and surgeons across key departments who are masters of their fields." }
-      ];
+      { title: "Compassionate Care", desc: "Every patient is treated with dignity, kindness, and individualized clinical attention." },
+      { title: "Clinical Integrity", desc: "Highest patient safety standards, strict sanitization protocols, and medical safety regulations." },
+      { title: "24/7 Availability", desc: "Round-the-clock emergency support, trauma services, ambulance, and diagnostic test labs." },
+      { title: "Specialized Doctors", desc: "Attending consultants and surgeons across key departments who are masters of their fields." }
+    ];
   const missionText = hospital?.missionText || "To deliver high-quality, compassionate clinical care using cutting-edge diagnostics, ensuring patient health remains our primary standard.";
   const visionText = hospital?.visionText || "To lead as a regional medical beacon of safety, integrating advanced clinical intelligence to make high-standard treatment accessible.";
   const valuesText = hospital?.valuesText || "Clinical Excellence, Compassionate Treatment, Operational Integrity, and Sovereignty over Patient Privacy.";
@@ -123,9 +128,13 @@ export function LandingPage() {
     queryKey: ["public", "doctors"],
     queryFn: async () => {
       const res = await api.get("/hospitals/public/doctors");
-      return res.data.data.doctors as any[];
+      const list = res.data?.data?.doctors || res.data?.doctors || res.data || [];
+      return Array.isArray(list) ? list : [];
     }
   });
+
+  const { data: publicBlogs = [] } = useBlogs({ publishedOnly: true });
+  const [selectedBlogModal, setSelectedBlogModal] = useState<BlogPost | null>(null);
 
   // Extract all services dynamically
   const dynamicServices = departments.reduce((acc: { service: string; deptName: string }[], dept) => {
@@ -154,7 +163,41 @@ export function LandingPage() {
   });
   const [bookingSuccessData, setBookingSuccessData] = useState<any | null>(null);
 
-  // Filter doctors based on selected department
+  const [selectedSpecialization, setSelectedSpecialization] = useState<string>("all");
+  const [doctorSearchQuery, setDoctorSearchQuery] = useState<string>("");
+  const [selectedDoctorForProfile, setSelectedDoctorForProfile] = useState<any | null>(null);
+
+  // Extract unique specializations
+  const doctorSpecializations = Array.from(
+    new Set(
+      doctors
+        .map((d: any) => {
+          const specName = d.specialization || (typeof d.department === "object" && d.department ? d.department.name : d.department);
+          return specName ? String(specName).trim() : null;
+        })
+        .filter(Boolean)
+    )
+  ) as string[];
+
+  // Filter doctors based on specialization & search query
+  const catalogDoctors = doctors.filter((doc: any) => {
+    const docName = String(doc.name || (typeof doc.user === "object" ? doc.user?.name : doc.user) || "").toLowerCase();
+    const spec = String(doc.specialization || (typeof doc.department === "object" && doc.department ? doc.department.name : doc.department) || "").toLowerCase();
+    const qual = String(doc.qualification || doc.qualifications || "").toLowerCase();
+
+    const specMatch =
+      selectedSpecialization === "all" ||
+      spec === selectedSpecialization.toLowerCase() ||
+      spec.includes(selectedSpecialization.toLowerCase());
+    const queryMatch =
+      !doctorSearchQuery ||
+      docName.includes(doctorSearchQuery.toLowerCase().trim()) ||
+      spec.includes(doctorSearchQuery.toLowerCase().trim()) ||
+      qual.includes(doctorSearchQuery.toLowerCase().trim());
+    return specMatch && queryMatch;
+  });
+
+  // Filter doctors based on selected department for booking form
   const filteredDoctors = bookingForm.departmentId
     ? doctors.filter((doc) => doc.department?._id === bookingForm.departmentId)
     : doctors;
@@ -176,7 +219,9 @@ export function LandingPage() {
         "home",
         "about",
         "departments",
+        "doctors",
         "services",
+        "blog",
         "book",
         "contact",
         "privacy",
@@ -262,11 +307,11 @@ export function LandingPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-800 font-sans antialiased overflow-x-clip selection:bg-navy-600 selection:text-white">
-      
+
       {/* --- GLASSMORPHIC NAV BAR --- */}
       <header className="sticky top-0 z-50 w-full border-b border-slate-200/50 bg-white/80 backdrop-blur-xl transition-all duration-300">
         <div className="mx-auto flex max-w-[1600px] items-center justify-between px-6 py-6 lg:px-8">
-          
+
           {/* Logo / Hospital Name */}
           <div
             onClick={() => changeTab("home")}
@@ -290,18 +335,18 @@ export function LandingPage() {
               { id: "home", label: "Home" },
               { id: "about", label: "About Us" },
               { id: "departments", label: "Departments" },
+              { id: "doctors", label: "Doctors" },
               { id: "services", label: "Services" },
-              { id: "book", label: "Book Appointment" },
+              { id: "blog", label: "Blog" },
               { id: "contact", label: "Contact Us" }
             ].map((nav) => (
               <button
                 key={nav.id}
                 onClick={() => changeTab(nav.id)}
-                className={`transition-colors hover:text-navy-700 relative py-1 ${
-                  activeTab === nav.id
+                className={`transition-colors hover:text-navy-700 relative py-1 ${activeTab === nav.id
                     ? "text-navy-700 font-bold after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-navy-700"
                     : ""
-                }`}
+                  }`}
               >
                 {nav.label}
               </button>
@@ -309,17 +354,17 @@ export function LandingPage() {
           </nav>
 
           {/* Nav Actions */}
-          <div className="hidden items-center gap-4 shrink-0 lg:flex">
+          <div className="hidden items-center gap-3 shrink-0 lg:flex">
             <Link to="/login">
               <button className="text-sm font-bold text-slate-700 transition-colors hover:text-navy-700">
                 Login
               </button>
             </Link>
             <button
-              onClick={() => changeTab("book")}
+              onClick={() => changeTab("doctors")}
               className="flex items-center gap-1.5 rounded-lg bg-navy-700 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-all duration-300 hover:bg-navy-800 hover:shadow-md active:scale-95 whitespace-nowrap"
             >
-              Book OPD Slot
+              Book Appointment
             </button>
           </div>
 
@@ -341,16 +386,16 @@ export function LandingPage() {
                 { id: "home", label: "Home" },
                 { id: "about", label: "About Us" },
                 { id: "departments", label: "Departments" },
+                { id: "doctors", label: "Doctors" },
                 { id: "services", label: "Services" },
-                { id: "book", label: "Book Appointment" },
+                { id: "blog", label: "Blog" },
                 { id: "contact", label: "Contact Us" }
               ].map((nav) => (
                 <button
                   key={nav.id}
                   onClick={() => changeTab(nav.id)}
-                  className={`text-left py-2 transition-all duration-250 hover:text-navy-700 ${
-                    activeTab === nav.id ? "text-navy-700 font-bold border-l-2 border-navy-700 pl-2" : ""
-                  }`}
+                  className={`text-left py-2 transition-all duration-250 hover:text-navy-700 ${activeTab === nav.id ? "text-navy-700 font-bold border-l-2 border-navy-700 pl-2" : ""
+                    }`}
                 >
                   {nav.label}
                 </button>
@@ -362,7 +407,7 @@ export function LandingPage() {
                     Login
                   </Button>
                 </Link>
-                <Button onClick={() => changeTab("book")} variant="primary" className="w-full py-2.5 bg-navy-700">
+                <Button onClick={() => changeTab("doctors")} variant="primary" className="w-full py-2.5 bg-navy-700">
                   Book Appointment
                 </Button>
               </div>
@@ -373,11 +418,11 @@ export function LandingPage() {
 
       {/* --- RENDER VIEW STATE CONTAINER --- */}
       <main className="flex-1">
-        
+
         {/* --- VIEW: HOME --- */}
         {activeTab === "home" && (
           <div className="transition-all duration-300 ease-in-out">
-            
+
             {/* Hero Section */}
             <section className="relative px-6 pb-16 pt-8 lg:px-12 lg:pb-24 lg:pt-12 bg-gradient-to-b from-white via-slate-50 to-slate-50 overflow-hidden">
               <div aria-hidden className="pointer-events-none absolute -right-[15%] -top-[10%] h-[500px] w-[500px] rounded-full bg-navy-100/40 blur-3xl opacity-60" />
@@ -397,17 +442,11 @@ export function LandingPage() {
                   </p>
                   <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row lg:justify-start">
                     <button
-                      onClick={() => changeTab("book")}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-navy-700 px-6 py-4 text-base font-bold text-white shadow-md hover:bg-navy-800 hover:shadow-lg sm:w-auto active:scale-95 transition-all duration-300 ease-in-out"
+                      onClick={() => changeTab("doctors")}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-navy-700 to-navy-900 px-7 py-4 text-base font-bold text-white shadow-lg hover:from-navy-800 hover:to-navy-950 hover:shadow-xl sm:w-auto active:scale-95 transition-all duration-300 ease-in-out"
                     >
                       Book Appointment Online
                       <ArrowRight className="h-5 w-5" />
-                    </button>
-                    <button
-                      onClick={() => changeTab("about")}
-                      className="flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-4 text-base font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto active:scale-95 transition-all duration-300 ease-in-out"
-                    >
-                      Learn More About Us
                     </button>
                   </div>
 
@@ -421,48 +460,35 @@ export function LandingPage() {
                   </div>
                 </div>
 
-                {/* Hero Banner / Clinical Illustration */}
+                {/* Hero Banner / 3D Clinical Illustration */}
                 <div className="lg:col-span-6">
                   {heroBannerUrl ? (
                     <div className="relative overflow-hidden rounded-3xl border border-slate-200 shadow-2xl">
                       <img src={heroBannerUrl} alt={hospitalName} className="w-full aspect-[4/3] object-cover" />
                     </div>
                   ) : (
-                    <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-xl">
-                      <div className="bg-gradient-to-br from-navy-700 to-navy-900 rounded-2xl p-8 text-white space-y-6 aspect-[4/3] flex flex-col justify-between">
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 backdrop-blur-sm">
-                              <Activity className="h-5 w-5 text-emerald-400" />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-bold">{hospitalName}</h4>
-                              <span className="text-[10px] text-slate-300">OPD & IPD Medical Center</span>
-                            </div>
-                          </div>
-                          <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-[10px] font-bold text-emerald-400 border border-emerald-500/30">24/7 OPEN</span>
+                    <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-gradient-to-b from-slate-50 to-white p-3 shadow-2xl group">
+                      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-navy-900 via-slate-900 to-navy-950 aspect-[4/3] flex items-center justify-center">
+                        <img
+                          src="/3d_doctors.png"
+                          alt="3D Doctors Illustration"
+                          className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                        />
+                        <div className="absolute top-4 right-4 rounded-full bg-emerald-500/20 backdrop-blur-md px-3.5 py-1 text-[11px] font-bold text-emerald-300 border border-emerald-400/30 flex items-center gap-1.5 shadow-sm">
+                          <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                          24/7 OPEN
                         </div>
-                        
-                        <div className="space-y-3">
-                          <h3 className="text-xl font-bold">Compassionate care with advanced technology</h3>
-                          <p className="text-xs text-slate-350 leading-relaxed">
-                            Our hospital integrates patient electronic scheduling, diagnostic labs, and critical inpatient ward telemetry under a unified healthcare framework.
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-4 border-t border-white/10 pt-6 text-center">
+                        <div className="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur-md rounded-xl p-3 border border-white/40 shadow-lg flex justify-between items-center text-navy-900">
                           <div>
-                            <div className="text-base font-extrabold text-white">{departments.length || 6}</div>
-                            <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Departments</div>
+                            <h4 className="text-xs font-extrabold">{hospitalName}</h4>
+                            <p className="text-[10px] text-slate-500 font-semibold">Specialized OPD & Trauma Center</p>
                           </div>
-                          <div>
-                            <div className="text-base font-extrabold text-white">{doctors.length || 12}</div>
-                            <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Practitioners</div>
-                          </div>
-                          <div>
-                            <div className="text-base font-extrabold text-white">100%</div>
-                            <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Patient Focus</div>
-                          </div>
+                          <button
+                            onClick={() => changeTab("doctors")}
+                            className="rounded-lg bg-navy-700 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-navy-800 transition-colors"
+                          >
+                            View Doctors
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -661,7 +687,7 @@ export function LandingPage() {
         {activeTab === "about" && (
           <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-white">
             <div className="mx-auto max-w-4xl space-y-16">
-              
+
               <div className="text-center space-y-3">
                 <span className="text-xs font-bold uppercase tracking-wider text-navy-700">Our Institution</span>
                 <h1 className="text-4xl font-extrabold text-slate-900">
@@ -764,7 +790,7 @@ export function LandingPage() {
                       <p className="text-xs text-slate-600 leading-relaxed">
                         {dept.description || "Our department provides comprehensive clinical checks and consulting services under experienced medical supervisors."}
                       </p>
-                      
+
                       <div className="space-y-2 pt-2 border-t border-slate-100">
                         <div className="flex justify-between text-xs text-slate-550">
                           <span>Specialization:</span>
@@ -789,7 +815,7 @@ export function LandingPage() {
                     </div>
                   </div>
                 ))}
-                
+
                 {departments.length === 0 && (
                   <div className="col-span-3 text-center py-20 text-slate-400 text-xs">
                     No active departments found.
@@ -800,6 +826,127 @@ export function LandingPage() {
           </div>
         )}
 
+        {/* --- VIEW: DOCTORS --- */}
+        {activeTab === "doctors" && (
+          <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-white">
+            <div className="mx-auto max-w-[1600px] space-y-10">
+              <div className="text-center space-y-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-navy-700">Clinical Practitioners</span>
+                <h1 className="text-4xl font-extrabold text-slate-900">
+                  Meet Our Specialist Doctors
+                </h1>
+                <p className="text-slate-600 text-sm max-w-md mx-auto">
+                  Find expert doctors across key medical departments and schedule online OPD consultations directly.
+                </p>
+              </div>
+
+              {/* Specialization & Search Filter Bar */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="relative flex-1 max-w-md">
+                  <input
+                    type="text"
+                    value={doctorSearchQuery}
+                    onChange={(e) => setDoctorSearchQuery(e.target.value)}
+                    placeholder="Search doctor by name or specialization..."
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:border-navy-600 focus:outline-none shadow-sm"
+                  />
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                </div>
+
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+                  <button
+                    onClick={() => setSelectedSpecialization("all")}
+                    className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${selectedSpecialization === "all"
+                        ? "bg-navy-700 text-white shadow-sm"
+                        : "bg-white text-slate-600 border border-slate-200 hover:border-navy-300"
+                      }`}
+                  >
+                    All Specializations
+                  </button>
+                  {doctorSpecializations.map((spec: string) => (
+                    <button
+                      key={spec}
+                      onClick={() => setSelectedSpecialization(spec)}
+                      className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all whitespace-nowrap capitalize ${selectedSpecialization.toLowerCase() === spec.toLowerCase()
+                          ? "bg-navy-700 text-white shadow-sm"
+                          : "bg-white text-slate-600 border border-slate-200 hover:border-navy-300"
+                        }`}
+                    >
+                      {spec}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Doctors Grid */}
+              <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+                {catalogDoctors.map((doc: any) => {
+                  const docName = doc.name || (typeof doc.user === "object" ? doc.user?.name : doc.user) || "Dr. Specialist";
+                  const photo = doc.photoUrl || (typeof doc.user === "object" ? doc.user?.avatarUrl : null);
+                  const deptName = typeof doc.department === "object" && doc.department ? doc.department.name : (doc.department || "General Medicine");
+                  const specName = doc.specialization || deptName;
+                  const qualText = doc.qualifications || doc.qualification || "MD, MBBS";
+                  const fee = String((doc.consultationSettings as any)?.fee || doc.consultationFee || doc.fee || 500).replace(/[^0-9]/g, "") || "500";
+
+                  return (
+                    <div key={doc._id || doc.id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between hover:border-navy-200 transition-all hover:shadow-md">
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-4">
+                          {photo ? (
+                            <img src={photo} alt={docName} className="h-16 w-16 rounded-full object-cover border border-slate-200 shadow-sm" />
+                          ) : (
+                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-navy-50 text-navy-700 font-bold border border-navy-100 shadow-sm text-xl">
+                              {docName.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <div>
+                            <span className="inline-block rounded-full bg-navy-50 px-2.5 py-0.5 text-[9px] font-bold text-navy-700 uppercase">
+                              {deptName}
+                            </span>
+                            <h3 className="text-lg font-bold text-slate-850 mt-1">Dr. {docName.replace(/^dr\.\s*/i, "")}</h3>
+                            <span className="block text-xs font-semibold text-slate-500">{specName}</span>
+                          </div>
+                        </div>
+
+                        <hr className="border-slate-100" />
+
+                        <div className="space-y-2 text-xs text-slate-600">
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Qualifications:</span>
+                            <span className="font-bold text-slate-700">{qualText}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Department:</span>
+                            <span className="font-bold text-slate-700">{deptName}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">OPD Consultation Fee:</span>
+                            <span className="font-bold text-navy-700 text-sm">₹{fee}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-6 border-t border-slate-100 mt-6">
+                        <Link
+                          to={`/doctors/${doc._id || doc.id}`}
+                          className="w-full flex items-center justify-center gap-2 rounded-xl bg-navy-700 py-3 text-xs font-bold text-white shadow-sm hover:bg-navy-800 active:scale-95 transition-all"
+                        >
+                          <Calendar className="h-4 w-4" /> Book Appointment
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {catalogDoctors.length === 0 && (
+                  <div className="col-span-3 text-center py-20 text-slate-400 text-xs">
+                    No doctors match the selected specialization or search filter.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         {/* --- VIEW: SERVICES --- */}
         {activeTab === "services" && (
           <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-white">
@@ -851,11 +998,82 @@ export function LandingPage() {
           </div>
         )}
 
+        {/* --- VIEW: BLOG --- */}
+        {activeTab === "blog" && (
+          <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-white">
+            <div className="mx-auto max-w-[1600px] space-y-12">
+              <div className="text-center space-y-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-navy-700">Health & Clinical Insights</span>
+                <h1 className="text-4xl font-extrabold text-slate-900">
+                  Hospital News & Articles
+                </h1>
+                <p className="text-slate-600 text-sm max-w-md mx-auto">
+                  Stay informed with health recommendations, medical breakthroughs, and operational updates from our practitioners.
+                </p>
+              </div>
+
+              {/* Blog Feed Grid */}
+              <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+                {publicBlogs.map((post) => (
+                  <div
+                    key={post._id}
+                    onClick={() => setSelectedBlogModal(post)}
+                    className="rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col justify-between overflow-hidden cursor-pointer hover:shadow-md hover:border-navy-200 transition-all group"
+                  >
+                    {post.coverImageUrl ? (
+                      <img src={post.coverImageUrl} alt={post.title} className="h-48 w-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    ) : (
+                      <div className="h-48 w-full bg-slate-100 flex items-center justify-center text-slate-300">
+                        <FileText className="h-12 w-12" />
+                      </div>
+                    )}
+
+                    <div className="p-6 space-y-3 flex-1">
+                      <div className="flex justify-between items-center text-[10px] font-bold text-slate-450 uppercase">
+                        <span>{post.author || "Hospital Admin"}</span>
+                        <span>{new Date(post.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+                      </div>
+
+                      <h3 className="text-lg font-bold text-slate-850 group-hover:text-navy-700 transition-colors line-clamp-2">
+                        {post.title}
+                      </h3>
+
+                      <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">
+                        {post.content}
+                      </p>
+
+                      {post.tags && post.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-2">
+                          {post.tags.map((t, idx) => (
+                            <span key={idx} className="text-[10px] font-bold bg-navy-50 text-navy-700 rounded px-2 py-0.5">
+                              #{t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="px-6 pb-6 pt-2 flex items-center gap-1 text-xs font-bold text-navy-700 group-hover:underline">
+                      Read Full Article <ArrowRight className="h-3.5 w-3.5" />
+                    </div>
+                  </div>
+                ))}
+
+                {publicBlogs.length === 0 && (
+                  <div className="col-span-3 text-center py-20 text-slate-400 text-xs">
+                    No articles published yet. New articles will appear here as soon as they are added in the Admin Dashboard.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* --- VIEW: BOOK APPOINTMENT --- */}
         {activeTab === "book" && (
           <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12">
             <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-8 shadow-lg relative">
-              
+
               <div className="text-center space-y-2 mb-8">
                 <span className="text-xs font-bold uppercase tracking-wider text-navy-700">Online OPD Request</span>
                 <h1 className="text-2xl font-extrabold text-slate-900">Book Appointment</h1>
@@ -908,7 +1126,7 @@ export function LandingPage() {
                 </div>
               ) : (
                 <form onSubmit={handleBookingSubmit} className="space-y-4 text-xs font-medium text-slate-700">
-                  
+
                   {/* Patient Name */}
                   <div>
                     <label className="block mb-1">Patient Full Name <span className="text-rose-500">*</span></label>
@@ -1080,7 +1298,7 @@ export function LandingPage() {
         {activeTab === "contact" && (
           <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12">
             <div className="mx-auto max-w-[1600px] grid grid-cols-1 gap-12 lg:grid-cols-12">
-              
+
               {/* Contact info */}
               <div className="lg:col-span-5 space-y-8">
                 <div>
@@ -1345,8 +1563,18 @@ export function LandingPage() {
                 </button>
               </li>
               <li>
+                <button onClick={() => changeTab("doctors")} className="hover:text-navy-700 text-left">
+                  Doctors Directory
+                </button>
+              </li>
+              <li>
                 <button onClick={() => changeTab("services")} className="hover:text-navy-700 text-left">
                   Clinical Services
+                </button>
+              </li>
+              <li>
+                <button onClick={() => changeTab("blog")} className="hover:text-navy-700 text-left">
+                  Health Blog
                 </button>
               </li>
             </ul>
@@ -1385,6 +1613,47 @@ export function LandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* Blog Article Reader Modal */}
+      {selectedBlogModal && (
+        <Modal
+          title={selectedBlogModal.title}
+          isOpen={!!selectedBlogModal}
+          onClose={() => setSelectedBlogModal(null)}
+        >
+          <div className="space-y-4 text-slate-700">
+            {selectedBlogModal.coverImageUrl && (
+              <img
+                src={selectedBlogModal.coverImageUrl}
+                alt={selectedBlogModal.title}
+                className="w-full max-h-64 object-cover rounded-xl border border-slate-200"
+              />
+            )}
+            <div className="flex items-center justify-between text-xs font-bold text-slate-400 border-b border-slate-100 pb-2">
+              <span>Author: {selectedBlogModal.author}</span>
+              <span>
+                {new Date(selectedBlogModal.createdAt).toLocaleDateString("en-IN", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </span>
+            </div>
+            <div className="text-xs leading-relaxed space-y-3 whitespace-pre-line text-slate-650">
+              {selectedBlogModal.content}
+            </div>
+            {selectedBlogModal.tags && selectedBlogModal.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-3 border-t border-slate-100">
+                {selectedBlogModal.tags.map((t, idx) => (
+                  <span key={idx} className="text-[10px] font-bold bg-slate-100 text-slate-600 rounded px-2 py-0.5">
+                    #{t}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

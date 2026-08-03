@@ -30,9 +30,14 @@ import {
   Pill,
   ClipboardCheck,
   Truck,
-  type LucideIcon,
+  User,
+  Heart,
+  Bell,
+  Clock,
 } from "lucide-react";
 import { Role } from "../types/auth";
+import type { ComponentType } from "react";
+export type LucideIcon = ComponentType<any>;
 
 export interface NavItem {
   label: string;
@@ -56,16 +61,17 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   hospital_admin: [
     { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
     { label: "Doctors", path: "/admin/doctors", icon: Stethoscope },
+    { label: "Staff", path: "/admin/staff", icon: UserCheck },
     { label: "Patients", path: "/admin/patients", icon: Users },
     { label: "Appointments", path: "/admin/appointments", icon: CalendarClock },
-    { label: "Staff", path: "/admin/staff", icon: UserCheck },
     { label: "Departments", path: "/admin/departments", icon: FolderTree },
-    { label: "Finance", path: "/admin/finance", icon: Wallet },
+    { label: "Revenue Analytics", path: "/admin/finance", icon: Wallet },
     { label: "Inventory", path: "/admin/inventory", icon: Boxes },
     { label: "Beds & Wards", path: "/admin/beds", icon: BedDouble },
     { label: "Roles", path: "/admin/roles", icon: ShieldCheck },
     { label: "Hospital Info", path: "/admin/hospital-info", icon: Building2 },
     { label: "Contact Enquiries", path: "/admin/enquiries", icon: ClipboardList },
+    { label: "Manage Blogs", path: "/admin/blogs", icon: FileText },
     { label: "Settings", path: "/admin/settings", icon: Settings },
   ],
   receptionist: [
@@ -123,5 +129,33 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "Billing", path: "/laboratory/billing", icon: Receipt },
     { label: "Settings", path: "/laboratory/settings", icon: Settings },
   ],
+  nurse: [
+    { label: "Dashboard", path: "/nurse", icon: LayoutDashboard },
+    { label: "Assigned Patients", path: "/nurse/patients", icon: Users },
+    { label: "Medication Admin", path: "/nurse/medications", icon: Pill },
+    { label: "Vitals Monitoring", path: "/nurse/vitals", icon: Activity },
+    { label: "Nursing Notes", path: "/nurse/notes", icon: FileText },
+    { label: "Care Plans", path: "/nurse/care-plans", icon: ClipboardCheck },
+    { label: "Shift Handover", path: "/nurse/shift-handover", icon: ClipboardList },
+    { label: "Ward Management", path: "/nurse/wards", icon: BedDouble },
+    { label: "Emergency Alerts", path: "/nurse/alerts", icon: Bell },
+    { label: "Notifications", path: "/nurse/notifications", icon: History },
+    { label: "Settings", path: "/nurse/settings", icon: Settings },
+  ],
+  patient: [
+    { label: "Dashboard", path: "/patient", icon: LayoutDashboard },
+    { label: "Profile Management", path: "/patient?tab=profile", icon: User },
+    { label: "Appointments", path: "/patient?tab=appointments", icon: CalendarClock },
+    { label: "Medical History", path: "/patient?tab=history", icon: Heart },
+    { label: "Prescriptions", path: "/patient?tab=prescriptions", icon: Pill },
+    { label: "Lab Reports", path: "/patient?tab=reports", icon: FileText },
+    { label: "Radiology & Scans", path: "/patient?tab=imaging", icon: ScanLine },
+    { label: "Billing & Pay", path: "/patient?tab=billing", icon: Wallet },
+    { label: "Insurance Details", path: "/patient?tab=insurance", icon: ShieldCheck },
+    { label: "Video Consult", path: "/patient?tab=telehealth", icon: Video },
+    { label: "Notifications", path: "/patient?tab=notifications", icon: Bell },
+    { label: "Settings", path: "/patient/settings", icon: Settings },
+  ],
 };
+
 

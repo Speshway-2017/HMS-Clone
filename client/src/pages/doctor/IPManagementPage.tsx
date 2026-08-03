@@ -24,6 +24,7 @@ import {
   useCreateRadiologyOrder
 } from "../../features/doctorDashboard";
 import { api } from "../../lib/api";
+import { socket } from "../../lib/socket";
 import toast from "react-hot-toast";
 
 const STATUS_BADGE: Record<string, { tone: "danger" | "warning" | "success" | "info" | "neutral"; label: string }> = {
@@ -47,6 +48,7 @@ function formatINR(amount: number | string | undefined) {
 const TABS = ["Admitted Patients", "Daily Notes", "Treatment Plan", "Lab Records", "Radiology", "Medical Timeline", "Discharge"];
 
 export function IPManagementPage() {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState(0);
   const { data: patientsData, isLoading } = usePatients({ status: "admitted" });
   const { data: admissionsList } = useDoctorInpatients();
@@ -60,6 +62,38 @@ export function IPManagementPage() {
   const saveVitalsMutation = useSaveInpatientVitals();
   const addMedicationMutation = useAddInpatientMedication();
   const updateMedicationMutation = useUpdateInpatientMedication();
+
+  // Real-time WebSockets synchronization for vitals and inpatient updates
+  useEffect(() => {
+    const handleVitalsUpdate = (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard", "inpatients"] });
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      if (selectedPatientId) {
+        queryClient.invalidateQueries({ queryKey: ["doctorDashboard", "inpatient", selectedPatientId] });
+      }
+      toast.success("Patient vitals updated live by Nurse!", { id: "live-vitals-toast" });
+    };
+
+    const handleIPUpdate = () => {
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard", "inpatients"] });
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      if (selectedPatientId) {
+        queryClient.invalidateQueries({ queryKey: ["doctorDashboard", "inpatient", selectedPatientId] });
+      }
+    };
+
+    socket.on("vitals_updated", handleVitalsUpdate);
+    socket.on("ip_management_update", handleIPUpdate);
+    socket.on("dashboard_update", handleIPUpdate);
+    socket.on("notification:new", handleIPUpdate);
+
+    return () => {
+      socket.off("vitals_updated", handleVitalsUpdate);
+      socket.off("ip_management_update", handleIPUpdate);
+      socket.off("dashboard_update", handleIPUpdate);
+      socket.off("notification:new", handleIPUpdate);
+    };
+  }, [queryClient, selectedPatientId]);
 
   // Modal control states
   const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
@@ -90,7 +124,6 @@ export function IPManagementPage() {
   const [night, setNight] = useState(false);
 
   // Lab & Radiology states & mutations
-  const queryClient = useQueryClient();
   const { data: hospitalData } = useMyHospital();
   const labTests = hospitalData?.availableLabTests && hospitalData.availableLabTests.length > 0
     ? hospitalData.availableLabTests

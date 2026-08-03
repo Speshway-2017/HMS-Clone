@@ -23,6 +23,7 @@ import { createDoctorNotification } from "../utils/notificationHelper";
 import { IPBill } from "../models/IPBill";
 import { IPBillPayment } from "../models/IPBillPayment";
 import { RoomTariff } from "../models/RoomTariff";
+import { User } from "../models/User";
 
 
 function generateDigits(length: number): string {
@@ -144,8 +145,28 @@ export class ReceptionService {
     const patientCode = `PAT-${generateDigits(6)}`;
     const qrCode = `HMS|${uhid}|${patientData.name}|${patientData.phone}`;
 
+    let linkedUserId = patientData.user;
+    if (!linkedUserId) {
+      const email = (patientData.email || "").trim();
+      const phone = (patientData.phone || "").replace(/\D/g, "").slice(-10);
+      const name = (patientData.name || "").trim();
+
+      const userConds: any[] = [];
+      if (email) userConds.push({ email: { $regex: `^${email.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+      if (phone && phone.length >= 7) userConds.push({ phone: { $regex: `${phone}$` } });
+      if (name) userConds.push({ name: { $regex: `^${name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+
+      if (userConds.length > 0) {
+        const existingUser = await User.findOne({ role: "patient", $or: userConds });
+        if (existingUser) {
+          linkedUserId = existingUser._id;
+        }
+      }
+    }
+
     const newPatient = await ReceptionRepository.createPatient({
       ...patientData,
+      ...(linkedUserId ? { user: linkedUserId } : {}),
       hospital: hospitalId,
       uhid,
       patientCode,
@@ -174,21 +195,28 @@ export class ReceptionService {
       throw new AppError("Patient not found", 404);
     }
     
-    // Get last active consultation today or most recent one
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
+    // Find all patient document IDs associated with this patient
+    const patientConds: any[] = [{ _id: patientId }];
+    if (patient.user) patientConds.push({ user: patient.user });
+    if (patient.email) patientConds.push({ email: patient.email });
+    if (patient.phone) {
+      const pClean = patient.phone.replace(/\D/g, "").slice(-10);
+      if (pClean.length >= 7) patientConds.push({ phone: { $regex: `${pClean}$` } });
+    }
+    const allPatientDocs = await Patient.find({ hospital: hospitalId, $or: patientConds }).select("_id");
+    const allPatientIds = allPatientDocs.map(p => p._id);
 
-    const lastAppointment = await Appointment.findOne({
+    const recentAppointmentsList = await Appointment.find({
       hospital: hospitalId,
-      patient: patientId,
+      patient: { $in: allPatientIds },
       status: { $nin: ["cancelled", "no_show"] }
-    }).sort({ createdAt: -1 }).populate("doctor department");
+    }).sort({ date: -1, createdAt: -1 }).limit(20).populate("doctor department");
+
+    const lastAppointment = recentAppointmentsList.length > 0 ? recentAppointmentsList[0] : null;
 
     const activeAdmission = await Admission.findOne({
       hospital: hospitalId,
-      patient: patientId,
+      patient: { $in: allPatientIds },
       status: {
         $in: [
           "admitted",
@@ -205,14 +233,19 @@ export class ReceptionService {
       }
     });
 
-    const hasExistingAppointments = await Appointment.exists({
-      hospital: hospitalId,
-      patient: patientId
-    });
-
     return {
       patient,
-      hasExistingAppointments: !!hasExistingAppointments,
+      hasExistingAppointments: recentAppointmentsList.length > 0,
+      recentAppointments: recentAppointmentsList.map(a => ({
+        _id: a._id,
+        date: a.date,
+        doctorName: (a.doctor as any)?.name || "N/A",
+        doctorId: (a.doctor as any)?._id ? String((a.doctor as any)._id) : (a.doctor ? String(a.doctor) : ""),
+        departmentName: (a.department as any)?.name || "N/A",
+        status: a.status,
+        visitType: a.type || "Consultation",
+        notes: a.notes || a.chiefComplaint || ""
+      })),
       activeAdmission: activeAdmission ? {
         _id: activeAdmission._id,
         admissionNumber: activeAdmission.admissionNumber,
@@ -420,9 +453,23 @@ export class ReceptionService {
     const referenceId = `${aptPrefix}${String(nextSerial).padStart(6, "0")}`;
 
     // 7. Calculate consultation/registration fees first to check if appointment is free
+    // Find all patient document IDs associated with this patient (by patientId, or matching email/phone/user)
+    const currentPatientDoc = await Patient.findById(patientId);
+    const patientConds: any[] = [{ _id: patientId }];
+    if (currentPatientDoc) {
+      if (currentPatientDoc.user) patientConds.push({ user: currentPatientDoc.user });
+      if (currentPatientDoc.email) patientConds.push({ email: currentPatientDoc.email });
+      if (currentPatientDoc.phone) {
+        const pClean = currentPatientDoc.phone.replace(/\D/g, "").slice(-10);
+        if (pClean.length >= 7) patientConds.push({ phone: { $regex: `${pClean}$` } });
+      }
+    }
+    const allPatientDocs = await Patient.find({ hospital: hospitalId, $or: patientConds }).select("_id");
+    const allPatientIds = allPatientDocs.map(p => p._id);
+
     const hasOtherAppointments = await Appointment.exists({
       hospital: hospitalId,
-      patient: patientId
+      patient: { $in: allPatientIds }
     });
 
     const registrationFee = hasOtherAppointments ? 0 : (type === "Emergency" ? 200 : 100);
@@ -435,9 +482,9 @@ export class ReceptionService {
       }
     }
 
-    // Check if patient has a completed appointment with this doctor within the opExpiryLimit
+    // Check if patient has any prior non-cancelled appointment with this doctor within opExpiryLimit
     const hospitalRecord = await Hospital.findById(hospitalId);
-    const opExpiryLimit = hospitalRecord?.opExpiryLimit ?? 10;
+    const opExpiryLimit = doctor.opExpiryLimit ?? hospitalRecord?.opExpiryLimit ?? 10;
     const expiryDate = new Date(bookingDate);
     expiryDate.setDate(expiryDate.getDate() - opExpiryLimit);
     expiryDate.setHours(0, 0, 0, 0);
@@ -445,15 +492,15 @@ export class ReceptionService {
     const bookingDateEnd = new Date(bookingDate);
     bookingDateEnd.setHours(23, 59, 59, 999);
 
-    const pastCompletedAppt = await Appointment.findOne({
+    const pastApptWithinLimit = await Appointment.findOne({
       hospital: hospitalId,
-      patient: patientId,
+      patient: { $in: allPatientIds },
       doctor: doctorId,
-      status: "completed",
+      status: { $nin: ["cancelled", "no_show"] },
       date: { $gte: expiryDate, $lte: bookingDateEnd }
     });
 
-    const isWithinExpiry = !!pastCompletedAppt;
+    const isWithinExpiry = !!pastApptWithinLimit;
     if (isWithinExpiry) {
       consultationFee = 0;
     }
@@ -529,130 +576,121 @@ export class ReceptionService {
       details: `Created provisional invoice ${newInvoice._id} for patient ID ${patientId} with Dr. ${doctor.name}. Reference ID: ${referenceId}`
     });
 
-    // If the appointment is free, create the appointment immediately (since payment is not needed)
-    if (isFree) {
-      const isToday = bookingDateStr === todayStr;
-      const appointmentStatus = isToday ? "checked_in" : "scheduled";
+    const isToday = bookingDateStr === todayStr;
+    const appointmentStatus = isFree ? (isToday ? "checked_in" : "scheduled") : "pending_payment";
 
-      const appointmentPayload: Record<string, unknown> = {
-        hospital: hospitalId,
-        referenceId,
-        patient: patientId,
-        doctor: doctorId,
-        department: departmentId,
-        date: bookingDate,
-        time,
-        type: type || "Consultation",
-        status: appointmentStatus,
-        notes: notes || "",
-      };
+    const appointmentPayload: Record<string, unknown> = {
+      hospital: hospitalId,
+      referenceId,
+      patient: patientId,
+      doctor: doctorId,
+      department: departmentId,
+      date: bookingDate,
+      time,
+      type: type || "Consultation",
+      status: appointmentStatus,
+      notes: notes || "",
+    };
 
-      // Attach follow-up metadata if applicable
-      if (followUp) {
-        appointmentPayload.followUp = true;
-        appointmentPayload.parentAppointmentId = parentAppointmentId;
-        appointmentPayload.followUpDate = bookingDate;
-        appointmentPayload.followUpReason = followUpReason || "";
-      }
-
-      const newAppointment = await ReceptionRepository.createAppointment(appointmentPayload);
-      
-      // Update invoice to link appointment
-      newInvoice.appointment = newAppointment._id;
-      await newInvoice.save();
-
-      const patientRecord = await Patient.findById(patientId);
-      const patientName = patientRecord ? patientRecord.name : "Patient";
-
-      let tokenNumber = "N/A";
-      let queueNumber = "N/A";
-      let queueRecord = null;
-
-      if (isToday) {
-        // Auto check-in and queue token generation for free consultations
-        const startOfToday = new Date();
-        startOfToday.setHours(0, 0, 0, 0);
-        const endOfToday = new Date();
-        endOfToday.setHours(23, 59, 59, 999);
-
-        const todayTokenCount = await Queue.countDocuments({
-          hospital: hospitalId,
-          createdAt: { $gte: startOfToday, $lte: endOfToday }
-        });
-        tokenNumber = `T${String(todayTokenCount + 1).padStart(3, "0")}`;
-
-        const doctorQueueCount = await Queue.countDocuments({
-          hospital: hospitalId,
-          doctor: doctorId,
-          createdAt: { $gte: startOfToday, $lte: endOfToday }
-        });
-        queueNumber = `Q${String(doctorQueueCount + 1).padStart(3, "0")}`;
-
-        queueRecord = await ReceptionRepository.createQueueToken({
-          hospital: hospitalId,
-          tokenNumber,
-          type: type === "Emergency" ? "emergency" : "regular",
-          status: "waiting",
-          patient: patientId,
-          doctor: doctorId,
-          department: departmentId || doctor.department,
-          appointment: newAppointment._id,
-          date: newAppointment.date
-        });
-
-        // Notify doctor of checked in OP patient
-        try {
-          await createDoctorNotification({
-            hospital: hospitalId,
-            title: "OP Patient Checked In",
-            message: `OP patient ${patientName} has checked in. You have been assigned this patient (Token: ${tokenNumber}, Queue: ${queueNumber}).`,
-            type: "appointment",
-            severity: "info",
-            recipientDoctor: doctorId,
-            link: `/doctor/op-management`,
-            data: {
-              appointmentId: newAppointment._id.toString(),
-              tokenNumber,
-              queueNumber,
-            }
-          });
-        } catch (err) {
-          console.error("Failed to notify doctor of checked-in OP patient:", err);
-        }
-      }
-
-      await ReceptionRepository.createAuditLog({
-        hospital: hospitalId,
-        user: userId,
-        action: "APPOINTMENT_BOOKED_FREE",
-        details: `Booked ${followUp ? "follow-up " : ""}appointment ${referenceId} for patient ID ${patientId} with Dr. ${doctor.name} (free visit).`
-      });
-
-      let checkInResult = null;
-      if (type === "Walk-in" || type === "Emergency") {
-        try {
-          checkInResult = await this.checkInAppointment(hospitalId, newAppointment._id.toString(), userId);
-        } catch (err) {
-          console.error("Immediate check-in failed for walk-in/emergency:", err);
-        }
-      }
-
-      return {
-        appointment: newAppointment,
-        invoice: newInvoice,
-        billing: {
-          registrationFee,
-          consultationFee,
-          gst,
-          discount,
-          total
-        },
-        token: checkInResult ? { tokenNumber: checkInResult.tokenNumber } : null
-      };
+    if (followUp) {
+      appointmentPayload.followUp = true;
+      appointmentPayload.parentAppointmentId = parentAppointmentId;
+      appointmentPayload.followUpDate = bookingDate;
+      appointmentPayload.followUpReason = followUpReason || "";
     }
 
-    // For paid appointments, only return the invoice
+    const newAppointment = await ReceptionRepository.createAppointment(appointmentPayload);
+    
+    // Update invoice to link appointment
+    newInvoice.appointment = newAppointment._id;
+    await newInvoice.save();
+
+    const patientRecord = await Patient.findById(patientId);
+    const patientName = patientRecord ? patientRecord.name : "Patient";
+
+    let tokenNumber = "N/A";
+    let queueNumber = "N/A";
+    let queueRecord = null;
+
+    if (isFree && isToday) {
+      // Auto check-in and queue token generation for free consultations on today's date
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const endOfToday = new Date();
+      endOfToday.setHours(23, 59, 59, 999);
+
+      const todayTokenCount = await Queue.countDocuments({
+        hospital: hospitalId,
+        createdAt: { $gte: startOfToday, $lte: endOfToday }
+      });
+      tokenNumber = `T${String(todayTokenCount + 1).padStart(3, "0")}`;
+
+      const doctorQueueCount = await Queue.countDocuments({
+        hospital: hospitalId,
+        doctor: doctorId,
+        createdAt: { $gte: startOfToday, $lte: endOfToday }
+      });
+      queueNumber = `Q${String(doctorQueueCount + 1).padStart(3, "0")}`;
+
+      queueRecord = await ReceptionRepository.createQueueToken({
+        hospital: hospitalId,
+        tokenNumber,
+        type: type === "Emergency" ? "emergency" : "regular",
+        status: "waiting",
+        patient: patientId,
+        doctor: doctorId,
+        department: departmentId || doctor.department,
+        appointment: newAppointment._id,
+        date: newAppointment.date
+      });
+
+      // Notify doctor of checked in OP patient
+      try {
+        await createDoctorNotification({
+          hospital: hospitalId,
+          title: "OP Patient Checked In",
+          message: `OP patient ${patientName} has checked in. You have been assigned this patient (Token: ${tokenNumber}, Queue: ${queueNumber}).`,
+          type: "appointment",
+          severity: "info",
+          recipientDoctor: doctorId,
+          link: `/doctor/op-management`,
+          data: {
+            appointmentId: newAppointment._id.toString(),
+            tokenNumber,
+            queueNumber,
+          }
+        });
+      } catch (err) {
+        console.error("Failed to notify doctor of checked-in OP patient:", err);
+      }
+    }
+
+    await ReceptionRepository.createAuditLog({
+      hospital: hospitalId,
+      user: userId,
+      action: isFree ? "APPOINTMENT_BOOKED_FREE" : "APPOINTMENT_BOOKED_PROVISIONAL",
+      details: `Booked ${followUp ? "follow-up " : ""}appointment ${referenceId} for patient ID ${patientId} with Dr. ${doctor.name}.`
+    });
+
+    let checkInResult = null;
+    if (isFree && (type === "Walk-in" || type === "Emergency")) {
+      try {
+        checkInResult = await this.checkInAppointment(hospitalId, newAppointment._id.toString(), userId);
+      } catch (err) {
+        console.error("Immediate check-in failed for walk-in/emergency:", err);
+      }
+    }
+
+    // Emit socket events so Patient Dashboard and Reception update in real time
+    try {
+      emitToHospital(hospitalId.toString(), "appointment_updated", { appointment: newAppointment });
+      emitToHospital(hospitalId.toString(), "dashboard_update", {});
+    } catch (err) {
+      console.error("Failed to emit socket events for appointment booking:", err);
+    }
+
     return {
+      appointment: newAppointment,
       invoice: newInvoice,
       billing: {
         registrationFee,
@@ -660,7 +698,8 @@ export class ReceptionService {
         gst,
         discount,
         total
-      }
+      },
+      token: checkInResult ? { tokenNumber: checkInResult.tokenNumber } : null
     };
   }
 
@@ -801,68 +840,82 @@ export class ReceptionService {
           };
         }
 
-        // Check duplicate appointment
-        const startOfDay = new Date(bookingDate);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(bookingDate);
-        endOfDay.setHours(23, 59, 59, 999);
-
-        const existingAppointment = await Appointment.findOne({
-          hospital: hospitalId,
-          patient: invoice.patient._id,
-          doctor: provisionalData.doctorId,
-          date: { $gte: startOfDay, $lte: endOfDay },
-          status: { $nin: ["cancelled", "no_show", "completed"] }
-        }).session(session);
-
-        if (existingAppointment) {
-          throw new AppError("Duplicate appointment already exists for this patient and doctor on this date.", 409);
-        }
-
-        // Generate reference ID
-        const bookingDateNoHyphens = new Date(provisionalData.date).toISOString().split("T")[0].replace(/-/g, "");
-        const aptPrefix = `APT-${bookingDateNoHyphens}-`;
-        const latestAppt = await Appointment.findOne({
-          hospital: hospitalId,
-          referenceId: new RegExp(`^${aptPrefix}`)
-        }).sort({ createdAt: -1 }).session(session);
-
-        let nextSerial = 1;
-        if (latestAppt) {
-          const serialPart = latestAppt.referenceId.replace(aptPrefix, "");
-          const lastSerial = parseInt(serialPart, 10);
-          if (!isNaN(lastSerial)) {
-            nextSerial = lastSerial + 1;
-          }
-        }
-        const referenceId = `${aptPrefix}${String(nextSerial).padStart(6, "0")}`;
-
-        // Create appointment payload
         const isToday = new Date(provisionalData.date).toDateString() === today.toDateString();
         const appointmentStatus = isToday ? "checked_in" : "scheduled";
-        const appointmentPayload: Record<string, any> = {
-          hospital: hospitalId,
-          referenceId,
-          patient: invoice.patient._id,
-          doctor: provisionalData.doctorId,
-          department: provisionalData.departmentId,
-          date: new Date(provisionalData.date),
-          time: provisionalData.time,
-          type: provisionalData.type,
-          status: appointmentStatus,
-          notes: provisionalData.notes
-        };
-        if (provisionalData.followUp) {
-          appointmentPayload.followUp = true;
-          appointmentPayload.parentAppointmentId = provisionalData.parentAppointmentId;
-          appointmentPayload.followUpDate = new Date(provisionalData.date);
-          appointmentPayload.followUpReason = provisionalData.followUpReason;
+
+        if (invoice.appointment) {
+          const apptDoc = await Appointment.findById(invoice.appointment).session(session);
+          if (apptDoc) {
+            apptDoc.status = appointmentStatus;
+            await apptDoc.save({ session });
+            appointment = apptDoc;
+          }
         }
 
-        appointment = await ReceptionRepository.createAppointment(appointmentPayload);
+        if (!appointment) {
+          // Check duplicate appointment
+          const startOfDay = new Date(bookingDate);
+          startOfDay.setHours(0, 0, 0, 0);
+          const endOfDay = new Date(bookingDate);
+          endOfDay.setHours(23, 59, 59, 999);
 
-        // Update invoice with appointment ID
-        invoice.appointment = appointment._id;
+          const existingAppointment = await Appointment.findOne({
+            hospital: hospitalId,
+            patient: invoice.patient._id,
+            doctor: provisionalData.doctorId,
+            date: { $gte: startOfDay, $lte: endOfDay },
+            status: { $nin: ["cancelled", "no_show", "completed"] }
+          }).session(session);
+
+          if (existingAppointment) {
+            existingAppointment.status = appointmentStatus;
+            await existingAppointment.save({ session });
+            appointment = existingAppointment;
+          } else {
+            // Generate reference ID
+            const bookingDateNoHyphens = new Date(provisionalData.date).toISOString().split("T")[0].replace(/-/g, "");
+            const aptPrefix = `APT-${bookingDateNoHyphens}-`;
+            const latestAppt = await Appointment.findOne({
+              hospital: hospitalId,
+              referenceId: new RegExp(`^${aptPrefix}`)
+            }).sort({ createdAt: -1 }).session(session);
+
+            let nextSerial = 1;
+            if (latestAppt) {
+              const serialPart = latestAppt.referenceId.replace(aptPrefix, "");
+              const lastSerial = parseInt(serialPart, 10);
+              if (!isNaN(lastSerial)) {
+                nextSerial = lastSerial + 1;
+              }
+            }
+            const referenceId = `${aptPrefix}${String(nextSerial).padStart(6, "0")}`;
+
+            // Create appointment payload
+            const appointmentPayload: Record<string, any> = {
+              hospital: hospitalId,
+              referenceId,
+              patient: invoice.patient._id,
+              doctor: provisionalData.doctorId,
+              department: provisionalData.departmentId,
+              date: new Date(provisionalData.date),
+              time: provisionalData.time,
+              type: provisionalData.type,
+              status: appointmentStatus,
+              notes: provisionalData.notes
+            };
+            if (provisionalData.followUp) {
+              appointmentPayload.followUp = true;
+              appointmentPayload.parentAppointmentId = provisionalData.parentAppointmentId;
+              appointmentPayload.followUpDate = new Date(provisionalData.date);
+              appointmentPayload.followUpReason = provisionalData.followUpReason;
+            }
+
+            appointment = await ReceptionRepository.createAppointment(appointmentPayload);
+          }
+
+          // Update invoice with appointment ID
+          invoice.appointment = appointment._id;
+        }
 
         // If it's today, generate token
         const startOfToday = new Date();

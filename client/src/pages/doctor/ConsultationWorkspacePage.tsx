@@ -156,8 +156,14 @@ function groupAndCombineHistory(historyList: any[]): CombinedConsultationGroup[]
   return Array.from(map.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
 }
 
-export function ConsultationWorkspacePage() {
-  const { id: appointmentId } = useParams<{ id: string }>();
+interface ConsultationWorkspaceProps {
+  appointmentIdOverride?: string;
+  isEmbedded?: boolean;
+}
+
+export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = false }: ConsultationWorkspaceProps = {}) {
+  const { id: paramId } = useParams<{ id: string }>();
+  const appointmentId = appointmentIdOverride || paramId;
   const navigate = useNavigate();
   const location = useLocation();
   const printRef = useRef<HTMLDivElement>(null);
@@ -208,13 +214,13 @@ export function ConsultationWorkspacePage() {
 
   // Prescription form state
   const [prescriptionMeds, setPrescriptionMeds] = useState<any[]>([
-    { 
+    {
       key: "init-med-0",
-      name: "", 
-      strength: "", 
-      dosage: "", 
-      frequency: "", 
-      duration: "", 
+      name: "",
+      strength: "",
+      dosage: "",
+      frequency: "",
+      duration: "",
       instructions: "",
       morning: false,
       afternoon: false,
@@ -265,7 +271,7 @@ export function ConsultationWorkspacePage() {
     if (workspaceData && !hasPopulated.current) {
       const draft = workspaceData.draftSession;
       const appt = workspaceData.appointment;
-      
+
       if (draft) {
         setTemperature(draft.vitals?.temperature || "");
         setBloodPressure(draft.vitals?.bloodPressure || "");
@@ -274,7 +280,7 @@ export function ConsultationWorkspacePage() {
         setOxygenSaturation(draft.vitals?.oxygenSaturation || "");
         setWeight(draft.vitals?.weight || "");
         setChiefComplaint(draft.chiefComplaint || "");
-        
+
         setDiagnosis(draft.diagnosis || "");
         setSymptoms(draft.symptoms || "");
         setClinicalNotes(draft.clinicalNotes || "");
@@ -340,9 +346,9 @@ export function ConsultationWorkspacePage() {
   // Auto-save logic
   useEffect(() => {
     if (!hasPopulated.current || !workspaceData?.draftSession?._id) return;
-    
+
     const draftId = workspaceData.draftSession._id;
-    
+
     // Construct update payload
     const updateData = {
       vitals: {
@@ -677,13 +683,13 @@ export function ConsultationWorkspacePage() {
   const handleCheckboxToggle = (index: number, time: "morning" | "afternoon" | "night") => {
     const updated = [...prescriptionMeds];
     updated[index][time] = !updated[index][time];
-    
+
     // Combine the checked values into a comma-separated instructions string
     const selectedTimes = [];
     if (updated[index].morning) selectedTimes.push("Morning");
     if (updated[index].afternoon) selectedTimes.push("Afternoon");
     if (updated[index].night) selectedTimes.push("Night");
-    
+
     updated[index].instructions = selectedTimes.join(", ");
     setPrescriptionMeds(updated);
   };
@@ -817,43 +823,45 @@ export function ConsultationWorkspacePage() {
   return (
     <div className="space-y-6">
       {/* Consultation Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-slate-900">Consultation Workspace</h1>
-            <Badge tone={appointment.status === "completed" ? "success" : appointment.status === "in_consultation" ? "warning" : "info"}>
-              {appointment.status === "in_consultation" ? "In Progress" : appointment.status === "completed" ? "Completed" : appointment.status.toUpperCase()}
-            </Badge>
-            {appointment.status === "in_consultation" && workspaceData?.draftSession && (
-              <span className="text-xs text-emerald-600 font-medium flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                {isSavingDraft ? "Saving..." : lastSavedTime ? `Draft saved at ${lastSavedTime}` : "Draft saved automatically"}
-              </span>
-            )}
+      {!isEmbedded && (
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-bold text-slate-900">Consultation Workspace</h1>
+              <Badge tone={appointment.status === "completed" ? "success" : appointment.status === "in_consultation" ? "warning" : "info"}>
+                {appointment.status === "in_consultation" ? "In Progress" : appointment.status === "completed" ? "Completed" : appointment.status.toUpperCase()}
+              </Badge>
+              {appointment.status === "in_consultation" && workspaceData?.draftSession && (
+                <span className="text-xs text-emerald-600 font-medium flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  {isSavingDraft ? "Saving..." : lastSavedTime ? `Draft saved at ${lastSavedTime}` : "Draft saved automatically"}
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-slate-500 mt-1">
+              Attending Patient: <span className="font-semibold text-slate-700">{patient.name}</span> (UHID: {patient.uhid})
+            </p>
           </div>
-          <p className="text-sm text-slate-500 mt-1">
-            Attending Patient: <span className="font-semibold text-slate-700">{patient.name}</span> (UHID: {patient.uhid})
-          </p>
-        </div>
 
-        <div className="flex gap-2">
-          {appointment.status === "checked_in" && (
-            <Button variant="primary" onClick={handleStartConsultation} disabled={startConsultationMutation.isPending}>
-              Start Consultation
+          <div className="flex gap-2">
+            {appointment.status === "checked_in" && (
+              <Button variant="primary" onClick={handleStartConsultation} disabled={startConsultationMutation.isPending}>
+                Start Consultation
+              </Button>
+            )}
+
+            {appointment.status === "in_consultation" && (
+              <Button variant="primary" onClick={handleCompleteConsultation} disabled={completeDraftMutation.isPending}>
+                Complete Consultation
+              </Button>
+            )}
+
+            <Button variant="secondary" onClick={() => navigate(-1)}>
+              Back to Dashboard
             </Button>
-          )}
-
-          {appointment.status === "in_consultation" && (
-            <Button variant="primary" onClick={handleCompleteConsultation} disabled={completeDraftMutation.isPending}>
-              Complete Consultation
-            </Button>
-          )}
-
-          <Button variant="secondary" onClick={() => navigate(-1)}>
-            Back to Dashboard
-          </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         {/* Left column: Patient quick details */}
@@ -917,21 +925,20 @@ export function ConsultationWorkspacePage() {
           {/* Tabs navigation */}
           <div className="flex bg-slate-100 p-1 rounded-lg w-full overflow-x-auto gap-1">
             {([
-              { key: "overview",     label: "Overview",     icon: <User className="h-3.5 w-3.5" /> },
-              { key: "history",      label: "History",      icon: <History className="h-3.5 w-3.5" /> },
-              { key: "vitals",       label: "Vitals Form",  icon: <Heart className="h-3.5 w-3.5" /> },
-              { key: "prescription", label: "Prescribe",    icon: <Pill className="h-3.5 w-3.5" /> },
-              { key: "lab",          label: "Labs",         icon: <FlaskConical className="h-3.5 w-3.5" /> },
-              { key: "radiology",    label: "Radiology",    icon: <Scan className="h-3.5 w-3.5" /> },
-              { key: "documents",    label: "Recommend Admission", icon: <FileText className="h-3.5 w-3.5" /> },
-              { key: "timeline",     label: "Timeline",     icon: <CalendarDays className="h-3.5 w-3.5" /> },
+              { key: "overview", label: "Overview", icon: <User className="h-3.5 w-3.5" /> },
+              { key: "history", label: "History", icon: <History className="h-3.5 w-3.5" /> },
+              { key: "vitals", label: "Vitals Form", icon: <Heart className="h-3.5 w-3.5" /> },
+              { key: "prescription", label: "Prescribe", icon: <Pill className="h-3.5 w-3.5" /> },
+              { key: "lab", label: "Labs", icon: <FlaskConical className="h-3.5 w-3.5" /> },
+              { key: "radiology", label: "Radiology", icon: <Scan className="h-3.5 w-3.5" /> },
+              { key: "documents", label: "Recommend Admission", icon: <FileText className="h-3.5 w-3.5" /> },
+              { key: "timeline", label: "Timeline", icon: <CalendarDays className="h-3.5 w-3.5" /> },
             ] as const).map((t) => (
               <button
                 key={t.key}
                 onClick={() => setActiveTab(t.key)}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors ${
-                  activeTab === t.key ? "bg-navy-700 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
-                }`}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors ${activeTab === t.key ? "bg-navy-700 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
+                  }`}
               >
                 {t.icon}
                 {t.label}
@@ -951,7 +958,7 @@ export function ConsultationWorkspacePage() {
                   <TextareaField label="Clinical Notes" value={clinicalNotes} onChange={(e) => setClinicalNotes(e.target.value)} placeholder="Attending doctor notes..." rows={3} />
                   <TextareaField label="Treatment Plan" value={treatmentPlan} onChange={(e) => setTreatmentPlan(e.target.value)} placeholder="Enter next plan..." rows={2} />
                   <TextareaField label="Advice / Follow-up notes" value={advice} onChange={(e) => setAdvice(e.target.value)} placeholder="Enter instructions for patient..." rows={2} />
-                  
+
                   <div className="flex justify-end">
                     <Button type="submit" variant="primary" disabled={saveNotesMutation.isPending}>
                       {saveNotesMutation.isPending ? "Saving..." : "Save Notes"}
@@ -979,11 +986,10 @@ export function ConsultationWorkspacePage() {
                       return (
                         <div
                           key={group.id}
-                          className={`rounded-xl border p-4.5 transition-all space-y-3.5 ${
-                            isLatest
+                          className={`rounded-xl border p-4.5 transition-all space-y-3.5 ${isLatest
                               ? "border-emerald-300 bg-gradient-to-r from-emerald-50/30 via-slate-50 to-white shadow-sm ring-1 ring-emerald-250/30"
                               : "border-slate-200 bg-slate-50/20"
-                          }`}
+                            }`}
                         >
                           {/* Group Header */}
                           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2 mb-1">
@@ -1113,7 +1119,7 @@ export function ConsultationWorkspacePage() {
                                   </div>
                                 ))}
                               </div>
-                          )}
+                            )}
                         </div>
                       );
                     })}
@@ -1550,9 +1556,9 @@ export function ConsultationWorkspacePage() {
                         <p className="text-[10px] text-slate-500 mt-0.5">UHID: <span className="font-mono font-semibold text-slate-700">{(appointment.patient as any)?.uhid}</span></p>
                       </div>
                     </div>
-                    
+
                     <div className="hidden md:block h-8 w-px bg-slate-200"></div>
-                    
+
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 text-slate-650 flex-1 md:justify-end md:flex md:flex-row md:gap-x-8">
                       <div>
                         <span className="block text-[9px] text-slate-400 font-medium uppercase tracking-wider">Age / Gender</span>
@@ -1679,7 +1685,7 @@ export function ConsultationWorkspacePage() {
                       Current IP workflow
                     </span>
                   </div>
-                  
+
                   {admissionRequests.length === 0 ? (
                     <div className="p-6 bg-slate-50 border border-dashed rounded-xl text-center text-xs text-slate-400 flex flex-col items-center justify-center gap-2">
                       <FolderOpen className="h-7 w-7 text-slate-350" />
@@ -1696,14 +1702,14 @@ export function ConsultationWorkspacePage() {
                             <span className="font-bold text-indigo-700 font-mono tracking-wider">Req: {req.requestNumber}</span>
                             <Badge tone={
                               req.status === "Admitted" ? "success" :
-                              req.status === "Approved" ? "success" :
-                              req.status === "Rejected" ? "danger" :
-                              "warning"
+                                req.status === "Approved" ? "success" :
+                                  req.status === "Rejected" ? "danger" :
+                                    "warning"
                             }>
                               {req.status}
                             </Badge>
                           </div>
-                          
+
                           <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-slate-600 border-t border-slate-100 pt-2.5">
                             <div>
                               <span className="block text-[9px] text-slate-400 uppercase tracking-wider">Priority</span>
@@ -1763,7 +1769,7 @@ export function ConsultationWorkspacePage() {
                               {adm.status.toUpperCase()}
                             </Badge>
                           </div>
-                          
+
                           <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-slate-600 border-t border-slate-100 pt-2.5">
                             <div>
                               <span className="block text-[9px] text-slate-400 uppercase tracking-wider">Allocated Ward</span>
@@ -1810,9 +1816,8 @@ export function ConsultationWorkspacePage() {
                   { label: "Discharged", isCompleted: admissions.some(a => a.status === "discharged"), date: admissions.some(a => a.status === "discharged") ? "Discharged" : "Active Treatment" },
                 ].map((step, idx) => (
                   <div key={idx} className="relative">
-                    <span className={`absolute -left-[31px] top-1 flex h-4.5 w-4.5 items-center justify-center rounded-full border bg-white ${
-                      step.isCompleted ? "border-emerald-500 text-emerald-500" : "border-slate-300 text-slate-350"
-                    }`}>
+                    <span className={`absolute -left-[31px] top-1 flex h-4.5 w-4.5 items-center justify-center rounded-full border bg-white ${step.isCompleted ? "border-emerald-500 text-emerald-500" : "border-slate-300 text-slate-350"
+                      }`}>
                       {step.isCompleted ? <CheckCircle className="h-4.5 w-4.5 fill-emerald-50 text-emerald-600" /> : <div className="h-1.5 w-1.5 bg-slate-300 rounded-full" />}
                     </span>
                     <div>
@@ -1842,7 +1847,7 @@ export function ConsultationWorkspacePage() {
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600">
               <CheckCircle className="h-6 w-6" />
             </div>
-            
+
             <div className="space-y-2">
               <h3 className="text-lg font-bold text-slate-900">
                 {successInfo.isCompleted ? "Workflow Completed!" : "Prescription Saved!"}
@@ -1902,7 +1907,7 @@ export function ConsultationWorkspacePage() {
                 Print
               </Button>
             </div>
-            
+
             <div className="border-t border-slate-100 pt-4">
               <Button
                 variant={successInfo.isCompleted ? "primary" : "secondary"}

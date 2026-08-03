@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 // ── SECURITY FIX: use doctor-scoped hook, NOT usePatients() ──────────────────
 // usePatients() calls /api/v1/patients which returns ALL hospital patients.
 // useDoctorPatients() calls /doctors/dashboard/my-patients — the server
@@ -16,14 +16,23 @@ const STATUS_TONE: Record<string, "success" | "warning" | "danger" | "info" | "n
 };
 
 export function PatientsPage() {
-  const [search, setSearch] = useState("");
-  const { data: myData, isLoading, isError, refetch } = useDoctorPatients({ search });
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  const { data: myData, isLoading, isError, refetch } = useDoctorPatients({ search: debouncedSearch });
 
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
   const patients: Patient[] = myData?.patients ?? [];
 
-  if (isLoading && patients.length === 0) {
+  if (isLoading && !debouncedSearch && patients.length === 0) {
     return (
       <div className="space-y-4">
         <div className="h-8 w-48 animate-pulse rounded bg-slate-200"></div>
@@ -64,8 +73,8 @@ export function PatientsPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Search your patients..."
                 className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-navy-500 focus:border-navy-500"
               />

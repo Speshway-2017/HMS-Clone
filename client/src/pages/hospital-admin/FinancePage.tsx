@@ -142,9 +142,54 @@ export function FinancePage() {
   const patientBalanceDue = displayedPatientInvoices.reduce((sum: number, inv: any) => sum + (inv.totals?.patientBalance || 0), 0);
   const patientTotalPaid = Math.max(0, patientTotalNet - patientInsurance - patientBalanceDue);
 
+  function getInvoiceReason(inv: any): string {
+    if (inv.reason && typeof inv.reason === "string" && inv.reason.trim()) {
+      return inv.reason;
+    }
+    if (inv.notes && typeof inv.notes === "string" && inv.notes.trim()) {
+      return inv.notes;
+    }
+    if (inv.description && typeof inv.description === "string" && inv.description.trim()) {
+      return inv.description;
+    }
+    if (Array.isArray(inv.items) && inv.items.length > 0) {
+      const descs = inv.items.map((i: any) => i.description || i.name).filter(Boolean);
+      if (descs.length > 0) return descs.join(", ");
+    }
+    const type = inv.billingType || inv.type || "OP";
+    switch (String(type).toUpperCase()) {
+      case "OP":
+      case "OPD":
+      case "CONSULTATION":
+        return "OPD Consultation Fee";
+      case "LAB":
+      case "LABORATORY":
+        return "Laboratory Diagnostics";
+      case "RADIOLOGY":
+      case "SCAN":
+        return "Radiology & Imaging Scan";
+      case "PHARMACY":
+      case "MEDICINE":
+        return "Pharmacy Medicines";
+      case "IP":
+      case "IPD":
+        return "IPD Hospitalization";
+      default:
+        return `${type} Service`;
+    }
+  }
+
   const columns: Column<Invoice>[] = [
     { header: "Invoice", render: (inv) => <span className="font-mono text-xs text-slate-500">{inv._id.slice(-8).toUpperCase()}</span> },
     { header: "Patient", render: (inv) => <span className="font-medium text-slate-700">{inv.patient && typeof inv.patient === "object" ? inv.patient.name : "Walk-in Patient"}</span> },
+    {
+      header: "Reason",
+      render: (inv) => (
+        <span className="text-xs font-semibold text-slate-700 max-w-[200px] truncate block" title={getInvoiceReason(inv)}>
+          {getInvoiceReason(inv)}
+        </span>
+      ),
+    },
     { header: "Date Issued", render: (inv) => <span className="text-slate-600">{new Date(inv.issuedAt).toLocaleDateString()}</span> },
     { header: "Amount", render: (inv) => <span className="font-semibold text-slate-800">₹{(inv.totals?.total ?? 0).toFixed(2)}</span> },
     { header: "Status", render: (inv) => <Badge tone={STATUS_TONE[inv.status]}>{inv.status.replace("_", " ")}</Badge> },
@@ -167,7 +212,7 @@ export function FinancePage() {
       {/* Header & Sub-Tabs Navigation */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Financial Dashboard</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Revenue Analytics</h1>
           <p className="text-sm text-slate-500">Real revenue, billing overview, and consolidated patient statements.</p>
         </div>
       </div>

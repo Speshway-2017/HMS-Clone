@@ -12,17 +12,17 @@ import {
 
 const router = Router();
 
-router.use(protect, restrictTo("hospital_admin", "doctor", "receptionist", "accountant", "pharmacist", "laboratory"), scopeToHospital);
+router.use(protect, restrictTo("hospital_admin", "doctor", "receptionist", "accountant", "pharmacist", "laboratory", "nurse", "patient"), scopeToHospital);
 
 router.get("/:id/invoice", getInvoiceByAppointmentId);
 
 router.route("/")
   .get(listAppointments)
-  .post(restrictTo("hospital_admin", "receptionist"), createAppointment);
+  .post(restrictTo("hospital_admin", "receptionist", "patient"), createAppointment);
 
 router.route("/:id")
   .get(getAppointment)
-  .patch(restrictTo("hospital_admin", "doctor", "receptionist"), updateAppointment)
+  .patch(restrictTo("hospital_admin", "doctor", "receptionist", "patient"), updateAppointment)
   .delete(restrictTo("hospital_admin"), deleteAppointment);
 
 export default router;

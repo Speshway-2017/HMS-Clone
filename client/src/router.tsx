@@ -3,10 +3,12 @@ import { PublicLayout } from "./layouts/PublicLayout";
 import { DashboardLayout } from "./layouts/DashboardLayout";
 import { LandingPage } from "./pages/public/LandingPage";
 import { LoginPage } from "./pages/auth/LoginPage";
+import { RegisterPage } from "./pages/auth/RegisterPage";
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage";
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { VerifyPrescriptionPage } from "./pages/public/VerifyPrescriptionPage";
+import { PublicDoctorProfilePage } from "./pages/public/PublicDoctorProfilePage";
 
 // Super Admin module
 import { SuperAdminDashboard } from "./pages/super-admin/Dashboard";
@@ -35,8 +37,6 @@ import { PatientsPage } from "./pages/hospital-admin/PatientsPage";
 import { PatientDetailsPage } from "./pages/hospital-admin/PatientDetailsPage";
 import { AppointmentsPage } from "./pages/hospital-admin/AppointmentsPage";
 import { AppointmentDetailsPage } from "./pages/hospital-admin/AppointmentDetailsPage";
-import { StaffPage } from "./pages/hospital-admin/StaffPage";
-import { StaffFormPage } from "./pages/hospital-admin/StaffFormPage";
 import { FinancePage } from "./pages/hospital-admin/FinancePage";
 import { PatientInvoicePage } from "./pages/hospital-admin/PatientInvoicePage";
 import { InventoryPage } from "./pages/hospital-admin/InventoryPage";
@@ -45,6 +45,14 @@ import { InventoryItemDetailsPage } from "./pages/hospital-admin/InventoryItemDe
 import { BedsPage } from "./pages/hospital-admin/BedsPage";
 import { HospitalInfoPage } from "./pages/hospital-admin/HospitalInfoPage";
 import { EnquiriesPage } from "./pages/hospital-admin/EnquiriesPage";
+import { BlogsPage } from "./pages/hospital-admin/BlogsPage";
+import { BlogFormPage } from "./pages/hospital-admin/BlogFormPage";
+import { StaffPage } from "./pages/hospital-admin/StaffPage";
+import { StaffFormPage } from "./pages/hospital-admin/StaffFormPage";
+import { StaffDetailsPage } from "./pages/hospital-admin/StaffDetailsPage";
+import { StaffAttendancePage } from "./pages/hospital-admin/StaffAttendancePage";
+import { ShiftManagementPage } from "./pages/hospital-admin/ShiftManagementPage";
+import { LeaveManagementPage } from "./pages/hospital-admin/LeaveManagementPage";
 
 // Accountant module
 import { AccountantDashboard } from "./pages/accountant/Dashboard";
@@ -124,15 +132,31 @@ import { UploadReportPage } from "./pages/laboratory/UploadReportPage";
 import { TestRequestDetailsPage } from "./pages/laboratory/TestRequestDetailsPage";
 import { LaboratoryQualityControl } from "./pages/laboratory/QualityControl";
 
+// Nurse & Patient modules
+import { NurseDashboardPage } from "./pages/nurse/DashboardPage";
+import { AssignedPatientsPage } from "./pages/nurse/AssignedPatientsPage";
+import { MedicationAdminPage } from "./pages/nurse/MedicationAdminPage";
+import { VitalsMonitoringPage } from "./pages/nurse/VitalsMonitoringPage";
+import { NursingNotesPage } from "./pages/nurse/NursingNotesPage";
+import { CarePlansPage } from "./pages/nurse/CarePlansPage";
+import ShiftHandover from "./pages/nurse/ShiftHandover";
+import { WardManagementPage } from "./pages/nurse/WardManagementPage";
+import { EmergencyAlertsPage } from "./pages/nurse/EmergencyAlertsPage";
+import { AlertDetailPage } from "./pages/nurse/AlertDetailPage";
+import NurseNotificationsPage from "./pages/nurse/NotificationsPage";
+import { PatientDashboard } from "./pages/patient/Dashboard";
+
 export const router = createBrowserRouter([
   {
     element: <PublicLayout />,
     children: [
       { path: "/", element: <LandingPage /> },
       { path: "/login", element: <LoginPage /> },
+      { path: "/register", element: <RegisterPage /> },
       { path: "/forgot-password", element: <ForgotPasswordPage /> },
       { path: "/reset-password/:token", element: <ResetPasswordPage /> },
       { path: "/verify-prescription/:id", element: <VerifyPrescriptionPage /> },
+      { path: "/doctors/:id", element: <PublicDoctorProfilePage /> },
     ],
   },
   {
@@ -180,13 +204,17 @@ export const router = createBrowserRouter([
           { path: "doctors/:id", element: <DoctorProfilePage /> },
           { path: "doctors/:id/edit", element: <DoctorFormPage /> },
           { path: "doctors/:id/performance", element: <DoctorPerformancePage /> },
+          { path: "staff", element: <StaffPage /> },
+          { path: "staff/new", element: <StaffFormPage /> },
+          { path: "staff/attendance", element: <StaffAttendancePage /> },
+          { path: "staff/shifts", element: <ShiftManagementPage /> },
+          { path: "staff/leaves", element: <LeaveManagementPage /> },
+          { path: "staff/:id", element: <StaffDetailsPage /> },
+          { path: "staff/:id/edit", element: <StaffFormPage /> },
           { path: "patients", element: <PatientsPage /> },
           { path: "patients/:id", element: <PatientDetailsPage /> },
           { path: "appointments", element: <AppointmentsPage /> },
           { path: "appointments/:id", element: <AppointmentDetailsPage /> },
-          { path: "staff", element: <StaffPage /> },
-          { path: "staff/new", element: <StaffFormPage /> },
-          { path: "staff/:id/edit", element: <StaffFormPage /> },
           { path: "departments", element: <DepartmentsPage /> },
           { path: "departments/new", element: <DepartmentFormPage /> },
           { path: "departments/:id/edit", element: <DepartmentFormPage /> },
@@ -203,6 +231,9 @@ export const router = createBrowserRouter([
           { path: "beds", element: <BedsPage /> },
           { path: "hospital-info", element: <HospitalInfoPage /> },
           { path: "enquiries", element: <EnquiriesPage /> },
+          { path: "blogs", element: <BlogsPage /> },
+          { path: "blogs/new", element: <BlogFormPage /> },
+          { path: "blogs/edit/:id", element: <BlogFormPage /> },
           { path: "settings", element: <SettingsPage /> },
         ],
       },
@@ -358,6 +389,44 @@ export const router = createBrowserRouter([
           { path: "billing", element: <LaboratoryBilling /> },
           { path: "billing/new", element: <NewLabBillPage /> },
           { path: "settings", element: <LaboratorySettings /> },
+        ],
+      },
+    ],
+  },
+  {
+    element: <ProtectedRoute allow={["nurse"]} />,
+    children: [
+      {
+        path: "/nurse",
+        element: <DashboardLayout />,
+        children: [
+          { index: true, element: <NurseDashboardPage /> },
+          { path: "patients", element: <AssignedPatientsPage /> },
+          { path: "inpatients", element: <AssignedPatientsPage /> },
+          { path: "medications", element: <MedicationAdminPage /> },
+          { path: "vitals", element: <VitalsMonitoringPage /> },
+          { path: "notes", element: <NursingNotesPage /> },
+          { path: "care-plans", element: <CarePlansPage /> },
+          { path: "shift-handover", element: <ShiftHandover /> },
+          { path: "handover", element: <ShiftHandover /> },
+          { path: "wards", element: <WardManagementPage /> },
+          { path: "alerts", element: <EmergencyAlertsPage /> },
+          { path: "alerts/:id", element: <AlertDetailPage /> },
+          { path: "notifications", element: <NurseNotificationsPage /> },
+          { path: "settings", element: <SettingsPage /> },
+        ],
+      },
+    ],
+  },
+  {
+    element: <ProtectedRoute allow={["patient"]} />,
+    children: [
+      {
+        path: "/patient",
+        element: <DashboardLayout />,
+        children: [
+          { index: true, element: <PatientDashboard /> },
+          { path: "settings", element: <SettingsPage /> },
         ],
       },
     ],

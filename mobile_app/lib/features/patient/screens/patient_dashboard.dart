@@ -136,8 +136,14 @@ class _PatientDashboardState extends State<PatientDashboard> {
         unselectedItemColor: AppColors.slate400,
         backgroundColor: AppColors.white,
         elevation: 8,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
+        selectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 11,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontWeight: FontWeight.w500,
+          fontSize: 11,
+        ),
         onTap: (index) {
           setState(() {
             _currentIndex = index;
@@ -174,7 +180,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
         children: [
           _buildPatientHeader(responsive),
           SizedBox(height: responsive.scaleHeight(20.0)),
-          
+
           // Latest Vitals
           Text(
             'Latest Measured Vitals',
@@ -200,7 +206,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   color: AppColors.slate800,
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.navy700),
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 12,
+                color: AppColors.navy700,
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -247,7 +257,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
           CircleAvatar(
             radius: 28,
             backgroundColor: AppColors.white.withOpacity(0.2),
-            child: const Icon(Icons.person_rounded, color: AppColors.white, size: 28),
+            child: const Icon(
+              Icons.person_rounded,
+              color: AppColors.white,
+              size: 28,
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -304,17 +318,29 @@ class _PatientDashboardState extends State<PatientDashboard> {
             children: [
               const Row(
                 children: [
-                  Icon(Icons.insights_rounded, color: AppColors.navy700, size: 18),
+                  Icon(
+                    Icons.insights_rounded,
+                    color: AppColors.navy700,
+                    size: 18,
+                  ),
                   SizedBox(width: 8),
                   Text(
                     'Clinical Summary',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.slate800),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.slate800,
+                    ),
                   ),
                 ],
               ),
               Text(
                 _vitals['lastChecked']!,
-                style: const TextStyle(fontSize: 10, color: AppColors.slate400, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppColors.slate400,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),
@@ -323,9 +349,19 @@ class _PatientDashboardState extends State<PatientDashboard> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _buildVitalItem('BP', _vitals['bp']!, Icons.speed, Colors.purple),
-              _buildVitalItem('Pulse', _vitals['pulse']!, Icons.favorite, Colors.red),
+              _buildVitalItem(
+                'Pulse',
+                _vitals['pulse']!,
+                Icons.favorite,
+                Colors.red,
+              ),
               _buildVitalItem('SpO2', _vitals['spo2']!, Icons.air, Colors.blue),
-              _buildVitalItem('Temp', _vitals['temp']!, Icons.thermostat, Colors.orange),
+              _buildVitalItem(
+                'Temp',
+                _vitals['temp']!,
+                Icons.thermostat,
+                Colors.orange,
+              ),
             ],
           ),
         ],
@@ -333,7 +369,12 @@ class _PatientDashboardState extends State<PatientDashboard> {
     );
   }
 
-  Widget _buildVitalItem(String label, String value, IconData icon, Color color) {
+  Widget _buildVitalItem(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Column(
       children: [
         Container(
@@ -347,17 +388,29 @@ class _PatientDashboardState extends State<PatientDashboard> {
         const SizedBox(height: 8),
         Text(
           label,
-          style: const TextStyle(fontSize: 10, color: AppColors.slate500, fontWeight: FontWeight.w600),
+          style: const TextStyle(
+            fontSize: 10,
+            color: AppColors.slate500,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 4),
         Text(
           value.split(' ')[0],
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.slate800),
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: AppColors.slate800,
+          ),
         ),
         if (value.split(' ').length > 1)
           Text(
             value.split(' ')[1],
-            style: const TextStyle(fontSize: 8, color: AppColors.slate400, fontWeight: FontWeight.w500),
+            style: const TextStyle(
+              fontSize: 8,
+              color: AppColors.slate400,
+              fontWeight: FontWeight.w500,
+            ),
           ),
       ],
     );
@@ -386,7 +439,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   color: AppColors.navy50,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.calendar_month_rounded, color: AppColors.navy700, size: 20),
+                child: const Icon(
+                  Icons.calendar_month_rounded,
+                  color: AppColors.navy700,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -395,17 +452,29 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   children: [
                     Text(
                       apt['doctorName'],
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.slate900),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.slate900,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '${apt['specialty']} • ${apt['type']}',
-                      style: const TextStyle(fontSize: 10, color: AppColors.slate500, fontWeight: FontWeight.w500),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppColors.slate500,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${apt['date']} at ${apt['time']}',
-                      style: const TextStyle(fontSize: 10, color: AppColors.navy700, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppColors.navy700,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
@@ -418,7 +487,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
                 ),
                 child: Text(
                   apt['status'].toString().toUpperCase(),
-                  style: const TextStyle(color: AppColors.emerald600, fontSize: 8, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: AppColors.emerald600,
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
@@ -444,7 +517,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
           color: AppColors.navy700,
           onTap: () {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Appointment booking screen is pending API integration.')),
+              const SnackBar(
+                content: Text(
+                  'Appointment booking screen is pending API integration.',
+                ),
+              ),
             );
           },
         ),
@@ -477,7 +554,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
           color: Colors.deepPurple.shade700,
           onTap: () {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Billing details are loading from the database...')),
+              const SnackBar(
+                content: Text(
+                  'Billing details are loading from the database...',
+                ),
+              ),
             );
           },
         ),
@@ -562,33 +643,53 @@ class _PatientDashboardState extends State<PatientDashboard> {
                     children: [
                       Text(
                         rx['id'],
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.navy700),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.navy700,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         'Prescribed by: ${rx['doctorName']}',
-                        style: const TextStyle(fontSize: 11, color: AppColors.slate700, fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.slate700,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
                   Text(
                     rx['date'],
-                    style: const TextStyle(fontSize: 10, color: AppColors.slate400, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.slate400,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
               Text(
                 'Diagnosis: ${rx['diagnosis']}',
-                style: const TextStyle(fontSize: 10, color: AppColors.slate500, fontStyle: FontStyle.italic),
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppColors.slate500,
+                  fontStyle: FontStyle.italic,
+                ),
               ),
               const SizedBox(height: 12),
               const Divider(color: AppColors.slate100, height: 1),
               const SizedBox(height: 12),
-              
+
               const Text(
                 'Medication & Dosage:',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.slate800),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.slate800,
+                ),
               ),
               const SizedBox(height: 6),
               ...((rx['medications'] as List<String>).map((med) {
@@ -597,12 +698,20 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.circle, size: 6, color: AppColors.emerald500),
+                      const Icon(
+                        Icons.circle,
+                        size: 6,
+                        color: AppColors.emerald500,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           med,
-                          style: const TextStyle(fontSize: 11, color: AppColors.slate700, height: 1.3),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.slate700,
+                            height: 1.3,
+                          ),
                         ),
                       ),
                     ],
@@ -618,14 +727,25 @@ class _PatientDashboardState extends State<PatientDashboard> {
                       backgroundColor: AppColors.navy700,
                       foregroundColor: AppColors.white,
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
                     ),
                     onPressed: () {
                       _showQRCodeVerification(rx['id']);
                     },
                     icon: const Icon(Icons.qr_code_2_rounded, size: 14),
-                    label: const Text('Verify Link / QR', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                    label: const Text(
+                      'Verify Link / QR',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -642,10 +762,16 @@ class _PatientDashboardState extends State<PatientDashboard> {
       builder: (context) {
         return AlertDialog(
           backgroundColor: AppColors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Text(
             'Verify Prescription • $rxId',
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.slate900),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: AppColors.slate900,
+            ),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -653,7 +779,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
               const Text(
                 'Scan this unique QR code to instantly verify the authenticity of this digital prescription slip.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, color: AppColors.slate500, height: 1.4),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.slate500,
+                  height: 1.4,
+                ),
               ),
               const SizedBox(height: 20),
               Container(
@@ -662,19 +792,33 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   color: AppColors.slate100,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.qr_code_scanner_rounded, size: 120, color: AppColors.navy900),
+                child: const Icon(
+                  Icons.qr_code_scanner_rounded,
+                  size: 120,
+                  color: AppColors.navy900,
+                ),
               ),
               const SizedBox(height: 14),
               Text(
                 'Prescription ID: $rxId',
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.slate600),
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.slate600,
+                ),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Close', style: TextStyle(color: AppColors.navy700, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Close',
+                style: TextStyle(
+                  color: AppColors.navy700,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         );
@@ -691,7 +835,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
       itemBuilder: (context, index) {
         final report = _reports[index];
         final isCompleted = report['status'] == 'Completed';
-        
+
         return Container(
           margin: const EdgeInsets.only(bottom: 12.0),
           padding: const EdgeInsets.all(16.0),
@@ -705,12 +849,18 @@ class _PatientDashboardState extends State<PatientDashboard> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: isCompleted ? AppColors.emerald50 : Colors.amber.shade50,
+                  color: isCompleted
+                      ? AppColors.emerald50
+                      : Colors.amber.shade50,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  isCompleted ? Icons.check_circle_outline_rounded : Icons.pending_actions_rounded,
-                  color: isCompleted ? AppColors.emerald600 : Colors.amber.shade800,
+                  isCompleted
+                      ? Icons.check_circle_outline_rounded
+                      : Icons.pending_actions_rounded,
+                  color: isCompleted
+                      ? AppColors.emerald600
+                      : Colors.amber.shade800,
                   size: 20,
                 ),
               ),
@@ -721,12 +871,20 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   children: [
                     Text(
                       report['title'],
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.slate900),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.slate900,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Category: ${report['category']} • ${report['date']}',
-                      style: const TextStyle(fontSize: 10, color: AppColors.slate500, fontWeight: FontWeight.w500),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppColors.slate500,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
@@ -735,15 +893,22 @@ class _PatientDashboardState extends State<PatientDashboard> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: isCompleted ? AppColors.emerald50 : Colors.amber.shade50,
+                      color: isCompleted
+                          ? AppColors.emerald50
+                          : Colors.amber.shade50,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       report['status'],
                       style: TextStyle(
-                        color: isCompleted ? AppColors.emerald600 : Colors.amber.shade800,
+                        color: isCompleted
+                            ? AppColors.emerald600
+                            : Colors.amber.shade800,
                         fontSize: 8,
                         fontWeight: FontWeight.bold,
                       ),
@@ -754,16 +919,26 @@ class _PatientDashboardState extends State<PatientDashboard> {
                     GestureDetector(
                       onTap: () {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Downloading report PDF...')),
+                          const SnackBar(
+                            content: Text('Downloading report PDF...'),
+                          ),
                         );
                       },
                       child: const Row(
                         children: [
-                          Icon(Icons.download_rounded, size: 10, color: AppColors.navy700),
+                          Icon(
+                            Icons.download_rounded,
+                            size: 10,
+                            color: AppColors.navy700,
+                          ),
                           SizedBox(width: 2),
                           Text(
                             'Download',
-                            style: TextStyle(fontSize: 9, color: AppColors.navy700, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: AppColors.navy700,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),

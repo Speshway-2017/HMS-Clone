@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Search, Filter, Clock, User, ChevronRight, Stethoscope,
@@ -46,19 +46,17 @@ export function OPManagementPage() {
     return "cancelled"; // fallback for cancelled/no_show
   };
 
-  const filtered = appointments.filter((appt) => {
-    const p = appt.patient as any;
-    const name = p?.name || "Unknown Patient";
-    const token = appt.referenceId || appt._id.slice(-6);
-    const matchSearch = name.toLowerCase().includes(search.toLowerCase()) || token.toLowerCase().includes(search.toLowerCase());
-    
-    const mapped = mapStatus(appt.status);
-    const matchStatus = statusFilter === "today"
-      ? new Date(appt.date).toDateString() === new Date().toDateString()
-      : mapped === statusFilter;
-    
-    return matchSearch && matchStatus;
-  });
+  const filtered = useMemo(() => {
+    return appointments.filter((appt) => {
+      const p = appt.patient as any;
+      const name = p?.name || (appt as any).patientName || "Patient";
+      const token = (appt as any).tokenNumber || (appt as any).appointmentNumber || appt._id.slice(-6);
+      const matchSearch = name.toLowerCase().includes(search.toLowerCase()) || token.toLowerCase().includes(search.toLowerCase());
+      const mapped = mapStatus(appt.status);
+      const matchStatus = statusFilter === "all" || mapped === statusFilter || (statusFilter === "today" && mapped !== "completed" && mapped !== "cancelled");
+      return matchSearch && matchStatus;
+    });
+  }, [appointments, search, statusFilter]);
 
   const selectedAppt = filtered.find((a) => a._id === selectedApptId) || filtered[0];
 

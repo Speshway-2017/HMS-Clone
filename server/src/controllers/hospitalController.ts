@@ -185,30 +185,76 @@ export const getPublicHospital = catchAsync(async (_req: Request, res: Response)
 });
 
 export const getPublicHospitalDepartments = catchAsync(async (_req: Request, res: Response) => {
-  let hospital = await Hospital.findOne({ status: "active" }).sort({ createdAt: 1 });
-  if (!hospital) {
-    hospital = await Hospital.findOne().sort({ createdAt: 1 });
+  try {
+    let hospital = await Hospital.findOne({ status: "active" }).sort({ createdAt: 1 });
+    if (!hospital) {
+      hospital = await Hospital.findOne().sort({ createdAt: 1 });
+    }
+
+    let departments: any[] = [];
+    if (hospital) {
+      departments = await Department.find({ hospital: hospital._id, isDisabled: { $ne: true } })
+        .populate("departmentHead", "name")
+        .sort({ displayOrder: 1 });
+    }
+
+    if (!departments || departments.length === 0) {
+      departments = await Department.find({ isDisabled: { $ne: true } })
+        .populate("departmentHead", "name")
+        .sort({ displayOrder: 1 });
+    }
+
+    res.json({ status: "success", data: { departments } });
+  } catch (err: any) {
+    console.error("Error fetching public departments:", err);
+    const fallbackDepts = await Department.find({}).catch(() => []);
+    res.json({ status: "success", data: { departments: fallbackDepts } });
   }
-  if (!hospital) {
-    return res.json({ status: "success", data: { departments: [] } });
-  }
-  const departments = await Department.find({ hospital: hospital._id, isDisabled: { $ne: true } })
-    .populate("departmentHead", "name")
-    .sort({ displayOrder: 1 });
-  res.json({ status: "success", data: { departments } });
 });
 
 export const getPublicHospitalDoctors = catchAsync(async (_req: Request, res: Response) => {
-  let hospital = await Hospital.findOne({ status: "active" }).sort({ createdAt: 1 });
-  if (!hospital) {
-    hospital = await Hospital.findOne().sort({ createdAt: 1 });
+  try {
+    let doctors = await Doctor.find({
+      $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }]
+    })
+      .populate("user", "name email avatarUrl")
+      .populate("department", "name consultationFee")
+      .sort({ createdAt: -1 });
+
+    if (!doctors || doctors.length === 0) {
+      doctors = await Doctor.find({})
+        .populate("user", "name email avatarUrl")
+        .populate("department", "name consultationFee")
+        .sort({ createdAt: -1 });
+    }
+
+    return res.json({ status: "success", data: { doctors: doctors || [] } });
+  } catch (err: any) {
+    console.error("Error fetching public doctors:", err);
+    const fallbackDoctors = await Doctor.find({}).catch(() => []);
+    return res.json({ status: "success", data: { doctors: fallbackDoctors || [] } });
   }
-  if (!hospital) {
-    return res.json({ status: "success", data: { doctors: [] } });
+});
+
+export const getPublicBookedSlots = catchAsync(async (req: Request, res: Response) => {
+  const { doctorId, date } = req.query as Record<string, string>;
+  if (!doctorId || !date) {
+    return res.json({ status: "success", data: { bookedSlots: [] } });
   }
-  const doctors = await Doctor.find({ hospital: hospital._id, isActive: { $ne: false } })
-    .populate("department", "name");
-  res.json({ status: "success", data: { doctors } });
+  const parsedDate = new Date(date);
+  const startOfDay = new Date(parsedDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(parsedDate);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const appointments = await Appointment.find({
+    doctor: doctorId,
+    date: { $gte: startOfDay, $lte: endOfDay },
+    status: { $nin: ["cancelled", "no_show"] }
+  }).select("time");
+
+  const bookedSlots = appointments.map(appt => appt.time?.trim()).filter(Boolean);
+  res.json({ status: "success", data: { bookedSlots } });
 });
 
 export const createPublicAppointment = catchAsync(async (req: Request, res: Response) => {

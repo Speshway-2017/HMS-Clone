@@ -54,7 +54,7 @@ export function InvoiceFormPage() {
       <div>
         <div className="text-sm text-slate-400">
           <Link to="/admin/finance" className="hover:text-navy-700">
-            Finance
+            Revenue Analytics
           </Link>{" "}
           &gt; Create Invoice
         </div>

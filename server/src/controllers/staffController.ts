@@ -3,9 +3,10 @@ import bcrypt from "bcrypt";
 import { z } from "zod";
 import { Staff, STAFF_DUTY_STATUSES } from "../models/Staff";
 import { User } from "../models/User";
+import { Admission } from "../models/Admission";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
-import { generateTempPassword } from "../utils/idGenerator";
+import { generateTempPassword, generateUniqueEmployeeId } from "../utils/idGenerator";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 
 const staffSchema = z.object({
@@ -40,9 +41,27 @@ export const listStaff = catchAsync(async (req: Request, res: Response) => {
 
   const countByStatus = (key: string) => dutyCounts.find((c) => c._id === key)?.count ?? 0;
 
+  const staffWithPatients = await Promise.all(
+    staff.map(async (member) => {
+      if (member.role === "nurse") {
+        const activeAdmissionsStatuses = ["admitted", "Admitted", "Under Observation", "Under Treatment", "In Ward", "ICU", "Bed Allocated"];
+        const count = await Admission.countDocuments({
+          assignedNurse: member._id,
+          status: { $in: activeAdmissionsStatuses }
+        });
+        return {
+          ...member.toObject(),
+          assignedPatientCount: count,
+          shift: member.dutyStatus === "on_duty" ? "Evening" : "Morning"
+        };
+      }
+      return member.toObject();
+    })
+  );
+
   res.json({
     status: "success",
-    ...paginatedResponse(staff, total, { page, limit, skip }),
+    ...paginatedResponse(staffWithPatients, total, { page, limit, skip }),
     counts: {
       present: countByStatus("on_duty"),
       late: countByStatus("late"),
@@ -59,11 +78,23 @@ export const getTopStaff = catchAsync(async (req: Request, res: Response) => {
   res.json({ status: "success", data: { staff } });
 });
 
+export const getNextEmployeeId = catchAsync(async (req: Request, res: Response) => {
+  const role = (req.query.role as string) || "staff";
+  const hospitalId = req.hospitalFilter!.hospital;
+  const employeeId = await generateUniqueEmployeeId(role, hospitalId);
+  res.json({ status: "success", data: { employeeId } });
+});
+
 export const createStaff = catchAsync(async (req: Request, res: Response) => {
   const body = staffSchema.parse(req.body);
   const hospitalId = req.hospitalFilter!.hospital;
 
-  const staff = await Staff.create({ ...body, hospital: hospitalId });
+  let employeeId = body.employeeId?.trim();
+  if (!employeeId) {
+    employeeId = await generateUniqueEmployeeId(body.role || "staff", hospitalId);
+  }
+
+  const staff = await Staff.create({ ...body, employeeId, hospital: hospitalId });
 
   // Auto-create a login User account for staff members with an email
   let tempPassword: string | undefined;
@@ -78,10 +109,10 @@ export const createStaff = catchAsync(async (req: Request, res: Response) => {
       email: body.email,
       passwordHash,
       role: userRole,
+      employeeId,
       hospital: hospitalId,
     });
   }
-
 
   res.status(201).json({
     status: "success",
@@ -94,7 +125,29 @@ export const getStaffMember = catchAsync(async (req: Request, res: Response) => 
   if (!staff) {
     throw new AppError("Staff member not found.", 404);
   }
-  res.json({ status: "success", data: { staff } });
+
+  let assignedPatients: any[] = [];
+  if (staff.role && (staff.role.toLowerCase() === "nurse" || staff.role.toLowerCase().includes("nurse"))) {
+    assignedPatients = await Admission.find({
+      assignedNurse: staff._id,
+      status: { $nin: ["discharged", "Discharged", "Cancelled", "Transferred Out (Final)"] }
+    })
+      .populate("patient", "name uhid age gender phone bloodGroup photoUrl")
+      .populate("room", "roomNumber type")
+      .populate("bed", "bedNumber")
+      .populate("admittingDoctor", "name specialization")
+      .sort({ createdAt: -1 });
+  }
+
+  res.json({
+    status: "success",
+    data: {
+      staff: {
+        ...staff.toObject(),
+        assignedPatients
+      }
+    }
+  });
 });
 
 export const updateStaff = catchAsync(async (req: Request, res: Response) => {
@@ -116,3 +169,12 @@ export const deleteStaff = catchAsync(async (req: Request, res: Response) => {
   }
   res.status(204).send();
 });
+
+export const getStaffProfileMe = catchAsync(async (req: Request, res: Response) => {
+  const staff = await Staff.findOne({ email: req.user!.email }).populate("department", "name");
+  if (!staff) {
+    throw new AppError("Staff profile not found for the logged-in user.", 404);
+  }
+  res.json({ status: "success", data: { staff } });
+});
+

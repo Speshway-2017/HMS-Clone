@@ -14,12 +14,25 @@ import {
   FlaskConical, 
   Pill, 
   FileCheck2, 
-  Download 
+  Download,
+  Eye,
+  X
 } from "lucide-react";
 import { useDoctor } from "../../features/doctors";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+
+const safeString = (val: any, fallback: string = ""): string => {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === "string") return val;
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  if (typeof val === "object") {
+    if (typeof val.name === "string") return val.name;
+    if (typeof val.testName === "string") return val.testName;
+  }
+  return fallback;
+};
 
 export function DoctorProfilePage() {
   const { id } = useParams();
@@ -28,6 +41,7 @@ export function DoctorProfilePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [selectedReport, setSelectedReport] = useState<any>(null);
 
   if (isLoading || !data) {
     return <p className="text-slate-400">Loading...</p>;
@@ -117,7 +131,7 @@ export function DoctorProfilePage() {
           <h3 className="mb-2 text-base font-semibold text-slate-800">Professional Biography</h3>
           <p className="text-sm text-slate-600">{doctor.bio || "No biography on file."}</p>
 
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-lg bg-slate-50 p-4">
               <h4 className="mb-2 text-sm font-semibold text-slate-700">Qualification</h4>
               <p className="text-sm text-slate-600">{doctor.qualification || "Not specified"}</p>
@@ -125,6 +139,10 @@ export function DoctorProfilePage() {
             <div className="rounded-lg bg-slate-50 p-4">
               <h4 className="mb-2 text-sm font-semibold text-slate-700">License</h4>
               <p className="text-sm text-slate-600">{doctor.licenseNo || "Not specified"}</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-4">
+              <h4 className="mb-2 text-sm font-semibold text-slate-700">OP Expiry Limit</h4>
+              <p className="text-sm text-slate-600">{doctor.opExpiryLimit !== undefined ? `${doctor.opExpiryLimit} Days` : "10 Days (Default)"}</p>
             </div>
           </div>
         </Card>
@@ -397,44 +415,53 @@ export function DoctorProfilePage() {
                                   {reports.length > 0 ? (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                       {reports.map((report: any) => (
-                                        <div key={report._id} className="border border-slate-200 rounded-lg p-3 bg-white flex flex-col justify-between gap-3">
+                                        <div key={report._id} className="border border-slate-200 rounded-lg p-3.5 bg-white flex flex-col justify-between gap-3 shadow-sm hover:border-indigo-200 transition-all">
                                           <div>
-                                            <div className="flex justify-between items-start">
-                                              <span className="font-bold text-slate-800 text-xs">{report.testName}</span>
-                                              <Badge tone="success">{report.status.replace("_", " ")}</Badge>
+                                            <div className="flex justify-between items-start gap-2">
+                                              <span className="font-extrabold text-slate-800 text-xs">{safeString(report.testName, "Diagnostic Report")}</span>
+                                              <Badge tone="success">{safeString(report.status, "Verified").replace("_", " ")}</Badge>
                                             </div>
-                                            <p className="text-[9px] text-slate-400 mt-0.5">
-                                              Uploaded: {new Date(report.uploadedAt).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                                            <p className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                                              Uploaded: {new Date(report.uploadedAt || report.createdAt || Date.now()).toLocaleDateString(undefined, { dateStyle: 'medium' })}
                                             </p>
                                             {report.observations && (
                                               <p className="mt-2 text-slate-700 text-[11px] leading-relaxed">
                                                 <strong className="text-[9px] font-bold text-slate-400 uppercase block">Observations</strong>
-                                                {report.observations}
+                                                {safeString(report.observations)}
                                               </p>
                                             )}
                                             {report.remarks && (
                                               <p className="mt-1 text-slate-500 text-[10px] italic">
-                                                Remarks: {report.remarks}
+                                                Remarks: {safeString(report.remarks)}
                                               </p>
                                             )}
                                           </div>
 
-                                          {report.files && report.files.length > 0 && (
-                                            <div className="border-t border-slate-100 pt-2 flex flex-wrap gap-1.5">
-                                              {report.files.map((file: any, fIdx: number) => (
-                                                <a 
-                                                  key={fIdx}
-                                                  href={file.secure_url}
-                                                  target="_blank"
-                                                  rel="noopener noreferrer"
-                                                  className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 hover:border-navy-500 hover:text-navy-700 rounded px-2 py-0.5 text-[9px] font-bold shadow-sm transition-colors"
-                                                >
-                                                  <Download className="h-2.5 w-2.5" />
-                                                  {file.original_filename || `File_${fIdx + 1}`}
-                                                </a>
-                                              ))}
-                                            </div>
-                                          )}
+                                          <div className="border-t border-slate-100 pt-2.5 flex items-center justify-between gap-2">
+                                            <button
+                                              onClick={() => setSelectedReport(report)}
+                                              className="inline-flex items-center gap-1.5 bg-navy-50 text-navy-700 hover:bg-navy-100 border border-navy-200 rounded-lg px-2.5 py-1 text-xs font-extrabold transition-all cursor-pointer active:scale-95 shadow-sm"
+                                            >
+                                              <Eye className="h-3.5 w-3.5 text-navy-700" /> View Report
+                                            </button>
+                                            {report.files && report.files.length > 0 && (
+                                              <div className="flex flex-wrap gap-1">
+                                                {report.files.map((file: any, fIdx: number) => (
+                                                  <a 
+                                                    key={fIdx}
+                                                    href={file.secure_url || file.url || file}
+                                                    download
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 hover:border-navy-500 hover:text-navy-700 rounded-lg px-2 py-1 text-[10px] font-bold shadow-sm transition-colors"
+                                                  >
+                                                    <Download className="h-3 w-3" />
+                                                    {file.original_filename || `Download`}
+                                                  </a>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
                                         </div>
                                       ))}
                                     </div>
@@ -458,6 +485,126 @@ export function DoctorProfilePage() {
           )}
         </div>
       </Card>
+
+      {/* Diagnostic Report Details Modal */}
+      {selectedReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 text-slate-800 my-8">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b pb-4 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  <FileCheck2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">
+                    {safeString(selectedReport.testName, "Diagnostic Report")}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {safeString(selectedReport.requestType || selectedReport.category, "Diagnostic Investigation")} · Uploaded: {new Date(selectedReport.uploadedAt || selectedReport.createdAt || Date.now()).toLocaleDateString("en-IN")}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge tone="success">
+                  {selectedReport.status === "report_uploaded" ? "Verified" : safeString(selectedReport.status, "Verified").toUpperCase()}
+                </Badge>
+                <button
+                  onClick={() => setSelectedReport(null)}
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-all cursor-pointer"
+                  aria-label="Close modal"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+              {/* Clinical Observations Section */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                  <Stethoscope className="h-4 w-4 text-indigo-600" /> Radiologist / Pathologist Impression
+                </span>
+                <p className="text-xs font-semibold text-slate-800 leading-relaxed whitespace-pre-wrap pt-1">
+                  {safeString(selectedReport.observations, "No specific clinical observations logged for this diagnostic investigation.")}
+                </p>
+              </div>
+
+              {selectedReport.remarks && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 space-y-1">
+                  <span className="text-xs font-extrabold text-amber-900 uppercase tracking-wide">Technical Remarks & Doctor Advice</span>
+                  <p className="text-xs font-medium text-amber-900 italic whitespace-pre-wrap pt-0.5">
+                    {safeString(selectedReport.remarks)}
+                  </p>
+                </div>
+              )}
+
+              {/* Attached Files & Image Preview Canvas */}
+              {selectedReport.files && selectedReport.files.length > 0 && (
+                <div className="space-y-3 border-t border-slate-100 pt-4">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                    Attached Report Documents & Imaging ({selectedReport.files.length})
+                  </h4>
+
+                  <div className="space-y-3">
+                    {selectedReport.files.map((file: any, index: number) => {
+                      const fileUrl = typeof file === "string" ? file : (file.secure_url || file.url);
+                      const fileName = typeof file === "object" ? (file.original_filename || `Attachment_${index + 1}`) : `Attachment_${index + 1}`;
+                      const isImage = typeof fileUrl === "string" && (fileUrl.match(/\.(jpeg|jpg|png|gif|webp)$/i) || fileUrl.includes("/image/upload/"));
+
+                      return (
+                        <div key={index} className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 flex flex-col gap-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-extrabold text-slate-800 truncate max-w-xs">{fileName}</span>
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 rounded-lg bg-indigo-50 border border-indigo-200 px-3 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-all"
+                              >
+                                <Eye className="h-3.5 w-3.5" /> Open Full Screen
+                              </a>
+                              <a
+                                href={fileUrl}
+                                download
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-all"
+                              >
+                                <Download className="h-3.5 w-3.5" /> Download
+                              </a>
+                            </div>
+                          </div>
+
+                          {isImage && (
+                            <div className="rounded-xl overflow-hidden border border-slate-800 bg-slate-950 p-2 max-h-80 flex items-center justify-center shadow-inner">
+                              <img src={fileUrl} alt={fileName} className="max-h-76 object-contain rounded" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between border-t pt-4 mt-4">
+              <p className="text-[11px] font-semibold text-slate-400">
+                Official Digital Report Record • Hospital Admin Diagnostic Portal
+              </p>
+              <button
+                onClick={() => setSelectedReport(null)}
+                className="rounded-xl bg-slate-800 px-5 py-2 text-xs font-extrabold text-white hover:bg-slate-900 transition-all cursor-pointer"
+              >
+                Close Report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

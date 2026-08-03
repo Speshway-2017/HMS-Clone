@@ -1421,8 +1421,13 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
 
               {/* TAB 4: REPORTS */}
               {profileTab === "reports" && (() => {
-                const labReports = reports.filter((r: any) => r.requestType === "Laboratory");
-                const radReports = reports.filter((r: any) => r.requestType === "Radiology" || r.requestType === "Combined");
+                const isRadiologyReport = (r: any) => {
+                  if (r.requestType === "Radiology") return true;
+                  const name = String(r.testName || r.title || r.category || "").toLowerCase();
+                  return /mri|x-ray|xray|ct\s*scan|ct\b|ultrasound|radiology|scan\b|mammogram|pet\s*scan|echo\b|ecg\b|usg\b|x\s*ray/.test(name);
+                };
+                const labReports = reports.filter((r: any) => !isRadiologyReport(r));
+                const radReports = reports.filter((r: any) => isRadiologyReport(r));
 
                 const labGroups = groupReportsByConsultation(labReports);
                 const radGroups = groupReportsByConsultation(radReports);

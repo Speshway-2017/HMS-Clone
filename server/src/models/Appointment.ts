@@ -4,6 +4,8 @@ export const APPOINTMENT_TYPES = [
   "Appointment",
   "Walk-in",
   "Emergency",
+  "Video Consultation",
+  "Consultation",
 ] as const;
 
 export const APPOINTMENT_STATUSES = [
@@ -33,6 +35,7 @@ const appointmentSchema = new Schema(
       default: "Appointment" 
     },
     status: { type: String, enum: APPOINTMENT_STATUSES, default: "scheduled" },
+    meetingLink: { type: String, default: "" },
     notes: { type: String, default: "" },
     chiefComplaint: { type: String, default: "" },
     symptoms: { type: String, default: "" },

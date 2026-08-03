@@ -205,7 +205,8 @@ export function useBookAppointment() {
       return res.data.data; // returns appointment & invoice
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["reception", "stats"] });
+      queryClient.invalidateQueries({ queryKey: ["reception"] });
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
     }
   });
 }
@@ -241,8 +242,8 @@ export function usePayBilling() {
       return res.data.data; // returns payment, invoice, receipt, token
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["reception", "stats"] });
-      queryClient.invalidateQueries({ queryKey: ["reception", "queues"] });
+      queryClient.invalidateQueries({ queryKey: ["reception"] });
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
     }
   });
 }
@@ -311,11 +312,12 @@ export function useAdmissionRequests() {
   });
 }
 
-export function useAdmissions(params?: string | { status?: string; patientId?: string }) {
+export function useAdmissions(params?: string | { status?: string; patientId?: string }, options?: { enabled?: boolean }) {
   const queryParams = typeof params === "string" ? { status: params } : params;
   const status = queryParams?.status || "admitted";
   return useQuery({
     queryKey: ["reception", "admissions", "list", queryParams],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<{ data: { admissions: InpatientAdmission[] } }>("/reception/admissions", {
         params: queryParams
@@ -567,6 +569,7 @@ export function useCancelAppointment() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reception"] });
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
     }
   });
 }
@@ -603,6 +606,7 @@ export function useRescheduleAppointment() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reception"] });
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
     }
   });
 }
