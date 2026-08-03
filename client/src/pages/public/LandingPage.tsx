@@ -128,7 +128,8 @@ export function LandingPage() {
     queryKey: ["public", "doctors"],
     queryFn: async () => {
       const res = await api.get("/hospitals/public/doctors");
-      return res.data.data.doctors as any[];
+      const list = res.data?.data?.doctors || res.data?.doctors || res.data || [];
+      return Array.isArray(list) ? list : [];
     }
   });
 

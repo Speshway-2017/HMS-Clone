@@ -199,35 +199,10 @@ export const getPublicHospitalDepartments = catchAsync(async (_req: Request, res
 });
 
 export const getPublicHospitalDoctors = catchAsync(async (_req: Request, res: Response) => {
-  let hospital = await Hospital.findOne({ status: "active" }).sort({ createdAt: -1 });
-  if (!hospital) {
-    hospital = await Hospital.findOne().sort({ createdAt: -1 });
-  }
-
-  let doctors: any[] = [];
-  if (hospital) {
-    doctors = await Doctor.find({
-      $or: [{ hospital: hospital._id }, { hospital: null }, { hospital: { $exists: false } }],
-      isActive: { $ne: false }
-    })
-      .populate("user", "name email avatarUrl")
-      .populate("department", "name consultationFee")
-      .sort({ createdAt: -1 });
-  }
-
-  if (!doctors || doctors.length === 0) {
-    doctors = await Doctor.find({ isActive: { $ne: false } })
-      .populate("user", "name email avatarUrl")
-      .populate("department", "name consultationFee")
-      .sort({ createdAt: -1 });
-  }
-
-  if (!doctors || doctors.length === 0) {
-    doctors = await Doctor.find({})
-      .populate("user", "name email avatarUrl")
-      .populate("department", "name consultationFee")
-      .sort({ createdAt: -1 });
-  }
+  const doctors = await Doctor.find({ deletedAt: null })
+    .populate("user", "name email avatarUrl")
+    .populate("department", "name consultationFee")
+    .sort({ createdAt: -1 });
 
   res.json({ status: "success", data: { doctors } });
 });
