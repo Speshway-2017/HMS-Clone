@@ -185,26 +185,55 @@ export const getPublicHospital = catchAsync(async (_req: Request, res: Response)
 });
 
 export const getPublicHospitalDepartments = catchAsync(async (_req: Request, res: Response) => {
-  let hospital = await Hospital.findOne({ status: "active" }).sort({ createdAt: 1 });
-  if (!hospital) {
-    hospital = await Hospital.findOne().sort({ createdAt: 1 });
+  try {
+    let hospital = await Hospital.findOne({ status: "active" }).sort({ createdAt: 1 });
+    if (!hospital) {
+      hospital = await Hospital.findOne().sort({ createdAt: 1 });
+    }
+
+    let departments: any[] = [];
+    if (hospital) {
+      departments = await Department.find({ hospital: hospital._id, isDisabled: { $ne: true } })
+        .populate("departmentHead", "name")
+        .sort({ displayOrder: 1 });
+    }
+
+    if (!departments || departments.length === 0) {
+      departments = await Department.find({ isDisabled: { $ne: true } })
+        .populate("departmentHead", "name")
+        .sort({ displayOrder: 1 });
+    }
+
+    res.json({ status: "success", data: { departments } });
+  } catch (err: any) {
+    console.error("Error fetching public departments:", err);
+    const fallbackDepts = await Department.find({}).catch(() => []);
+    res.json({ status: "success", data: { departments: fallbackDepts } });
   }
-  if (!hospital) {
-    return res.json({ status: "success", data: { departments: [] } });
-  }
-  const departments = await Department.find({ hospital: hospital._id, isDisabled: { $ne: true } })
-    .populate("departmentHead", "name")
-    .sort({ displayOrder: 1 });
-  res.json({ status: "success", data: { departments } });
 });
 
 export const getPublicHospitalDoctors = catchAsync(async (_req: Request, res: Response) => {
-  const doctors = await Doctor.find({ deletedAt: null })
-    .populate("user", "name email avatarUrl")
-    .populate("department", "name consultationFee")
-    .sort({ createdAt: -1 });
+  try {
+    let doctors = await Doctor.find({
+      $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }]
+    })
+      .populate("user", "name email avatarUrl")
+      .populate("department", "name consultationFee")
+      .sort({ createdAt: -1 });
 
-  res.json({ status: "success", data: { doctors } });
+    if (!doctors || doctors.length === 0) {
+      doctors = await Doctor.find({})
+        .populate("user", "name email avatarUrl")
+        .populate("department", "name consultationFee")
+        .sort({ createdAt: -1 });
+    }
+
+    return res.json({ status: "success", data: { doctors: doctors || [] } });
+  } catch (err: any) {
+    console.error("Error fetching public doctors:", err);
+    const fallbackDoctors = await Doctor.find({}).catch(() => []);
+    return res.json({ status: "success", data: { doctors: fallbackDoctors || [] } });
+  }
 });
 
 export const getPublicBookedSlots = catchAsync(async (req: Request, res: Response) => {
