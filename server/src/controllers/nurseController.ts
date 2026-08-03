@@ -9,6 +9,8 @@ import { User } from "../models/User";
 import { signAccessToken, signRefreshToken } from "../utils/token";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
+import { emitToHospital } from "../config/socket";
+import { notifyAssignedDoctorForPatient, checkCriticalVitalsAndNotify } from "../utils/autoNotifyAssignedDoctor";
 
 // 1. Get Nurse Inpatients
 export const getNurseInpatients = catchAsync(async (req: Request, res: Response) => {
@@ -140,6 +142,33 @@ export const saveNurseInpatientVitals = catchAsync(async (req: Request, res: Res
   }
 
   await activeAdmission.save();
+
+  // Populate patient details for auto-notification to assigned doctor
+  const populatedAdmission = await Admission.findById(activeAdmission._id).populate("patient", "name uhid");
+  const ptName = (populatedAdmission?.patient as any)?.name || "Inpatient";
+  const ptUhid = (populatedAdmission?.patient as any)?.uhid || "";
+
+  // Automatically notify the patient's assigned doctor (Normal vs Critical Red Alert)
+  await checkCriticalVitalsAndNotify({
+    hospitalId,
+    patientId,
+    patientName: ptName,
+    uhid: ptUhid,
+    nurseName: recordedByName,
+    temperature,
+    bloodPressure,
+    pulseRate,
+    respiratoryRate,
+    oxygenSaturation,
+    bloodSugar,
+    painScore
+  });
+
+  // Broadcast real-time WebSockets events for Doctor IP Management Dashboard sync
+  emitToHospital(hospitalId, "vitals_updated", { patientId, admissionId: activeAdmission._id });
+  emitToHospital(hospitalId, "ip_management_update", { patientId, admissionId: activeAdmission._id });
+  emitToHospital(hospitalId, "dashboard_update", { patientId });
+
   res.json({ status: "success", data: activeAdmission });
 });
 
@@ -174,6 +203,28 @@ export const addNurseInpatientNotes = catchAsync(async (req: Request, res: Respo
   });
 
   await activeAdmission.save();
+
+  // Populate patient details for doctor notification
+  const populatedAdmission = await Admission.findById(activeAdmission._id).populate("patient", "name uhid");
+  const ptName = (populatedAdmission?.patient as any)?.name || "Inpatient";
+  const ptUhid = (populatedAdmission?.patient as any)?.uhid || "";
+
+  // Send real-time notification to patient's assigned doctor
+  await notifyAssignedDoctorForPatient({
+    hospitalId,
+    patientId,
+    patientName: ptName,
+    uhid: ptUhid,
+    nurseName: recordedByName,
+    title: "New Nursing Note",
+    message: `A new nursing note has been added for Patient ${ptName} by Nurse ${recordedByName}.`,
+    severity: "info",
+    extraData: {
+      type: "nursing_note",
+      notesSnippet: notes ? (notes.length > 80 ? notes.substring(0, 80) + "..." : notes) : ""
+    }
+  });
+
   res.json({ status: "success", data: activeAdmission });
 });
 
@@ -295,6 +346,29 @@ export const saveNurseInpatientNote = catchAsync(async (req: Request, res: Respo
   });
 
   await activeAdmission.save();
+
+  // Populate patient details for doctor notification
+  const populatedAdmission = await Admission.findById(activeAdmission._id).populate("patient", "name uhid");
+  const ptName = (populatedAdmission?.patient as any)?.name || "Inpatient";
+  const ptUhid = (populatedAdmission?.patient as any)?.uhid || "";
+
+  // Send real-time notification to patient's assigned doctor
+  await notifyAssignedDoctorForPatient({
+    hospitalId,
+    patientId,
+    patientName: ptName,
+    uhid: ptUhid,
+    nurseName: staff.name || req.user!.name || "Nurse",
+    title: "New Nursing Note",
+    message: `A new nursing note has been added for Patient ${ptName} by Nurse ${staff.name || req.user!.name || "Nurse"}.`,
+    severity: "info",
+    extraData: {
+      type: "nursing_note",
+      observationType: observationType || "Routine",
+      treatmentProgress: treatmentProgress || ""
+    }
+  });
+
   res.json({ status: "success", data: activeAdmission });
 });
 
@@ -501,38 +575,127 @@ export const saveShiftHandover = catchAsync(async (req: Request, res: Response) 
     nextShift,
     patientsHandedOverCount,
     patientsHandedOverDetails,
+    patientHandoverItems,
     pendingMedication,
     pendingProcedures,
     criticalPatients,
     specialInstructions,
     remarks,
-    nurseSignature
+    handoverNotesChips,
+    nurseSignature,
+    incomingNurseId,
+    incomingNurseName,
+    isVerified
   } = req.body;
+
+  const clientIp = (req.headers["x-forwarded-for"] as string || req.ip || req.socket.remoteAddress || "").split(",")[0].trim();
+  const userAgent = (req.headers["user-agent"] as string) || "Web Browser";
 
   const handover = await ShiftHandover.create({
     hospital: hospitalId,
-    currentShift,
-    nextShift,
-    patientsHandedOverCount: Number(patientsHandedOverCount) || 0,
+    currentShift: currentShift || "Morning",
+    nextShift: nextShift || "Evening",
+    status: "Submitted",
+    patientsHandedOverCount: Number(patientsHandedOverCount) || (Array.isArray(patientHandoverItems) ? patientHandoverItems.length : 0),
     patientsHandedOverDetails: patientsHandedOverDetails || "",
+    patientHandoverItems: Array.isArray(patientHandoverItems) ? patientHandoverItems : [],
     pendingMedication: pendingMedication || "",
     pendingProcedures: pendingProcedures || "",
     criticalPatients: criticalPatients || "",
     specialInstructions: specialInstructions || "",
     remarks: remarks || "",
-    nurseSignature,
+    handoverNotesChips: Array.isArray(handoverNotesChips) ? handoverNotesChips : [],
+    nurseSignature: nurseSignature || (staff.name || "Nurse"),
+    isVerified: isVerified !== false,
     loggedBy: staff._id,
     loggedByName: staff.name || req.user!.name || "Nurse",
+    incomingNurse: incomingNurseId ? new Types.ObjectId(incomingNurseId) : undefined,
+    incomingNurseName: incomingNurseName || "",
+    ipAddress: clientIp,
+    deviceInfo: userAgent,
     timestamp: new Date()
   });
+
+  // Emit WebSocket real-time update to hospital
+  emitToHospital(hospitalId, "shift_handover_created", handover);
+
+  // If incoming nurse specified, send DB notification
+  if (incomingNurseId) {
+    await DbNotification.create({
+      hospital: hospitalId,
+      title: "Handover Required",
+      message: `Shift handover submitted by Nurse ${staff.name || req.user!.name}. Please review and accept pending patient handovers.`,
+      type: "general",
+      recipientRole: "nurse",
+      isRead: false
+    });
+  }
 
   res.json({ status: "success", data: handover });
 });
 
-// 11. Get Shift Handovers Audit History
+// 11. Get Shift Handovers Audit History (with filters)
 export const getShiftHandovers = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
-  const handovers = await ShiftHandover.find({ hospital: hospitalId })
+  const { dateRange, startDate, endDate, search, shift, status } = req.query;
+
+  const filterQuery: any = { hospital: hospitalId };
+
+  // Status Filter
+  if (status && typeof status === "string" && status !== "All") {
+    filterQuery.status = status;
+  }
+
+  // Shift Filter
+  if (shift && typeof shift === "string" && shift !== "All") {
+    filterQuery.currentShift = shift;
+  }
+
+  // Date Range Filtering
+  const now = new Date();
+  if (dateRange === "today") {
+    const startOfDay = new Date(now.setHours(0, 0, 0, 0));
+    const endOfDay = new Date(now.setHours(23, 59, 59, 999));
+    filterQuery.timestamp = { $gte: startOfDay, $lte: endOfDay };
+  } else if (dateRange === "yesterday") {
+    const yesterdayStart = new Date(now.setDate(now.getDate() - 1));
+    yesterdayStart.setHours(0, 0, 0, 0);
+    const yesterdayEnd = new Date(yesterdayStart);
+    yesterdayEnd.setHours(23, 59, 59, 999);
+    filterQuery.timestamp = { $gte: yesterdayStart, $lte: yesterdayEnd };
+  } else if (dateRange === "7days") {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+    filterQuery.timestamp = { $gte: sevenDaysAgo };
+  } else if (dateRange === "30days") {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+    filterQuery.timestamp = { $gte: thirtyDaysAgo };
+  } else if (dateRange === "custom" && startDate && endDate) {
+    filterQuery.timestamp = {
+      $gte: new Date(startDate as string),
+      $lte: new Date(endDate as string)
+    };
+  }
+
+  // Text Search across Nurse Name, Incoming Nurse Name, Patient Details, Remarks
+  if (search && typeof search === "string" && search.trim() !== "") {
+    const searchRegex = new RegExp(search.trim(), "i");
+    filterQuery.$or = [
+      { loggedByName: searchRegex },
+      { incomingNurseName: searchRegex },
+      { currentShift: searchRegex },
+      { nextShift: searchRegex },
+      { remarks: searchRegex },
+      { "patientHandoverItems.patientName": searchRegex },
+      { "patientHandoverItems.uhid": searchRegex },
+      { "patientHandoverItems.ward": searchRegex }
+    ];
+  }
+
+  const handovers = await ShiftHandover.find(filterQuery)
     .sort({ timestamp: -1 });
 
   res.json({ status: "success", data: handovers });
@@ -960,6 +1123,30 @@ export const completeShiftHandover = catchAsync(async (req: Request, res: Respon
     );
   }
 
+  // Notify assigned doctors for all handed over inpatients
+  const handedOverAdmissions = await Admission.find({
+    hospital: hospitalId,
+    assignedNurse: incomingStaff._id,
+    status: { $in: activeAdmissionsStatuses }
+  }).populate("patient", "name uhid");
+
+  for (const adm of handedOverAdmissions) {
+    if (adm.patient) {
+      const ptName = (adm.patient as any).name || "Inpatient";
+      const ptUhid = (adm.patient as any).uhid || "";
+      await notifyAssignedDoctorForPatient({
+        hospitalId,
+        patientId: (adm.patient as any)._id,
+        patientName: ptName,
+        uhid: ptUhid,
+        nurseName: outgoingStaff.name || "Nurse",
+        title: "New Shift Handover Note",
+        message: `Shift handover notes updated for Patient ${ptName} by Nurse ${outgoingStaff.name || "Nurse"}.`,
+        severity: "info"
+      });
+    }
+  }
+
   // 3. Mark outgoing nurse shift as completed (off_duty) and incoming nurse as on_duty
   outgoingStaff.dutyStatus = "off_duty";
   await outgoingStaff.save();
@@ -1007,5 +1194,242 @@ export const completeShiftHandover = catchAsync(async (req: Request, res: Respon
       token: accessToken,
       refreshToken
     }
+  });
+});
+
+// 19. Accept Incoming Shift Handover
+export const acceptShiftHandover = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const staff = await Staff.findOne({ email: req.user!.email });
+  if (!staff) {
+    throw new AppError("Staff record not found.", 404);
+  }
+
+  const { handoverId } = req.body;
+  if (!handoverId) {
+    throw new AppError("Handover ID is required.", 400);
+  }
+
+  const handover = await ShiftHandover.findOne({ _id: handoverId, hospital: hospitalId });
+  if (!handover) {
+    throw new AppError("Shift handover record not found.", 404);
+  }
+
+  handover.status = "Completed";
+  handover.acceptedBy = staff._id;
+  handover.acceptedByName = staff.name || req.user!.name || "Nurse";
+  handover.acceptedAt = new Date();
+  await handover.save();
+
+  // Update duty status to on_duty
+  staff.dutyStatus = "on_duty";
+  await staff.save();
+
+  // Transfer patient admissions to accepting nurse if specified
+  const activeAdmissionsStatuses = ["admitted", "Admitted", "Under Observation", "Under Treatment", "In Ward", "ICU", "Bed Allocated"];
+  if (handover.loggedBy) {
+    await Admission.updateMany(
+      {
+        hospital: hospitalId,
+        assignedNurse: handover.loggedBy,
+        status: { $in: activeAdmissionsStatuses }
+      },
+      { assignedNurse: staff._id }
+    );
+  }
+
+  // Emit WebSocket update
+  emitToHospital(hospitalId, "shift_handover_accepted", handover);
+
+  res.json({ status: "success", message: "Handover accepted successfully.", data: handover });
+});
+
+// 20. Get Current Nurse Shift Status & Live Countdown Details
+export const getNurseShiftStatus = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const staff = await Staff.findOne({ email: req.user!.email });
+  if (!staff) {
+    throw new AppError("Staff record not found.", 404);
+  }
+
+  const now = new Date();
+  const currentHours = now.getHours();
+  const currentMinutes = now.getMinutes();
+  const currentTimeMinutes = currentHours * 60 + currentMinutes;
+
+  // Determine active 3-shift rotation timing:
+  // Morning: 06:00 (360) - 14:00 (840)
+  // Evening: 14:00 (840) - 22:00 (1320)
+  // Night: 22:00 (1320) - 06:00 (360 next day)
+  let currentShift = "Morning";
+  let nextShift = "Evening";
+  let shiftStartMinutes = 6 * 60; // 06:00 AM
+  let shiftEndMinutes = 14 * 60;  // 02:00 PM
+
+  if (currentTimeMinutes >= 6 * 60 && currentTimeMinutes < 14 * 60) {
+    currentShift = "Morning";
+    nextShift = "Evening";
+    shiftStartMinutes = 6 * 60;
+    shiftEndMinutes = 14 * 60;
+  } else if (currentTimeMinutes >= 14 * 60 && currentTimeMinutes < 22 * 60) {
+    currentShift = "Evening";
+    nextShift = "Night";
+    shiftStartMinutes = 14 * 60;
+    shiftEndMinutes = 22 * 60;
+  } else {
+    currentShift = "Night";
+    nextShift = "Morning";
+    shiftStartMinutes = 22 * 60;
+    shiftEndMinutes = 6 * 60; // Crosses midnight
+  }
+
+  // Calculate remaining seconds to shift end
+  let remainingSeconds = 0;
+  if (currentShift === "Night") {
+    if (currentTimeMinutes >= 22 * 60) {
+      remainingSeconds = (24 * 60 - currentTimeMinutes + 6 * 60) * 60 - now.getSeconds();
+    } else {
+      remainingSeconds = (6 * 60 - currentTimeMinutes) * 60 - now.getSeconds();
+    }
+  } else {
+    remainingSeconds = (shiftEndMinutes - currentTimeMinutes) * 60 - now.getSeconds();
+  }
+
+  if (remainingSeconds < 0) remainingSeconds = 0;
+
+  // Calculate shift state:
+  // "On Duty", "Shift Ending Soon" (<= 15 min), "Handover Required" (<= 5 min), "Waiting for Handover"
+  let shiftState = "On Duty";
+  if (remainingSeconds <= 0) {
+    shiftState = "Waiting for Handover";
+  } else if (remainingSeconds <= 5 * 60) {
+    shiftState = "Handover Required";
+  } else if (remainingSeconds <= 15 * 60) {
+    shiftState = "Shift Ending Soon";
+  }
+
+  // Check pending handovers for this nurse
+  const pendingIncomingHandovers = await ShiftHandover.find({
+    hospital: hospitalId,
+    incomingNurse: staff._id,
+    status: { $in: ["Pending", "Submitted", "In Progress"] }
+  }).sort({ timestamp: -1 });
+
+  // Check latest outgoing handover submitted by this nurse today
+  const startOfDay = new Date(now.setHours(0, 0, 0, 0));
+  const latestOutgoingHandover = await ShiftHandover.findOne({
+    hospital: hospitalId,
+    loggedBy: staff._id,
+    timestamp: { $gte: startOfDay }
+  }).sort({ timestamp: -1 });
+
+  if (latestOutgoingHandover) {
+    if (latestOutgoingHandover.status === "Completed") {
+      shiftState = "Shift Completed";
+    } else if (latestOutgoingHandover.status === "Submitted") {
+      shiftState = "Handover In Progress";
+    }
+  }
+
+  res.json({
+    status: "success",
+    data: {
+      currentShift,
+      nextShift,
+      shiftState,
+      remainingSeconds,
+      dutyStatus: staff.dutyStatus || "on_duty",
+      pendingIncomingHandovers,
+      latestOutgoingHandover
+    }
+  });
+});
+
+// 21. Trigger Nursing Supervisor Alert for Overdue Handover
+export const triggerSupervisorAlert = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const staff = await Staff.findOne({ email: req.user!.email });
+  const nurseName = staff?.name || req.user!.name || "Nurse";
+
+  // Create High Priority DB Notification for Nursing Supervisor & Hospital Admins
+  const notification = await DbNotification.create({
+    hospital: hospitalId,
+    title: "SUPERVISOR ALERT: Shift Handover Failed / Overdue",
+    message: `Nurse ${nurseName} failed to complete shift handover before leaving shift. Immediate action required.`,
+    type: "general",
+    severity: "error",
+    recipientRole: "admin",
+    isRead: false
+  });
+
+  // Broadcast WebSocket Alert
+  emitToHospital(hospitalId, "supervisor_handover_alert", {
+    nurseName,
+    message: `Nurse ${nurseName} failed to complete shift handover. Immediate action required.`,
+    timestamp: new Date()
+  });
+
+  res.json({ status: "success", message: "Supervisor alert dispatched successfully.", data: notification });
+});
+
+// 22. Send Note directly to Patient's Assigned Doctor
+export const sendNoteToAssignedDoctor = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const { patientId, noteContent, observationType } = req.body;
+
+  if (!patientId || !noteContent) {
+    throw new AppError("Patient ID and Note Content are required.", 400);
+  }
+
+  const staff = await Staff.findOne({ email: req.user!.email });
+  const recordedByName = staff?.name || req.user!.name || "Nurse";
+
+  // Find active admission or patient details
+  const activeAdmission = await Admission.findOne({
+    hospital: hospitalId,
+    patient: patientId,
+    status: { $in: ["admitted", "Admitted", "Under Observation", "Under Treatment", "In Ward", "ICU", "Bed Allocated"] }
+  }).populate("patient", "name uhid").populate("admittingDoctor", "name specialization");
+
+  let ptName = "Inpatient";
+  let ptUhid = "";
+  let doctorName = "Assigned Doctor";
+
+  if (activeAdmission) {
+    ptName = (activeAdmission.patient as any)?.name || ptName;
+    ptUhid = (activeAdmission.patient as any)?.uhid || ptUhid;
+    if (activeAdmission.admittingDoctor) {
+      doctorName = (activeAdmission.admittingDoctor as any)?.name || doctorName;
+    }
+  } else {
+    const pt = await Patient.findById(patientId);
+    if (pt) {
+      ptName = pt.name;
+      ptUhid = pt.uhid;
+    }
+  }
+
+  // Trigger real-time notification to patient's assigned doctor
+  const notif = await notifyAssignedDoctorForPatient({
+    hospitalId,
+    patientId,
+    patientName: ptName,
+    uhid: ptUhid,
+    nurseName: recordedByName,
+    title: "New Nursing Note",
+    message: `A new nursing note has been sent for Patient ${ptName} by Nurse ${recordedByName}: "${noteContent.length > 60 ? noteContent.substring(0, 60) + '...' : noteContent}"`,
+    severity: "info",
+    extraData: {
+      type: "nursing_note",
+      observationType: observationType || "Clinical Note",
+      noteContent
+    }
+  });
+
+  res.json({
+    status: "success",
+    message: `Nursing note sent to ${doctorName} successfully!`,
+    doctorName,
+    notification: notif
   });
 });

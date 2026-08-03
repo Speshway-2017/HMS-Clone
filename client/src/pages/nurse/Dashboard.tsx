@@ -69,6 +69,10 @@ import {
 } from "../../features/nurse";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
+import { ShiftManagementWidget } from "../../components/nurse/ShiftManagementWidget";
+import { ShiftHandoverModal } from "../../components/nurse/ShiftHandoverModal";
+import { ShiftHistoryView } from "../../components/nurse/ShiftHistoryView";
+import { PendingHandoverAcceptModal } from "../../components/nurse/PendingHandoverAcceptModal";
 
 interface NurseDashboardProps {
   activeTab?: string;
@@ -89,6 +93,11 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
 
   // Active drawer overlay controller
   const [activeDrawer, setActiveDrawer] = useState<string | null>(null);
+
+  // Shift Management Modals & Views States
+  const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
+  const [isViewingHistory, setIsViewingHistory] = useState(false);
+  const [pendingHandoverToAccept, setPendingHandoverToAccept] = useState<any>(null);
 
   // Real-time dynamic ticking date and time clock
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
@@ -1871,83 +1880,63 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
             )}
           </div>
         </div>
+      ) : isViewingHistory ? (
+        <ShiftHistoryView onBack={() => setIsViewingHistory(false)} />
       ) : (
         <>
           {/* ==========================================
-              HEADER SECTION
+              HEADER SECTION (Doctor Dashboard Design Match)
              ========================================== */}
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-white rounded-2xl p-6 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm">
             <div className="flex items-center gap-4">
-              <div className="relative">
-                {user?.avatarUrl ? (
-                  <img
-                    src={user?.avatarUrl}
-                    alt={staff?.name || user?.name || "Nurse"}
-                    className="h-16 w-16 rounded-full object-cover ring-4 ring-navy-50 border border-white shadow-sm"
-                  />
-                ) : (
-                  <div className="h-16 w-16 rounded-full bg-navy-100 ring-4 ring-navy-50 border border-white shadow-sm flex items-center justify-center text-navy-700 font-extrabold text-xl">
-                    {(staff?.name || user?.name || "N").charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500 animate-pulse" />
+              <div className="h-12 w-12 rounded-2xl bg-navy-50 text-navy-700 border border-navy-100/60 flex items-center justify-center shrink-0">
+                <HeartPulse className="h-6 w-6 text-navy-700" />
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-2xl font-bold text-slate-900">
-                    Good Morning, {(staff?.name || user?.name || "Nurse").toLowerCase().startsWith("nurse")
-                      ? (staff?.name || user?.name || "Nurse")
-                      : `Nurse ${staff?.name || user?.name || "Nurse"}`} 👋
+                  <h1 className="text-2xl font-bold text-slate-900 tracking-tight font-sans">
+                    Nurse Dashboard
                   </h1>
-                  <span className="rounded-full bg-navy-50 border border-navy-100 px-2.5 py-0.5 text-[9px] font-bold text-navy-700 uppercase tracking-wide">
-                    Duty Roster Staff
-                  </span>
+                  <Badge tone="info">Duty Roster Staff</Badge>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Employee ID: <span className="font-semibold text-slate-750">{staff?.employeeId || "NUR-ACTIVE"}</span>
+                <p className="text-xs text-slate-500 font-sans mt-0.5">
+                  Monitor assigned patients, medications, vitals, nursing notes and shift handovers.
                 </p>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-slate-500">
-                  <span className="flex items-center gap-1">
-                    <HeartPulse className="h-3.5 w-3.5 text-navy-500" />
-                    Dept: <strong className="text-slate-700 font-semibold">{staff?.department && typeof staff.department === "object" ? (staff.department as any).name : "General Medicine Ward"}</strong>
-                  </span>
-                  <span className="text-slate-300">•</span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3.5 w-3.5 text-navy-500" />
-                    Shift: <strong className="text-slate-700 font-semibold">Shift Schedule (On Duty)</strong>
-                  </span>
-                </div>
               </div>
             </div>
 
-            {/* Clock & Action Controls */}
-            <div className="flex flex-col items-end gap-2 border-t border-slate-100 pt-4 md:border-t-0 md:pt-0">
-              <div className="text-right">
-                <p className="text-sm font-bold text-slate-800">
-                  {currentTime.toLocaleDateString("en-US", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
+            {/* Right Side: Current Date, Live Clock, Shift Status */}
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 text-right">
+                <p className="text-xs font-bold text-slate-800 font-sans">
+                  {currentTime.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
                 </p>
-                <p className="text-xs font-mono font-bold text-navy-600 bg-navy-50 border border-navy-100/50 px-2.5 py-0.5 rounded-lg inline-block mt-1">
-                  {currentTime.toLocaleTimeString("en-US", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit",
-                    hour12: true
-                  })}
+                <p className="text-[11px] font-mono font-bold text-navy-700 mt-0.5">
+                  {currentTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })}
                 </p>
               </div>
-
+              <div className="bg-emerald-50 border border-emerald-200/80 rounded-xl px-3.5 py-2 text-center">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 block font-sans">Shift Status</span>
+                <span className="text-xs font-extrabold text-emerald-800 font-sans flex items-center gap-1 justify-center">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> Morning Shift
+                </span>
+              </div>
             </div>
           </div>
 
           {/* ==========================================
-              DASHBOARD CARDS GRID
+              SHIFT MANAGEMENT & COCKPIT WIDGET
              ========================================== */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          <ShiftManagementWidget
+            onStartHandover={() => setIsHandoverModalOpen(true)}
+            onViewHistory={() => setIsViewingHistory(true)}
+            onOpenPendingAccept={(handover) => setPendingHandoverToAccept(handover)}
+          />
+
+          {/* ==========================================
+              6 KPI CARDS GRID (Doctor Dashboard Palette & Layout)
+             ========================================== */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {showLoading ? (
               <>
                 <SkeletonCard />
@@ -1955,139 +1944,129 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                 <SkeletonCard />
                 <SkeletonCard />
                 <SkeletonCard />
+                <SkeletonCard />
               </>
-            ) : showEmpty ? (
-              <div className="col-span-full bg-white rounded-2xl p-10 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] text-center py-16">
-                <Users className="h-12 w-12 text-slate-300 mx-auto mb-2" />
-                <h3 className="text-lg font-bold text-slate-700">No Patient Data Found</h3>
-                <p className="text-sm text-slate-400 mt-1">There are no active admitted patients registered in the hospital database.</p>
-              </div>
             ) : (
               <>
-                {/* 1. Assigned Patients Card */}
+                {/* 1. Assigned Patients (Blue) */}
                 <div
                   onClick={() => navigate("/nurse/inpatients")}
-                  className="bg-navy-700 text-white rounded-2xl p-5 border border-navy-700 shadow-[0_4px_20px_rgba(0,0,0,0.02)] transition-all duration-300 cursor-pointer group"
+                  className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 cursor-pointer group flex flex-col justify-between"
                 >
                   <div className="flex justify-between items-start">
-                    <span className="text-xs font-bold text-navy-100 uppercase tracking-wide">Assigned Patients</span>
-                    <div className="p-2 rounded-xl bg-white/15 text-white transition-colors">
+                    <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider font-sans">Assigned Patients</span>
+                    <div className="p-2 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                       <Users className="h-4.5 w-4.5" />
                     </div>
                   </div>
-                  <p className="text-3xl font-extrabold text-white mt-2">{totalAssignedCount}</p>
-                  <div className="mt-3 flex items-center gap-1 text-[10px] text-navy-200">
-                    <span className="font-semibold text-rose-200 bg-rose-500/25 px-2 py-0.5 rounded-full">{criticalCount} Critical</span>
-                    <span>on shift duty</span>
+                  <div className="mt-3">
+                    <p className="text-3xl font-black text-slate-800 font-sans tracking-tight">{totalAssignedCount}</p>
+                    <p className="text-[11px] font-medium font-sans text-slate-500 mt-1">
+                      {totalAssignedCount === 0 ? "No Patients Assigned" : `${criticalCount} Critical cases`}
+                    </p>
                   </div>
                 </div>
 
-                {/* 2. Pending Vitals Card */}
-                <div
-                  onClick={() => setActiveDrawer("vitals")}
-                  className="bg-white rounded-2xl p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] transition-all duration-300 cursor-pointer group"
-                >
-                  <div className="flex justify-between items-start">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">Pending Vitals</span>
-                    <div className="p-2 rounded-xl bg-amber-50 text-amber-600">
-                      <Thermometer className="h-4.5 w-4.5" />
-                    </div>
-                  </div>
-                  <p className="text-3xl font-extrabold text-slate-800 mt-2">{pendingVitalsCount}</p>
-                  <div className="mt-3 flex items-center gap-1.5">
-                    {pendingVitalsCount > 0 ? (
-                      <>
-                        <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
-                        <span className="text-[10px] font-bold text-amber-700">Vitals record missing</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                        <span className="text-[10px] font-bold text-emerald-700">All vitals logged</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* 3. Pending Medications Card */}
+                {/* 2. Pending Medications (Orange/Amber) */}
                 <div
                   onClick={() => setActiveDrawer("meds")}
-                  className="bg-white rounded-2xl p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] transition-all duration-300 cursor-pointer group"
+                  className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 cursor-pointer group flex flex-col justify-between"
                 >
                   <div className="flex justify-between items-start">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">Pending Meds</span>
-                    <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
+                    <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider font-sans">Pending Meds</span>
+                    <div className="p-2 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 group-hover:bg-amber-600 group-hover:text-white transition-colors">
                       <Pill className="h-4.5 w-4.5" />
                     </div>
                   </div>
-                  <p className="text-3xl font-extrabold text-slate-800 mt-2">{pendingMedsCount}</p>
-                  <div className="mt-3 flex items-center gap-1.5">
-                    {pendingMedsCount > 0 ? (
-                      <>
-                        <span className="h-2 w-2 rounded-full bg-rose-555 animate-pulse" />
-                        <span className="text-[10px] font-bold text-rose-600">Active prescriptions scheduled</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                        <span className="text-[10px] font-bold text-emerald-700">No pending medication orders</span>
-                      </>
-                    )}
+                  <div className="mt-3">
+                    <p className="text-3xl font-black text-slate-800 font-sans tracking-tight">{pendingMedsCount}</p>
+                    <p className="text-[11px] font-medium font-sans text-slate-500 mt-1">
+                      {pendingMedsCount === 0 ? "No Pending Medications - Great Job!" : "Active prescriptions scheduled"}
+                    </p>
                   </div>
                 </div>
 
-                {/* 4. Emergency Alerts Card */}
+                {/* 3. Pending Vitals (Purple) */}
                 <div
-                  onClick={() => setActiveDrawer("alerts")}
-                  className={`rounded-2xl p-5 border shadow-[0_4px_20px_rgba(0,0,0,0.02)] transition-all duration-300 cursor-pointer group ${emergencyAlertsCount > 0
-                      ? "bg-rose-50/40 border-rose-200/80"
-                      : "bg-white border-slate-100"
-                    }`}
+                  onClick={() => setActiveDrawer("vitals")}
+                  className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 cursor-pointer group flex flex-col justify-between"
                 >
                   <div className="flex justify-between items-start">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">Emergency Alerts</span>
-                    <div className={`p-2 rounded-xl ${emergencyAlertsCount > 0
-                        ? "bg-rose-100 text-rose-700"
-                        : "bg-slate-100 text-slate-500"
-                      }`}>
-                      <ShieldAlert className={`h-4.5 w-4.5 ${emergencyAlertsCount > 0 ? "animate-bounce" : ""}`} />
+                    <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider font-sans">Pending Vitals</span>
+                    <div className="p-2 rounded-xl bg-purple-50 text-purple-600 border border-purple-100 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                      <Thermometer className="h-4.5 w-4.5" />
                     </div>
                   </div>
-                  <p className="text-3xl font-extrabold text-slate-800 mt-2">{emergencyAlertsCount}</p>
-                  <div className="mt-3 flex items-center gap-1.5">
-                    {emergencyAlertsCount > 0 ? (
-                      <>
-                        <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
-                        <span className="text-[10px] font-bold text-rose-600">Alarms active in Ward</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                        <span className="text-[10px] font-bold text-emerald-750">No triage flags active</span>
-                      </>
-                    )}
+                  <div className="mt-3">
+                    <p className="text-3xl font-black text-slate-800 font-sans tracking-tight">{pendingVitalsCount}</p>
+                    <p className="text-[11px] font-medium font-sans text-slate-500 mt-1">
+                      {pendingVitalsCount === 0 ? "No Pending Vitals - Everything Updated" : "Vitals entry required"}
+                    </p>
                   </div>
                 </div>
 
-                {/* 5. Today's Nursing Tasks Card */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] group transition-all">
+                {/* 4. Critical Patients (Red) */}
+                <div
+                  onClick={() => navigate("/nurse/inpatients")}
+                  className={`rounded-2xl p-5 border shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 cursor-pointer group flex flex-col justify-between ${
+                    criticalCount > 0 ? "bg-rose-50/40 border-rose-200" : "bg-white border-slate-200/80"
+                  }`}
+                >
                   <div className="flex justify-between items-start">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">Nursing Tasks today</span>
-                    <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
-                      <ClipboardList className="h-4.5 w-4.5" />
+                    <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider font-sans">Critical Cases</span>
+                    <div className={`p-2 rounded-xl border ${
+                      criticalCount > 0 ? "bg-rose-100 text-rose-700 border-rose-200" : "bg-slate-100 text-slate-500 border-slate-200"
+                    }`}>
+                      <ShieldAlert className={`h-4.5 w-4.5 ${criticalCount > 0 ? "animate-bounce" : ""}`} />
                     </div>
                   </div>
-                  <p className="text-3xl font-extrabold text-slate-800 mt-2">{taskCompletionPercentage}%</p>
-                  <div className="mt-3.5 space-y-1">
-                    <div className="w-full bg-slate-100 rounded-full h-1.5">
-                      <div
-                        className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
-                        style={{ width: `${taskCompletionPercentage}%` }}
-                      />
+                  <div className="mt-3">
+                    <p className="text-3xl font-black text-slate-800 font-sans tracking-tight">{criticalCount}</p>
+                    <p className="text-[11px] font-medium font-sans text-slate-500 mt-1">
+                      {criticalCount === 0 ? "No Critical Patients - All Patients Stable" : "Emergency triage priority"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 5. Shift Status (Green) */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 group flex flex-col justify-between">
+                  <div className="flex justify-between items-start">
+                    <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider font-sans">Shift Status</span>
+                    <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+                      <CheckCircle2 className="h-4.5 w-4.5" />
                     </div>
-                    <span className="text-[9px] font-bold text-slate-400 mt-1 block">
-                      {completedClinicalTasks} of {totalPossibleClinicalTasks} shift tasks logged
-                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <p className="text-sm font-extrabold text-emerald-800 font-sans">Morning Shift</p>
+                    </div>
+                    <p className="text-[11px] font-medium font-sans text-slate-500 mt-1">
+                      On Duty · Roster Active
+                    </p>
+                  </div>
+                </div>
+
+                {/* 6. Nurse Alerts (Amber) */}
+                <div
+                  onClick={() => setActiveDrawer("alerts")}
+                  className={`rounded-2xl p-5 border shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 cursor-pointer group flex flex-col justify-between ${
+                    emergencyAlertsCount > 0 ? "bg-amber-50/40 border-amber-200" : "bg-white border-slate-200/80"
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider font-sans">Nurse Alerts</span>
+                    <div className={`p-2 rounded-xl border ${
+                      emergencyAlertsCount > 0 ? "bg-amber-100 text-amber-800 border-amber-200" : "bg-slate-100 text-slate-500 border-slate-200"
+                    }`}>
+                      <Bell className="h-4.5 w-4.5" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <p className="text-3xl font-black text-slate-800 font-sans tracking-tight">{emergencyAlertsCount}</p>
+                    <p className="text-[11px] font-medium font-sans text-slate-500 mt-1">
+                      {emergencyAlertsCount === 0 ? "No Active Alerts" : "Ward alarms pending"}
+                    </p>
                   </div>
                 </div>
               </>
@@ -2095,127 +2074,183 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
           </div>
 
           {/* ==========================================
+              CLINICAL SHIFT TASKS PROGRESS BAR SECTION
+             ========================================== */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-800 font-sans uppercase tracking-wider flex items-center gap-2">
+                  <Activity className="h-4.5 w-4.5 text-navy-700" /> Clinical Shift Tasks Progress
+                </h3>
+                <p className="text-xs text-slate-500 font-sans mt-0.5">Overall task completion status for assigned ward patients</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge tone={taskCompletionPercentage >= 80 ? "success" : taskCompletionPercentage >= 40 ? "warning" : "neutral"}>
+                  {taskCompletionPercentage}% Overall Completion
+                </Badge>
+              </div>
+            </div>
+
+            {/* Main Progress Bar */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-bold text-slate-700 font-sans">
+                <span>Completed: {completedClinicalTasks} Tasks</span>
+                <span>Pending: {totalPossibleClinicalTasks - completedClinicalTasks} Tasks</span>
+              </div>
+              <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden p-0.5 border border-slate-200/60">
+                <div
+                  className="bg-gradient-to-r from-navy-700 via-indigo-600 to-emerald-500 h-2 rounded-full transition-all duration-700 ease-out shadow-sm"
+                  style={{ width: `${taskCompletionPercentage}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Task Progress List Breakdown */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+              {/* Vitals Monitoring */}
+              <div className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-3.5 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-extrabold text-slate-800 font-sans flex items-center gap-1.5">
+                    <Thermometer className="h-4 w-4 text-rose-500" /> Vitals Monitoring
+                  </span>
+                  <span className="font-bold text-slate-600 font-mono text-[11px]">{patientVitalsSavedTodayCount} / {totalAssignedCount}</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-rose-500 h-1.5 rounded-full transition-all duration-500"
+                    style={{ width: `${totalAssignedCount > 0 ? (patientVitalsSavedTodayCount / totalAssignedCount) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Medication Administration */}
+              <div className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-3.5 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-extrabold text-slate-800 font-sans flex items-center gap-1.5">
+                    <Pill className="h-4 w-4 text-indigo-500" /> Medication Admin
+                  </span>
+                  <span className="font-bold text-slate-600 font-mono text-[11px]">{totalAssignedCount - pendingMedsCount} / {totalAssignedCount}</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-indigo-600 h-1.5 rounded-full transition-all duration-500"
+                    style={{ width: `${totalAssignedCount > 0 ? ((totalAssignedCount - pendingMedsCount) / totalAssignedCount) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Nursing Notes */}
+              <div className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-3.5 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-extrabold text-slate-800 font-sans flex items-center gap-1.5">
+                    <ClipboardList className="h-4 w-4 text-purple-500" /> Nursing Notes
+                  </span>
+                  <span className="font-bold text-slate-600 font-mono text-[11px]">{patientNotesSavedTodayCount} / {totalAssignedCount}</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-purple-600 h-1.5 rounded-full transition-all duration-500"
+                    style={{ width: `${totalAssignedCount > 0 ? (patientNotesSavedTodayCount / totalAssignedCount) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ==========================================
               QUICK ACTIONS GRID
              ========================================== */}
           <div className="space-y-4">
-            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 font-sans flex items-center gap-1.5">
               <Grid className="h-4.5 w-4.5 text-navy-500" />
               Bedside Clinical Quick Actions
             </h2>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {/* 1. Assigned Patients */}
-              <div
-                onClick={() => navigate("/nurse/inpatients")}
-                className="bg-white rounded-2xl p-5 border border-slate-100 cursor-pointer flex flex-col justify-between h-32 group"
-              >
-                <div className="h-10 w-10 rounded-xl bg-navy-50 text-navy-600 flex items-center justify-center">
-                  <Users className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-slate-800">Assigned Patients</h3>
-                  <p className="text-[10px] text-slate-450 mt-1">Bed roster chart</p>
-                </div>
-              </div>
-
-              {/* 2. Record Vitals */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {/* 1. Record Vitals */}
               <div
                 onClick={() => setActiveDrawer("vitals")}
-                className="bg-white rounded-2xl p-5 border border-slate-100 cursor-pointer flex flex-col justify-between h-32 group"
+                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-navy-200 cursor-pointer flex flex-col justify-between h-32 hover:shadow-md transition-all group"
               >
-                <div className="h-10 w-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-xl bg-rose-50 text-rose-500 border border-rose-100 flex items-center justify-center group-hover:bg-rose-500 group-hover:text-white transition-colors">
                   <Thermometer className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-xs font-bold text-slate-800">Record Vitals</h3>
-                  <p className="text-[10px] text-slate-450 mt-1">Log temp, BP, pulse</p>
+                  <h3 className="text-xs font-bold text-slate-800 font-sans">Record Vitals</h3>
+                  <p className="text-[10px] text-slate-500 font-sans mt-0.5">Log temp, BP, pulse</p>
                 </div>
               </div>
 
-              {/* 3. Medication Admin */}
+              {/* 2. Medication Admin */}
               <div
                 onClick={() => setActiveDrawer("meds")}
-                className="bg-white rounded-2xl p-5 border border-slate-100 cursor-pointer flex flex-col justify-between h-32 group"
+                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-navy-200 cursor-pointer flex flex-col justify-between h-32 hover:shadow-md transition-all group"
               >
-                <div className="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-500 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-500 border border-indigo-100 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                   <Pill className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-xs font-bold text-slate-800">Medication Admin</h3>
-                  <p className="text-[10px] text-slate-400 mt-1">Dose checkoffs & logs</p>
+                  <h3 className="text-xs font-bold text-slate-800 font-sans">Medication Admin</h3>
+                  <p className="text-[10px] text-slate-500 font-sans mt-0.5">Dose checkoffs & logs</p>
                 </div>
               </div>
 
-              {/* 4. Nursing Notes */}
+              {/* 3. Nursing Notes */}
               <div
                 onClick={() => setActiveDrawer("notes")}
-                className="bg-white rounded-2xl p-5 border border-slate-100 cursor-pointer flex flex-col justify-between h-32 group"
+                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-navy-200 cursor-pointer flex flex-col justify-between h-32 hover:shadow-md transition-all group"
               >
-                <div className="h-10 w-10 rounded-xl bg-purple-50 text-purple-500 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-xl bg-purple-50 text-purple-500 border border-purple-100 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
                   <ClipboardList className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-xs font-bold text-slate-800">Nursing Notes</h3>
-                  <p className="text-[10px] text-slate-400 mt-1">Write EMR progress notes</p>
+                  <h3 className="text-xs font-bold text-slate-800 font-sans">Nursing Notes</h3>
+                  <p className="text-[10px] text-slate-500 font-sans mt-0.5">Write EMR progress notes</p>
                 </div>
               </div>
 
-              {/* 5. Bedside Care */}
+              {/* 4. Shift Handover */}
               <div
-                onClick={() => setActiveDrawer("bedside")}
-                className="bg-white rounded-2xl p-5 border border-slate-100 cursor-pointer flex flex-col justify-between h-32 group"
+                onClick={() => {
+                  setSelectedPatientId("");
+                  setActiveDrawer("handover");
+                }}
+                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-navy-200 cursor-pointer flex flex-col justify-between h-32 hover:shadow-md transition-all group"
               >
-                <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
-                  <HeartPulse className="h-5 w-5" />
+                <div className="h-10 w-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                  <UserCheck className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-xs font-bold text-slate-800">Bedside Care</h3>
-                  <p className="text-[10px] text-slate-400 mt-1">Log rounds & checks</p>
+                  <h3 className="text-xs font-bold text-slate-800 font-sans">Shift Handover</h3>
+                  <p className="text-[10px] text-slate-500 font-sans mt-0.5">Outgoing signoff brief</p>
+                </div>
+              </div>
+
+              {/* 5. Ward Management */}
+              <div
+                onClick={() => navigate("/nurse/inpatients")}
+                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-navy-200 cursor-pointer flex flex-col justify-between h-32 hover:shadow-md transition-all group"
+              >
+                <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <BedDouble className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-800 font-sans">Ward Management</h3>
+                  <p className="text-[10px] text-slate-500 font-sans mt-0.5">Bed roster & inpatients</p>
                 </div>
               </div>
 
               {/* 6. Emergency Alerts */}
               <div
                 onClick={() => setActiveDrawer("alerts")}
-                className="bg-white rounded-2xl p-5 border border-slate-100 cursor-pointer flex flex-col justify-between h-32 group"
+                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-navy-200 cursor-pointer flex flex-col justify-between h-32 hover:shadow-md transition-all group"
               >
-                <div className="h-10 w-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center">
-                  <AlertCircle className="h-5 w-5" />
+                <div className="h-10 w-10 rounded-xl bg-rose-50 text-rose-500 border border-rose-100 flex items-center justify-center group-hover:bg-rose-500 group-hover:text-white transition-colors">
+                  <ShieldAlert className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-xs font-bold text-slate-800">Emergency Alerts</h3>
-                  <p className="text-[10px] text-slate-450 mt-1">Acknowledge ward alarms</p>
-                </div>
-              </div>
-
-              {/* 7. Shift Handover */}
-              <div
-                onClick={() => {
-                  setSelectedPatientId("");
-                  setActiveDrawer("handover");
-                }}
-                className="bg-white rounded-2xl p-5 border border-slate-100 cursor-pointer flex flex-col justify-between h-32 group"
-              >
-                <div className="h-10 w-10 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center">
-                  <UserCheck className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-slate-800">Shift Handover</h3>
-                  <p className="text-[10px] text-slate-450 mt-1">Outgoing checklist signoff</p>
-                </div>
-              </div>
-
-              {/* 8. Discharge Prep */}
-              <div
-                onClick={() => setActiveDrawer("discharge")}
-                className="bg-white rounded-2xl p-5 border border-slate-100 cursor-pointer flex flex-col justify-between h-32 group"
-              >
-                <div className="h-10 w-10 rounded-xl bg-teal-50 text-teal-500 flex items-center justify-center">
-                  <CheckCircle2 className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-slate-800">Discharge Prep</h3>
-                  <p className="text-[10px] text-slate-400 mt-1">Audit physician clearings</p>
+                  <h3 className="text-xs font-bold text-slate-800 font-sans">Emergency Alerts</h3>
+                  <p className="text-[10px] text-slate-500 font-sans mt-0.5">Acknowledge ward alarms</p>
                 </div>
               </div>
             </div>
@@ -3919,11 +3954,25 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                 Close Drawer
               </button>
             </div>
-
           </div>
         </div>,
         document.body
       )}
+
+      {/* Shift Handover Interactive Modal */}
+      <ShiftHandoverModal
+        isOpen={isHandoverModalOpen || activeDrawer === "handover"}
+        onClose={() => {
+          setIsHandoverModalOpen(false);
+          setActiveDrawer(null);
+        }}
+      />
+
+      {/* Incoming Pending Handover Accept Modal */}
+      <PendingHandoverAcceptModal
+        handover={pendingHandoverToAccept}
+        onClose={() => setPendingHandoverToAccept(null)}
+      />
 
     </div>
   );

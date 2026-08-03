@@ -110,10 +110,10 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
 
   if (dateMode === "other_days") {
     const today = new Date();
-    const endOfToday = new Date(today);
-    endOfToday.setHours(23, 59, 59, 999);
+    const startOfToday = new Date(today);
+    startOfToday.setHours(0, 0, 0, 0);
 
-    filter.date = { $gt: endOfToday };
+    filter.date = { $gte: startOfToday };
     filter.status = { $nin: ["completed", "cancelled", "no_show"] };
   } else if (dateMode === "completed") {
     filter.status = { $in: ["completed", "cancelled", "no_show"] };
@@ -126,8 +126,8 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
 
   const [appointments, total, todayCount] = await Promise.all([
     Appointment.find(filter)
-      .populate("patient", "name uhid")
-      .populate("doctor", "name specialization")
+      .populate("patient", "name uhid phone age gender")
+      .populate("doctor", "name specialization department consultationFee")
       .populate("department", "name")
       .sort(dateMode === "completed" ? { date: -1, time: -1 } : { date: 1, time: 1 })
       .skip(skip)

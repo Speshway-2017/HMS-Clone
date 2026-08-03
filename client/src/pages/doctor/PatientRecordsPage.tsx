@@ -84,10 +84,19 @@ function groupReportsByConsultation(reportsList: any[]): ConsultationGroup[] {
 }
 
 export function PatientRecordsPage() {
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   // Doctor-scoped — only returns patients that have an appointment/admission/
   // lab order/radiology order with the logged-in doctor.
-  const { data: myPatientsData, isLoading, isError } = useDoctorPatients({ search });
+  const { data: myPatientsData, isLoading, isError } = useDoctorPatients({ search: debouncedSearch });
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
@@ -182,8 +191,8 @@ export function PatientRecordsPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   placeholder="Search your patients..."
                   className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
                 />

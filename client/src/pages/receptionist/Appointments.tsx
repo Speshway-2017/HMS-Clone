@@ -65,16 +65,16 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const { data: doctors } = useDoctorsAvailability();
   const { data: departmentsResponse } = useDepartments();
   const { data: searchPatients } = usePatientsSearch(patientQuery);
-  const { data: todayAppointments, isLoading: listLoading, refetch: refetchQueue } = useReceptionQueue();
+  const { data: todayAppointmentsRaw, isLoading: listLoading, refetch: refetchQueue } = useReceptionQueue();
 
   const [scheduledPage, setScheduledPage] = useState(1);
-  const { data: scheduledData, isLoading: scheduledLoading, refetch: refetchScheduled } = useAppointments({
+  const { data: scheduledDataRaw, isLoading: scheduledLoading, refetch: refetchScheduled } = useAppointments({
     page: scheduledPage,
     dateMode: "other_days"
   });
 
   const [completedPage, setCompletedPage] = useState(1);
-  const { data: completedData, isLoading: completedLoading, refetch: refetchCompleted } = useAppointments({
+  const { data: completedDataRaw, isLoading: completedLoading, refetch: refetchCompleted } = useAppointments({
     page: completedPage,
     dateMode: "completed"
   });
@@ -96,10 +96,46 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const { data: calendarAppointmentsData, isLoading: calendarLoading, refetch: refetchCalendar } = useAppointments({
     from: calFromStr,
     to: calToStr,
-    limit: 100
-  }, { enabled: tab === "calendar" });
+    limit: 500
+  });
 
   const calendarAppointments = calendarAppointmentsData?.data || [];
+
+  // Unified fallback synchronization so Today's Queue and Scheduled Bookings draw from calendar Appointments
+  const todayDateStr = new Date().toDateString();
+  const derivedTodayAppts = (calendarAppointments || []).filter((a: any) => {
+    const apptDateStr = new Date(a.date).toDateString();
+    return apptDateStr === todayDateStr && a.status !== "cancelled" && a.status !== "no_show";
+  }).map((appt: any, idx: number) => ({
+    _id: appt._id,
+    tokenNumber: appt.tokenNumber || appt.appointmentNumber || appt.referenceId || `T-${String(idx + 1).padStart(3, "0")}`,
+    type: appt.type || "Appointment",
+    status: appt.status || "scheduled",
+    patient: appt.patient,
+    doctor: appt.doctor,
+    department: appt.department,
+    createdAt: appt.createdAt || appt.date
+  }));
+
+  const todayAppointments = (todayAppointmentsRaw && todayAppointmentsRaw.length > 0)
+    ? todayAppointmentsRaw
+    : derivedTodayAppts;
+
+  const derivedScheduledAppts = (calendarAppointments || []).filter((a: any) => {
+    return a.status !== "completed" && a.status !== "cancelled" && a.status !== "no_show" && a.status !== "missed";
+  });
+
+  const scheduledData: any = (scheduledDataRaw?.data && scheduledDataRaw.data.length > 0)
+    ? scheduledDataRaw
+    : { data: derivedScheduledAppts, total: derivedScheduledAppts.length, page: 1, limit: 50, pagination: { totalPages: Math.ceil(derivedScheduledAppts.length / 50) || 1 } };
+
+  const derivedCompletedAppts = (calendarAppointments || []).filter((a: any) => {
+    return a.status === "completed" || a.status === "cancelled" || a.status === "no_show" || a.status === "missed";
+  });
+
+  const completedData: any = (completedDataRaw?.data && completedDataRaw.data.length > 0)
+    ? completedDataRaw
+    : { data: derivedCompletedAppts, total: derivedCompletedAppts.length, page: 1, limit: 50, pagination: { totalPages: Math.ceil(derivedCompletedAppts.length / 50) || 1 } };
 
   // Group appointments by day
   const appointmentsByDay = calendarAppointments.reduce((acc: Record<number, any[]>, appt: any) => {

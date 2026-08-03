@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FlaskConical, Plus, CheckCircle2, Clock, AlertTriangle, Search, User, ShieldAlert, X, Eye, Download } from "lucide-react";
 import toast from "react-hot-toast";
 import { Card } from "../../components/ui/Card";
@@ -43,7 +43,16 @@ const TABS = ["View Reports", "Order Tests", "Approve Results"];
 
 export function LaboratoryPage() {
   const [activeTab, setActiveTab] = useState(0);
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   const [selectedTests, setSelectedTests] = useState<string[]>([]);
   const [priority, setPriority] = useState("Routine");
   const [patientId, setPatientId] = useState("");
@@ -53,7 +62,7 @@ export function LaboratoryPage() {
   const [selectedOrderReportId, setSelectedOrderReportId] = useState<string | null>(null);
 
   // Fetch only doctor-owned lab orders from secured endpoints
-  const { data: labOrdersData, isLoading: isLabOrdersLoading, isError: isLabError } = useDoctorLabOrders({ search });
+  const { data: labOrdersData, isLoading: isLabOrdersLoading, isError: isLabError } = useDoctorLabOrders({ search: debouncedSearch });
 
   // Fetch only doctor-assigned patients for the placement selector dropdown to prevent leakage
   const { data: myPatientsData, isLoading: isPatientsLoading } = useDoctorPatients();
@@ -185,8 +194,8 @@ export function LaboratoryPage() {
               <div className="relative max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   placeholder="Search patient or test..."
                   className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
                 />
