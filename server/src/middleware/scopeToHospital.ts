@@ -8,7 +8,9 @@ import { AppError } from "../utils/AppError";
  */
 export function scopeToHospital(req: Request, _res: Response, next: NextFunction) {
   if (!req.user) {
-    throw new AppError("You are not logged in.", 401);
+    const hospitalId = req.query.hospitalId as string | undefined;
+    req.hospitalFilter = hospitalId ? { hospital: hospitalId } : {};
+    return next();
   }
 
   if (req.user.role === "super_admin") {

@@ -164,6 +164,7 @@ export interface Staff {
   checkInTime: string;
   taskLoad: number;
   rating: number;
+  assignedPatients?: any[];
 }
 
 export interface MedicalHistoryEntry {

@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { getBlogs, getBlog, createBlog, updateBlog, deleteBlog } from "../controllers/blogController";
-import { protect, restrictTo } from "../middleware/auth";
+import { protect, protectOptional, restrictTo } from "../middleware/auth";
 import { scopeToHospital } from "../middleware/scopeToHospital";
 
 const router = Router();
 
-router.get("/", scopeToHospital, getBlogs);
+router.get("/", protectOptional, scopeToHospital, getBlogs);
 router.get("/:id", getBlog);
 
 router.use(protect);
