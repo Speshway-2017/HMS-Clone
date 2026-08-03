@@ -25,7 +25,8 @@ import {
   Award,
   FileText,
   Search,
-  Star
+  Star,
+  HelpCircle
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
@@ -82,12 +83,9 @@ export function LandingPage() {
   const aboutText = hospital?.aboutText || "Sunrise General Hospital is committed to providing compassionate, high-quality, patient-centric healthcare services. With our state-of-the-art facilities, modern diagnostic laboratories, and an experienced team of medical practitioners, we ensure that you and your loved ones receive the best possible clinical care. From emergency trauma services to outpatient consultations, we are here for you 24/7.";
   const googleMapsLink = hospital?.googleMapsLink || "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3888.750247477546!2d77.6223405757754!3d12.923766787386766!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bae148ebffffff%3A0x6bde35501869e5d4!2sKoramangala%2080%20Feet%20Rd%2C%20Bengaluru%2C%20Karnataka!5e0!3m2!1sen!2sin!4v1700000000000!5m2!1sen!2sin";
   const footerText = hospital?.footerText || "Serving our community with integrity, compassion, and clinical excellence. Your health is our first priority.";
-  const faqs = hospital?.faqs || [
-    { q: "What are the outpatient (OPD) registration hours?", a: "Outpatient consultations are available from Monday to Saturday, 08:00 AM to 08:00 PM. We recommend booking an appointment online to avoid long queue waiting times." },
-    { q: "Do you offer emergency medical services?", a: "Yes, our fully-equipped Emergency and Trauma care unit is open 24 hours a day, 7 days a week, with dedicated on-call surgeons and emergency physicians." },
-    { q: "How can I obtain a copy of my diagnostic reports?", a: "Patients can securely access their laboratory and radiology reports online through the verified prescription/document portal, or collect them from the reception desk during working hours." },
-    { q: "Which health insurance providers do you support?", a: "We support direct cashless claims for all major national health insurance providers and Third-Party Administrators (TPAs). Please contact our insurance desk at the hospital for details." }
-  ];
+  const faqs = hospital?.faqs || [];
+  const displayFaqs = faqs;
+
   const socialLinks = hospital?.socialLinks || {
     facebook: "https://facebook.com",
     twitter: "https://twitter.com",
@@ -113,7 +111,7 @@ export function LandingPage() {
 
   const [activeTab, setActiveTab] = useState<string>("home");
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
-  const [activeFaq, setActiveFaq] = useState<number | null>(null);
+  const [activeFaq, setActiveFaq] = useState<number | null>(0);
 
   // --- QUERY DEPARTMENTS & DOCTORS ---
   const { data: departments = [] } = useQuery({
@@ -651,31 +649,90 @@ export function LandingPage() {
               </div>
             </section>
 
-            {/* FAQ Preview */}
-            <section className="py-20 px-6 lg:px-12 bg-white border-t border-slate-200">
-              <div className="mx-auto max-w-3xl">
-                <div className="text-center space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-navy-700">FAQ Desk</span>
-                  <h2 className="text-3xl font-extrabold text-slate-900">Patient Queries</h2>
-                </div>
-
-                <div className="mt-12 space-y-4">
-                  {faqs.slice(0, 3).map((faq, idx) => (
-                    <div key={idx} className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                      <button
-                        onClick={() => setActiveFaq(activeFaq === idx ? null : idx)}
-                        className="flex w-full items-center justify-between px-6 py-4 text-left text-sm font-bold text-slate-850 hover:bg-slate-50"
-                      >
-                        <span>{faq.q}</span>
-                        <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${activeFaq === idx ? "rotate-180" : ""}`} />
-                      </button>
-                      {activeFaq === idx && (
-                        <div className="border-t border-slate-100 px-6 py-4 text-xs leading-relaxed text-slate-600 bg-slate-50/50">
-                          {faq.a}
-                        </div>
-                      )}
+            {/* FAQ Section */}
+            <section id="faqs-section" className="py-20 px-6 lg:px-12 bg-slate-50/70 border-t border-slate-200">
+              <div className="mx-auto max-w-7xl">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+                  
+                  {/* Left Column: Heading & Support Contact Box */}
+                  <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-24">
+                    <div className="space-y-3">
+                      <div className="inline-flex items-center gap-2 rounded-full bg-navy-50 px-3.5 py-1.5 text-xs font-bold text-navy-700 border border-navy-100">
+                        <HelpCircle className="h-4 w-4 text-navy-600" />
+                        <span>PATIENT HELP DESK</span>
+                      </div>
+                      <h2 className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+                        Frequently Asked Questions
+                      </h2>
+                      <p className="text-sm text-slate-600 leading-relaxed font-medium">
+                        Have questions about outpatient registrations, hospital admissions, insurance claims, or visiting hours? Find quick answers to common patient queries below.
+                      </p>
                     </div>
-                  ))}
+
+                    {/* Contact Help Card */}
+                    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-navy-100 text-navy-700 font-bold shrink-0">
+                          <Phone className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-extrabold text-slate-900">Need Instant Help?</h4>
+                          <p className="text-xs text-slate-500">Our medical reception desk is active 24/7</p>
+                        </div>
+                      </div>
+                      <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-xs">
+                        <span className="font-semibold text-slate-600">Hospital Helpline:</span>
+                        <span className="font-extrabold text-navy-700">{phone}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Accordion Questions List */}
+                  <div className="lg:col-span-7 space-y-4">
+                    {displayFaqs.length === 0 ? (
+                      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500 font-medium text-sm shadow-sm">
+                        No FAQs have been published for this hospital yet.
+                      </div>
+                    ) : (
+                      displayFaqs.map((faq: any, idx: number) => {
+                        const isOpen = activeFaq === idx;
+                        return (
+                          <div
+                            key={idx}
+                            className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
+                              isOpen
+                                ? "border-navy-500 bg-white shadow-md ring-1 ring-navy-200"
+                                : "border-slate-200 bg-white shadow-sm hover:border-slate-300"
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setActiveFaq(isOpen ? null : idx)}
+                              className="flex w-full items-center justify-between px-6 py-5 text-left transition-colors cursor-pointer"
+                            >
+                              <span className={`text-base font-bold pr-4 ${isOpen ? "text-navy-900" : "text-slate-800"}`}>
+                                {faq.q}
+                              </span>
+                              <div
+                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all ${
+                                  isOpen ? "bg-navy-100 text-navy-800 rotate-180" : "bg-slate-100 text-slate-500"
+                                }`}
+                              >
+                                <ChevronDown className="h-4 w-4 transition-transform" />
+                              </div>
+                            </button>
+
+                            {isOpen && (
+                              <div className="border-t border-slate-100 px-6 py-4 text-xs leading-relaxed text-slate-600 bg-slate-50/50">
+                                {faq.a}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
                 </div>
               </div>
             </section>
