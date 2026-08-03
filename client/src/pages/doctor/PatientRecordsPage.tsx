@@ -391,7 +391,12 @@ export function PatientRecordsPage() {
                 {/* Helper for consultation grouping */}
                 {/* Lab Reports Tab */}
                 {activeTab === 4 && (() => {
-                  const labReports = reports.filter((r: any) => r.requestType === "Laboratory");
+                  const isRadiologyReport = (r: any) => {
+                    if (r.requestType === "Radiology") return true;
+                    const name = String(r.testName || r.title || r.category || "").toLowerCase();
+                    return /mri|x-ray|xray|ct\s*scan|ct\b|ultrasound|radiology|scan\b|mammogram|pet\s*scan|echo\b|ecg\b|usg\b|x\s*ray/.test(name);
+                  };
+                  const labReports = reports.filter((r: any) => !isRadiologyReport(r));
                   const labGroups = groupReportsByConsultation(labReports);
 
                   return (
@@ -515,7 +520,12 @@ export function PatientRecordsPage() {
 
                 {/* Radiology Tab */}
                 {activeTab === 5 && (() => {
-                  const radReports = reports.filter((r: any) => r.requestType === "Radiology");
+                  const isRadiologyReport = (r: any) => {
+                    if (r.requestType === "Radiology") return true;
+                    const name = String(r.testName || r.title || r.category || "").toLowerCase();
+                    return /mri|x-ray|xray|ct\s*scan|ct\b|ultrasound|radiology|scan\b|mammogram|pet\s*scan|echo\b|ecg\b|usg\b|x\s*ray/.test(name);
+                  };
+                  const radReports = reports.filter((r: any) => isRadiologyReport(r));
                   const radGroups = groupReportsByConsultation(radReports);
 
                   return (
