@@ -170,22 +170,29 @@ export function LandingPage() {
   const doctorSpecializations = Array.from(
     new Set(
       doctors
-        .map((d: any) => d.specialization || (typeof d.department === "object" && d.department ? d.department.name : null))
+        .map((d: any) => {
+          const specName = d.specialization || (typeof d.department === "object" && d.department ? d.department.name : d.department);
+          return specName ? String(specName).trim() : null;
+        })
         .filter(Boolean)
     )
   ) as string[];
 
   // Filter doctors based on specialization & search query
   const catalogDoctors = doctors.filter((doc: any) => {
-    const spec = doc.specialization || (typeof doc.department === "object" && doc.department ? doc.department.name : "");
+    const docName = String(doc.name || (typeof doc.user === "object" ? doc.user?.name : doc.user) || "").toLowerCase();
+    const spec = String(doc.specialization || (typeof doc.department === "object" && doc.department ? doc.department.name : doc.department) || "").toLowerCase();
+    const qual = String(doc.qualification || doc.qualifications || "").toLowerCase();
+
     const specMatch =
       selectedSpecialization === "all" ||
-      spec.toLowerCase() === selectedSpecialization.toLowerCase();
+      spec === selectedSpecialization.toLowerCase() ||
+      spec.includes(selectedSpecialization.toLowerCase());
     const queryMatch =
       !doctorSearchQuery ||
-      doc.name?.toLowerCase().includes(doctorSearchQuery.toLowerCase()) ||
-      spec.toLowerCase().includes(doctorSearchQuery.toLowerCase()) ||
-      doc.qualifications?.toLowerCase().includes(doctorSearchQuery.toLowerCase());
+      docName.includes(doctorSearchQuery.toLowerCase().trim()) ||
+      spec.includes(doctorSearchQuery.toLowerCase().trim()) ||
+      qual.includes(doctorSearchQuery.toLowerCase().trim());
     return specMatch && queryMatch;
   });
 
@@ -883,56 +890,63 @@ export function LandingPage() {
 
               {/* Doctors Grid */}
               <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-                {catalogDoctors.map((doc: any) => (
-                  <div key={doc._id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between hover:border-navy-200 transition-all hover:shadow-md">
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-4">
-                        {doc.photoUrl ? (
-                          <img src={doc.photoUrl} alt={doc.name} className="h-16 w-16 rounded-full object-cover border border-slate-200 shadow-sm" />
-                        ) : (
-                          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-navy-50 text-navy-700 font-bold border border-navy-100 shadow-sm">
-                            <Stethoscope className="h-8 w-8" />
+                {catalogDoctors.map((doc: any) => {
+                  const docName = doc.name || (typeof doc.user === "object" ? doc.user?.name : doc.user) || "Dr. Specialist";
+                  const photo = doc.photoUrl || (typeof doc.user === "object" ? doc.user?.avatarUrl : null);
+                  const deptName = typeof doc.department === "object" && doc.department ? doc.department.name : (doc.department || "General Medicine");
+                  const specName = doc.specialization || deptName;
+                  const qualText = doc.qualifications || doc.qualification || "MD, MBBS";
+                  const fee = String((doc.consultationSettings as any)?.fee || doc.consultationFee || doc.fee || 500).replace(/[^0-9]/g, "") || "500";
+
+                  return (
+                    <div key={doc._id || doc.id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between hover:border-navy-200 transition-all hover:shadow-md">
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-4">
+                          {photo ? (
+                            <img src={photo} alt={docName} className="h-16 w-16 rounded-full object-cover border border-slate-200 shadow-sm" />
+                          ) : (
+                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-navy-50 text-navy-700 font-bold border border-navy-100 shadow-sm text-xl">
+                              {docName.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <div>
+                            <span className="inline-block rounded-full bg-navy-50 px-2.5 py-0.5 text-[9px] font-bold text-navy-700 uppercase">
+                              {deptName}
+                            </span>
+                            <h3 className="text-lg font-bold text-slate-850 mt-1">Dr. {docName.replace(/^dr\.\s*/i, "")}</h3>
+                            <span className="block text-xs font-semibold text-slate-500">{specName}</span>
                           </div>
-                        )}
-                        <div>
-                          <span className="inline-block rounded-full bg-navy-50 px-2.5 py-0.5 text-[9px] font-bold text-navy-700 uppercase">
-                            {doc.department?.name || "Specialist"}
-                          </span>
-                          <h3 className="text-lg font-bold text-slate-850 mt-1">{doc.name}</h3>
-                          <span className="block text-xs font-semibold text-slate-500">{doc.specialization || "Attending Doctor"}</span>
                         </div>
-                      </div>
 
-                      <hr className="border-slate-100" />
+                        <hr className="border-slate-100" />
 
-                      <div className="space-y-2 text-xs text-slate-600">
-                        {doc.qualifications && (
+                        <div className="space-y-2 text-xs text-slate-600">
                           <div className="flex justify-between">
                             <span className="text-slate-400">Qualifications:</span>
-                            <span className="font-bold text-slate-700">{doc.qualifications}</span>
+                            <span className="font-bold text-slate-700">{qualText}</span>
                           </div>
-                        )}
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Department:</span>
-                          <span className="font-bold text-slate-700">{doc.department?.name || "General"}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">OPD Consultation Fee:</span>
-                          <span className="font-bold text-navy-700 text-sm">₹{doc.consultationFee || 300}</span>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Department:</span>
+                            <span className="font-bold text-slate-700">{deptName}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">OPD Consultation Fee:</span>
+                            <span className="font-bold text-navy-700 text-sm">₹{fee}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="pt-6 border-t border-slate-100 mt-6">
-                      <Link
-                        to={`/doctors/${doc._id}`}
-                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-navy-700 py-3 text-xs font-bold text-white shadow-sm hover:bg-navy-800 active:scale-95 transition-all"
-                      >
-                        <Calendar className="h-4 w-4" /> Book Appointment
-                      </Link>
+                      <div className="pt-6 border-t border-slate-100 mt-6">
+                        <Link
+                          to={`/doctors/${doc._id || doc.id}`}
+                          className="w-full flex items-center justify-center gap-2 rounded-xl bg-navy-700 py-3 text-xs font-bold text-white shadow-sm hover:bg-navy-800 active:scale-95 transition-all"
+                        >
+                          <Calendar className="h-4 w-4" /> Book Appointment
+                        </Link>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {catalogDoctors.length === 0 && (
                   <div className="col-span-3 text-center py-20 text-slate-400 text-xs">
