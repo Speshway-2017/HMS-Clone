@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { socket } from "../../lib/socket";
+import { SettingsPage } from "../shared/SettingsPage";
 import {
   Activity,
   Calendar,
@@ -148,13 +149,8 @@ export function PatientDashboard() {
   const normalizedTab = (!rawTab || rawTab === "dashboard") ? "overview" : rawTab;
 
   const [activeTab, setActiveTab] = useState<
-    "overview" | "profile" | "appointments" | "history" | "prescriptions" | "reports" | "imaging" | "billing" | "insurance" | "telehealth" | "notifications"
+    "overview" | "profile" | "appointments" | "history" | "prescriptions" | "reports" | "imaging" | "billing" | "insurance" | "telehealth" | "notifications" | "settings"
   >((normalizedTab as any) || "overview");
-
-  useEffect(() => {
-    const targetTab = (!rawTab || rawTab === "dashboard") ? "overview" : rawTab;
-    setActiveTab(targetTab as any);
-  }, [rawTab]);
 
   const changeTab = (tab: typeof activeTab) => {
     setActiveTab(tab);
@@ -390,11 +386,17 @@ export function PatientDashboard() {
     return list.sort((a, b) => b.timestamp - a.timestamp);
   }, [prescriptionsRes, appointments, reports, invoices, rawNotifications]);
 
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [markedReadNotifIds, setMarkedReadNotifIds] = useState<string[]>([]);
+  const [dismissedNotifIds, setDismissedNotifIds] = useState<string[]>([]);
 
-  useEffect(() => {
-    setNotifications(combinedNotificationsList);
-  }, [combinedNotificationsList]);
+  const notifications = useMemo(() => {
+    return combinedNotificationsList
+      .filter((n: any) => !dismissedNotifIds.includes(n.id))
+      .map((n: any) => ({
+        ...n,
+        read: n.read || markedReadNotifIds.includes(n.id)
+      }));
+  }, [combinedNotificationsList, dismissedNotifIds, markedReadNotifIds]);
 
   const [draftNotice, setDraftNotice] = useState<string | null>(null);
 
@@ -579,6 +581,35 @@ export function PatientDashboard() {
   const [calendarViewDate, setCalendarViewDate] = useState(new Date());
   const [selectedCalendarDayAppts, setSelectedCalendarDayAppts] = useState<{ day: number; appts: any[] } | null>(null);
   const [viewApptSlip, setViewApptSlip] = useState<any | null>(null);
+
+  const openBookingInterface = (type: "Appointment" | "Video Consultation" = "Appointment") => {
+    setActiveTab("appointments");
+    setApptSubTab("book");
+    setBookingType(type);
+    if (type === "Video Consultation") {
+      setSearchParams({ tab: "appointments", subtab: "book", type: "video" });
+    } else {
+      setSearchParams({ tab: "appointments", subtab: "book" });
+    }
+  };
+
+  useEffect(() => {
+    let targetTab = (!rawTab || rawTab === "dashboard") ? "overview" : rawTab;
+    const subtabParam = searchParams.get("subtab");
+    const typeParam = searchParams.get("type");
+
+    if (targetTab === "appointments") {
+      if (subtabParam === "book" || typeParam === "video") {
+        setApptSubTab("book");
+      }
+      if (typeParam === "video") {
+        setBookingType("Video Consultation");
+      } else if (typeParam === "appointment") {
+        setBookingType("Appointment");
+      }
+    }
+    setActiveTab(targetTab as any);
+  }, [rawTab, searchParams]);
 
   // Payment & Billing Checkout Modal States
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -1353,14 +1384,16 @@ export function PatientDashboard() {
             </div>
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => setIsBookModalOpen(true)}
-                className="flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-navy-800 hover:bg-indigo-50 transition-all shadow-md active:scale-95"
+                type="button"
+                onClick={() => openBookingInterface("Appointment")}
+                className="flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-navy-800 hover:bg-indigo-50 transition-all shadow-md active:scale-95 cursor-pointer"
               >
                 <Plus className="h-4 w-4 text-navy-700" /> Book Appointment
               </button>
               <button
-                onClick={() => changeTab("telehealth")}
-                className="flex items-center justify-center gap-2 rounded-xl bg-indigo-500/30 border border-indigo-300/30 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-500/50 transition-all active:scale-95"
+                type="button"
+                onClick={() => openBookingInterface("Video Consultation")}
+                className="flex items-center justify-center gap-2 rounded-xl bg-indigo-500/30 border border-indigo-300/30 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-500/50 transition-all active:scale-95 cursor-pointer"
               >
                 <Video className="h-4 w-4 text-indigo-300" /> Video Consult
               </button>
@@ -1373,21 +1406,25 @@ export function PatientDashboard() {
               value={scheduledAppointments.length}
               icon={<Calendar className="h-5 w-5 text-indigo-500" />}
               emphasis
+              onClick={() => changeTab("appointments")}
             />
             <KpiCard
               label="Prescribed Medicines"
               value={prescriptions.reduce((sum, rx) => sum + (rx.medications?.length || 0), 0)}
               icon={<Pill className="h-5 w-5 text-emerald-500" />}
+              onClick={() => changeTab("prescriptions")}
             />
             <KpiCard
               label="Diagnostic & Scans"
               value={reports?.length || 0}
               icon={<FileText className="h-5 w-5 text-blue-500" />}
+              onClick={() => changeTab("reports")}
             />
             <KpiCard
               label="Pending Payables"
               value={`₹${totalBalance.toLocaleString("en-IN")}`}
               icon={<Wallet className="h-5 w-5 text-amber-500" />}
+              onClick={() => changeTab("billing")}
             />
           </div>
 
@@ -1667,7 +1704,7 @@ export function PatientDashboard() {
                 ) : (
                   <div className="flex h-24 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-slate-500">
                     <p className="text-xs font-semibold">No upcoming appointments right now</p>
-                    <button onClick={() => setIsBookModalOpen(true)} className="mt-2 text-xs font-bold text-navy-700 hover:underline">
+                    <button type="button" onClick={() => openBookingInterface("Appointment")} className="mt-2 text-xs font-bold text-navy-700 hover:underline cursor-pointer">
                       + Book a new appointment
                     </button>
                   </div>
@@ -2233,43 +2270,81 @@ export function PatientDashboard() {
                         })
                         .map((doc: any) => {
                           const activeSelectedDoc = getSelectedDoctor();
-                          const isSelected = activeSelectedDoc ? (activeSelectedDoc._id === doc._id || activeSelectedDoc.id === doc.id || (activeSelectedDoc.user && (activeSelectedDoc.user._id === doc.user?._id || activeSelectedDoc.user === doc.user))) : false;
+                          const curId = String(doc._id || doc.id || "").toLowerCase().trim();
+                          const curUserId = String(typeof doc.user === "object" ? doc.user?._id : (doc.user || "")).toLowerCase().trim();
+                          const targetId = String(selectedDoctorId || "").toLowerCase().trim();
+                          const activeId = String(activeSelectedDoc?._id || activeSelectedDoc?.id || "").toLowerCase().trim();
+                          const activeUserId = String(typeof activeSelectedDoc?.user === "object" ? activeSelectedDoc?.user?._id : (activeSelectedDoc?.user || "")).toLowerCase().trim();
+
+                          const isSelected = Boolean(
+                            (targetId && (curId === targetId || curUserId === targetId)) ||
+                            (activeId && (curId === activeId || curUserId === activeId))
+                          );
+
                           const status = doc.status || "on_duty";
+                          const fee = (doc.consultationSettings as any)?.fee || doc.fee || 500;
+
+                          const docName = safeText(doc.name || (typeof doc.user === "object" ? doc.user?.name : doc.user), "Doctor");
+                          const docSpec = safeText(doc.specialization || (typeof doc.department === "object" ? doc.department?.name : doc.department), "General Specialist");
+                          const docQual = safeText(doc.qualification, "MD, MBBS");
+                          const avatarChar = docName.charAt(0).toUpperCase() || "D";
+
                           return (
                             <div
                               key={doc._id || doc.id}
                               onClick={() => setSelectedDoctorId(doc._id || doc.id || doc.user?._id || doc.user)}
-                              className={`relative cursor-pointer rounded-2xl border p-4 transition-all ${isSelected
-                                  ? "border-navy-700 bg-indigo-50/40 ring-2 ring-navy-600 shadow-md scale-[1.02]"
-                                  : "border-slate-200 bg-white hover:border-navy-300 hover:shadow-sm"
+                              className={`relative cursor-pointer rounded-2xl p-5 transition-all duration-200 ${isSelected
+                                  ? "bg-indigo-50/70 border-2 border-navy-800 ring-4 ring-navy-800/15 shadow-md scale-[1.01]"
+                                  : "bg-white border-2 border-slate-200 text-slate-700 hover:border-indigo-300 hover:shadow-sm"
                                 }`}
                             >
-                              <div className="flex items-start gap-3">
-                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-navy-700 to-indigo-800 text-white font-extrabold text-lg shadow-sm shrink-0">
-                                  {doc.name.charAt(0).toUpperCase()}
+                              {/* Selection Indicator Badge */}
+                              <div className="flex items-center justify-between mb-3 border-b pb-2.5 border-slate-200/60">
+                                <span className={`text-[11px] font-extrabold uppercase tracking-wider ${isSelected ? "text-navy-900" : "text-slate-400"}`}>
+                                  {docSpec}
+                                </span>
+                                {isSelected ? (
+                                  <span className="inline-flex items-center gap-1.5 rounded-full bg-navy-800 text-white px-3 py-1 text-[11px] font-extrabold shadow-sm">
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Selected Doctor
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-slate-600">
+                                    <span className="h-4 w-4 rounded-full border-2 border-slate-300 flex items-center justify-center" /> Select
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-start gap-4 my-2">
+                                <div className={`flex h-12 w-12 items-center justify-center rounded-xl font-black text-lg shadow-sm shrink-0 ${isSelected
+                                    ? "bg-navy-800 text-white ring-2 ring-indigo-200"
+                                    : "bg-slate-100 text-navy-800 border border-slate-200"
+                                  }`}>
+                                  {avatarChar}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between">
-                                    <h4 className="text-sm font-extrabold text-slate-800 truncate">Dr. {doc.name}</h4>
-                                    {isSelected && <CheckCircle2 className="h-5 w-5 text-navy-700 shrink-0" />}
-                                  </div>
-                                  <p className="text-xs font-semibold text-indigo-600 truncate">{doc.specialization || "General Specialist"}</p>
-                                  <p className="text-[11px] text-slate-500 mt-0.5 truncate">{doc.qualification || "MD, MBBS"}</p>
+                                  <h4 className={`text-base font-extrabold truncate ${isSelected ? "text-navy-950" : "text-slate-800"}`}>
+                                    Dr. {docName}
+                                  </h4>
+                                  <p className={`text-xs mt-0.5 truncate ${isSelected ? "text-indigo-700 font-bold" : "text-slate-500 font-medium"}`}>
+                                    {docQual}
+                                  </p>
                                 </div>
                               </div>
 
-                              <div className="mt-3 flex items-center justify-between border-t pt-2 text-[11px] font-semibold">
-                                <span className="text-slate-600">Fee: ₹{(doc.consultationSettings as any)?.fee || doc.fee || 500}</span>
+                              <div className={`mt-4 flex items-center justify-between border-t pt-3 text-xs font-bold ${isSelected ? "border-indigo-200/80" : "border-slate-100"}`}>
+                                <span className={isSelected ? "text-navy-900 font-black" : "text-slate-600"}>
+                                  Consultation Fee: ₹{fee}
+                                </span>
                                 <span
-                                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${status === "on_duty"
-                                      ? "bg-emerald-100 text-emerald-800"
-                                      : status === "on_leave"
-                                        ? "bg-rose-100 text-rose-800"
+                                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${isSelected
+                                      ? "bg-emerald-100 text-emerald-900 border border-emerald-300/80"
+                                      : status === "on_duty"
+                                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                         : "bg-slate-100 text-slate-700"
                                     }`}
                                 >
-                                  <span className={`h-1.5 w-1.5 rounded-full ${status === "on_duty" ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
-                                  {status === "on_duty" ? "On Duty" : status === "on_leave" ? "On Leave" : "Available"}
+                                  <span className={`h-1.5 w-1.5 rounded-full ${isSelected || status === "on_duty" ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
+                                  {isSelected ? "Active Selection" : status === "on_duty" ? "On Duty" : "Available"}
                                 </span>
                               </div>
                             </div>
@@ -2411,14 +2486,14 @@ export function PatientDashboard() {
                           <div className="flex justify-between items-center py-1 border-b border-slate-100">
                             <span className="text-slate-500">Selected Doctor:</span>
                             <span className="font-extrabold text-slate-800 text-right">
-                              {activeDoc ? `Dr. ${activeDoc.name}` : "Auto-assigned"}
+                              {activeDoc ? `Dr. ${safeText(activeDoc.name || activeDoc.user?.name || activeDoc.user, "Doctor")}` : "Auto-assigned"}
                             </span>
                           </div>
 
                           <div className="flex justify-between items-center py-1 border-b border-slate-100">
                             <span className="text-slate-500">Department:</span>
                             <span className="font-bold text-indigo-600">
-                              {activeDoc ? (typeof activeDoc.department === "object" && activeDoc.department ? activeDoc.department.name : activeDoc.department || activeDoc.specialization) : "General Medicine"}
+                              {activeDoc ? safeText(typeof activeDoc.department === "object" && activeDoc.department ? activeDoc.department.name : activeDoc.department || activeDoc.specialization, "General Medicine") : "General Medicine"}
                             </span>
                           </div>
 
@@ -3243,22 +3318,35 @@ export function PatientDashboard() {
 
                           <div className="flex items-center gap-2">
                             <button
+                              type="button"
                               onClick={() => setSelectedPrescriptionRx(rx)}
-                              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all active:scale-95"
+                              className="flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50/70 px-3.5 py-2 text-xs font-bold text-indigo-900 hover:bg-indigo-100 transition-all active:scale-95 cursor-pointer"
                             >
-                              <Printer className="h-3.5 w-3.5" /> View & Print Digital RX
+                              <Eye className="h-3.5 w-3.5 text-indigo-700" /> View Prescription
                             </button>
 
-                            {rx.pdfUrl && (
-                              <a
-                                href={rx.pdfUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-xs font-bold text-white transition-all shadow active:scale-95"
-                              >
-                                <Download className="h-3.5 w-3.5" /> Download RX PDF
-                              </a>
-                            )}
+                            <a
+                              href={rx.pdfUrl || rx.fileUrl || "#"}
+                              onClick={(e) => {
+                                if (!rx.pdfUrl && !rx.fileUrl) {
+                                  e.preventDefault();
+                                  const content = `METROPOLITAN HOSPITAL DIGITAL RX PASS\nRX No: ${rx.prescriptionNumber || rx._id}\nDoctor: ${typeof rx.doctor === "object" ? rx.doctor?.name : rx.doctor || "Specialist"}\nDiagnosis: ${rx.diagnosis || "N/A"}\nMedications:\n` + (rx.medications || []).map((m: any) => `- ${m.name} (${m.frequency || "1-0-1"})`).join("\n");
+                                  const blob = new Blob([content], { type: "text/plain" });
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement("a");
+                                  a.href = url;
+                                  a.download = `Prescription-${rx.prescriptionNumber || "RX"}.txt`;
+                                  a.click();
+                                  URL.revokeObjectURL(url);
+                                  toast.success("Downloaded prescription details file.");
+                                }
+                              }}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-xs font-bold text-white transition-all shadow active:scale-95 cursor-pointer"
+                            >
+                              <Download className="h-3.5 w-3.5" /> Download RX PDF
+                            </a>
                           </div>
                         </div>
                       </Card>
@@ -3798,13 +3886,20 @@ export function PatientDashboard() {
       {/* ========================================================================= */}
       {activeTab === "telehealth" && (
         <Card className="p-6 space-y-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
             <div>
               <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                 <Video className="h-5 w-5 text-indigo-600" /> Online Doctor Video Consultations
               </h3>
-              <p className="text-xs text-slate-500">Join real-time HD video appointments with your attending physicians.</p>
+              <p className="text-xs text-slate-500">Join real-time HD video appointments or schedule a new video consultation with specialist doctors.</p>
             </div>
+            <button
+              type="button"
+              onClick={() => openBookingInterface("Video Consultation")}
+              className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
+            >
+              <Plus className="h-4 w-4" /> Book New Video Consultation
+            </button>
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -3817,9 +3912,19 @@ export function PatientDashboard() {
               });
               if (videoAppointments.length === 0) {
                 return (
-                  <div className="col-span-2 flex flex-col items-center justify-center py-12 text-slate-400 border border-dashed rounded-xl bg-slate-50">
-                    <Video className="h-12 w-12 text-slate-300 mb-2" />
-                    <p className="text-sm font-semibold">No upcoming video consultations found.</p>
+                  <div className="col-span-2 flex flex-col items-center justify-center py-12 text-slate-400 border border-dashed rounded-2xl bg-slate-50">
+                    <Video className="h-12 w-12 text-indigo-300 mb-3" />
+                    <h4 className="text-base font-extrabold text-slate-700">No upcoming video consultations found</h4>
+                    <p className="text-xs text-slate-500 mt-1 max-w-md text-center">
+                      You don't have any scheduled online video appointments right now. Click below to choose a doctor and schedule a live video consultation.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => openBookingInterface("Video Consultation")}
+                      className="mt-4 flex items-center gap-2 rounded-xl bg-navy-800 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-navy-900 transition-all cursor-pointer active:scale-95"
+                    >
+                      <Plus className="h-4 w-4" /> Book Video Consultation Now
+                    </button>
                   </div>
                 );
               }
@@ -3894,7 +3999,7 @@ export function PatientDashboard() {
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => {
-                    setNotifications(notifications.map((n) => ({ ...n, read: true })));
+                    setMarkedReadNotifIds(notifications.map((n: any) => n.id));
                     toast.success("Marked all notifications as read.");
                   }}
                   className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs font-extrabold text-white hover:bg-white/20 transition-all backdrop-blur-md"
@@ -3903,7 +4008,7 @@ export function PatientDashboard() {
                 </button>
                 <button
                   onClick={() => {
-                    setNotifications([]);
+                    setDismissedNotifIds(combinedNotificationsList.map((n: any) => n.id));
                     toast.success("Cleared notification feed.");
                   }}
                   className="rounded-xl border border-rose-400/40 bg-rose-500/20 px-4 py-2 text-xs font-extrabold text-rose-200 hover:bg-rose-500/30 transition-all backdrop-blur-md"
@@ -4050,7 +4155,7 @@ export function PatientDashboard() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setNotifications(notifications.filter((item) => item.id !== n.id));
+                          setDismissedNotifIds((prev) => [...prev, n.id]);
                         }}
                         className="text-slate-400 hover:text-slate-600 text-xs font-bold p-1"
                       >
@@ -4063,6 +4168,13 @@ export function PatientDashboard() {
             })()}
           </div>
         </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 12. SETTINGS TAB */}
+      {/* ========================================================================= */}
+      {activeTab === "settings" && (
+        <SettingsPage />
       )}
 
       {/* ========================================================================= */}
@@ -4425,17 +4537,30 @@ export function PatientDashboard() {
 
             {/* Modal Actions */}
             <div className="flex justify-end gap-2 pt-4 border-t mt-4">
-              <button onClick={() => setSelectedPrescriptionRx(null)} className="rounded-lg px-4 py-2 border font-bold text-xs">
+              <button onClick={() => setSelectedPrescriptionRx(null)} className="rounded-lg px-4 py-2 border border-slate-300 font-bold text-xs hover:bg-slate-100 cursor-pointer">
                 Close
               </button>
               <button
+                type="button"
                 onClick={() => {
-                  toast.success("Printing prescription document...");
-                  window.print();
+                  const rx = selectedPrescriptionRx;
+                  if (rx.pdfUrl || rx.fileUrl) {
+                    window.open(rx.pdfUrl || rx.fileUrl, "_blank");
+                  } else {
+                    const content = `METROPOLITAN HOSPITAL DIGITAL RX PASS\nRX No: ${rx.prescriptionNumber || rx._id}\nDoctor: ${typeof rx.doctor === "object" ? rx.doctor?.name : rx.doctor || "Specialist"}\nDiagnosis: ${rx.diagnosis || "N/A"}\nMedications:\n` + (rx.medications || []).map((m: any) => `- ${m.name} (${m.frequency || "1-0-1"})`).join("\n");
+                    const blob = new Blob([content], { type: "text/plain" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `Prescription-${rx.prescriptionNumber || "RX"}.txt`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    toast.success("Downloaded prescription file.");
+                  }
                 }}
-                className="rounded-lg bg-navy-800 px-4 py-2 text-white font-bold text-xs hover:bg-navy-900 flex items-center gap-1.5 shadow"
+                className="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-white font-bold text-xs flex items-center gap-1.5 shadow cursor-pointer active:scale-95"
               >
-                <Printer className="h-4 w-4" /> Print Digital RX
+                <Download className="h-4 w-4" /> Download RX PDF
               </button>
             </div>
           </div>
