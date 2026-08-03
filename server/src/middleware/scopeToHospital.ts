@@ -10,6 +10,7 @@ export function scopeToHospital(req: Request, _res: Response, next: NextFunction
   if (!req.user) {
     const hospitalId = req.query.hospitalId as string | undefined;
     req.hospitalFilter = hospitalId ? { hospital: hospitalId } : {};
+    req.hospitalFilter = {};
     return next();
   }
 
