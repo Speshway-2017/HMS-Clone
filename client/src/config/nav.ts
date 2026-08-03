@@ -61,6 +61,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   hospital_admin: [
     { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
     { label: "Doctors", path: "/admin/doctors", icon: Stethoscope },
+    { label: "Staff", path: "/admin/staff", icon: UserCheck },
     { label: "Patients", path: "/admin/patients", icon: Users },
     { label: "Appointments", path: "/admin/appointments", icon: CalendarClock },
     { label: "Departments", path: "/admin/departments", icon: FolderTree },

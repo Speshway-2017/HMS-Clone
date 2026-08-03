@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Boxes, Plus, Search, Edit3, Trash2, AlertTriangle, AlertCircle } from "lucide-react";
+import { Boxes, Plus, Search, Edit3, Trash2, AlertTriangle, AlertCircle, Sparkles } from "lucide-react";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
 import { Badge } from "../../components/ui/Badge";
@@ -7,6 +7,22 @@ import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
 import { InputField, SelectField } from "../../components/ui/Field";
 import { useInventory, useCreateInventoryItem, useUpdateInventoryItem, useDeleteInventoryItem } from "../../features/inventory";
+
+function generateAutoSku(medName: string = "", cat: string = "Analgesic"): string {
+  const catPrefix = (cat || "MED").substring(0, 3).toUpperCase();
+  const nameClean = medName.trim().replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  const nameCode = nameClean.length >= 2 ? nameClean.substring(0, 3) : "MED";
+  const num = Math.floor(100 + Math.random() * 900);
+  return `${catPrefix}-${nameCode}-${num}`;
+}
+
+function generateAutoBatchNo(): string {
+  const now = new Date();
+  const yr = now.getFullYear();
+  const mo = String(now.getMonth() + 1).padStart(2, "0");
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  return `B${yr}${mo}-${rand}`;
+}
 
 interface Medicine {
   _id: string;
@@ -89,16 +105,31 @@ export function PharmacyInventoryManagement() {
 
   const handleOpenAdd = () => {
     setSelectedMed(null);
+    const initialCategory = "Analgesic";
     setName("");
-    setCategory("Analgesic");
-    setSku("");
+    setCategory(initialCategory);
+    setSku(generateAutoSku("", initialCategory));
+    setBatchNo(generateAutoBatchNo());
     setStockQty(0);
     setReorderLevel(0);
     setExpiryDate("");
     setPrice(0);
-    setBatchNo("");
     setSupplier("");
     setIsAddEditOpen(true);
+  };
+
+  const handleNameChange = (val: string) => {
+    setName(val);
+    if (!selectedMed) {
+      setSku(generateAutoSku(val, category));
+    }
+  };
+
+  const handleCategoryChange = (val: string) => {
+    setCategory(val);
+    if (!selectedMed) {
+      setSku(generateAutoSku(name, val));
+    }
   };
 
   const handleOpenEdit = (med: Medicine) => {
@@ -366,35 +397,63 @@ export function PharmacyInventoryManagement() {
               required
               placeholder="e.g. Paracetamol 650mg"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => handleNameChange(e.target.value)}
             />
 
             <SelectField
               label="Category"
               required
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={(e) => handleCategoryChange(e.target.value)}
             >
               {categories.map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </SelectField>
 
-            <InputField
-              label="SKU"
-              required
-              placeholder="e.g. MED-PC-01"
-              value={sku}
-              onChange={(e) => setSku(e.target.value)}
-            />
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-bold text-slate-700 uppercase">SKU (Auto-Generated)</label>
+                <button
+                  type="button"
+                  onClick={() => setSku(generateAutoSku(name, category))}
+                  className="text-[10px] font-extrabold text-navy-700 hover:underline flex items-center gap-1 cursor-pointer"
+                  title="Generate new unique SKU"
+                >
+                  <Sparkles className="h-3 w-3 text-indigo-600" /> Auto Generate
+                </button>
+              </div>
+              <input
+                type="text"
+                required
+                value={sku}
+                onChange={(e) => setSku(e.target.value)}
+                placeholder="e.g. ANA-PAR-402"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono font-bold text-slate-800 outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100"
+              />
+            </div>
 
-            <InputField
-              label="Batch Number"
-              required
-              placeholder="e.g. B-PC201"
-              value={batchNo}
-              onChange={(e) => setBatchNo(e.target.value)}
-            />
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-bold text-slate-700 uppercase">Batch Number (Auto-Generated)</label>
+                <button
+                  type="button"
+                  onClick={() => setBatchNo(generateAutoBatchNo())}
+                  className="text-[10px] font-extrabold text-navy-700 hover:underline flex items-center gap-1 cursor-pointer"
+                  title="Generate new unique Batch Number"
+                >
+                  <Sparkles className="h-3 w-3 text-indigo-600" /> Auto Generate
+                </button>
+              </div>
+              <input
+                type="text"
+                required
+                value={batchNo}
+                onChange={(e) => setBatchNo(e.target.value)}
+                placeholder="e.g. B202608-4910"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono font-bold text-slate-800 outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100"
+              />
+            </div>
 
             <InputField
               label="Stock Quantity"

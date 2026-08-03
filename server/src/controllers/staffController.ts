@@ -125,7 +125,29 @@ export const getStaffMember = catchAsync(async (req: Request, res: Response) => 
   if (!staff) {
     throw new AppError("Staff member not found.", 404);
   }
-  res.json({ status: "success", data: { staff } });
+
+  let assignedPatients: any[] = [];
+  if (staff.role && (staff.role.toLowerCase() === "nurse" || staff.role.toLowerCase().includes("nurse"))) {
+    assignedPatients = await Admission.find({
+      assignedNurse: staff._id,
+      status: { $nin: ["discharged", "Discharged", "Cancelled", "Transferred Out (Final)"] }
+    })
+      .populate("patient", "name uhid age gender phone bloodGroup photoUrl")
+      .populate("room", "roomNumber type")
+      .populate("bed", "bedNumber")
+      .populate("admittingDoctor", "name specialization")
+      .sort({ createdAt: -1 });
+  }
+
+  res.json({
+    status: "success",
+    data: {
+      staff: {
+        ...staff.toObject(),
+        assignedPatients
+      }
+    }
+  });
 });
 
 export const updateStaff = catchAsync(async (req: Request, res: Response) => {

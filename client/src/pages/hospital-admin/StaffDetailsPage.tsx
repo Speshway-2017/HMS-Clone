@@ -1,5 +1,5 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Pencil, UserCircle, Briefcase, Mail, Phone, Building2, CheckCircle2, Clock, Award, Activity } from "lucide-react";
+import { ArrowLeft, Pencil, Briefcase, Mail, Phone, Building2, Activity, BedDouble, Users, Stethoscope, Eye, Calendar } from "lucide-react";
 import { useStaffMember } from "../../features/staff";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -35,6 +35,8 @@ export function StaffDetailsPage() {
   }
 
   const deptName = typeof staff.department === "object" && staff.department ? (staff.department as any).name : "Unassigned";
+  const isNurse = staff.role && (staff.role.toLowerCase() === "nurse" || staff.role.toLowerCase().includes("nurse"));
+  const assignedPatients = staff.assignedPatients || [];
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -111,7 +113,6 @@ export function StaffDetailsPage() {
 
       {/* Grid details */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        
         {/* Professional Details */}
         <Card className="p-6 space-y-4">
           <div className="flex items-center gap-2 text-navy-700 font-bold border-b pb-3">
@@ -170,8 +171,117 @@ export function StaffDetailsPage() {
             </div>
           </div>
         </Card>
-
       </div>
+
+      {/* ALLOTTED PATIENTS SECTION (Specifically for Nurses) */}
+      {(isNurse || assignedPatients.length > 0) && (
+        <Card className="p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-4">
+            <div className="flex items-center gap-2 text-navy-800 font-extrabold">
+              <BedDouble className="h-5 w-5 text-indigo-600" />
+              <h3 className="text-base">Allotted Inpatients & Ward Care Assignments</h3>
+            </div>
+            <span className="rounded-full bg-indigo-50 border border-indigo-200 px-3 py-1 text-xs font-extrabold text-indigo-700">
+              {assignedPatients.length} Active {assignedPatients.length === 1 ? "Patient Allotted" : "Patients Allotted"}
+            </span>
+          </div>
+
+          {assignedPatients.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center space-y-2">
+              <Users className="h-8 w-8 text-slate-400 mx-auto" />
+              <p className="text-xs font-semibold text-slate-600">No active inpatients currently allotted to this nurse.</p>
+              <p className="text-[11px] text-slate-400">Patients allocated to this nurse during IP admission or shift transfer will appear here.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {assignedPatients.map((adm: any) => {
+                const pat = typeof adm.patient === "object" && adm.patient ? adm.patient : {};
+                const doctor = typeof adm.admittingDoctor === "object" && adm.admittingDoctor ? adm.admittingDoctor : {};
+                const roomObj = typeof adm.room === "object" && adm.room ? adm.room : {};
+                const bedObj = typeof adm.bed === "object" && adm.bed ? adm.bed : {};
+
+                const patientName = pat.name || "Inpatient";
+                const uhid = pat.uhid || "N/A";
+                const roomNo = roomObj.roomNumber || adm.room || "Room";
+                const bedNo = bedObj.bedNumber || adm.bed || "Bed";
+                const doctorName = doctor.name ? `Dr. ${doctor.name}` : "Attending Doctor";
+
+                return (
+                  <div
+                    key={adm._id}
+                    className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 hover:shadow-md hover:border-indigo-200 transition-all flex flex-col justify-between"
+                  >
+                    <div className="space-y-3">
+                      {/* Patient Banner Header */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-800 font-black text-sm border border-indigo-200 shrink-0">
+                            {patientName.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-slate-900 text-sm">{patientName}</h4>
+                            <span className="text-[10px] font-bold text-slate-400 font-mono">UHID: {uhid}</span>
+                          </div>
+                        </div>
+                        <Badge tone={adm.status === "ICU" ? "danger" : "info"}>
+                          {(adm.status || "Admitted").replace("_", " ")}
+                        </Badge>
+                      </div>
+
+                      {/* Location & Room Assignment */}
+                      <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3 grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Ward / Room</span>
+                          <span className="font-bold text-slate-800">{adm.ward || "General Ward"} · Room {roomNo}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Bed Number</span>
+                          <span className="font-bold text-indigo-700">Bed {bedNo}</span>
+                        </div>
+                      </div>
+
+                      {/* Details & Doctor Info */}
+                      <div className="space-y-1.5 text-xs text-slate-600 font-medium">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Attending Doctor:</span>
+                          <span className="font-bold text-slate-800 flex items-center gap-1">
+                            <Stethoscope className="h-3.5 w-3.5 text-navy-700" /> {doctorName}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Admission Date:</span>
+                          <span className="font-semibold text-slate-700 flex items-center gap-1">
+                            <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                            {new Date(adm.admissionDate || adm.createdAt).toLocaleDateString("en-IN")}
+                          </span>
+                        </div>
+                        {adm.primaryDiagnosis && (
+                          <div className="pt-1">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase block">Diagnosis</span>
+                            <span className="text-slate-800 font-semibold">{adm.primaryDiagnosis}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action Button */}
+                    <div className="border-t border-slate-100 pt-3 flex justify-end">
+                      {pat._id && (
+                        <Link
+                          to={`/admin/patients/${pat._id}`}
+                          className="inline-flex items-center gap-1.5 text-xs font-extrabold text-navy-700 hover:text-navy-900 hover:underline"
+                        >
+                          <Eye className="h-3.5 w-3.5" /> View Patient Record
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   );
 }

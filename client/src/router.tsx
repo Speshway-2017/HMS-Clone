@@ -47,6 +47,12 @@ import { HospitalInfoPage } from "./pages/hospital-admin/HospitalInfoPage";
 import { EnquiriesPage } from "./pages/hospital-admin/EnquiriesPage";
 import { BlogsPage } from "./pages/hospital-admin/BlogsPage";
 import { BlogFormPage } from "./pages/hospital-admin/BlogFormPage";
+import { StaffPage } from "./pages/hospital-admin/StaffPage";
+import { StaffFormPage } from "./pages/hospital-admin/StaffFormPage";
+import { StaffDetailsPage } from "./pages/hospital-admin/StaffDetailsPage";
+import { StaffAttendancePage } from "./pages/hospital-admin/StaffAttendancePage";
+import { ShiftManagementPage } from "./pages/hospital-admin/ShiftManagementPage";
+import { LeaveManagementPage } from "./pages/hospital-admin/LeaveManagementPage";
 
 // Accountant module
 import { AccountantDashboard } from "./pages/accountant/Dashboard";
@@ -198,6 +204,13 @@ export const router = createBrowserRouter([
           { path: "doctors/:id", element: <DoctorProfilePage /> },
           { path: "doctors/:id/edit", element: <DoctorFormPage /> },
           { path: "doctors/:id/performance", element: <DoctorPerformancePage /> },
+          { path: "staff", element: <StaffPage /> },
+          { path: "staff/new", element: <StaffFormPage /> },
+          { path: "staff/attendance", element: <StaffAttendancePage /> },
+          { path: "staff/shifts", element: <ShiftManagementPage /> },
+          { path: "staff/leaves", element: <LeaveManagementPage /> },
+          { path: "staff/:id", element: <StaffDetailsPage /> },
+          { path: "staff/:id/edit", element: <StaffFormPage /> },
           { path: "patients", element: <PatientsPage /> },
           { path: "patients/:id", element: <PatientDetailsPage /> },
           { path: "appointments", element: <AppointmentsPage /> },
