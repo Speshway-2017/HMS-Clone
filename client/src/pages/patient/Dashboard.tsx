@@ -49,7 +49,8 @@ import {
   Sparkles,
   Send,
   Building,
-  CheckSquare
+  CheckSquare,
+  ScanLine
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -2899,11 +2900,11 @@ export function PatientDashboard() {
                 // 2. Search Query Filter
                 if (historySearchQuery.trim()) {
                   const q = historySearchQuery.toLowerCase();
-                  const diag = (record.diagnosis || "").toLowerCase();
-                  const doc = (record.doctorName || "").toLowerCase();
-                  const dept = (record.department || "").toLowerCase();
-                  const notes = (record.notes || record.advice || "").toLowerCase();
-                  const vType = (record.visitType || "").toLowerCase();
+                  const diag = safeText(record.diagnosis).toLowerCase();
+                  const doc = safeText(record.doctorName || record.doctor).toLowerCase();
+                  const dept = safeText(record.department).toLowerCase();
+                  const notes = safeText(record.notes || record.advice).toLowerCase();
+                  const vType = safeText(record.visitType).toLowerCase();
                   return diag.includes(q) || doc.includes(q) || dept.includes(q) || notes.includes(q) || vType.includes(q);
                 }
                 return true;
@@ -2965,8 +2966,8 @@ export function PatientDashboard() {
                               )}
                             </div>
                             <div className="text-right sm:text-right">
-                              <p className="text-xs font-extrabold text-slate-800">Dr. {item.doctorName}</p>
-                              <p className="text-[11px] font-medium text-slate-500">{item.department}</p>
+                              <p className="text-xs font-extrabold text-slate-800">Dr. {safeText(item.doctorName)}</p>
+                              <p className="text-[11px] font-medium text-slate-500">{safeText(item.department)}</p>
                             </div>
                           </div>
 
@@ -4376,78 +4377,7 @@ export function PatientDashboard() {
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL 4: RADIOLOGY DICOM VIEWER MODAL */}
-      {/* ========================================================================= */}
-      {selectedRadiology && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4">
-          <div className="w-full max-w-4xl rounded-2xl bg-slate-900 p-6 text-white shadow-2xl border border-slate-800 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
-              <div>
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <ImageIcon className="h-5 w-5 text-indigo-400" /> {selectedRadiology.title}
-                </h3>
-                <p className="text-xs text-slate-400">{selectedRadiology.doctor} · Study Date: {selectedRadiology.date}</p>
-              </div>
-              <button onClick={() => setSelectedRadiology(null)} className="text-slate-400 hover:text-white font-bold text-lg">✕</button>
-            </div>
 
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              {/* Viewer Window */}
-              <div className="lg:col-span-2 space-y-3">
-                {/* DICOM Control Toolbar */}
-                <div className="flex items-center justify-between rounded-lg bg-slate-800 p-2 text-xs font-bold text-slate-300">
-                  <div className="flex gap-2">
-                    <button onClick={() => setDicomZoom((z) => Math.min(z + 0.2, 2.5))} className="p-1.5 rounded hover:bg-slate-700">
-                      <ZoomIn className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => setDicomZoom((z) => Math.max(z - 0.2, 0.6))} className="p-1.5 rounded hover:bg-slate-700">
-                      <ZoomOut className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => setDicomRotation((r) => (r + 90) % 360)} className="p-1.5 rounded hover:bg-slate-700">
-                      <RotateCw className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => { setDicomZoom(1); setDicomRotation(0); }} className="p-1.5 rounded hover:bg-slate-700">
-                      <RefreshCw className="h-4 w-4" /> Reset
-                    </button>
-                  </div>
-                  <span className="text-[10px] text-slate-400">Zoom: {Math.round(dicomZoom * 100)}%</span>
-                </div>
-
-                <div className="relative h-[360px] rounded-xl bg-black overflow-hidden flex items-center justify-center border border-slate-800">
-                  <img
-                    src={selectedRadiology.imageUrl}
-                    alt={selectedRadiology.title}
-                    style={{
-                      transform: `scale(${dicomZoom}) rotate(${dicomRotation}deg)`,
-                      transition: "transform 0.2s ease"
-                    }}
-                    className="max-h-full max-w-full object-contain"
-                  />
-                </div>
-              </div>
-
-              {/* Radiologist Impression & Findings Panel */}
-              <div className="space-y-4 text-xs">
-                <div className="rounded-xl bg-slate-800 p-4 border border-slate-700">
-                  <p className="text-[10px] font-bold uppercase text-indigo-400">Radiologist Impression</p>
-                  <p className="mt-1 font-extrabold text-white text-sm">{selectedRadiology.impression}</p>
-                </div>
-                <div className="rounded-xl bg-slate-800 p-4 border border-slate-700 space-y-2">
-                  <p className="text-[10px] font-bold uppercase text-slate-400">Detailed Findings</p>
-                  <p className="text-slate-300 leading-relaxed font-medium">{selectedRadiology.findings}</p>
-                </div>
-                <button
-                  onClick={() => toast.success("Radiology DICOM Study downloaded.")}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700"
-                >
-                  <Download className="h-4 w-4" /> Download DICOM Image
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* MODAL 5: PRINTABLE RX PRESCRIPTION MODAL */}
@@ -5266,32 +5196,34 @@ export function PatientDashboard() {
       {/* MODAL 13: RADIOLOGY SCAN & DICOM IMAGING VIEWER MODAL */}
       {/* ========================================================================= */}
       {selectedRadiology && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 overflow-y-auto">
-          <div className="w-full max-w-3xl rounded-2xl bg-slate-900 text-white p-6 shadow-2xl border border-slate-800 my-8">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 text-slate-800 my-8">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b pb-4 mb-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-950 text-indigo-400 border border-indigo-800">
-                  <ImageIcon className="h-5 w-5" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-200">
+                  <ScanLine className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-white">
+                  <h3 className="text-base font-extrabold text-slate-800">
                     {safeText(selectedRadiology?.testName, "Radiology Scan & Imaging")}
                   </h3>
-                  <p className="text-xs text-slate-400 font-medium">
-                    Radiology Speciality · Dr. {safeText(selectedRadiology?.doctor, "Radiologist")}
+                  <p className="text-xs text-slate-500 font-medium">
+                    {safeText(selectedRadiology?.category) || safeText(selectedRadiology?.requestType) || "Radiology"} · Ref: {safeText(selectedRadiology?.appointment?.referenceId) || (typeof selectedRadiology?._id === "string" ? `RAD-${selectedRadiology._id.slice(-6).toUpperCase()}` : "REF-LIVE")}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Badge tone="success">{selectedRadiology?.status === "report_uploaded" ? "Verified" : safeText(selectedRadiology?.status, "Verified")}</Badge>
+                <Badge tone="success">
+                  {selectedRadiology?.status === "report_uploaded" ? "Uploaded" : safeText(selectedRadiology?.status, "VERIFIED").toUpperCase()}
+                </Badge>
                 <button
                   onClick={() => {
                     setSelectedRadiology(null);
                     setDicomZoom(1);
                     setDicomRotation(0);
                   }}
-                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-all cursor-pointer"
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-all cursor-pointer"
                   aria-label="Close radiology scan modal"
                 >
                   <X className="h-5 w-5" />
@@ -5299,117 +5231,171 @@ export function PatientDashboard() {
               </div>
             </div>
 
-            <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-              {/* DICOM / Image Viewer Container with Controls */}
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+              {/* Metadata Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-xl bg-slate-50 p-4 border border-slate-200/80 text-xs">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Patient</span>
+                  <span className="font-extrabold text-slate-800">{safeText(patient?.name) || safeText(user?.name) || "Patient"}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">UHID</span>
+                  <span className="font-mono font-bold text-slate-800">{safeText(patient?.uhid) || "UHID-1002"}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Ordering Doctor</span>
+                  <span className="font-bold text-slate-800">
+                    Dr. {safeText(selectedRadiology?.doctor, "Radiologist")}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Report Date</span>
+                  <span className="font-medium text-slate-700">
+                    {new Date(selectedRadiology?.createdAt || selectedRadiology?.uploadedAt || Date.now()).toLocaleDateString("en-IN")}
+                  </span>
+                </div>
+              </div>
+
+              {/* Findings & Observations Card */}
+              <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-1 shadow-sm">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                  <FileCheck className="h-4 w-4 text-emerald-600" /> Findings & Observations
+                </span>
+                <p className="text-xs font-semibold text-slate-700 leading-relaxed whitespace-pre-wrap pt-1">
+                  {safeText(selectedRadiology?.observations) || safeText(selectedRadiology?.remarks) || safeText(selectedRadiology?.findings) || "No radiological abnormalities detected. Standard diagnostic scan parameters recorded."}
+                </p>
+              </div>
+
+              {/* DICOM Scan Document & Interactive Viewer Container */}
               {(() => {
                 const rawUrl = safeText(selectedRadiology?.files?.[0]?.secure_url) || safeText(selectedRadiology?.fileUrl);
                 const scanUrl = rawUrl || "https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&w=1200&q=80";
+                const fileName = safeText(selectedRadiology?.files?.[0]?.original_filename) || `${safeText(selectedRadiology?.testName, "Radiology_Scan")}.png`;
+
                 return (
-                  <div className="relative rounded-2xl bg-black border border-slate-800 overflow-hidden flex flex-col items-center justify-center min-h-[320px] p-4 group">
-                    {/* Viewer Control Bar */}
-                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-10 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700/60 text-xs font-bold">
-                      <span className="text-indigo-300 flex items-center gap-1.5">
-                        <Sparkles className="h-3.5 w-3.5" /> High-Resolution DICOM Viewer
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setDicomZoom((z) => Math.min(z + 0.25, 3))}
-                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
-                          title="Zoom In"
-                        >
-                          <ZoomIn className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => setDicomZoom((z) => Math.max(z - 0.25, 0.5))}
-                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
-                          title="Zoom Out"
-                        >
-                          <ZoomOut className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => setDicomRotation((r) => (r + 90) % 360)}
-                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
-                          title="Rotate"
-                        >
-                          <RotateCw className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setDicomZoom(1);
-                            setDicomRotation(0);
-                          }}
-                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
-                          title="Reset View"
-                        >
-                          <RefreshCw className="h-4 w-4" />
-                        </button>
+                  <div className="space-y-3 border-t border-slate-100 pt-4">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                      Attached Scan Documents ({(selectedRadiology?.files?.length || 1)})
+                    </h4>
+
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-3">
+                      {/* Document Toolbar */}
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <ImageIcon className="h-4 w-4 text-blue-600 shrink-0" />
+                          <span className="text-xs font-bold text-slate-800 truncate">
+                            {fileName}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <a
+                            href={scanUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 rounded-lg bg-indigo-50 border border-indigo-200 px-3 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-all"
+                          >
+                            <Eye className="h-3.5 w-3.5" /> View Full Document
+                          </a>
+                          <a
+                            href={scanUrl}
+                            download
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-all"
+                          >
+                            <Download className="h-3.5 w-3.5" /> Download
+                          </a>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Image Canvas */}
-                    <div className="overflow-auto max-h-[400px] w-full flex items-center justify-center p-4 pt-12">
-                      <img
-                        src={scanUrl}
-                        alt={safeText(selectedRadiology?.testName, "Radiology Scan")}
-                        style={{
-                          transform: `scale(${dicomZoom}) rotate(${dicomRotation}deg)`,
-                          transition: "transform 0.2s ease-out"
-                        }}
-                        className="max-h-[350px] object-contain rounded-lg shadow-2xl"
-                      />
-                    </div>
+                      {/* Integrated High-Resolution DICOM Viewer Canvas */}
+                      <div className="relative rounded-xl bg-slate-950 border border-slate-800 overflow-hidden flex flex-col items-center justify-center min-h-[300px] p-3 group">
+                        {/* DICOM Control Bar */}
+                        <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between z-10 bg-slate-900/85 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-700/60 text-xs font-bold text-white">
+                          <span className="text-indigo-300 flex items-center gap-1.5 text-[11px]">
+                            <Sparkles className="h-3.5 w-3.5" /> DICOM Viewer Canvas
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => setDicomZoom((z) => Math.min(z + 0.25, 3))}
+                              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer"
+                              title="Zoom In"
+                            >
+                              <ZoomIn className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setDicomZoom((z) => Math.max(z - 0.25, 0.5))}
+                              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer"
+                              title="Zoom Out"
+                            >
+                              <ZoomOut className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setDicomRotation((r) => (r + 90) % 360)}
+                              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer"
+                              title="Rotate"
+                            >
+                              <RotateCw className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setDicomZoom(1);
+                                setDicomRotation(0);
+                              }}
+                              className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer"
+                              title="Reset View"
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
 
-                    {/* Bottom Action Bar */}
-                    <div className="w-full flex items-center justify-between pt-3 border-t border-slate-800/80 px-2 text-xs">
-                      <span className="text-slate-400">Zoom: {Math.round(dicomZoom * 100)}% · Rotation: {dicomRotation}°</span>
-                      <a
-                        href={scanUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 font-bold"
-                      >
-                        <Eye className="h-3.5 w-3.5" /> Open Full Screen Image
-                      </a>
+                        {/* Image Canvas */}
+                        <div className="overflow-auto max-h-[350px] w-full flex items-center justify-center p-2 pt-10">
+                          <img
+                            src={scanUrl}
+                            alt={safeText(selectedRadiology?.testName, "Radiology Scan")}
+                            style={{
+                              transform: `scale(${dicomZoom}) rotate(${dicomRotation}deg)`,
+                              transition: "transform 0.2s ease-out"
+                            }}
+                            className="max-h-[300px] object-contain rounded-lg shadow-xl"
+                          />
+                        </div>
+
+                        {/* Bottom Status Indicator */}
+                        <div className="w-full flex items-center justify-between pt-2 border-t border-slate-800/80 px-1 text-[11px]">
+                          <span className="text-slate-400">Zoom: {Math.round(dicomZoom * 100)}% · Rotation: {dicomRotation}°</span>
+                          <a
+                            href={scanUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-indigo-400 hover:text-indigo-300 font-bold"
+                          >
+                            <Eye className="h-3 w-3" /> Full Screen
+                          </a>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
               })()}
-
-              {/* Clinical Observations */}
-              <div className="rounded-xl bg-slate-800/60 p-4 border border-slate-700/60 space-y-2">
-                <h4 className="text-xs font-extrabold text-indigo-300 uppercase tracking-wider">Radiologist Impression & Findings</h4>
-                <p className="text-xs font-medium text-slate-200 leading-relaxed whitespace-pre-wrap">
-                  {safeText(selectedRadiology?.observations) || safeText(selectedRadiology?.remarks) || "No radiological abnormalities detected. Standard diagnostic scan parameters recorded."}
-                </p>
-              </div>
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-between border-t border-slate-800 pt-4 mt-4">
-              {(() => {
-                const rawUrl = selectedRadiology.files?.[0]?.secure_url || selectedRadiology.fileUrl;
-                const downloadUrl = typeof rawUrl === "string" && rawUrl ? rawUrl : "#";
-                return (
-                  <a
-                    href={downloadUrl}
-                    download
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 transition-all"
-                  >
-                    <Download className="h-3.5 w-3.5" /> Download Diagnostic Image
-                  </a>
-                );
-              })()}
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between border-t pt-4 mt-4">
+              <p className="text-[11px] font-semibold text-slate-400">
+                Official Digital Radiology Report issued by Spesway Hospitals Diagnostic Center
+              </p>
               <button
                 onClick={() => {
                   setSelectedRadiology(null);
                   setDicomZoom(1);
                   setDicomRotation(0);
                 }}
-                className="rounded-xl bg-slate-800 px-5 py-2 text-xs font-extrabold text-white hover:bg-slate-700 transition-all cursor-pointer"
+                className="rounded-xl bg-navy-800 px-5 py-2 text-xs font-extrabold text-white hover:bg-navy-900 shadow transition-all cursor-pointer"
               >
-                Close Viewer
+                Close Report
               </button>
             </div>
           </div>

@@ -195,6 +195,49 @@ export class ReceptionRepository {
     return await Bed.findOneAndUpdate({ _id: bedId, hospital: hospitalId }, { isOccupied, status }, { new: true });
   }
 
+  static async getQueueByDate(hospitalId: Types.ObjectId, targetDate: Date) {
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const queueTokens = await Queue.find({
+      hospital: hospitalId,
+      $or: [
+        { date: { $gte: startOfDay, $lte: endOfDay } },
+        { createdAt: { $gte: startOfDay, $lte: endOfDay } }
+      ]
+    })
+      .populate("patient", "name uhid phone age gender")
+      .populate("doctor", "name specialization department")
+      .populate("department", "name")
+      .sort({ createdAt: 1 });
+
+    if (queueTokens.length > 0) {
+      return queueTokens;
+    }
+
+    const todayAppts = await Appointment.find({
+      hospital: hospitalId,
+      date: { $gte: startOfDay, $lte: endOfDay }
+    })
+      .populate("patient", "name uhid phone age gender")
+      .populate("doctor", "name specialization department")
+      .populate("department", "name")
+      .sort({ time: 1 });
+
+    return todayAppts.map((appt: any, idx: number) => ({
+      _id: appt._id,
+      tokenNumber: appt.tokenNumber || appt.appointmentNumber || appt.referenceId || `T-${String(idx + 1).padStart(3, "0")}`,
+      type: appt.type === "Emergency" ? "emergency" : appt.type === "Walk-in" ? "priority" : "regular",
+      status: appt.status === "completed" ? "completed" : appt.status === "in_consultation" ? "called" : appt.status === "cancelled" ? "skipped" : "waiting",
+      patient: appt.patient,
+      doctor: appt.doctor,
+      department: appt.department,
+      createdAt: appt.createdAt || appt.date
+    }));
+  }
+
   // ── Inpatient (Admission) Operations ──
   static async createAdmission(data: any) {
     return await Admission.create(data);

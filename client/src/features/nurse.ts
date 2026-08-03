@@ -274,12 +274,58 @@ export function useCompleteShiftHandover() {
   });
 }
 
-export function useShiftHandovers() {
+export function useShiftHandovers(params?: {
+  dateRange?: string;
+  startDate?: string;
+  endDate?: string;
+  search?: string;
+  shift?: string;
+  status?: string;
+}) {
   return useQuery({
-    queryKey: ["nurse", "handovers"],
+    queryKey: ["nurse", "handovers", params],
     queryFn: async () => {
-      const res = await api.get<{ data: ShiftHandoverReport[] }>("/nurse/handovers");
+      const res = await api.get<{ data: ShiftHandoverReport[] }>("/nurse/handovers", { params });
       return res.data.data;
+    },
+  });
+}
+
+export function useNurseShiftStatus() {
+  return useQuery({
+    queryKey: ["nurse", "shift-status"],
+    queryFn: async () => {
+      const res = await api.get("/nurse/shift-status");
+      return res.data.data;
+    },
+    refetchInterval: 10000,
+  });
+}
+
+export function useAcceptShiftHandover() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (handoverId: string) => {
+      const res = await api.post("/nurse/handovers/accept", { handoverId });
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["nurse", "handovers"] });
+      queryClient.invalidateQueries({ queryKey: ["nurse", "inpatients"] });
+      queryClient.invalidateQueries({ queryKey: ["nurse", "shift-status"] });
+    },
+  });
+}
+
+export function useTriggerSupervisorAlert() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await api.post("/nurse/handovers/supervisor-alert");
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["nurse", "notifications"] });
     },
   });
 }
@@ -396,6 +442,23 @@ export function useDismissNotification() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["nurse", "notifications"] });
+    },
+  });
+}
+
+export function useSendNoteToDoctor() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      patientId: string;
+      noteContent: string;
+      observationType?: string;
+    }) => {
+      const res = await api.post(`/nurse/notes/send-to-doctor`, payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["nurse", "inpatients"] });
     },
   });
 }

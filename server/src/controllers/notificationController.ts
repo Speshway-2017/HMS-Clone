@@ -328,3 +328,20 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
   });
 });
 
+export const deleteNotification = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const hospitalFilter = req.hospitalFilter as Record<string, unknown>;
+
+  const rawId = id.replace(/^(db-|pay-|appt-|patient-|lab-|rad-)/, "");
+
+  await DbNotification.deleteOne({
+    _id: rawId,
+    hospital: hospitalFilter.hospital
+  });
+
+  res.json({
+    status: "success",
+    message: "Notification deleted successfully."
+  });
+});
+

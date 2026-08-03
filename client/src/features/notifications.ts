@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 
 export type NotificationType = "appointment" | "inventory" | "invoice" | "patient" | "admission_request" | "general";
@@ -31,10 +31,21 @@ export function useNotifications() {
   return useQuery({
     queryKey: ["notifications"],
     queryFn: fetchNotifications,
-    // Refetch every 60 seconds so new events surface automatically
-    refetchInterval: 60_000,
-    // Also refetch when tab regains focus
-    refetchOnWindowFocus: true,
-    staleTime: 30_000,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useDeleteNotification() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.delete(`/notifications/${id}`);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["nurse", "notifications"] });
+    },
   });
 }

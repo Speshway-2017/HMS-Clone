@@ -381,7 +381,11 @@ export function NurseDashboardPage() {
     },
     {
       header: "Doctor",
-      render: (row) => <span className="text-xs font-bold text-slate-800">{row.doctorName || row.doctor?.name || "Dr. Assigned"}</span>,
+      render: (row) => (
+        <span className="text-xs font-bold text-slate-800">
+          {row.admittingDoctor?.name || (typeof row.admittingDoctor === "string" ? row.admittingDoctor : null) || row.doctorName || row.doctor?.name || "Dr. Unassigned"}
+        </span>
+      ),
     },
     {
       header: "Latest Vitals",

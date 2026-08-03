@@ -104,12 +104,16 @@ export function AssignedPatientsPage() {
     },
     {
       header: "Attending Doctor",
-      render: (row) => (
-        <div>
-          <p className="text-xs font-bold text-slate-800">{row.doctorName || row.doctor?.name || "Dr. Assigned"}</p>
-          <p className="text-[10px] text-slate-400">Primary Consultant</p>
-        </div>
-      ),
+      render: (row) => {
+        const docName = row.admittingDoctor?.name || (typeof row.admittingDoctor === "string" ? row.admittingDoctor : null) || row.doctorName || row.doctor?.name || "Dr. Unassigned";
+        const docSpec = row.admittingDoctor?.specialization || "Primary Consultant";
+        return (
+          <div>
+            <p className="text-xs font-bold text-slate-800">{docName}</p>
+            <p className="text-[10px] text-slate-400 font-medium">{docSpec}</p>
+          </div>
+        );
+      },
     },
     {
       header: "Latest Vitals Status",
