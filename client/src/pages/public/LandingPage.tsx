@@ -100,11 +100,11 @@ export function LandingPage() {
   const whyChooseUs = hospital?.whyChooseUs && hospital.whyChooseUs.length > 0
     ? hospital.whyChooseUs
     : [
-        { title: "Compassionate Care", desc: "Every patient is treated with dignity, kindness, and individualized clinical attention." },
-        { title: "Clinical Integrity", desc: "Highest patient safety standards, strict sanitization protocols, and medical safety regulations." },
-        { title: "24/7 Availability", desc: "Round-the-clock emergency support, trauma services, ambulance, and diagnostic test labs." },
-        { title: "Specialized Doctors", desc: "Attending consultants and surgeons across key departments who are masters of their fields." }
-      ];
+      { title: "Compassionate Care", desc: "Every patient is treated with dignity, kindness, and individualized clinical attention." },
+      { title: "Clinical Integrity", desc: "Highest patient safety standards, strict sanitization protocols, and medical safety regulations." },
+      { title: "24/7 Availability", desc: "Round-the-clock emergency support, trauma services, ambulance, and diagnostic test labs." },
+      { title: "Specialized Doctors", desc: "Attending consultants and surgeons across key departments who are masters of their fields." }
+    ];
   const missionText = hospital?.missionText || "To deliver high-quality, compassionate clinical care using cutting-edge diagnostics, ensuring patient health remains our primary standard.";
   const visionText = hospital?.visionText || "To lead as a regional medical beacon of safety, integrating advanced clinical intelligence to make high-standard treatment accessible.";
   const valuesText = hospital?.valuesText || "Clinical Excellence, Compassionate Treatment, Operational Integrity, and Sovereignty over Patient Privacy.";
@@ -307,11 +307,11 @@ export function LandingPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-800 font-sans antialiased overflow-x-clip selection:bg-navy-600 selection:text-white">
-      
+
       {/* --- GLASSMORPHIC NAV BAR --- */}
       <header className="sticky top-0 z-50 w-full border-b border-slate-200/50 bg-white/80 backdrop-blur-xl transition-all duration-300">
         <div className="mx-auto flex max-w-[1600px] items-center justify-between px-6 py-6 lg:px-8">
-          
+
           {/* Logo / Hospital Name */}
           <div
             onClick={() => changeTab("home")}
@@ -343,11 +343,10 @@ export function LandingPage() {
               <button
                 key={nav.id}
                 onClick={() => changeTab(nav.id)}
-                className={`transition-colors hover:text-navy-700 relative py-1 ${
-                  activeTab === nav.id
+                className={`transition-colors hover:text-navy-700 relative py-1 ${activeTab === nav.id
                     ? "text-navy-700 font-bold after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-navy-700"
                     : ""
-                }`}
+                  }`}
               >
                 {nav.label}
               </button>
@@ -395,9 +394,8 @@ export function LandingPage() {
                 <button
                   key={nav.id}
                   onClick={() => changeTab(nav.id)}
-                  className={`text-left py-2 transition-all duration-250 hover:text-navy-700 ${
-                    activeTab === nav.id ? "text-navy-700 font-bold border-l-2 border-navy-700 pl-2" : ""
-                  }`}
+                  className={`text-left py-2 transition-all duration-250 hover:text-navy-700 ${activeTab === nav.id ? "text-navy-700 font-bold border-l-2 border-navy-700 pl-2" : ""
+                    }`}
                 >
                   {nav.label}
                 </button>
@@ -420,11 +418,11 @@ export function LandingPage() {
 
       {/* --- RENDER VIEW STATE CONTAINER --- */}
       <main className="flex-1">
-        
+
         {/* --- VIEW: HOME --- */}
         {activeTab === "home" && (
           <div className="transition-all duration-300 ease-in-out">
-            
+
             {/* Hero Section */}
             <section className="relative px-6 pb-16 pt-8 lg:px-12 lg:pb-24 lg:pt-12 bg-gradient-to-b from-white via-slate-50 to-slate-50 overflow-hidden">
               <div aria-hidden className="pointer-events-none absolute -right-[15%] -top-[10%] h-[500px] w-[500px] rounded-full bg-navy-100/40 blur-3xl opacity-60" />
@@ -450,13 +448,6 @@ export function LandingPage() {
                       Book Appointment Online
                       <ArrowRight className="h-5 w-5" />
                     </button>
-                    <Link to="/register" className="w-full sm:w-auto">
-                      <button
-                        className="flex w-full items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50/80 px-7 py-4 text-base font-bold text-indigo-950 shadow-sm hover:bg-indigo-100 sm:w-auto active:scale-95 transition-all duration-300 ease-in-out"
-                      >
-                        Register as Patient
-                      </button>
-                    </Link>
                   </div>
 
                   <div className="pt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-xs lg:text-sm font-semibold text-slate-500 lg:justify-start">
@@ -696,7 +687,7 @@ export function LandingPage() {
         {activeTab === "about" && (
           <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-white">
             <div className="mx-auto max-w-4xl space-y-16">
-              
+
               <div className="text-center space-y-3">
                 <span className="text-xs font-bold uppercase tracking-wider text-navy-700">Our Institution</span>
                 <h1 className="text-4xl font-extrabold text-slate-900">
@@ -799,7 +790,7 @@ export function LandingPage() {
                       <p className="text-xs text-slate-600 leading-relaxed">
                         {dept.description || "Our department provides comprehensive clinical checks and consulting services under experienced medical supervisors."}
                       </p>
-                      
+
                       <div className="space-y-2 pt-2 border-t border-slate-100">
                         <div className="flex justify-between text-xs text-slate-550">
                           <span>Specialization:</span>
@@ -824,7 +815,7 @@ export function LandingPage() {
                     </div>
                   </div>
                 ))}
-                
+
                 {departments.length === 0 && (
                   <div className="col-span-3 text-center py-20 text-slate-400 text-xs">
                     No active departments found.
@@ -865,11 +856,10 @@ export function LandingPage() {
                 <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
                   <button
                     onClick={() => setSelectedSpecialization("all")}
-                    className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${
-                      selectedSpecialization === "all"
+                    className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${selectedSpecialization === "all"
                         ? "bg-navy-700 text-white shadow-sm"
                         : "bg-white text-slate-600 border border-slate-200 hover:border-navy-300"
-                    }`}
+                      }`}
                   >
                     All Specializations
                   </button>
@@ -877,11 +867,10 @@ export function LandingPage() {
                     <button
                       key={spec}
                       onClick={() => setSelectedSpecialization(spec)}
-                      className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all whitespace-nowrap capitalize ${
-                        selectedSpecialization.toLowerCase() === spec.toLowerCase()
+                      className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all whitespace-nowrap capitalize ${selectedSpecialization.toLowerCase() === spec.toLowerCase()
                           ? "bg-navy-700 text-white shadow-sm"
                           : "bg-white text-slate-600 border border-slate-200 hover:border-navy-300"
-                      }`}
+                        }`}
                     >
                       {spec}
                     </button>
@@ -1084,7 +1073,7 @@ export function LandingPage() {
         {activeTab === "book" && (
           <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12">
             <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-8 shadow-lg relative">
-              
+
               <div className="text-center space-y-2 mb-8">
                 <span className="text-xs font-bold uppercase tracking-wider text-navy-700">Online OPD Request</span>
                 <h1 className="text-2xl font-extrabold text-slate-900">Book Appointment</h1>
@@ -1137,7 +1126,7 @@ export function LandingPage() {
                 </div>
               ) : (
                 <form onSubmit={handleBookingSubmit} className="space-y-4 text-xs font-medium text-slate-700">
-                  
+
                   {/* Patient Name */}
                   <div>
                     <label className="block mb-1">Patient Full Name <span className="text-rose-500">*</span></label>
@@ -1309,7 +1298,7 @@ export function LandingPage() {
         {activeTab === "contact" && (
           <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12">
             <div className="mx-auto max-w-[1600px] grid grid-cols-1 gap-12 lg:grid-cols-12">
-              
+
               {/* Contact info */}
               <div className="lg:col-span-5 space-y-8">
                 <div>
