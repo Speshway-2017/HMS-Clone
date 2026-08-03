@@ -354,7 +354,7 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
         }
 
         // Determine if it is Lab or Radiology
-        const isRadiology = radTests.includes(rep.testName);
+        const isRadiology = type === "Radiology" || radTests.includes(rep.testName) || /mri|x-ray|xray|ct|ultrasound|scan|mammogram|pet|echo|ecg|radiology|usg/i.test(rep.testName);
         const requestType = isRadiology ? "Radiology" : "Laboratory";
 
         const report = await DiagnosticReport.create(

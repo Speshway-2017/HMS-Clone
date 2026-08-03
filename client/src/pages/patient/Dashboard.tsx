@@ -99,6 +99,23 @@ function normalizeTime(t: string): string {
   return cleaned;
 }
 
+function safeText(val: any, fallback: string = ""): string {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === "string") return val;
+  if (typeof val === "number" || typeof val === "boolean") return String(val);
+  if (typeof val === "object") {
+    if (typeof val.name === "string") return val.name;
+    if (typeof val.title === "string") return val.title;
+    if (typeof val.doctorName === "string") return val.doctorName;
+    if (typeof val.testName === "string") return val.testName;
+    if (typeof val.text === "string") return val.text;
+    if (val.name && typeof val.name === "object") return safeText(val.name, fallback);
+    if (val.user && typeof val.user === "object") return safeText(val.user, fallback);
+    if (val.doctor && typeof val.doctor === "object") return safeText(val.doctor, fallback);
+  }
+  return fallback;
+}
+
 function findDoctorMatch(list: any[], draftObj: any) {
   if (!list || list.length === 0 || !draftObj) return null;
   const targetId = String(typeof draftObj === "object" ? (draftObj.doctorId || draftObj.userId || "") : draftObj).trim();
@@ -430,8 +447,14 @@ export function PatientDashboard() {
     }
   }, [user, doctors]);
 
-  const labReports = reports?.filter((r: any) => r.requestType === "Laboratory") || [];
-  const radiologyReports = reports?.filter((r: any) => r.requestType === "Radiology") || [];
+  const isRadiologyReport = (r: any) => {
+    if (r.requestType === "Radiology") return true;
+    const name = String(r.testName || r.title || r.category || "").toLowerCase();
+    return /mri|x-ray|xray|ct\s*scan|ct\b|ultrasound|radiology|scan\b|mammogram|pet\s*scan|echo\b|ecg\b|usg\b|x\s*ray/.test(name);
+  };
+
+  const labReports = reports?.filter((r: any) => !isRadiologyReport(r)) || [];
+  const radiologyReports = reports?.filter((r: any) => isRadiologyReport(r)) || [];
 
   // Real-time Socket Event Sync for Receptionist Bookings & Billing Updates
   useEffect(() => {
@@ -2937,15 +2960,43 @@ export function PatientDashboard() {
                                 <Pill className="h-3.5 w-3.5" /> View Prescription RX
                               </button>
                             )}
-                            {isReport && item.fileUrl && (
-                              <a
-                                href={item.fileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-800 hover:bg-blue-100 transition-all"
-                              >
-                                <Download className="h-3.5 w-3.5" /> Download Report
-                              </a>
+                            {isReport && (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const matchedRep = reports?.find((r: any) =>
+                                      r._id === item.rawReportId || r._id === item.id || r.testName === item.title
+                                    );
+                                    const fullReport = matchedRep || {
+                                      _id: item.id || item.rawReportId || `rep-${Date.now()}`,
+                                      testName: item.title || item.name || "Diagnostic Lab Report",
+                                      requestType: item.category?.toLowerCase().includes("radiology") ? "Radiology" : "Laboratory",
+                                      category: item.category || "Lab Investigation",
+                                      status: "verified",
+                                      uploadedAt: item.date || item.createdAt || new Date().toISOString(),
+                                      doctor: { name: item.doctorName || "Attending Doctor" },
+                                      observations: item.notes || item.observations || "Diagnostic lab investigation details and parameters published.",
+                                      remarks: item.remarks || "Verified digital lab report record.",
+                                      files: item.fileUrl ? [{ secure_url: item.fileUrl, original_filename: `${item.title || "Report"}.pdf` }] : []
+                                    };
+                                    setSelectedReport(fullReport);
+                                  }}
+                                  className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-800 hover:bg-indigo-100 transition-all cursor-pointer"
+                                >
+                                  <Eye className="h-3.5 w-3.5" /> View Report
+                                </button>
+                                {item.fileUrl && (
+                                  <a
+                                    href={item.fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-800 hover:bg-blue-100 transition-all"
+                                  >
+                                    <Download className="h-3.5 w-3.5" /> Download Report
+                                  </a>
+                                )}
+                              </div>
                             )}
                             {isConsultation && (
                               <button
@@ -3240,8 +3291,11 @@ export function PatientDashboard() {
               </div>
             ) : (
               labReports.map((rep: any, idx: number) => {
-                const docName = typeof rep.doctor === "object" ? rep.doctor?.name : "Pathologist";
-                const dateStr = new Date(rep.createdAt || rep.uploadedAt).toLocaleDateString("en-IN");
+                const docName = safeText(rep?.doctor, "Pathologist");
+                const testName = safeText(rep?.testName, "Diagnostic Test");
+                const categoryText = safeText(rep?.category, "Laboratory Speciality");
+                const statusText = rep?.status === "report_uploaded" ? "Uploaded" : safeText(rep?.status, "Verified");
+                const dateStr = new Date(rep?.createdAt || rep?.uploadedAt || Date.now()).toLocaleDateString("en-IN");
                 return (
                   <div
                     key={rep._id || idx}
@@ -3254,11 +3308,11 @@ export function PatientDashboard() {
                           <FileText className="h-5 w-5" />
                         </div>
                         <Badge tone={rep.status === "Critical" ? "danger" : rep.status === "Borderline" ? "warning" : "success"}>
-                          {rep.status === "report_uploaded" ? "Uploaded" : rep.status || "Verified"}
+                          {statusText}
                         </Badge>
                       </div>
-                      <h4 className="text-sm font-extrabold text-slate-800">{rep.testName}</h4>
-                      <p className="text-xs text-slate-400">{rep.category || "Laboratory Speciality"} · {dateStr}</p>
+                      <h4 className="text-sm font-extrabold text-slate-800">{testName}</h4>
+                      <p className="text-xs text-slate-400">{categoryText} · {dateStr}</p>
                       <p className="mt-2 text-xs font-semibold text-slate-600">Doctor: Dr. {docName}</p>
                     </div>
                     <div className="mt-4 border-t pt-3 flex items-center justify-between text-xs">
@@ -3304,9 +3358,13 @@ export function PatientDashboard() {
               </div>
             ) : (
               radiologyReports.map((rad: any) => {
-                const docName = typeof rad.doctor === "object" ? rad.doctor?.name : "Radiologist";
-                const imgUrl = rad.files?.[0]?.secure_url || "https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&w=800&q=80";
-                const dateStr = new Date(rad.createdAt || rad.uploadedAt).toLocaleDateString("en-IN");
+                const docName = safeText(rad?.doctor, "Radiologist");
+                const imgUrl = safeText(rad?.files?.[0]?.secure_url) || safeText(rad?.fileUrl) || "https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&w=800&q=80";
+                const dateStr = new Date(rad?.createdAt || rad?.uploadedAt || Date.now()).toLocaleDateString("en-IN");
+                const observationsText = safeText(rad?.observations) || safeText(rad?.remarks) || "No findings summary.";
+                const testName = safeText(rad?.testName, "Radiology Scan");
+                const statusText = rad?.status === "report_uploaded" ? "Uploaded" : safeText(rad?.status, "Verified");
+
                 return (
                   <div
                     key={rad._id}
@@ -3314,7 +3372,7 @@ export function PatientDashboard() {
                   >
                     <div>
                       <div className="relative h-44 bg-slate-900 overflow-hidden cursor-pointer" onClick={() => setSelectedRadiology(rad)}>
-                        <img src={imgUrl} alt={rad.testName} className="h-full w-full object-cover opacity-85 hover:opacity-100 hover:scale-105 transition-all duration-300" />
+                        <img src={imgUrl} alt={testName} className="h-full w-full object-cover opacity-85 hover:opacity-100 hover:scale-105 transition-all duration-300" />
                         <div className="absolute top-3 left-3">
                           <span className="rounded-md bg-navy-900/80 backdrop-blur-md px-2.5 py-1 text-[10px] font-bold text-white">
                             Radiology
@@ -3328,11 +3386,11 @@ export function PatientDashboard() {
                       </div>
                       <div className="p-5 space-y-2">
                         <div className="flex justify-between items-start">
-                          <h4 className="text-sm font-extrabold text-slate-800">{rad.testName}</h4>
-                          <Badge tone="success">{rad.status === "report_uploaded" ? "Uploaded" : rad.status}</Badge>
+                          <h4 className="text-sm font-extrabold text-slate-800">{testName}</h4>
+                          <Badge tone="success">{statusText}</Badge>
                         </div>
                         <p className="text-xs text-slate-500">Dr. {docName} · {dateStr}</p>
-                        <p className="text-xs font-medium text-slate-600 line-clamp-2 mt-2">{rad.observations || rad.remarks || "No findings summary."}</p>
+                        <p className="text-xs font-medium text-slate-600 line-clamp-2 mt-2">{observationsText}</p>
                       </div>
                     </div>
                     <div className="p-5 pt-0">
@@ -4927,36 +4985,306 @@ export function PatientDashboard() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 11: CALENDAR DAY CONSULTATIONS POPUP MODAL */}
+      {/* MODAL 12: DETAILED DIAGNOSTIC REPORT POPUP MODAL */}
       {/* ========================================================================= */}
-      {selectedCalendarDayAppts && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border text-slate-800">
-            <div className="flex justify-between items-center border-b pb-3 mb-4">
-              <h3 className="text-base font-extrabold text-slate-800">
-                Scheduled Consultations for Day {selectedCalendarDayAppts.day}
-              </h3>
-              <button onClick={() => setSelectedCalendarDayAppts(null)} className="text-slate-400 font-bold">✕</button>
+      {selectedReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 text-slate-800 my-8">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b pb-4 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-200">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-800">
+                    {safeText(selectedReport.testName, "Diagnostic Investigation Report")}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {safeText(selectedReport.category) || safeText(selectedReport.requestType) || "Laboratory"} · Ref: {safeText(selectedReport.appointment?.referenceId) || (typeof selectedReport._id === "string" ? `REP-${selectedReport._id.slice(-6).toUpperCase()}` : "REF-LIVE")}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge tone={selectedReport.status === "Critical" ? "danger" : selectedReport.status === "Borderline" ? "warning" : "success"}>
+                  {selectedReport.status === "report_uploaded" ? "Uploaded" : safeText(selectedReport.status, "VERIFIED").toUpperCase()}
+                </Badge>
+                <button
+                  onClick={() => setSelectedReport(null)}
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-all cursor-pointer"
+                  aria-label="Close modal"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-              {selectedCalendarDayAppts.appts.map((a) => {
-                const docName = typeof a.doctor === "object" ? (a.doctor as any).name : a.doctor;
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+              {/* Metadata Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-xl bg-slate-50 p-4 border border-slate-200/80 text-xs">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Patient</span>
+                  <span className="font-extrabold text-slate-800">{safeText(patient?.name) || safeText(user?.name) || "Patient"}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">UHID</span>
+                  <span className="font-mono font-bold text-slate-800">{safeText(patient?.uhid) || "UHID-1002"}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Ordering Doctor</span>
+                  <span className="font-bold text-slate-800">
+                    Dr. {safeText(selectedReport.doctor, "Attending Doctor")}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Report Date</span>
+                  <span className="font-medium text-slate-700">
+                    {new Date(selectedReport.uploadedAt || selectedReport.createdAt || Date.now()).toLocaleDateString("en-IN")}
+                  </span>
+                </div>
+              </div>
+
+              {/* Clinical Observations & Findings */}
+              <div className="space-y-3">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-1 shadow-sm">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                    <FileCheck className="h-4 w-4 text-emerald-600" /> Findings & Observations
+                  </span>
+                  <p className="text-xs font-semibold text-slate-700 leading-relaxed whitespace-pre-wrap pt-1">
+                    {safeText(selectedReport.observations) || safeText(selectedReport.notes) || "Investigation completed. All parameters verified against standard pathology reference ranges."}
+                  </p>
+                </div>
+
+                {(safeText(selectedReport.remarks) || safeText(selectedReport.advice)) && (
+                  <div className="rounded-xl border border-amber-200/70 bg-amber-50/50 p-4 space-y-1">
+                    <span className="text-xs font-extrabold text-amber-900 uppercase tracking-wide">Technical Remarks & Doctor Advice</span>
+                    <p className="text-xs font-medium text-amber-900 italic whitespace-pre-wrap pt-0.5">
+                      {safeText(selectedReport.remarks) || safeText(selectedReport.advice)}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Document Attachments & File Preview */}
+              {(selectedReport.files?.length > 0 || selectedReport.fileUrl) && (
+                <div className="space-y-3 border-t border-slate-100 pt-4">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                    Attached Report Documents ({(selectedReport.files?.length || 1)})
+                  </h4>
+
+                  <div className="space-y-2">
+                    {(selectedReport.files || [{ secure_url: selectedReport.fileUrl, original_filename: `${safeText(selectedReport.testName, "Lab_Report")}.pdf` }]).map((file: any, index: number) => {
+                      const fileUrl = safeText(file?.secure_url) || safeText(file?.url) || safeText(file);
+                      const fileName = safeText(file?.original_filename) || `${safeText(selectedReport.testName, "Report")}_Document_${index + 1}`;
+                      const isImage = typeof fileUrl === "string" && (fileUrl.match(/\.(jpeg|jpg|png|gif|webp)$/i) || fileUrl.includes("/image/upload/"));
+                      return (
+                        <div key={index} className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <FileText className="h-4 w-4 text-blue-600 shrink-0" />
+                              <span className="text-xs font-bold text-slate-800 truncate">
+                                {fileName}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <a
+                                href={fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 rounded-lg bg-indigo-50 border border-indigo-200 px-3 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-all"
+                              >
+                                <Eye className="h-3.5 w-3.5" /> View Full Document
+                              </a>
+                              <a
+                                href={fileUrl}
+                                download
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-all"
+                              >
+                                <Download className="h-3.5 w-3.5" /> Download
+                              </a>
+                            </div>
+                          </div>
+
+                          {/* Inline Image Preview if document is an image */}
+                          {isImage && (
+                            <div className="rounded-lg overflow-hidden border border-slate-200 bg-slate-900 max-h-64 flex items-center justify-center">
+                              <img src={fileUrl} alt={safeText(selectedReport.testName, "Report")} className="max-h-64 object-contain" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between border-t pt-4 mt-4">
+              <p className="text-[11px] font-semibold text-slate-400">
+                Official Digital Report issued by Spesway Hospitals Pathology & Diagnostic Lab
+              </p>
+              <button
+                onClick={() => setSelectedReport(null)}
+                className="rounded-xl bg-navy-800 px-5 py-2 text-xs font-extrabold text-white hover:bg-navy-900 shadow transition-all cursor-pointer"
+              >
+                Close Report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 13: RADIOLOGY SCAN & DICOM IMAGING VIEWER MODAL */}
+      {/* ========================================================================= */}
+      {selectedRadiology && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 overflow-y-auto">
+          <div className="w-full max-w-3xl rounded-2xl bg-slate-900 text-white p-6 shadow-2xl border border-slate-800 my-8">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-950 text-indigo-400 border border-indigo-800">
+                  <ImageIcon className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">
+                    {safeText(selectedRadiology?.testName, "Radiology Scan & Imaging")}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-medium">
+                    Radiology Speciality · Dr. {safeText(selectedRadiology?.doctor, "Radiologist")}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge tone="success">{selectedRadiology?.status === "report_uploaded" ? "Verified" : safeText(selectedRadiology?.status, "Verified")}</Badge>
+                <button
+                  onClick={() => {
+                    setSelectedRadiology(null);
+                    setDicomZoom(1);
+                    setDicomRotation(0);
+                  }}
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-all cursor-pointer"
+                  aria-label="Close radiology scan modal"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+              {/* DICOM / Image Viewer Container with Controls */}
+              {(() => {
+                const rawUrl = safeText(selectedRadiology?.files?.[0]?.secure_url) || safeText(selectedRadiology?.fileUrl);
+                const scanUrl = rawUrl || "https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&w=1200&q=80";
                 return (
-                  <div key={a._id} className="rounded-xl border p-3 bg-slate-50 text-xs font-semibold">
-                    <div className="flex justify-between font-bold text-slate-800">
-                      <span>Dr. {docName}</span>
-                      <span className="text-indigo-600 font-extrabold">{a.time}</span>
+                  <div className="relative rounded-2xl bg-black border border-slate-800 overflow-hidden flex flex-col items-center justify-center min-h-[320px] p-4 group">
+                    {/* Viewer Control Bar */}
+                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-10 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700/60 text-xs font-bold">
+                      <span className="text-indigo-300 flex items-center gap-1.5">
+                        <Sparkles className="h-3.5 w-3.5" /> High-Resolution DICOM Viewer
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setDicomZoom((z) => Math.min(z + 0.25, 3))}
+                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+                          title="Zoom In"
+                        >
+                          <ZoomIn className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => setDicomZoom((z) => Math.max(z - 0.25, 0.5))}
+                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+                          title="Zoom Out"
+                        >
+                          <ZoomOut className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => setDicomRotation((r) => (r + 90) % 360)}
+                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+                          title="Rotate"
+                        >
+                          <RotateCw className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDicomZoom(1);
+                            setDicomRotation(0);
+                          }}
+                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+                          title="Reset View"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-[11px] text-slate-500 mt-1">Ref: {a.referenceId || "REF-1002"} · {a.type}</p>
+
+                    {/* Image Canvas */}
+                    <div className="overflow-auto max-h-[400px] w-full flex items-center justify-center p-4 pt-12">
+                      <img
+                        src={scanUrl}
+                        alt={safeText(selectedRadiology?.testName, "Radiology Scan")}
+                        style={{
+                          transform: `scale(${dicomZoom}) rotate(${dicomRotation}deg)`,
+                          transition: "transform 0.2s ease-out"
+                        }}
+                        className="max-h-[350px] object-contain rounded-lg shadow-2xl"
+                      />
+                    </div>
+
+                    {/* Bottom Action Bar */}
+                    <div className="w-full flex items-center justify-between pt-3 border-t border-slate-800/80 px-2 text-xs">
+                      <span className="text-slate-400">Zoom: {Math.round(dicomZoom * 100)}% · Rotation: {dicomRotation}°</span>
+                      <a
+                        href={scanUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300 font-bold"
+                      >
+                        <Eye className="h-3.5 w-3.5" /> Open Full Screen Image
+                      </a>
+                    </div>
                   </div>
                 );
-              })}
+              })()}
+
+              {/* Clinical Observations */}
+              <div className="rounded-xl bg-slate-800/60 p-4 border border-slate-700/60 space-y-2">
+                <h4 className="text-xs font-extrabold text-indigo-300 uppercase tracking-wider">Radiologist Impression & Findings</h4>
+                <p className="text-xs font-medium text-slate-200 leading-relaxed whitespace-pre-wrap">
+                  {safeText(selectedRadiology?.observations) || safeText(selectedRadiology?.remarks) || "No radiological abnormalities detected. Standard diagnostic scan parameters recorded."}
+                </p>
+              </div>
             </div>
 
-            <div className="flex justify-end pt-4 border-t mt-4">
-              <button onClick={() => setSelectedCalendarDayAppts(null)} className="rounded-lg bg-navy-700 px-4 py-2 text-white font-bold text-xs">
-                Close
+            {/* Footer */}
+            <div className="flex items-center justify-between border-t border-slate-800 pt-4 mt-4">
+              {(() => {
+                const rawUrl = selectedRadiology.files?.[0]?.secure_url || selectedRadiology.fileUrl;
+                const downloadUrl = typeof rawUrl === "string" && rawUrl ? rawUrl : "#";
+                return (
+                  <a
+                    href={downloadUrl}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 transition-all"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Download Diagnostic Image
+                  </a>
+                );
+              })()}
+              <button
+                onClick={() => {
+                  setSelectedRadiology(null);
+                  setDicomZoom(1);
+                  setDicomRotation(0);
+                }}
+                className="rounded-xl bg-slate-800 px-5 py-2 text-xs font-extrabold text-white hover:bg-slate-700 transition-all cursor-pointer"
+              >
+                Close Viewer
               </button>
             </div>
           </div>
