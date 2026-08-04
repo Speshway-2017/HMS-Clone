@@ -10,6 +10,7 @@ import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 import { emitToHospital } from "../config/socket";
 import { logAudit } from "../utils/auditLogger";
+import { validateAppointmentTimeRestriction } from "../utils/appointmentTimeValidation";
 
 async function generateReferenceId(hospitalId: string, bookingDate: Date): Promise<string> {
   const dateStr = bookingDate.toISOString().split("T")[0].replace(/-/g, "");
@@ -315,12 +316,25 @@ export const updateAppointment = catchAsync(async (req: Request, res: Response) 
   }
 
   const body = appointmentSchema.partial().parse(req.body);
+
+  const existingAppt = await Appointment.findOne(filter);
+  if (!existingAppt) {
+    throw new AppError("Appointment not found or unauthorized.", 403);
+  }
+
+  const isCancelling = body.status === "cancelled";
+  const isRescheduling = (body.date && new Date(body.date).toISOString() !== new Date(existingAppt.date).toISOString()) || (body.time && body.time !== existingAppt.time);
+
+  if (isCancelling || isRescheduling) {
+    validateAppointmentTimeRestriction(existingAppt);
+  }
+
   const appointment = await Appointment.findOneAndUpdate(filter, body, {
     new: true,
     runValidators: true,
   });
   if (!appointment) {
-    throw new AppError("Appointment not found or unauthorized.", 403);
+    throw new AppError("Appointment not found or unauthorized.", 404);
   }
 
   const targetHospital = req.hospitalFilter?.hospital || (appointment.hospital || "").toString();

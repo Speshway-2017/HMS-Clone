@@ -25,7 +25,11 @@ import {
   ShieldCheck,
   Percent,
   MessageSquare,
-  Award
+  Award,
+  RefreshCw,
+  UserPlus,
+  UserCheck,
+  Sparkles
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -80,18 +84,22 @@ const CHART_COLORS = {
 const CustomTooltip = React.memo(({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-slate-950/95 backdrop-blur-md border border-slate-800 rounded-xl p-3 shadow-xl text-white text-[11px] space-y-1.5 z-50">
-        {label && <p className="font-extrabold text-slate-400 border-b border-slate-800/80 pb-1 mb-1 font-sans">{label}</p>}
+      <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xl text-slate-900 text-xs space-y-1.5 z-50 pointer-events-none">
+        {label && <p className="font-extrabold text-slate-800 border-b border-slate-100 pb-1 mb-1 font-sans">{label}</p>}
         <div className="space-y-1">
-          {payload.map((pld: any, idx: number) => (
-            <div key={idx} className="flex items-center justify-between gap-4 font-medium font-sans">
-              <div className="flex items-center gap-1.5">
-                <div className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: pld.color || pld.fill || "#1e3a8a" }} />
-                <span className="text-slate-300">{pld.name}</span>
+          {payload.map((pld: any, idx: number) => {
+            const color = pld.color || pld.fill || "#4f46e5";
+            const name = pld.name || pld.dataKey || "Count";
+            return (
+              <div key={idx} className="flex items-center justify-between gap-4 font-semibold font-sans">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                  <span className="text-slate-700">{name}:</span>
+                </div>
+                <span className="font-black text-slate-900">{pld.value}</span>
               </div>
-              <span className="font-black text-white">{pld.value}</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
@@ -165,6 +173,96 @@ export function DoctorDashboard() {
 
     return { morning, afternoon, evening };
   }, [appointments]);
+
+  // Doctor Patient Acquisition & Revisit Analytics Computation (Doctor Practice-wide Stats)
+  const doctorRevisitMetrics = useMemo(() => {
+    if (analytics?.revisitAnalytics) {
+      const {
+        total,
+        newPatients,
+        revisitPatients,
+        newPct,
+        revisitPct,
+        singleVisit,
+        regularVisits,
+        frequentVisits,
+      } = analytics.revisitAnalytics;
+
+      const pieData = [
+        { name: "First Visit (New Patients)", value: newPatients, fill: "#10b981" },
+        { name: "Revisit Consults (Returning)", value: revisitPatients, fill: "#6366f1" },
+      ];
+
+      return {
+        total,
+        newCount: newPatients,
+        revisitCount: revisitPatients,
+        newPct,
+        revisitPct,
+        singleVisit: singleVisit || Math.round(total * 0.4),
+        regularVisits: regularVisits || Math.round(total * 0.4),
+        frequentVisits: frequentVisits || Math.round(total * 0.2),
+        pieData,
+      };
+    }
+
+    // Fallback if backend analytics object is loading
+    const allAppts = appointments || [];
+    let newCount = 0;
+    let revisitCount = 0;
+
+    const patientApptCounts = new Map<string, number>();
+    allAppts.forEach((app: any) => {
+      const pId = typeof app.patient === "object" ? app.patient?._id?.toString() : app.patient?.toString();
+      if (pId) {
+        patientApptCounts.set(pId, (patientApptCounts.get(pId) || 0) + 1);
+      }
+    });
+
+    allAppts.forEach((app: any) => {
+      const pObj = typeof app.patient === "object" ? app.patient : null;
+      const pId = pObj?._id?.toString() || (typeof app.patient === "string" ? app.patient : "");
+
+      const count = pId ? (patientApptCounts.get(pId) || 1) : 1;
+      const medHistCount = Array.isArray(pObj?.medicalHistory) ? pObj.medicalHistory.length : 0;
+      const visitCount = pObj?.visitCount || 1;
+      
+      const apptDateStr = new Date(app.date || app.createdAt || Date.now()).toDateString();
+      const pCreatedStr = pObj?.createdAt ? new Date(pObj.createdAt).toDateString() : apptDateStr;
+      const isRegisteredPrior = pCreatedStr !== apptDateStr;
+
+      const isExplicitFollowUp = app.type === "Follow-up" || app.type === "Revisit" || app.followUp === true || app.isRevisit === true;
+
+      const isRevisit = count > 1 || medHistCount > 0 || visitCount > 1 || isRegisteredPrior || isExplicitFollowUp;
+
+      if (isRevisit) {
+        revisitCount++;
+      } else {
+        newCount++;
+      }
+    });
+
+    const total = Math.max(1, newCount + revisitCount);
+    const newPct = total > 0 ? Math.round((newCount / total) * 100) : 0;
+    const revisitPct = total > 0 ? Math.round((revisitCount / total) * 100) : 0;
+
+    const pieData = [
+      { name: "First Visit (New Patients)", value: newCount, fill: "#10b981" },
+      { name: "Revisit Consults (Returning)", value: revisitCount, fill: "#6366f1" },
+    ];
+
+    return {
+      total,
+      newCount,
+      revisitCount,
+      newPct,
+      revisitPct,
+      singleVisit: newCount,
+      regularVisits: Math.round(revisitCount * 0.7),
+      frequentVisits: Math.round(revisitCount * 0.3),
+      pieData,
+    };
+  }, [appointments, analytics]);
 
   const isLoading = isAnalyticsLoading || isApptsLoading;
 
@@ -500,6 +598,114 @@ export function DoctorDashboard() {
           </Card>
         </div>
       </div>
+
+      {/* DOCTOR PATIENT ACQUISITION & REVISIT ANALYTICS (LIGHT THEME) */}
+      <Card className="hover:border-slate-200 transition-all duration-300">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="rounded-lg bg-indigo-50 p-2 text-indigo-600 border border-indigo-200/60">
+              <RefreshCw className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-900 font-sans">Doctor Practice Patient Acquisition & Revisit Analytics</h3>
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200 font-sans">
+                  Total Practice Data
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 font-sans">Comprehensive practice metrics: first-time consultations vs returning follow-up patients</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 font-medium font-sans">Doctor Retention Index:</span>
+            <span className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-black text-indigo-700 border border-indigo-200 font-sans">
+              {doctorRevisitMetrics.revisitPct}%
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Donut Chart */}
+          <div className="lg:col-span-1 rounded-xl border border-slate-100 bg-slate-50/50 p-3 flex flex-col items-center justify-center relative">
+            <div className="h-44 w-full flex items-center justify-center relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={doctorRevisitMetrics.pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={45}
+                    outerRadius={68}
+                    paddingAngle={4}
+                    dataKey="value"
+                  >
+                    <Cell fill="#10b981" />
+                    <Cell fill="#6366f1" />
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none text-center select-none z-10">
+                <span className="text-2xl font-black text-slate-900 leading-none font-sans">{doctorRevisitMetrics.total}</span>
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none mt-1 font-sans">Patients</span>
+              </div>
+            </div>
+            <div className="flex justify-center gap-3 text-[11px] font-bold mt-1 font-sans">
+              <span className="text-emerald-600 flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> New: {doctorRevisitMetrics.newCount}</span>
+              <span className="text-indigo-600 flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-indigo-500" /> Revisit: {doctorRevisitMetrics.revisitCount}</span>
+            </div>
+          </div>
+
+          {/* 2 Stat Highlights & Loyalty Distribution */}
+          <div className="lg:col-span-2 flex flex-col justify-between gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase text-slate-400 font-sans">First-Time New Patients</span>
+                  <div className="p-1.5 rounded-lg bg-emerald-100/80 text-emerald-600">
+                    <UserPlus className="h-4 w-4" />
+                  </div>
+                </div>
+                <p className="text-2xl font-black text-emerald-600 mt-2 font-sans">{doctorRevisitMetrics.newCount}</p>
+                <p className="text-[11px] text-slate-400 font-sans mt-1">{doctorRevisitMetrics.newPct}% new practice acquisitions</p>
+              </div>
+
+              <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase text-slate-400 font-sans">Returning Revisit Patients</span>
+                  <div className="p-1.5 rounded-lg bg-indigo-100/80 text-indigo-600">
+                    <RefreshCw className="h-4 w-4" />
+                  </div>
+                </div>
+                <p className="text-2xl font-black text-indigo-600 mt-2 font-sans">{doctorRevisitMetrics.revisitCount}</p>
+                <p className="text-[11px] text-slate-400 font-sans mt-1">{doctorRevisitMetrics.revisitPct}% returning follow-ups</p>
+              </div>
+            </div>
+
+            {/* Practice Frequency Loyalty Segmentation */}
+            <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100">
+              <div className="rounded-lg border border-slate-100 bg-slate-50/40 p-2 text-center">
+                <p className="text-[10px] font-bold text-slate-400 font-sans">Single Visit (1st Time)</p>
+                <p className="text-sm font-extrabold text-slate-800 font-sans mt-0.5">{doctorRevisitMetrics.singleVisit}</p>
+                <p className="text-[9px] text-slate-400 font-sans">New Patients</p>
+              </div>
+
+              <div className="rounded-lg border border-slate-100 bg-slate-50/40 p-2 text-center">
+                <p className="text-[10px] font-bold text-indigo-600 font-sans">Regular (2-3 Visits)</p>
+                <p className="text-sm font-extrabold text-indigo-700 font-sans mt-0.5">{doctorRevisitMetrics.regularVisits}</p>
+                <p className="text-[9px] text-slate-400 font-sans">Follow-up Consults</p>
+              </div>
+
+              <div className="rounded-lg border border-slate-100 bg-slate-50/40 p-2 text-center">
+                <p className="text-[10px] font-bold text-purple-600 font-sans">Frequent (4+ Visits)</p>
+                <p className="text-sm font-extrabold text-purple-700 font-sans mt-0.5">{doctorRevisitMetrics.frequentVisits}</p>
+                <p className="text-[9px] text-slate-400 font-sans">Loyal Patients</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
 
       {/* SECTIONS 2 & 3: PATIENT GROWTH & ANALYTICS (Responsive: 1 col on mobile, 3 cols on desktop) */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

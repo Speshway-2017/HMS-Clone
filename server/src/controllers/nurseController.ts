@@ -10,6 +10,7 @@ import { signAccessToken, signRefreshToken } from "../utils/token";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { emitToHospital } from "../config/socket";
+import { Patient } from "../models/Patient";
 import { notifyAssignedDoctorForPatient, checkCriticalVitalsAndNotify } from "../utils/autoNotifyAssignedDoctor";
 
 // 1. Get Nurse Inpatients
@@ -1404,8 +1405,8 @@ export const sendNoteToAssignedDoctor = catchAsync(async (req: Request, res: Res
   } else {
     const pt = await Patient.findById(patientId);
     if (pt) {
-      ptName = pt.name;
-      ptUhid = pt.uhid;
+      ptName = pt.name || ptName;
+      ptUhid = pt.uhid || ptUhid || "N/A";
     }
   }
 

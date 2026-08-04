@@ -26,7 +26,7 @@ export class DoctorDashboardRepository {
       date: { $gte: start, $lte: end },
       status: { $ne: "pending_payment" },
     })
-      .populate("patient", "name uhid age gender phone")
+      .populate("patient", "name uhid age gender phone medicalHistory createdAt")
       .populate("doctor", "name")
       .populate("department", "name")
       .sort({ time: 1 });

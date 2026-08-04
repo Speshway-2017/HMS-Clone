@@ -342,8 +342,8 @@ export function LandingPage() {
                 key={nav.id}
                 onClick={() => changeTab(nav.id)}
                 className={`transition-colors hover:text-navy-700 relative py-1 ${activeTab === nav.id
-                    ? "text-navy-700 font-bold after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-navy-700"
-                    : ""
+                  ? "text-navy-700 font-bold after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-navy-700"
+                  : ""
                   }`}
               >
                 {nav.label}
@@ -653,7 +653,7 @@ export function LandingPage() {
             <section id="faqs-section" className="py-20 px-6 lg:px-12 bg-slate-50/70 border-t border-slate-200">
               <div className="mx-auto max-w-7xl">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-                  
+
                   {/* Left Column: Heading & Support Contact Box */}
                   <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-24">
                     <div className="space-y-3">
@@ -699,11 +699,10 @@ export function LandingPage() {
                         return (
                           <div
                             key={idx}
-                            className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
-                              isOpen
+                            className={`rounded-2xl border transition-all duration-200 overflow-hidden ${isOpen
                                 ? "border-navy-500 bg-white shadow-md ring-1 ring-navy-200"
                                 : "border-slate-200 bg-white shadow-sm hover:border-slate-300"
-                            }`}
+                              }`}
                           >
                             <button
                               type="button"
@@ -714,9 +713,8 @@ export function LandingPage() {
                                 {faq.q}
                               </span>
                               <div
-                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all ${
-                                  isOpen ? "bg-navy-100 text-navy-800 rotate-180" : "bg-slate-100 text-slate-500"
-                                }`}
+                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all ${isOpen ? "bg-navy-100 text-navy-800 rotate-180" : "bg-slate-100 text-slate-500"
+                                  }`}
                               >
                                 <ChevronDown className="h-4 w-4 transition-transform" />
                               </div>
@@ -914,8 +912,8 @@ export function LandingPage() {
                   <button
                     onClick={() => setSelectedSpecialization("all")}
                     className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${selectedSpecialization === "all"
-                        ? "bg-navy-700 text-white shadow-sm"
-                        : "bg-white text-slate-600 border border-slate-200 hover:border-navy-300"
+                      ? "bg-navy-700 text-white shadow-sm"
+                      : "bg-white text-slate-600 border border-slate-200 hover:border-navy-300"
                       }`}
                   >
                     All Specializations
@@ -925,8 +923,8 @@ export function LandingPage() {
                       key={spec}
                       onClick={() => setSelectedSpecialization(spec)}
                       className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all whitespace-nowrap capitalize ${selectedSpecialization.toLowerCase() === spec.toLowerCase()
-                          ? "bg-navy-700 text-white shadow-sm"
-                          : "bg-white text-slate-600 border border-slate-200 hover:border-navy-300"
+                        ? "bg-navy-700 text-white shadow-sm"
+                        : "bg-white text-slate-600 border border-slate-200 hover:border-navy-300"
                         }`}
                     >
                       {spec}

@@ -290,7 +290,7 @@ export function HospitalAdminDashboard() {
       {/* 5. TAB 1: OVERVIEW (Unified Multi-Section ERP View) */}
       {(activeTab === "overview" || activeTab === "patient_flow") && (
         <div className="space-y-8">
-          <PatientAnalyticsSection patients={patientsList} admissions={admissionsList} isLoading={loadingPatients} />
+          <PatientAnalyticsSection patients={patientsList} admissions={admissionsList} appointments={appointmentsList} isLoading={loadingPatients} />
           <OpIpAnalyticsSection patients={patientsList} appointments={appointmentsList} admissions={admissionsList} />
           <PatientFlowSection appointments={appointmentsList} labRequests={labRequestsList} admissions={admissionsList} patients={patientsList} />
         </div>

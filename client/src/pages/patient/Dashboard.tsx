@@ -575,6 +575,25 @@ export function PatientDashboard() {
 
   const updateApptMutation = useUpdateAppointment(rescheduleApptId || cancelApptId || "");
 
+  const isCancellationAllowed = (dateVal: string | Date, timeStr?: string): boolean => {
+    if (!dateVal) return false;
+    const apptDate = new Date(dateVal);
+    if (timeStr && typeof timeStr === "string") {
+      const parts = timeStr.trim().split(":");
+      if (parts.length >= 2) {
+        const hours = parseInt(parts[0], 10);
+        const minutes = parseInt(parts[1], 10);
+        if (!isNaN(hours) && !isNaN(minutes)) {
+          apptDate.setHours(hours, minutes, 0, 0);
+        }
+      }
+    }
+    const now = new Date();
+    const diffMs = apptDate.getTime() - now.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    return diffMinutes >= 60;
+  };
+
   // Reception-style Appointments Sub-tab & Calendar State
   const [apptSubTab, setApptSubTab] = useState<"scheduled" | "book" | "calendar" | "completed">("scheduled");
   const [selectedDeptFilter, setSelectedDeptFilter] = useState("all");
@@ -1032,7 +1051,7 @@ export function PatientDashboard() {
       toast.success("Appointment rescheduled successfully!");
       setRescheduleApptId(null);
     } catch (err: any) {
-      toast.error(err.message || "Failed to reschedule appointment.");
+      toast.error(err?.response?.data?.message || err.message || "Failed to reschedule appointment.");
     }
   };
 
@@ -1047,7 +1066,7 @@ export function PatientDashboard() {
       setCancelApptId(null);
       setCancelReason("");
     } catch (err: any) {
-      toast.error(err.message || "Failed to cancel appointment.");
+      toast.error(err?.response?.data?.message || err.message || "Failed to cancel appointment.");
     }
   };
 
@@ -2162,26 +2181,49 @@ export function PatientDashboard() {
                           </div>
 
                           <div className="flex items-center gap-2">
-                            {isUpcoming && (
-                              <>
-                                <button
-                                  onClick={() => {
-                                    setRescheduleApptId(a._id);
-                                    setRescheduleDate(a.date.split("T")[0]);
-                                    setRescheduleTime(a.time);
-                                  }}
-                                  className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-all"
-                                >
-                                  Reschedule
-                                </button>
-                                <button
-                                  onClick={() => setCancelApptId(a._id)}
-                                  className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-all"
-                                >
-                                  Cancel
-                                </button>
-                              </>
-                            )}
+                            {isUpcoming && (() => {
+                              const canAct = isCancellationAllowed(a.date, a.time);
+                              return (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      if (!canAct) {
+                                        toast.error("Appointments can only be cancelled or rescheduled up to 1 hour before the scheduled appointment time.");
+                                        return;
+                                      }
+                                      setRescheduleApptId(a._id);
+                                      setRescheduleDate(a.date.split("T")[0]);
+                                      setRescheduleTime(a.time);
+                                    }}
+                                    title={canAct ? "Reschedule appointment" : "Appointments can only be cancelled or rescheduled up to 1 hour before the scheduled appointment time."}
+                                    className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
+                                      canAct
+                                        ? "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                                        : "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed opacity-60"
+                                    }`}
+                                  >
+                                    Reschedule
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (!canAct) {
+                                        toast.error("Appointments can only be cancelled or rescheduled up to 1 hour before the scheduled appointment time.");
+                                        return;
+                                      }
+                                      setCancelApptId(a._id);
+                                    }}
+                                    title={canAct ? "Cancel appointment" : "Appointments can only be cancelled or rescheduled up to 1 hour before the scheduled appointment time."}
+                                    className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
+                                      canAct
+                                        ? "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                                        : "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed opacity-60"
+                                    }`}
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              );
+                            })()}
                             {isUpcoming && (a.type?.toLowerCase().includes("video") || (a as any).meetingLink) && (
                               <div className="flex flex-col items-end gap-1">
                                 <button
