@@ -21,7 +21,12 @@ const branchSchema = z.object({
 
 export const listBranches = catchAsync(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req);
-  const hospitalId = req.query.hospitalId as string | undefined;
+  let hospitalId = req.query.hospitalId as string | undefined;
+
+  if (!hospitalId && req.user?.hospital && req.user?.role !== "super_admin") {
+    const rawHosp: any = req.user.hospital;
+    hospitalId = typeof rawHosp === "object" && rawHosp ? rawHosp._id?.toString() : String(rawHosp);
+  }
 
   const filter: Record<string, unknown> = {};
   if (hospitalId) {

@@ -23,6 +23,7 @@ export const APPOINTMENT_STATUSES = [
 const appointmentSchema = new Schema(
   {
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
+    branch: { type: Schema.Types.ObjectId, ref: "Branch", default: null },
     referenceId: { type: String, required: true, unique: true, uppercase: true },
     patient: { type: Schema.Types.ObjectId, ref: "Patient", required: true },
     doctor: { type: Schema.Types.ObjectId, ref: "Doctor", required: true },

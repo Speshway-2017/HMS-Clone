@@ -19,6 +19,7 @@ const patientSchema = new Schema(
   {
     user: { type: Schema.Types.ObjectId, ref: "User", default: null },
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
+    branch: { type: Schema.Types.ObjectId, ref: "Branch", default: null },
     uhid: { type: String, unique: true, sparse: true },
     patientCode: { type: String, unique: true, sparse: true },
     qrCode: { type: String, default: "" },
