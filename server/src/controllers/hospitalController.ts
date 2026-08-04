@@ -333,32 +333,54 @@ export const createPublicAppointment = catchAsync(async (req: Request, res: Resp
 export const createPublicEnquiry = catchAsync(async (req: Request, res: Response) => {
   const { name, email, subject, message } = req.body;
   
+  const nameStr = name?.trim() || "";
+  const emailStr = email?.trim() || "";
+  const messageStr = message?.trim() || "";
+
+  if (!nameStr || !emailStr || !messageStr) {
+    throw new AppError("Name, email, and message are required fields.", 400);
+  }
+
   let hospital = await Hospital.findOne({ status: "active" }).sort({ createdAt: 1 });
   if (!hospital) {
     hospital = await Hospital.findOne().sort({ createdAt: 1 });
   }
   if (!hospital) {
-    throw new AppError("No active hospital configuration found.", 404);
+    hospital = await Hospital.create({
+      name: "Sunrise Hospital",
+      tagline: "Advanced Healthcare & Patient Care",
+      status: "active"
+    });
   }
   
   const enquiry = await Enquiry.create({
     hospital: hospital._id,
-    name: name.trim(),
-    email: email.trim(),
-    subject: subject?.trim() || "",
-    message: message.trim(),
+    name: nameStr,
+    email: emailStr,
+    subject: subject?.trim() || "General Enquiry",
+    message: messageStr,
     status: "pending"
   });
   
-  // Emit socket event
-  emitToHospital(hospital._id, "new_enquiry", enquiry);
+  // Emit socket event for real-time admin dashboard update
+  try {
+    emitToHospital(hospital._id, "new_enquiry", enquiry);
+    emitToHospital(hospital._id, "dashboard_update", enquiry);
+  } catch (err) {
+    console.error("Socket emit error:", err);
+  }
   
   res.status(201).json({ status: "success", data: { enquiry } });
 });
 
 export const listHospitalEnquiries = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
-  const enquiries = await Enquiry.find({ hospital: hospitalId }).sort({ createdAt: -1 });
+  const hospitalId = req.hospitalFilter?.hospital;
+  let enquiries;
+  if (hospitalId) {
+    enquiries = await Enquiry.find({ hospital: hospitalId }).sort({ createdAt: -1 });
+  } else {
+    enquiries = await Enquiry.find({}).sort({ createdAt: -1 });
+  }
   res.json({ status: "success", data: { enquiries } });
 });
 
