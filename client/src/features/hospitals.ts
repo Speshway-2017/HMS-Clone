@@ -4,6 +4,7 @@ import { Hospital, Paginated } from "../types/domain";
 
 interface HospitalListParams {
   page?: number;
+  limit?: number;
   search?: string;
   status?: string;
 }

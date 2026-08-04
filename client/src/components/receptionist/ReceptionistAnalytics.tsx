@@ -32,6 +32,36 @@ const APPOINTMENT_STATUS_COLORS: { [key: string]: string } = {
 
 const CHART_COLORS = ["#4f46e5", "#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899"];
 
+const CustomReceptionistTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xl text-slate-900 text-xs space-y-1.5 z-50 pointer-events-none">
+        {label && <p className="font-extrabold text-slate-800 border-b border-slate-100 pb-1 mb-1 font-sans">{label}</p>}
+        <div className="space-y-1">
+          {payload.map((item: any, idx: number) => {
+            const color = item.color || item.fill || "#4f46e5";
+            const name = item.name || item.dataKey || "Count";
+            const rawVal = item.value;
+            const valDisplay = typeof rawVal === "number" && (item.dataKey === "amount" || name.toLowerCase().includes("revenue"))
+              ? `₹${rawVal.toLocaleString("en-IN")}`
+              : rawVal;
+            return (
+              <div key={idx} className="flex items-center justify-between gap-4 font-semibold font-sans">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                  <span className="text-slate-700">{name}:</span>
+                </div>
+                <span className="font-extrabold text-slate-900">{valDisplay}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 export function ReceptionistAnalytics({
   patients,
   appointments,
@@ -89,16 +119,46 @@ export function ReceptionistAnalytics({
       { name: "Evening (16-20)", patients: evening },
     ];
 
-    // 3. Revisitor vs New split
+    // 3. Revisitor vs New split - Comprehensive logic checking patient history & booking patterns
     let newPatients = 0;
     let followUps = 0;
-    appointments.forEach(appt => {
-      if (appt.type === "Follow-up" || appt.followUp === true) {
+
+    const patientApptCounts = new Map<string, number>();
+    appointments.forEach((appt: any) => {
+      const pId = typeof appt.patient === "object" ? appt.patient?._id?.toString() : appt.patient?.toString();
+      if (pId) {
+        patientApptCounts.set(pId, (patientApptCounts.get(pId) || 0) + 1);
+      }
+    });
+
+    const patientMap = new Map<string, any>();
+    patients.forEach((p: any) => {
+      if (p._id) patientMap.set(p._id.toString(), p);
+    });
+
+    appointments.forEach((appt: any) => {
+      const pObj = typeof appt.patient === "object" ? appt.patient : (appt.patient ? patientMap.get(appt.patient.toString()) : null);
+      const pId = pObj?._id?.toString() || (typeof appt.patient === "string" ? appt.patient : "");
+
+      const apptCount = pId ? (patientApptCounts.get(pId) || 1) : 1;
+      const medHistCount = Array.isArray(pObj?.medicalHistory) ? pObj.medicalHistory.length : 0;
+      const visitCount = pObj?.visitCount || 1;
+      
+      const apptDateStr = new Date(appt.date || appt.createdAt || Date.now()).toDateString();
+      const pCreatedStr = pObj?.createdAt ? new Date(pObj.createdAt).toDateString() : apptDateStr;
+      const isRegisteredPrior = pCreatedStr !== apptDateStr;
+
+      const isExplicitFollowUp = appt.type === "Follow-up" || appt.type === "Revisit" || appt.followUp === true || appt.isRevisit === true;
+
+      const isRevisit = apptCount > 1 || medHistCount > 0 || visitCount > 1 || isRegisteredPrior || isExplicitFollowUp;
+
+      if (isRevisit) {
         followUps++;
       } else {
         newPatients++;
       }
     });
+
     const revisitorData = [
       { name: "New Consults", value: newPatients },
       { name: "Revisits", value: followUps },
@@ -183,6 +243,8 @@ export function ReceptionistAnalytics({
       dailyCollectionsData,
       trafficData,
       revisitorData,
+      newPatients,
+      followUps,
       appointmentStatusData,
       wardOccupancyData,
       invoiceStatusData,
@@ -279,10 +341,7 @@ export function ReceptionistAnalytics({
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} fontWeight={600} tickLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={11} fontWeight={600} tickLine={false} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: "#0f172a", borderRadius: "12px", border: "none", color: "#fff" }}
-                  labelClassName="font-bold text-slate-400 text-xs"
-                />
+                <Tooltip content={<CustomReceptionistTooltip />} />
                 <Area type="monotone" dataKey="registrations" stroke="#4f46e5" strokeWidth={2.5} fillOpacity={1} fill="url(#regGrad2)" name="New Patients" />
               </AreaChart>
             </ResponsiveContainer>
@@ -303,11 +362,7 @@ export function ReceptionistAnalytics({
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} fontWeight={600} tickLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={11} fontWeight={600} tickLine={false} tickFormatter={(v) => `₹${v}`} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: "#0f172a", borderRadius: "12px", border: "none", color: "#fff" }}
-                  formatter={(value) => [`₹${Number(value).toFixed(2)}`, "Collected"]}
-                  labelClassName="font-bold text-slate-400 text-xs"
-                />
+                <Tooltip content={<CustomReceptionistTooltip />} />
                 <Area type="monotone" dataKey="amount" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colGrad2)" name="Revenue" />
               </AreaChart>
             </ResponsiveContainer>
@@ -325,10 +380,7 @@ export function ReceptionistAnalytics({
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} fontWeight={600} tickLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={11} fontWeight={600} tickLine={false} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: "#0f172a", borderRadius: "12px", border: "none", color: "#fff" }}
-                  labelClassName="font-bold text-slate-400 text-xs"
-                />
+                <Tooltip content={<CustomReceptionistTooltip />} />
                 <Bar dataKey="patients" fill="#4f46e5" radius={[6, 6, 0, 0]} name="Patients" barSize={32} />
               </BarChart>
             </ResponsiveContainer>
@@ -336,33 +388,52 @@ export function ReceptionistAnalytics({
         </ChartCard>
 
         {/* Revisitor Split */}
-        <ChartCard title="Revisitor Ratio" subtitle="Proportion of new registrations vs follow-up consultations">
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={data.revisitorData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={4}
-                  dataKey="value"
-                >
-                  <Cell fill="#3b82f6" />
-                  <Cell fill="#10b981" />
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: "#0f172a", borderRadius: "12px", border: "none", color: "#fff" }}
-                />
-                <Legend 
-                  verticalAlign="bottom" 
-                  height={36} 
-                  iconType="circle"
-                  formatter={(value) => <span className="text-xs font-semibold text-slate-600">{value}</span>}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+        <ChartCard title="Desk Patient Revisit Split" subtitle="Proportion of new registrations vs follow-up consultations">
+          <div className="h-72 w-full flex flex-col justify-between">
+            <div className="h-52 w-full relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={data.revisitorData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={75}
+                    paddingAngle={4}
+                    dataKey="value"
+                  >
+                    <Cell fill="#10b981" />
+                    <Cell fill="#6366f1" />
+                  </Pie>
+                  <Tooltip content={<CustomReceptionistTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none text-center select-none z-10">
+                <span className="text-2xl font-black text-slate-900 leading-none">{data.newPatients + data.followUps}</span>
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none mt-1">Desk Check-Ins</span>
+              </div>
+            </div>
+
+            <div className="space-y-1 text-xs font-semibold pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                  <span className="text-slate-700">New Consults</span>
+                </div>
+                <span className="font-bold text-emerald-600">
+                  {data.newPatients} ({data.newPatients + data.followUps > 0 ? Math.round((data.newPatients / (data.newPatients + data.followUps)) * 100) : 0}%)
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-indigo-500" />
+                  <span className="text-slate-700">Follow-up Revisits</span>
+                </div>
+                <span className="font-bold text-indigo-600">
+                  {data.followUps} ({data.newPatients + data.followUps > 0 ? Math.round((data.followUps / (data.newPatients + data.followUps)) * 100) : 0}%)
+                </span>
+              </div>
+            </div>
           </div>
         </ChartCard>
 
@@ -384,9 +455,7 @@ export function ReceptionistAnalytics({
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: "#0f172a", borderRadius: "12px", border: "none", color: "#fff" }}
-                />
+                <Tooltip content={<CustomReceptionistTooltip />} />
                 <Legend 
                   verticalAlign="bottom" 
                   height={36} 
@@ -414,10 +483,7 @@ export function ReceptionistAnalytics({
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis dataKey="name" stroke="#94a3b8" fontSize={9} fontWeight={600} tickLine={false} />
                   <YAxis stroke="#94a3b8" fontSize={11} fontWeight={600} tickLine={false} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: "#0f172a", borderRadius: "12px", border: "none", color: "#fff" }}
-                    labelClassName="font-bold text-slate-400 text-xs"
-                  />
+                  <Tooltip content={<CustomReceptionistTooltip />} />
                   <Bar dataKey="value" fill="#06b6d4" radius={[6, 6, 0, 0]} name="Admitted" barSize={24} />
                 </BarChart>
               </ResponsiveContainer>
@@ -443,9 +509,7 @@ export function ReceptionistAnalytics({
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: "#0f172a", borderRadius: "12px", border: "none", color: "#fff" }}
-                />
+                <Tooltip content={<CustomReceptionistTooltip />} />
                 <Legend 
                   verticalAlign="bottom" 
                   height={36} 
@@ -480,10 +544,7 @@ export function ReceptionistAnalytics({
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: "#0f172a", borderRadius: "12px", border: "none", color: "#fff" }}
-                    formatter={(value) => [`₹${Number(value).toFixed(2)}`, "Total"]}
-                  />
+                  <Tooltip content={<CustomReceptionistTooltip />} />
                   <Legend 
                     verticalAlign="bottom" 
                     height={36} 
@@ -506,10 +567,7 @@ export function ReceptionistAnalytics({
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis type="number" stroke="#94a3b8" fontSize={11} fontWeight={600} tickLine={false} />
                 <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={11} fontWeight={600} tickLine={false} width={80} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: "#0f172a", borderRadius: "12px", border: "none", color: "#fff" }}
-                  labelClassName="font-bold text-slate-400 text-xs"
-                />
+                <Tooltip content={<CustomReceptionistTooltip />} />
                 <Bar dataKey="appointments" fill="#8b5cf6" radius={[0, 6, 6, 0]} name="Appointments" barSize={16} />
               </BarChart>
             </ResponsiveContainer>

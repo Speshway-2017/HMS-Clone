@@ -15,6 +15,7 @@ import { getDoctorDynamicStatus, getBusyDoctorIds } from "../utils/doctorStatus"
 const doctorSchema = z.object({
   department: z.string().optional().nullable(),
   name: z.string().min(1),
+  gender: z.string().min(1, "Gender is required").default("Male"),
   email: z.string().optional().default(""),
   phone: z.string().optional().default(""),
   photoUrl: z.string().optional().default(""),
@@ -71,9 +72,10 @@ export const listDoctors = catchAsync(async (req: Request, res: Response) => {
 export const createDoctor = catchAsync(async (req: Request, res: Response) => {
   const body = doctorSchema.parse(req.body);
   const hospitalId = req.hospitalFilter!.hospital;
+  const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
 
   // Create the Doctor profile record
-  const doctor = await Doctor.create({ ...body, hospital: hospitalId });
+  const doctor = await Doctor.create({ ...body, hospital: hospitalId, branch: branchId });
 
   // Auto-create a login User account if an email is provided
   let tempPassword: string | undefined;
@@ -86,6 +88,7 @@ export const createDoctor = catchAsync(async (req: Request, res: Response) => {
       passwordHash,
       role: "doctor",
       hospital: hospitalId,
+      branch: branchId,
     });
   }
 

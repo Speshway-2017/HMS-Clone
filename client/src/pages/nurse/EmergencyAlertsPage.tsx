@@ -345,12 +345,12 @@ export function EmergencyAlertsPage() {
                       <td className="px-4 py-2.5 w-28 text-center">
                         <span className={`inline-block w-20 text-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase border ${
                           row.severity === "critical"
-                            ? "bg-red-100 text-red-800 border-red-200 animate-pulse"
+                            ? "bg-rose-50 text-rose-700 border-rose-200"
                             : row.severity === "warning"
-                            ? "bg-amber-100 text-amber-800 border-amber-200"
+                            ? "bg-amber-50 text-amber-700 border-amber-200"
                             : row.severity === "success"
-                            ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-                            : "bg-blue-100 text-blue-800 border-blue-200"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : "bg-sky-50 text-sky-700 border-sky-200"
                         }`}>
                           {row.severity}
                         </span>
@@ -366,9 +366,9 @@ export function EmergencyAlertsPage() {
                       <td className="px-4 py-2.5 text-center w-32">
                         <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase border ${
                           row.status === "new"
-                            ? "bg-red-50 text-red-700 border-red-200"
+                            ? "bg-rose-50 text-rose-700 border-rose-200"
                             : row.status === "acknowledged"
-                            ? "bg-blue-50 text-blue-700 border-blue-200"
+                            ? "bg-indigo-50 text-indigo-700 border-indigo-200"
                             : row.status === "in_progress"
                             ? "bg-purple-50 text-purple-700 border-purple-200"
                             : "bg-emerald-50 text-emerald-700 border-emerald-200"
@@ -385,16 +385,16 @@ export function EmergencyAlertsPage() {
                               e.stopPropagation();
                               navigate(`/nurse/alerts/${row._id}`);
                             }}
-                            className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-200"
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-xs cursor-pointer"
                             title="View Full Details"
                           >
-                            <Eye className="h-3 w-3" /> View
+                            <Eye className="h-3 w-3 text-slate-500" /> View
                           </button>
 
                           {row.status === "new" && (
                             <button
                               onClick={(e) => handleAcknowledge(e, row._id)}
-                              className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-700 hover:bg-blue-100"
+                              className="inline-flex items-center gap-1 rounded-lg bg-navy-700 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-navy-800 transition-all shadow-xs cursor-pointer"
                               title="Acknowledge Alert"
                             >
                               <Check className="h-3 w-3" /> Ack
@@ -404,7 +404,7 @@ export function EmergencyAlertsPage() {
                           {row.status !== "resolved" && (
                             <button
                               onClick={(e) => handleResolve(e, row._id)}
-                              className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100"
+                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 transition-all shadow-xs cursor-pointer"
                               title="Mark Resolved"
                             >
                               <CheckCircle2 className="h-3 w-3" /> Resolve

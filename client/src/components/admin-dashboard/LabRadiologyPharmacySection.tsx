@@ -210,7 +210,7 @@ export function LabRadiologyPharmacySection({ labRequests, inventory }: LabRadio
                     <Cell key={`cell-${index}`} fill={MODALITY_COLORS[index % MODALITY_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", color: "#fff", fontSize: "12px" }} />
+                <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", border: "1px solid #1e293b", color: "#fff", fontSize: "12px" }} itemStyle={{ color: "#fff" }} labelStyle={{ color: "#fff", fontWeight: 600 }} />
               </PieChart>
             </ResponsiveContainer>
           </div>

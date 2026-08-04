@@ -1610,6 +1610,10 @@ export const startConsultationSession = catchAsync(async (req: Request, res: Res
     { status: "called" }
   );
 
+  emitToHospital(hospitalId.toString(), "appointment_updated", { appointmentId, status: "in_consultation" });
+  emitToHospital(hospitalId.toString(), "queue_updated", { appointmentId, status: "called" });
+  emitToHospital(hospitalId.toString(), "dashboard_update", { action: "start_consultation", appointmentId });
+
   res.json({ status: "success", data: session });
 });
 
@@ -1702,6 +1706,9 @@ export const cancelConsultationSession = catchAsync(async (req: Request, res: Re
     );
 
     await dbSession.commitTransaction();
+    emitToHospital(hospitalId.toString(), "appointment_updated", { appointmentId: session.appointment, status: "checked_in" });
+    emitToHospital(hospitalId.toString(), "queue_updated", { appointmentId: session.appointment, status: "waiting" });
+    emitToHospital(hospitalId.toString(), "dashboard_update", { action: "cancel_consultation", appointmentId: session.appointment });
     res.json({ status: "success", data: session });
   } catch (err) {
     await dbSession.abortTransaction();
@@ -2011,6 +2018,9 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
     );
 
     await dbSession.commitTransaction();
+    emitToHospital(hospitalId.toString(), "appointment_updated", { appointmentId: appointment._id, status: "completed" });
+    emitToHospital(hospitalId.toString(), "queue_updated", { appointmentId: appointment._id, status: "completed" });
+    emitToHospital(hospitalId.toString(), "dashboard_update", { action: "complete_consultation", appointmentId: appointment._id });
     res.json({ status: "success", data: appointment, prescription });
   } catch (err) {
     await dbSession.abortTransaction();
@@ -2523,12 +2533,51 @@ export const getAnalytics = catchAsync(async (req: Request, res: Response) => {
     });
   }
 
-  // Patient details breakdown
+  // Patient details breakdown & exact Doctor-specific revisit classification
   const patientIds = Array.from(new Set(appointments.map(a => a.patient?._id?.toString() || a.patient?.toString()).filter(Boolean)));
   const patientsDetails = await Patient.find({ _id: { $in: patientIds } });
 
-  const newPatientsCount = patientsDetails.filter(p => p.createdAt >= startOf7DaysAgo).length;
-  const returningPatientsCount = Math.max(0, patientIds.length - newPatientsCount);
+  // Query total appointments ever for this doctor to count doctor-specific visits
+  const allDoctorAppts = await Appointment.find({
+    hospital: hospitalId,
+    doctor: doctor._id,
+    status: { $ne: "pending_payment" }
+  }).select("patient");
+
+  const doctorApptFrequencyMap = new Map<string, number>();
+  allDoctorAppts.forEach(a => {
+    const pId = a.patient?.toString();
+    if (pId) {
+      doctorApptFrequencyMap.set(pId, (doctorApptFrequencyMap.get(pId) || 0) + 1);
+    }
+  });
+
+  let newPatientsCount = 0;
+  let returningPatientsCount = 0;
+  let docSingleVisitCount = 0;
+  let docRegularVisitsCount = 0;
+  let docFrequentVisitsCount = 0;
+
+  patientIds.forEach(pId => {
+    const doctorVisitsCount = doctorApptFrequencyMap.get(pId) || 1;
+    
+    // User's exact rule:
+    // If patient is arriving for the first time for this doctor (visits == 1) -> New Visited
+    // If patient was already consulted by this doctor and booked again (visits > 1) -> Revisited
+    if (doctorVisitsCount > 1) {
+      returningPatientsCount++;
+    } else {
+      newPatientsCount++;
+    }
+
+    if (doctorVisitsCount === 1) {
+      docSingleVisitCount++;
+    } else if (doctorVisitsCount <= 3) {
+      docRegularVisitsCount++;
+    } else {
+      docFrequentVisitsCount++;
+    }
+  });
   
   const walkinCount = appointments.filter(a => a.type?.toLowerCase() === "walk-in").length;
   const regularApptCount = appointments.filter(a => a.type?.toLowerCase() === "appointment").length;
@@ -2741,6 +2790,16 @@ export const getAnalytics = catchAsync(async (req: Request, res: Response) => {
           weeklyDiff: followups.length - 2,
           sparkline: [2, 3, 1, 4, followups.length],
         }
+      },
+      revisitAnalytics: {
+        total: patientIds.length || appointments.length,
+        newPatients: newPatientsCount,
+        revisitPatients: returningPatientsCount,
+        newPct: patientIds.length > 0 ? Math.round((newPatientsCount / patientIds.length) * 100) : 0,
+        revisitPct: patientIds.length > 0 ? Math.round((returningPatientsCount / patientIds.length) * 100) : 0,
+        singleVisit: docSingleVisitCount,
+        regularVisits: docRegularVisitsCount,
+        frequentVisits: docFrequentVisitsCount
       },
       patientAnalytics: {
         types: [

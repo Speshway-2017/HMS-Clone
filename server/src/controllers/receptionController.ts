@@ -16,6 +16,7 @@ import { IPBill } from "../models/IPBill";
 import { IPBillPayment } from "../models/IPBillPayment";
 import { Appointment } from "../models/Appointment";
 import { getIPBillItemsSummary } from "./ipBillController";
+import { AppointmentSlotService } from "../services/appointmentSlotService";
 
 
 // Validation Schemas
@@ -23,7 +24,7 @@ const patientRegistrationSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().min(5, "Phone is required"),
-  age: z.coerce.number().min(0, "Age must be positive"),
+  age: z.coerce.number().min(0, "Age must be at least 0").max(150, "Age cannot exceed 150 years"),
   gender: z.string().min(1, "Gender is required"),
   bloodGroup: z.string().default(""),
   address: z.string().default(""),
@@ -687,20 +688,14 @@ export const getBookedSlots = catchAsync(async (req: Request, res: Response) => 
   if (!doctorId || !date) {
     throw new AppError("doctorId and date are required query parameters.", 400);
   }
-  const parsedDate = new Date(date);
-  const startOfDay = new Date(parsedDate);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(parsedDate);
-  endOfDay.setHours(23, 59, 59, 999);
 
-  const appointments = await Appointment.find({
-    hospital: req.hospitalFilter!.hospital,
-    doctor: doctorId,
-    date: { $gte: startOfDay, $lte: endOfDay },
-    status: { $in: ["scheduled", "checked_in", "in_consultation"] }
-  }).select("time");
+  // Delegate entirely to the shared AppointmentSlotService — single source of truth.
+  const bookedSlots = await AppointmentSlotService.getBookedSlots(
+    doctorId,
+    date,
+    req.hospitalFilter!.hospital
+  );
 
-  const bookedSlots = appointments.map(appt => appt.time);
   res.json({ status: "success", data: { bookedSlots } });
 });
 

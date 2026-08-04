@@ -134,7 +134,7 @@ export function DoctorAnalyticsSection({ doctors, appointments }: DoctorAnalytic
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#64748b" }} />
                   <YAxis tick={{ fontSize: 11, fill: "#64748b" }} />
-                  <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", color: "#fff", fontSize: "12px" }} />
+                  <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", border: "1px solid #1e293b", color: "#fff", fontSize: "12px" }} itemStyle={{ color: "#fff" }} labelStyle={{ color: "#fff", fontWeight: 600 }} />
                   <Line type="monotone" dataKey="consults" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4, fill: "#4f46e5" }} />
                 </LineChart>
               </ResponsiveContainer>

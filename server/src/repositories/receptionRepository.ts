@@ -82,6 +82,13 @@ export class ReceptionRepository {
   }
 
   // ── Appointment Operations ──
+  // ── Canonical status filter ──
+  // A slot is BOOKED (unavailable) when ANY appointment for that doctor+date+time
+  // has a status that is NOT "cancelled" or "no_show".
+  // This MUST match AppointmentSlotService.RELEASED_STATUSES so the display and
+  // the booking guard are always consistent.
+  static readonly SLOT_RELEASED_STATUSES = ["cancelled", "no_show"] as const;
+
   static async checkDoctorSlotOverlap(hospitalId: Types.ObjectId, doctorId: string, date: Date, time: string) {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
@@ -92,8 +99,8 @@ export class ReceptionRepository {
       hospital: hospitalId,
       doctor: doctorId,
       date: { $gte: startOfDay, $lte: endOfDay },
-      time: time,
-      status: { $in: ["scheduled", "checked_in", "in_consultation"] }
+      time: time.trim(),
+      status: { $nin: ReceptionRepository.SLOT_RELEASED_STATUSES },
     });
   }
 
@@ -118,7 +125,7 @@ export class ReceptionRepository {
       hospital: hospitalId,
       date: { $gte: startOfDay, $lte: endOfDay }
     })
-      .populate("patient", "name uhid phone")
+      .populate("patient", "name uhid phone gender age medicalHistory createdAt")
       .populate("doctor", "name specialization")
       .populate("department", "name")
       .sort({ time: 1 });
@@ -354,7 +361,7 @@ export class ReceptionRepository {
   }
 
   // ── Queue (Token) Operations ──
-  static async getQueueByDate(hospitalId: Types.ObjectId, date: Date) {
+  static async getQueueTokensByDate(hospitalId: Types.ObjectId, date: Date) {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(date);

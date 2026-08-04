@@ -55,7 +55,7 @@ const patientSchema = z.object({
   name: z.string().min(1),
   email: z.string().optional().default(""),
   phone: z.string().optional().default(""),
-  age: z.coerce.number().min(0).optional().nullable(),
+  age: z.coerce.number().min(0, "Age must be at least 0").max(150, "Age cannot exceed 150 years").optional().nullable(),
   gender: z.string().optional().default(""),
   bloodGroup: z.string().optional().default(""),
   address: z.string().optional().default(""),
@@ -133,7 +133,20 @@ export const listPatients = catchAsync(async (req: Request, res: Response) => {
 
 export const createPatient = catchAsync(async (req: Request, res: Response) => {
   const body = patientSchema.parse(req.body);
-  const patient = await Patient.create({ ...body, hospital: req.hospitalFilter!.hospital });
+  const hospitalId = req.hospitalFilter!.hospital;
+
+  if (body.insurancePolicyNumber && body.insurancePolicyNumber.trim()) {
+    const existingPolicy = await Patient.findOne({
+      hospital: hospitalId,
+      insurancePolicyNumber: body.insurancePolicyNumber.trim()
+    });
+    if (existingPolicy) {
+      throw new AppError("Insurance Policy Number is already registered to another patient.", 400);
+    }
+  }
+
+  const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
+  const patient = await Patient.create({ ...body, hospital: hospitalId, branch: branchId });
 
   if (req.hospitalFilter?.hospital) {
     emitToHospital(req.hospitalFilter.hospital, "patient_created", { patientId: patient._id, name: patient.name, uhid: patient.uhid });
@@ -208,6 +221,19 @@ export const getPatient = catchAsync(async (req: Request, res: Response) => {
 export const updatePatient = catchAsync(async (req: Request, res: Response) => {
   await checkPatientDoctorAccess(req, req.params.id);
   const body = patientSchema.partial().parse(req.body);
+  const hospitalId = req.hospitalFilter!.hospital;
+
+  if (body.insurancePolicyNumber && body.insurancePolicyNumber.trim()) {
+    const existingPolicy = await Patient.findOne({
+      hospital: hospitalId,
+      insurancePolicyNumber: body.insurancePolicyNumber.trim(),
+      _id: { $ne: req.params.id }
+    });
+    if (existingPolicy) {
+      throw new AppError("Insurance Policy Number is already registered to another patient.", 400);
+    }
+  }
+
   const patient = await Patient.findOneAndUpdate({ _id: req.params.id, ...req.hospitalFilter }, body, {
     new: true,
     runValidators: true,

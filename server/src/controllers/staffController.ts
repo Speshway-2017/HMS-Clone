@@ -12,6 +12,7 @@ import { getPagination, paginatedResponse } from "../utils/pagination";
 const staffSchema = z.object({
   department: z.string().optional().nullable(),
   name: z.string().min(1),
+  gender: z.string().min(1, "Gender is required").default("Male"),
   email: z.string().optional().default(""),
   phone: z.string().optional().default(""),
   photoUrl: z.string().optional().default(""),
@@ -88,13 +89,14 @@ export const getNextEmployeeId = catchAsync(async (req: Request, res: Response) 
 export const createStaff = catchAsync(async (req: Request, res: Response) => {
   const body = staffSchema.parse(req.body);
   const hospitalId = req.hospitalFilter!.hospital;
+  const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
 
   let employeeId = body.employeeId?.trim();
   if (!employeeId) {
     employeeId = await generateUniqueEmployeeId(body.role || "staff", hospitalId);
   }
 
-  const staff = await Staff.create({ ...body, employeeId, hospital: hospitalId });
+  const staff = await Staff.create({ ...body, employeeId, hospital: hospitalId, branch: branchId });
 
   // Auto-create a login User account for staff members with an email
   let tempPassword: string | undefined;
@@ -111,6 +113,7 @@ export const createStaff = catchAsync(async (req: Request, res: Response) => {
       role: userRole,
       employeeId,
       hospital: hospitalId,
+      branch: branchId,
     });
   }
 

@@ -10,6 +10,8 @@ import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 import { emitToHospital } from "../config/socket";
 import { logAudit } from "../utils/auditLogger";
+import { validateAppointmentTimeRestriction } from "../utils/appointmentTimeValidation";
+import { AppointmentSlotService } from "../services/appointmentSlotService";
 
 async function generateReferenceId(hospitalId: string, bookingDate: Date): Promise<string> {
   const dateStr = bookingDate.toISOString().split("T")[0].replace(/-/g, "");
@@ -193,23 +195,27 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
     }
   }
 
-  // 2. Prevent two active appointments for the same doctor and same time slot
-  const slotClash = await Appointment.findOne({
-    hospital: hospitalId,
-    doctor: body.doctor,
-    date: body.date,
-    time: body.time,
-    status: { $nin: ["cancelled", "no_show", "completed", "missed"] }
-  });
+  // 2. Prevent two active appointments for the same doctor and same time slot.
+  //    Uses AppointmentSlotService.checkSlotConflict — the SAME logic as the display layer.
+  const slotClash = await AppointmentSlotService.checkSlotConflict(
+    body.doctor,
+    body.date as unknown as Date,
+    body.time,
+    hospitalId
+  );
   if (slotClash) {
-    throw new AppError("This time slot is already booked for this doctor. Please choose a different slot.", 409);
+    throw new AppError(
+      "This appointment slot has already been booked. Please choose another available slot.",
+      409
+    );
   }
 
   const referenceId = await generateReferenceId(hospitalId.toString(), new Date(body.date));
-
+  const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
   const appointment = await Appointment.create({
     ...body,
     hospital: hospitalId,
+    branch: branchId,
     referenceId,
   });
 
@@ -315,12 +321,25 @@ export const updateAppointment = catchAsync(async (req: Request, res: Response) 
   }
 
   const body = appointmentSchema.partial().parse(req.body);
+
+  const existingAppt = await Appointment.findOne(filter);
+  if (!existingAppt) {
+    throw new AppError("Appointment not found or unauthorized.", 403);
+  }
+
+  const isCancelling = body.status === "cancelled";
+  const isRescheduling = (body.date && new Date(body.date).toISOString() !== new Date(existingAppt.date).toISOString()) || (body.time && body.time !== existingAppt.time);
+
+  if (isCancelling || isRescheduling) {
+    validateAppointmentTimeRestriction(existingAppt);
+  }
+
   const appointment = await Appointment.findOneAndUpdate(filter, body, {
     new: true,
     runValidators: true,
   });
   if (!appointment) {
-    throw new AppError("Appointment not found or unauthorized.", 403);
+    throw new AppError("Appointment not found or unauthorized.", 404);
   }
 
   const targetHospital = req.hospitalFilter?.hospital || (appointment.hospital || "").toString();
@@ -376,3 +395,28 @@ export const getInvoiceByAppointmentId = catchAsync(async (req: Request, res: Re
   }
   res.json({ status: "success", data: { invoice } });
 });
+
+/**
+ * GET /appointments/available-slots?doctorId=&date=
+ *
+ * Unified booked-slots endpoint accessible by BOTH patient and receptionist roles.
+ * Returns the list of already-booked time strings for a doctor on a given date,
+ * using the canonical AppointmentSlotService — the single source of truth.
+ *
+ * Frontend must NEVER cache these results between doctor/date changes.
+ */
+export const getAvailableSlots = catchAsync(async (req: Request, res: Response) => {
+  const { doctorId, date } = req.query as Record<string, string>;
+  if (!doctorId || !date) {
+    throw new AppError("doctorId and date are required query parameters.", 400);
+  }
+
+  const bookedSlots = await AppointmentSlotService.getBookedSlots(
+    doctorId,
+    date,
+    req.hospitalFilter?.hospital
+  );
+
+  res.json({ status: "success", data: { bookedSlots } });
+});
+

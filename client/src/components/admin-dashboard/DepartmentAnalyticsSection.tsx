@@ -128,7 +128,7 @@ export function DepartmentAnalyticsSection({ departments, invoices, appointments
                       <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                       <XAxis type="number" tick={{ fontSize: 10, fill: "#64748b" }} tickFormatter={(val) => `₹${val}`} />
                       <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#334155", fontWeight: 600 }} width={110} />
-                      <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", color: "#fff", fontSize: "12px" }} formatter={(value: any) => [formatINR(value), "Revenue"]} />
+                      <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", border: "1px solid #1e293b", color: "#fff", fontSize: "12px" }} itemStyle={{ color: "#fff" }} labelStyle={{ color: "#fff", fontWeight: 600 }} formatter={(value: any) => [formatINR(value), "Revenue"]} />
                       <Bar dataKey="revenue" fill="#0f172a" radius={[0, 6, 6, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -146,7 +146,7 @@ export function DepartmentAnalyticsSection({ departments, invoices, appointments
                         <Cell key={`cell-${index}`} fill={DEPT_COLORS[index % DEPT_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", color: "#fff", fontSize: "12px" }} formatter={(value: any) => [formatINR(value), "Share"]} />
+                    <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", border: "1px solid #1e293b", color: "#fff", fontSize: "12px" }} itemStyle={{ color: "#fff" }} labelStyle={{ color: "#fff", fontWeight: 600 }} formatter={(value: any) => [formatINR(value), "Share"]} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>

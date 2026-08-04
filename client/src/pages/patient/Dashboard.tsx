@@ -73,12 +73,29 @@ import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { useAuth } from "../../context/AuthContext";
 import { usePatientProfileMe, usePatientInvoices, usePatientReports, useUpdatePatient, useUpdatePatientProfileMe, usePatientPrescriptions } from "../../features/patients";
-import { useAppointments, useCreateAppointment, useUpdateAppointment } from "../../features/appointments";
+import { useAppointments, useCreateAppointment, useUpdateAppointment, useAvailableSlots } from "../../features/appointments";
 import { useDoctors } from "../../features/doctors";
 import { useNotifications } from "../../features/notifications";
+import { generateTimeSlots, isSlotBooked } from "../../lib/slotUtils";
 import { api } from "../../lib/api";
 
-
+const CustomPatientTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xl backdrop-blur-md">
+        {label && <p className="mb-1 text-xs font-bold text-slate-700">{label}</p>}
+        {payload.map((entry: any, index: number) => (
+          <div key={`item-${index}`} className="flex items-center gap-2 text-xs">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color || entry.fill || "#6366f1" }} />
+            <span className="font-medium text-slate-600">{entry.name}:</span>
+            <span className="font-extrabold text-slate-900">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
 
 function normalizeTime(t: string): string {
   if (!t) return "";
@@ -522,6 +539,7 @@ export function PatientDashboard() {
   // Appointment Modal States
   const [isBookModalOpen, setIsBookModalOpen] = useState(false);
   const [selectedDoctorId, setSelectedDoctorId] = useState("");
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState("all");
   const [bookingDate, setBookingDate] = useState(new Date().toISOString().split("T")[0]);
   const [bookingTime, setBookingTime] = useState("");
   const [bookingType, setBookingType] = useState<"Appointment" | "Video Consultation" | "Walk-in">("Appointment");
@@ -575,9 +593,35 @@ export function PatientDashboard() {
 
   const updateApptMutation = useUpdateAppointment(rescheduleApptId || cancelApptId || "");
 
+  const targetDoc = getSelectedDoctor();
+  const docObjId = targetDoc?._id || targetDoc?.id || selectedDoctorId;
+  // Use the shared useAvailableSlots hook (hits /appointments/available-slots)
+  // which is accessible to the patient role and uses the same backend service
+  // as the Receptionist Dashboard — single source of truth.
+  const { data: bookedSlotsRaw } = useAvailableSlots(docObjId, bookingDate);
+  const bookedSlots = bookedSlotsRaw || [];
+
+  const isCancellationAllowed = (dateVal: string | Date, timeStr?: string): boolean => {
+    if (!dateVal) return false;
+    const apptDate = new Date(dateVal);
+    if (timeStr && typeof timeStr === "string") {
+      const parts = timeStr.trim().split(":");
+      if (parts.length >= 2) {
+        const hours = parseInt(parts[0], 10);
+        const minutes = parseInt(parts[1], 10);
+        if (!isNaN(hours) && !isNaN(minutes)) {
+          apptDate.setHours(hours, minutes, 0, 0);
+        }
+      }
+    }
+    const now = new Date();
+    const diffMs = apptDate.getTime() - now.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    return diffMinutes >= 60;
+  };
+
   // Reception-style Appointments Sub-tab & Calendar State
   const [apptSubTab, setApptSubTab] = useState<"scheduled" | "book" | "calendar" | "completed">("scheduled");
-  const [selectedDeptFilter, setSelectedDeptFilter] = useState("all");
   const [apptSearchQuery, setApptSearchQuery] = useState("");
   const [calendarViewDate, setCalendarViewDate] = useState(new Date());
   const [selectedCalendarDayAppts, setSelectedCalendarDayAppts] = useState<{ day: number; appts: any[] } | null>(null);
@@ -622,76 +666,12 @@ export function PatientDashboard() {
   const [selectedBank, setSelectedBank] = useState("HDFC Bank");
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
-  // Dynamic 15-min slot generator & past-slot filter for TODAY ("before slots should not be visible")
-  const generate15MinSlots = (from: string, to: string, duration: number = 15, breakTime?: string) => {
-    const slots: string[] = [];
-    const [startH, startM] = from.split(":").map(Number);
-    const [endH, endM] = to.split(":").map(Number);
-
-    let current = startH * 60 + startM;
-    const end = endH * 60 + endM;
-
-    let breakStart = -1;
-    let breakEnd = -1;
-    if (breakTime) {
-      const [breakH, breakM] = breakTime.split(":").map(Number);
-      breakStart = breakH * 60 + breakM;
-      breakEnd = breakStart + 60;
-    }
-
-    while (current + duration <= end) {
-      if (breakStart !== -1 && current >= breakStart && current < breakEnd) {
-        current += duration;
-        continue;
-      }
-      const h = Math.floor(current / 60);
-      const m = current % 60;
-      const timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-      slots.push(timeStr);
-      current += duration;
-    }
-    return slots;
-  };
-
+  // Slot generation is now handled by the shared generateTimeSlots utility from slotUtils.ts.
+  // This is the SAME function used by the Receptionist Appointments page to ensure
+  // identical slot lists are generated on both dashboards.
   const getAvailableTimeSlots = (dateStr: string, doctorId?: string) => {
     const selectedDoc = doctors?.find((d: any) => d._id === doctorId);
-    let from = "09:00";
-    let to = "17:00";
-    let duration = 15;
-    let breakTime = "13:00";
-
-    if (selectedDoc) {
-      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      const dateObj = new Date(dateStr || new Date());
-      const dayName = days[dateObj.getDay()];
-      const daySchedule = selectedDoc.workingHours?.find((wh: any) => wh.day === dayName);
-
-      if (daySchedule && !daySchedule.active) {
-        return [];
-      }
-      if (daySchedule?.from && daySchedule.from !== "—") from = daySchedule.from;
-      if (daySchedule?.to && daySchedule.to !== "—") to = daySchedule.to;
-      if (selectedDoc.consultationSettings?.slotDuration) duration = selectedDoc.consultationSettings.slotDuration;
-      if (selectedDoc.consultationSettings?.breakTime) breakTime = selectedDoc.consultationSettings.breakTime;
-    }
-
-    let generated = generate15MinSlots(from, to, duration, breakTime);
-
-    // CRITICAL REQUIREMENT: "before slots should not be visible"
-    // For TODAY, filter out all time slots before current time!
-    const todayStr = new Date().toISOString().split("T")[0];
-    const targetDateStr = dateStr || todayStr;
-    if (targetDateStr === todayStr) {
-      const now = new Date();
-      const currentH = now.getHours();
-      const currentM = now.getMinutes();
-      generated = generated.filter((slot) => {
-        const [h, m] = slot.split(":").map(Number);
-        return h > currentH || (h === currentH && m > currentM);
-      });
-    }
-
-    return generated;
+    return generateTimeSlots(selectedDoc, dateStr);
   };
 
   // Helper to check if patient booking is within OP limit (7 days from previous visit)
@@ -939,13 +919,20 @@ export function PatientDashboard() {
     }
 
     let timeToUse = bookingTime;
+    if (timeToUse && bookedSlots.some((b: string) => normalizeTime(b) === normalizeTime(timeToUse))) {
+      toast.error("The selected time slot is already booked for this doctor. Please choose a different slot.");
+      return;
+    }
+
     if (!timeToUse) {
-      const availSlots = getAvailableTimeSlots(dateToUse, docId);
+      const availSlots = getAvailableTimeSlots(dateToUse, docId).filter(
+        (slot: string) => !bookedSlots.some((b: string) => normalizeTime(b) === normalizeTime(slot))
+      );
       if (availSlots.length > 0) {
         timeToUse = availSlots[0];
         setBookingTime(timeToUse);
       } else {
-        toast.error("No available time slots for the selected date. (All past slots for today are hidden). Please pick a future date.");
+        toast.error("No available unbooked time slots for the selected date. Please pick a future date or doctor.");
         return;
       }
     }
@@ -1032,7 +1019,7 @@ export function PatientDashboard() {
       toast.success("Appointment rescheduled successfully!");
       setRescheduleApptId(null);
     } catch (err: any) {
-      toast.error(err.message || "Failed to reschedule appointment.");
+      toast.error(err?.response?.data?.message || err.message || "Failed to reschedule appointment.");
     }
   };
 
@@ -1047,7 +1034,7 @@ export function PatientDashboard() {
       setCancelApptId(null);
       setCancelReason("");
     } catch (err: any) {
-      toast.error(err.message || "Failed to cancel appointment.");
+      toast.error(err?.response?.data?.message || err.message || "Failed to cancel appointment.");
     }
   };
 
@@ -1474,7 +1461,7 @@ export function PatientDashboard() {
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", color: "#fff", fontSize: "12px" }} />
+                      <Tooltip content={<CustomPatientTooltip />} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -1515,7 +1502,7 @@ export function PatientDashboard() {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                       <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#64748b" }} />
                       <YAxis tick={{ fontSize: 10, fill: "#64748b" }} />
-                      <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", color: "#fff", fontSize: "12px" }} />
+                      <Tooltip content={<CustomPatientTooltip />} />
                       <Area type="monotone" dataKey="totalBilled" name="Total Billed (₹)" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#patientBillingGrad)" />
                       <Area type="monotone" dataKey="amountPaid" name="Paid (₹)" stroke="#3b82f6" strokeWidth={2} fillOpacity={0.1} fill="#3b82f6" />
                     </AreaChart>
@@ -1554,7 +1541,7 @@ export function PatientDashboard() {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                       <XAxis dataKey="category" tick={{ fontSize: 9, fill: "#64748b" }} interval={0} />
                       <YAxis tick={{ fontSize: 10, fill: "#64748b" }} />
-                      <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", color: "#fff", fontSize: "12px" }} />
+                      <Tooltip content={<CustomPatientTooltip />} />
                       <Bar dataKey="count" fill="#3b82f6" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -2162,26 +2149,49 @@ export function PatientDashboard() {
                           </div>
 
                           <div className="flex items-center gap-2">
-                            {isUpcoming && (
-                              <>
-                                <button
-                                  onClick={() => {
-                                    setRescheduleApptId(a._id);
-                                    setRescheduleDate(a.date.split("T")[0]);
-                                    setRescheduleTime(a.time);
-                                  }}
-                                  className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-all"
-                                >
-                                  Reschedule
-                                </button>
-                                <button
-                                  onClick={() => setCancelApptId(a._id)}
-                                  className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-all"
-                                >
-                                  Cancel
-                                </button>
-                              </>
-                            )}
+                            {isUpcoming && (() => {
+                              const canAct = isCancellationAllowed(a.date, a.time);
+                              return (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      if (!canAct) {
+                                        toast.error("Appointments can only be cancelled or rescheduled up to 1 hour before the scheduled appointment time.");
+                                        return;
+                                      }
+                                      setRescheduleApptId(a._id);
+                                      setRescheduleDate(a.date.split("T")[0]);
+                                      setRescheduleTime(a.time);
+                                    }}
+                                    title={canAct ? "Reschedule appointment" : "Appointments can only be cancelled or rescheduled up to 1 hour before the scheduled appointment time."}
+                                    className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
+                                      canAct
+                                        ? "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                                        : "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed opacity-60"
+                                    }`}
+                                  >
+                                    Reschedule
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (!canAct) {
+                                        toast.error("Appointments can only be cancelled or rescheduled up to 1 hour before the scheduled appointment time.");
+                                        return;
+                                      }
+                                      setCancelApptId(a._id);
+                                    }}
+                                    title={canAct ? "Cancel appointment" : "Appointments can only be cancelled or rescheduled up to 1 hour before the scheduled appointment time."}
+                                    className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition-all ${
+                                      canAct
+                                        ? "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                                        : "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed opacity-60"
+                                    }`}
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              );
+                            })()}
                             {isUpcoming && (a.type?.toLowerCase().includes("video") || (a as any).meetingLink) && (
                               <div className="flex flex-col items-end gap-1">
                                 <button
@@ -2417,7 +2427,25 @@ export function PatientDashboard() {
                         return (
                           <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5 pt-1">
                             {slots.map((slot) => {
+                              const isBooked = bookedSlots.some(
+                                (b: string) => normalizeTime(b) === normalizeTime(slot)
+                              );
                               const isSelected = bookingTime === slot || (!!bookingTime && !!slot && normalizeTime(bookingTime) === normalizeTime(slot));
+
+                              if (isBooked) {
+                                return (
+                                  <button
+                                    key={slot}
+                                    type="button"
+                                    disabled
+                                    title="This slot is already booked"
+                                    className="rounded-xl border border-slate-200 bg-slate-100/80 text-slate-400 font-semibold cursor-not-allowed opacity-60 line-through py-2.5 text-center text-xs"
+                                  >
+                                    {slot}
+                                  </button>
+                                );
+                              }
+
                               return (
                                 <button
                                   key={slot}
@@ -4255,7 +4283,25 @@ export function PatientDashboard() {
                   return (
                     <div className="grid grid-cols-4 gap-2 max-h-36 overflow-y-auto p-1 border rounded-lg bg-slate-50">
                       {modalSlots.map((slot) => {
-                        const isSelected = bookingTime === slot;
+                        const isBooked = bookedSlots.some(
+                          (b: string) => normalizeTime(b) === normalizeTime(slot)
+                        );
+                        const isSelected = bookingTime === slot || (!!bookingTime && !!slot && normalizeTime(bookingTime) === normalizeTime(slot));
+
+                        if (isBooked) {
+                          return (
+                            <button
+                              key={slot}
+                              type="button"
+                              disabled
+                              title="This slot is already booked"
+                              className="rounded-lg border border-slate-200 bg-slate-100/80 text-slate-400 font-semibold cursor-not-allowed opacity-60 line-through py-1.5 text-center text-xs"
+                            >
+                              {slot}
+                            </button>
+                          );
+                        }
+
                         return (
                           <button
                             key={slot}

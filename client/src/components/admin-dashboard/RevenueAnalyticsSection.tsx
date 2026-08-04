@@ -178,7 +178,7 @@ export function RevenueAnalyticsSection({ invoices, hospitalCounts }: RevenueAna
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#64748b" }} />
                   <YAxis tick={{ fontSize: 11, fill: "#64748b" }} tickFormatter={(val) => `₹${val}`} />
-                  <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", color: "#fff", fontSize: "12px" }} formatter={(value: any) => [formatINR(value), "Amount"]} />
+                  <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", border: "1px solid #1e293b", color: "#fff", fontSize: "12px" }} itemStyle={{ color: "#fff" }} labelStyle={{ color: "#fff", fontWeight: 600 }} formatter={(value: any) => [formatINR(value), "Amount"]} />
                   <Area type="monotone" dataKey="revenue" stroke="#059669" strokeWidth={2.5} fillOpacity={1} fill="url(#revGrad)" name="Collections" />
                 </AreaChart>
               </ResponsiveContainer>
@@ -199,7 +199,7 @@ export function RevenueAnalyticsSection({ invoices, hospitalCounts }: RevenueAna
                       <Cell key={`cell-${index}`} fill={BILLING_COLORS[index % BILLING_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", color: "#fff", fontSize: "12px" }} formatter={(value: any) => [formatINR(value), "Billed Gross"]} />
+                  <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", border: "1px solid #1e293b", color: "#fff", fontSize: "12px" }} itemStyle={{ color: "#fff" }} labelStyle={{ color: "#fff", fontWeight: 600 }} formatter={(value: any) => [formatINR(value), "Billed Gross"]} />
                 </PieChart>
               </ResponsiveContainer>
             )}

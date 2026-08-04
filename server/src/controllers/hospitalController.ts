@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { Types } from "mongoose";
 import { z } from "zod";
 import { Hospital } from "../models/Hospital";
 import { Branch } from "../models/Branch";
@@ -12,6 +13,7 @@ import { emitToHospital } from "../config/socket";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
+import { AppointmentSlotService } from "../services/appointmentSlotService";
 
 const hospitalSchema = z.object({
   name: z.string().min(1),
@@ -217,13 +219,11 @@ export const getPublicHospitalDoctors = catchAsync(async (_req: Request, res: Re
     let doctors = await Doctor.find({
       $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }]
     })
-      .populate("user", "name email avatarUrl")
       .populate("department", "name consultationFee")
       .sort({ createdAt: -1 });
 
     if (!doctors || doctors.length === 0) {
       doctors = await Doctor.find({})
-        .populate("user", "name email avatarUrl")
         .populate("department", "name consultationFee")
         .sort({ createdAt: -1 });
     }
@@ -241,19 +241,10 @@ export const getPublicBookedSlots = catchAsync(async (req: Request, res: Respons
   if (!doctorId || !date) {
     return res.json({ status: "success", data: { bookedSlots: [] } });
   }
-  const parsedDate = new Date(date);
-  const startOfDay = new Date(parsedDate);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(parsedDate);
-  endOfDay.setHours(23, 59, 59, 999);
 
-  const appointments = await Appointment.find({
-    doctor: doctorId,
-    date: { $gte: startOfDay, $lte: endOfDay },
-    status: { $nin: ["cancelled", "no_show"] }
-  }).select("time");
-
-  const bookedSlots = appointments.map(appt => appt.time?.trim()).filter(Boolean);
+  // Delegate to the shared AppointmentSlotService — single source of truth.
+  // No hospitalId scope for public routes (doctor may be cross-hospital in a multi-tenant setup).
+  const bookedSlots = await AppointmentSlotService.getBookedSlots(doctorId, date);
   res.json({ status: "success", data: { bookedSlots } });
 });
 

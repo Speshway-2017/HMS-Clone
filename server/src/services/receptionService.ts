@@ -24,6 +24,7 @@ import { IPBill } from "../models/IPBill";
 import { IPBillPayment } from "../models/IPBillPayment";
 import { RoomTariff } from "../models/RoomTariff";
 import { User } from "../models/User";
+import { validateAppointmentTimeRestriction } from "../utils/appointmentTimeValidation";
 
 
 function generateDigits(length: number): string {
@@ -195,16 +196,14 @@ export class ReceptionService {
       throw new AppError("Patient not found", 404);
     }
     
-    // Find all patient document IDs associated with this patient
-    const patientConds: any[] = [{ _id: patientId }];
-    if (patient.user) patientConds.push({ user: patient.user });
-    if (patient.email) patientConds.push({ email: patient.email });
-    if (patient.phone) {
-      const pClean = patient.phone.replace(/\D/g, "").slice(-10);
-      if (pClean.length >= 7) patientConds.push({ phone: { $regex: `${pClean}$` } });
+    // Find all patient document IDs associated with this patient (by patientId or linked user account)
+    let allPatientIds: any[] = [patientId];
+    if (patient.user) {
+      const relatedDocs = await Patient.find({ hospital: hospitalId, user: patient.user }).select("_id");
+      if (relatedDocs.length > 0) {
+        allPatientIds = relatedDocs.map(p => p._id);
+      }
     }
-    const allPatientDocs = await Patient.find({ hospital: hospitalId, $or: patientConds }).select("_id");
-    const allPatientIds = allPatientDocs.map(p => p._id);
 
     const recentAppointmentsList = await Appointment.find({
       hospital: hospitalId,
@@ -429,9 +428,14 @@ export class ReceptionService {
       }
     }
     // 5. Doctor slot occupancy check (other patients in same time slot)
+    //    Uses the updated ReceptionRepository.checkDoctorSlotOverlap which now applies
+    //    the same $nin status filter as the display layer (AppointmentSlotService).
     const overlap = await ReceptionRepository.checkDoctorSlotOverlap(hospitalId, doctorId, bookingDate, time);
     if (overlap) {
-      throw new AppError("Doctor is already booked for this time slot. Please choose a different slot.", 400);
+      throw new AppError(
+        "This appointment slot has already been booked. Please choose another available slot.",
+        409
+      );
     }
 
     // 6. Generate unique auto-incremented appointment reference ID: APT-YYYYMMDD-XXXXXX (we'll reserve this for later)
@@ -453,23 +457,20 @@ export class ReceptionService {
     const referenceId = `${aptPrefix}${String(nextSerial).padStart(6, "0")}`;
 
     // 7. Calculate consultation/registration fees first to check if appointment is free
-    // Find all patient document IDs associated with this patient (by patientId, or matching email/phone/user)
+    // Find all patient document IDs associated with this patient (by patientId or linked user account)
     const currentPatientDoc = await Patient.findById(patientId);
-    const patientConds: any[] = [{ _id: patientId }];
-    if (currentPatientDoc) {
-      if (currentPatientDoc.user) patientConds.push({ user: currentPatientDoc.user });
-      if (currentPatientDoc.email) patientConds.push({ email: currentPatientDoc.email });
-      if (currentPatientDoc.phone) {
-        const pClean = currentPatientDoc.phone.replace(/\D/g, "").slice(-10);
-        if (pClean.length >= 7) patientConds.push({ phone: { $regex: `${pClean}$` } });
+    let allPatientIds: any[] = [patientId];
+    if (currentPatientDoc?.user) {
+      const relatedDocs = await Patient.find({ hospital: hospitalId, user: currentPatientDoc.user }).select("_id");
+      if (relatedDocs.length > 0) {
+        allPatientIds = relatedDocs.map(p => p._id);
       }
     }
-    const allPatientDocs = await Patient.find({ hospital: hospitalId, $or: patientConds }).select("_id");
-    const allPatientIds = allPatientDocs.map(p => p._id);
 
     const hasOtherAppointments = await Appointment.exists({
       hospital: hospitalId,
-      patient: { $in: allPatientIds }
+      patient: { $in: allPatientIds },
+      status: { $nin: ["cancelled", "no_show"] }
     });
 
     const registrationFee = hasOtherAppointments ? 0 : (type === "Emergency" ? 200 : 100);
@@ -482,7 +483,7 @@ export class ReceptionService {
       }
     }
 
-    // Check if patient has any prior non-cancelled appointment with this doctor within opExpiryLimit
+    // Check if patient has any prior COMPLETED or IN_CONSULTATION appointment with this doctor within opExpiryLimit
     const hospitalRecord = await Hospital.findById(hospitalId);
     const opExpiryLimit = doctor.opExpiryLimit ?? hospitalRecord?.opExpiryLimit ?? 10;
     const expiryDate = new Date(bookingDate);
@@ -496,7 +497,7 @@ export class ReceptionService {
       hospital: hospitalId,
       patient: { $in: allPatientIds },
       doctor: doctorId,
-      status: { $nin: ["cancelled", "no_show"] },
+      status: { $in: ["completed", "in_consultation", "checked_in"] },
       date: { $gte: expiryDate, $lte: bookingDateEnd }
     });
 
@@ -1124,6 +1125,10 @@ export class ReceptionService {
       details: `Simulated Dr. Calling Patient Token ${queueItem.tokenNumber}`
     });
 
+    emitToHospital(hospitalId.toString(), "queue_updated", { queueItem });
+    emitToHospital(hospitalId.toString(), "appointment_updated", { appointmentId: queueItem.appointment, status: "in_consultation" });
+    emitToHospital(hospitalId.toString(), "dashboard_update", { action: "simulate_doctor_call", queueId });
+
     return queueItem;
   }
 
@@ -1219,6 +1224,10 @@ export class ReceptionService {
       action: "SIMULATE_DOCTOR_COMPLETE",
       details: `Simulated consult completion for Token ${queueItem.tokenNumber}. Outcome: ${outcome}`
     });
+
+    emitToHospital(hospitalId.toString(), "queue_updated", { queueItem });
+    emitToHospital(hospitalId.toString(), "appointment_updated", { appointmentId: queueItem.appointment, status: "completed" });
+    emitToHospital(hospitalId.toString(), "dashboard_update", { action: "simulate_doctor_complete", queueId });
 
     return { opVisit, outcome };
   }
@@ -1991,9 +2000,8 @@ export class ReceptionService {
         throw new AppError("Appointment not found.", 404);
       }
 
-      if (["in_consultation", "completed"].includes(appointment.status)) {
-        throw new AppError("Cannot cancel appointment. Consultation has already started or is completed.", 400);
-      }
+      // Enforce strict 1-hour cancellation restriction
+      validateAppointmentTimeRestriction(appointment);
 
       // Check queue state if any
       const queueItem = await Queue.findOne({ appointment: appointmentId, hospital: hospitalId }).session(session);
@@ -2119,7 +2127,10 @@ export class ReceptionService {
     // ── 3. Slot occupancy check (doctor already booked for this slot) ──────────
     const slotOverlap = await ReceptionRepository.checkDoctorSlotOverlap(hospitalId, doctorId, parsedDate, newTime);
     if (slotOverlap && slotOverlap._id.toString() !== appointmentId) {
-      throw new AppError("The doctor is already booked for this date and time slot. Please choose a different slot.", 400);
+      throw new AppError(
+        "This appointment slot has already been booked. Please choose another available slot.",
+        409
+      );
     }
 
     // ── 4. Open transaction ────────────────────────────────────────────────────
@@ -2136,10 +2147,8 @@ export class ReceptionService {
         throw new AppError("Appointment not found.", 404);
       }
 
-      // ── 5. Status guard ────────────────────────────────────────────────────
-      if (["in_consultation", "completed", "cancelled"].includes(appointment.status)) {
-        throw new AppError("Cannot reschedule. Appointment is already in consultation, completed, or cancelled.", 400);
-      }
+      // Enforce strict 1-hour cancellation & rescheduling restriction
+      validateAppointmentTimeRestriction(appointment);
 
       // ── 6. ONE-RESCHEDULE LIMIT ────────────────────────────────────────────
       const currentRescheduleCount = (appointment as any).rescheduleCount ?? appointment.rescheduleHistory?.length ?? 0;

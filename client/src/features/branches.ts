@@ -2,8 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { Branch, Paginated } from "../types/domain";
 
+export type { Branch };
+
 interface BranchListParams {
   page?: number;
+  limit?: number;
   hospitalId?: string;
 }
 
