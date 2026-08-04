@@ -142,7 +142,7 @@ export function OpIpAnalyticsSection({ patients, appointments, admissions = [] }
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", color: "#fff", fontSize: "12px" }} />
+                <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", border: "1px solid #1e293b", color: "#fff", fontSize: "12px" }} itemStyle={{ color: "#fff" }} labelStyle={{ color: "#fff", fontWeight: 600 }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -166,7 +166,7 @@ export function OpIpAnalyticsSection({ patients, appointments, admissions = [] }
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#64748b" }} />
                 <YAxis tick={{ fontSize: 11, fill: "#64748b" }} />
-                <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", color: "#fff", fontSize: "12px" }} />
+                <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", border: "1px solid #1e293b", color: "#fff", fontSize: "12px" }} itemStyle={{ color: "#fff" }} labelStyle={{ color: "#fff", fontWeight: 600 }} />
                 <Area type="monotone" dataKey="op" stackId="1" stroke="#2563eb" fill="#3b82f6" fillOpacity={0.6} name="OP Visits" />
                 <Area type="monotone" dataKey="ip" stackId="1" stroke="#9333ea" fill="#a855f7" fillOpacity={0.8} name="IP Admissions" />
               </AreaChart>

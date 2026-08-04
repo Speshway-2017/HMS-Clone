@@ -149,9 +149,7 @@ export function AppointmentAnalyticsSection({ appointments }: AppointmentAnalyti
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#64748b" }} />
                 <YAxis tick={{ fontSize: 11, fill: "#64748b" }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", color: "#fff", fontSize: "12px" }}
-                />
+                <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", border: "1px solid #1e293b", color: "#fff", fontSize: "12px" }} itemStyle={{ color: "#fff" }} labelStyle={{ color: "#fff", fontWeight: 600 }} />
                 <Bar dataKey="appointments" fill="#cbd5e1" radius={[4, 4, 0, 0]} name="Scheduled" />
                 <Bar dataKey="completed" fill="#0284c7" radius={[4, 4, 0, 0]} name="Completed" />
               </BarChart>
@@ -173,9 +171,7 @@ export function AppointmentAnalyticsSection({ appointments }: AppointmentAnalyti
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#64748b" }} />
                 <YAxis tick={{ fontSize: 11, fill: "#64748b" }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", color: "#fff", fontSize: "12px" }}
-                />
+                <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", border: "1px solid #1e293b", color: "#fff", fontSize: "12px" }} itemStyle={{ color: "#fff" }} labelStyle={{ color: "#fff", fontWeight: 600 }} />
                 <Area type="monotone" dataKey="total" stroke="#0284c7" strokeWidth={2.5} fillOpacity={1} fill="url(#appTrendGrad)" />
               </AreaChart>
             </ResponsiveContainer>

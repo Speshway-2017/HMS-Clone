@@ -118,7 +118,7 @@ export class ReceptionRepository {
       hospital: hospitalId,
       date: { $gte: startOfDay, $lte: endOfDay }
     })
-      .populate("patient", "name uhid phone")
+      .populate("patient", "name uhid phone gender age medicalHistory createdAt")
       .populate("doctor", "name specialization")
       .populate("department", "name")
       .sort({ time: 1 });
@@ -354,7 +354,7 @@ export class ReceptionRepository {
   }
 
   // ── Queue (Token) Operations ──
-  static async getQueueByDate(hospitalId: Types.ObjectId, date: Date) {
+  static async getQueueTokensByDate(hospitalId: Types.ObjectId, date: Date) {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(date);

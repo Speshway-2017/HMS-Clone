@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { formatINR } from "../../lib/currency";
-import { Calendar, User, Search, Stethoscope, FolderHeart, Clock, Plus, List, AlertTriangle, RefreshCw, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, User, Search, Stethoscope, FolderHeart, Clock, Plus, List, AlertTriangle, AlertCircle, RefreshCw, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   useBookAppointment,
   useReceptionQueue,
@@ -53,6 +53,25 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
       : "today";
     setTab(normalizedTab);
   }, [activeTab]);
+
+  const isCancellationAllowed = (dateVal: string | Date, timeStr?: string): boolean => {
+    if (!dateVal) return false;
+    const apptDate = new Date(dateVal);
+    if (timeStr && typeof timeStr === "string") {
+      const parts = timeStr.trim().split(":");
+      if (parts.length >= 2) {
+        const hours = parseInt(parts[0], 10);
+        const minutes = parseInt(parts[1], 10);
+        if (!isNaN(hours) && !isNaN(minutes)) {
+          apptDate.setHours(hours, minutes, 0, 0);
+        }
+      }
+    }
+    const now = new Date();
+    const diffMs = apptDate.getTime() - now.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    return diffMinutes >= 60;
+  };
 
   const [patientQuery, setPatientQuery] = useState("");
   const navigate = useNavigate();
@@ -418,6 +437,10 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
     // 1. Check recentAppointments from backend patientDetail
     const recent = (patientDetail as any)?.recentAppointments || [];
     const matchRecent = recent.some((app: any) => {
+      // Must be a completed or active consultation visit!
+      const isConsultedStatus = app.status === "completed" || app.status === "in_consultation" || app.status === "checked_in";
+      if (!isConsultedStatus) return false;
+
       const docName = String(app.doctorName || "").toLowerCase().replace(/dr\.?\s*/g, "").trim();
       const docId = String(app.doctorId || "");
       const isSameDoctor = (selectedDocId && docId === selectedDocId) || (selectedDocName && docName === selectedDocName) || (docName && selectedDocName && (docName.includes(selectedDocName) || selectedDocName.includes(docName)));
@@ -1492,36 +1515,45 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
               </div>
             </div>
 
-            {/* Action Selector — always visible */}
             {(() => {
               const alreadyRescheduled = getIsAlreadyRescheduled(selectedAppt);
+              const timeAllowed = isCancellationAllowed(selectedAppt?.date, selectedAppt?.time);
               return (
                 <div className="rounded-lg border border-slate-200 p-3 space-y-2">
                   <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">Select Action</p>
-                  <label className="flex items-center gap-3 cursor-pointer">
+                  <label className={`flex items-center gap-3 ${!timeAllowed ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
                     <input
                       type="radio"
                       name="dialogAction"
                       value="cancel"
                       checked={dialogAction === "cancel"}
-                      onChange={() => setDialogAction("cancel")}
+                      onChange={() => timeAllowed && setDialogAction("cancel")}
+                      disabled={!timeAllowed}
                       className="h-4 w-4 accent-red-600"
                     />
                     <span className="text-sm font-semibold text-slate-800">Cancel Appointment</span>
                   </label>
-                  <label className={`flex items-center gap-3 ${alreadyRescheduled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
+                  <label className={`flex items-center gap-3 ${alreadyRescheduled || !timeAllowed ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
                     <input
                       type="radio"
                       name="dialogAction"
                       value="reschedule"
                       checked={dialogAction === "reschedule"}
-                      onChange={() => !alreadyRescheduled && setDialogAction("reschedule")}
-                      disabled={alreadyRescheduled}
+                      onChange={() => !alreadyRescheduled && timeAllowed && setDialogAction("reschedule")}
+                      disabled={alreadyRescheduled || !timeAllowed}
                       className="h-4 w-4 accent-navy-600"
                     />
                     <span className="text-sm font-semibold text-slate-800">Reschedule Appointment</span>
                   </label>
-                  {alreadyRescheduled && (
+                  {!timeAllowed && (
+                    <div className="mt-2 flex items-start gap-2 rounded-md bg-rose-50 border border-rose-200 px-3 py-2">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
+                      <p className="text-xs font-medium text-rose-700 leading-snug">
+                        Appointments can only be cancelled or rescheduled up to 1 hour before the scheduled appointment time.
+                      </p>
+                    </div>
+                  )}
+                  {timeAllowed && alreadyRescheduled && (
                     <div className="mt-2 flex items-start gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2">
                       <svg className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
@@ -1660,11 +1692,11 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                 Close
               </Button>
               {dialogAction === "cancel" ? (
-                <Button type="submit" variant="danger" disabled={isMutating}>
+                <Button type="submit" variant="danger" disabled={isMutating || !isCancellationAllowed(selectedAppt?.date, selectedAppt?.time)}>
                   {cancelMutation.isPending ? "Cancelling..." : "Confirm Cancellation"}
                 </Button>
               ) : (
-                <Button type="submit" disabled={isMutating} className="bg-navy-600 hover:bg-navy-700 text-white">
+                <Button type="submit" disabled={isMutating || !isCancellationAllowed(selectedAppt?.date, selectedAppt?.time)} className="bg-navy-600 hover:bg-navy-700 text-white">
                   {rescheduleMutation.isPending ? "Rescheduling..." : "Confirm Reschedule"}
                 </Button>
               )}
