@@ -19,7 +19,7 @@ import {
 import { useDepartments } from "../../features/departments";
 import { useMyHospital } from "../../features/hospitals";
 import { useCheckInAppointment } from "../../features/appointments";
-import { generateTimeSlots } from "../../lib/slotUtils";
+import { generateTimeSlots, isSlotBooked, formatSlot12Hour } from "../../lib/slotUtils";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -1122,7 +1122,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                   ) : (
                     <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
                       {getFilteredSlots().map((slot: string) => {
-                        const isBooked = bookedSlots?.includes(slot);
+                        const isBooked = isSlotBooked(slot, bookedSlots || []);
                         const isSelected = watch("time") === slot;
 
                         return (
@@ -1133,15 +1133,15 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                             onClick={() => {
                               setValue("time", slot, { shouldValidate: true });
                             }}
-                            className={`flex flex-col items-center justify-center rounded-lg border py-2 text-xs font-semibold shadow-sm transition-all focus:outline-none ${
+                            className={`flex flex-col items-center justify-center rounded-lg border py-2 text-xs font-semibold shadow-xs transition-all focus:outline-none ${
                               isBooked
-                                ? "border-rose-100 bg-rose-50 text-rose-450 line-through cursor-not-allowed"
+                                ? "border-rose-100 bg-rose-50 text-rose-450 line-through cursor-not-allowed opacity-60"
                                 : isSelected
                                 ? "border-navy-600 bg-navy-600 text-white ring-2 ring-navy-100"
                                 : "border-emerald-200 bg-emerald-50/50 text-emerald-700 hover:border-emerald-400 hover:bg-emerald-100 active:scale-95"
                             }`}
                           >
-                            <span>{slot}</span>
+                            <span>{formatSlot12Hour(slot)}</span>
                             {isBooked && <span className="text-[8px] font-bold tracking-tight mt-0.5 opacity-80">Booked</span>}
                           </button>
                         );

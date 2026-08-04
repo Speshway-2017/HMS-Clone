@@ -198,8 +198,8 @@ export function MedicationAdminPage() {
 
       {/* Modal: Administer Medication */}
       {administerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-transparent">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="text-base font-bold text-slate-900">Log Administration</h3>
               <button onClick={() => setAdministerModal(null)} className="text-slate-400 hover:text-slate-600">✕</button>

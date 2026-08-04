@@ -17,7 +17,7 @@ import toast from "react-hot-toast";
 import { socket } from "../../lib/socket";
 import { useNotifications, useDeleteNotification, AppNotification, NotificationType, NotificationSeverity } from "../../features/notifications";
 import { useAuth } from "../../context/AuthContext";
-import { useNurseNotifications } from "../../features/nurse";
+import { useNurseNotifications, useMarkAllNotificationsRead } from "../../features/nurse";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -202,6 +202,7 @@ export function NotificationPanel() {
   // Conditionally load nurse notifications count
   const isNurse = user?.role === "nurse";
   const { data: nurseNotifsData } = useNurseNotifications(isNurse);
+  const nurseMarkAllReadMutation = useMarkAllNotificationsRead();
 
   const { data, isLoading: isGeneralLoading } = useNotifications();
 
@@ -337,6 +338,9 @@ export function NotificationPanel() {
 
   function handleMarkAllRead() {
     setReadIds(new Set(notifications.map((n) => n.id)));
+    if (isNurse) {
+      nurseMarkAllReadMutation.mutate();
+    }
   }
 
   function handleNavigate(link: string) {
@@ -447,14 +451,14 @@ export function NotificationPanel() {
               )}
             </div>
             <div className="flex items-center gap-1">
-              {unreadCount > 0 && (
+              {notifications.length > 0 && (
                 <button
                   onClick={handleMarkAllRead}
-                  className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                  className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-navy-700 hover:bg-navy-50 transition-colors cursor-pointer"
                   title="Mark all as read"
                 >
-                  <CheckCheck className="h-3.5 w-3.5" />
-                  All read
+                  <CheckCheck className="h-3.5 w-3.5 text-navy-700" />
+                  Mark All Read
                 </button>
               )}
               <button

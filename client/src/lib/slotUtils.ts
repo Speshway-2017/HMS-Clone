@@ -164,6 +164,22 @@ export function normalizeSlotTime(time: string): string {
  * using normalised comparison to handle format differences.
  */
 export function isSlotBooked(slot: string, bookedSlots: string[]): boolean {
+  if (!bookedSlots || bookedSlots.length === 0) return false;
   const normalized = normalizeSlotTime(slot);
   return bookedSlots.some((b) => normalizeSlotTime(b) === normalized);
+}
+
+/**
+ * Format a 24-hour HH:MM slot string into a clean 12-hour string with AM/PM label.
+ * Example: "09:00" -> "09:00 AM", "14:30" -> "02:30 PM".
+ */
+export function formatSlot12Hour(timeStr: string): string {
+  if (!timeStr) return "";
+  const norm = normalizeSlotTime(timeStr);
+  const [hStr, mStr] = norm.split(":");
+  const h = parseInt(hStr, 10);
+  if (isNaN(h)) return timeStr;
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${String(h12).padStart(2, "0")}:${mStr} ${period}`;
 }

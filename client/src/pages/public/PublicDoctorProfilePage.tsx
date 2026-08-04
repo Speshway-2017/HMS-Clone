@@ -488,7 +488,7 @@ export function PublicDoctorProfilePage() {
 
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center md:text-right shrink-0">
                 <span className="text-[10px] font-bold text-slate-400 uppercase block">OPD Consultation Fee</span>
-                <span className="text-2xl font-black text-navy-700">₹{doctor.consultationFee ?? doctor.department?.consultationFee ?? 500}</span>
+                <span className="text-2xl font-black text-navy-700">₹{String((doctor as any)?.consultationSettings?.fee || doctor.consultationFee || doctor.department?.consultationFee || 500).replace(/[^0-9.]/g, "") || "500"}</span>
               </div>
             </div>
 
@@ -803,7 +803,7 @@ export function PublicDoctorProfilePage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400 font-semibold">Consultation Fee:</span>
-                <span className="font-bold text-emerald-700">₹{doctor.consultationFee ?? doctor.department?.consultationFee ?? 500}</span>
+                <span className="font-bold text-emerald-700">₹{String((doctor as any)?.consultationSettings?.fee || doctor.consultationFee || doctor.department?.consultationFee || 500).replace(/[^0-9.]/g, "") || "500"}</span>
               </div>
             </div>
 
