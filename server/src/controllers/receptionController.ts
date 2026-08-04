@@ -16,6 +16,7 @@ import { IPBill } from "../models/IPBill";
 import { IPBillPayment } from "../models/IPBillPayment";
 import { Appointment } from "../models/Appointment";
 import { getIPBillItemsSummary } from "./ipBillController";
+import { AppointmentSlotService } from "../services/appointmentSlotService";
 
 
 // Validation Schemas
@@ -688,39 +689,13 @@ export const getBookedSlots = catchAsync(async (req: Request, res: Response) => 
     throw new AppError("doctorId and date are required query parameters.", 400);
   }
 
-  let doctorQuery: any = doctorId;
-  if (Types.ObjectId.isValid(doctorId)) {
-    const docDoc = await Doctor.findOne({
-      $or: [{ _id: doctorId }, { user: doctorId }],
-      hospital: req.hospitalFilter!.hospital
-    });
-    if (docDoc) {
-      doctorQuery = docDoc._id;
-    }
-  } else {
-    const docDoc = await Doctor.findOne({
-      name: new RegExp(doctorId.replace(/^dr\.\s*/i, ""), "i"),
-      hospital: req.hospitalFilter!.hospital
-    });
-    if (docDoc) {
-      doctorQuery = docDoc._id;
-    }
-  }
+  // Delegate entirely to the shared AppointmentSlotService — single source of truth.
+  const bookedSlots = await AppointmentSlotService.getBookedSlots(
+    doctorId,
+    date,
+    req.hospitalFilter!.hospital
+  );
 
-  const parsedDate = new Date(date);
-  const startOfDay = new Date(parsedDate);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(parsedDate);
-  endOfDay.setHours(23, 59, 59, 999);
-
-  const appointments = await Appointment.find({
-    hospital: req.hospitalFilter!.hospital,
-    doctor: doctorQuery,
-    date: { $gte: startOfDay, $lte: endOfDay },
-    status: { $nin: ["cancelled", "no_show"] }
-  }).select("time");
-
-  const bookedSlots = appointments.map(appt => appt.time?.trim()).filter(Boolean);
   res.json({ status: "success", data: { bookedSlots } });
 });
 
