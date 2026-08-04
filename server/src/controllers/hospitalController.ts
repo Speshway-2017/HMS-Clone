@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { Types } from "mongoose";
 import { z } from "zod";
 import { Hospital } from "../models/Hospital";
 import { Branch } from "../models/Branch";
@@ -217,13 +218,11 @@ export const getPublicHospitalDoctors = catchAsync(async (_req: Request, res: Re
     let doctors = await Doctor.find({
       $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }]
     })
-      .populate("user", "name email avatarUrl")
       .populate("department", "name consultationFee")
       .sort({ createdAt: -1 });
 
     if (!doctors || doctors.length === 0) {
       doctors = await Doctor.find({})
-        .populate("user", "name email avatarUrl")
         .populate("department", "name consultationFee")
         .sort({ createdAt: -1 });
     }
@@ -241,6 +240,24 @@ export const getPublicBookedSlots = catchAsync(async (req: Request, res: Respons
   if (!doctorId || !date) {
     return res.json({ status: "success", data: { bookedSlots: [] } });
   }
+
+  let doctorQuery: any = doctorId;
+  if (Types.ObjectId.isValid(doctorId)) {
+    const docDoc = await Doctor.findOne({
+      $or: [{ _id: doctorId }, { user: doctorId }]
+    });
+    if (docDoc) {
+      doctorQuery = docDoc._id;
+    }
+  } else {
+    const docDoc = await Doctor.findOne({
+      name: new RegExp(doctorId.replace(/^dr\.\s*/i, ""), "i")
+    });
+    if (docDoc) {
+      doctorQuery = docDoc._id;
+    }
+  }
+
   const parsedDate = new Date(date);
   const startOfDay = new Date(parsedDate);
   startOfDay.setHours(0, 0, 0, 0);
@@ -248,7 +265,7 @@ export const getPublicBookedSlots = catchAsync(async (req: Request, res: Respons
   endOfDay.setHours(23, 59, 59, 999);
 
   const appointments = await Appointment.find({
-    doctor: doctorId,
+    doctor: doctorQuery,
     date: { $gte: startOfDay, $lte: endOfDay },
     status: { $nin: ["cancelled", "no_show"] }
   }).select("time");

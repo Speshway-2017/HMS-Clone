@@ -76,9 +76,26 @@ import { usePatientProfileMe, usePatientInvoices, usePatientReports, useUpdatePa
 import { useAppointments, useCreateAppointment, useUpdateAppointment } from "../../features/appointments";
 import { useDoctors } from "../../features/doctors";
 import { useNotifications } from "../../features/notifications";
+import { useBookedSlots } from "../../features/receptionist";
 import { api } from "../../lib/api";
 
-
+const CustomPatientTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xl backdrop-blur-md">
+        {label && <p className="mb-1 text-xs font-bold text-slate-700">{label}</p>}
+        {payload.map((entry: any, index: number) => (
+          <div key={`item-${index}`} className="flex items-center gap-2 text-xs">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color || entry.fill || "#6366f1" }} />
+            <span className="font-medium text-slate-600">{entry.name}:</span>
+            <span className="font-extrabold text-slate-900">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
 
 function normalizeTime(t: string): string {
   if (!t) return "";
@@ -522,6 +539,7 @@ export function PatientDashboard() {
   // Appointment Modal States
   const [isBookModalOpen, setIsBookModalOpen] = useState(false);
   const [selectedDoctorId, setSelectedDoctorId] = useState("");
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState("all");
   const [bookingDate, setBookingDate] = useState(new Date().toISOString().split("T")[0]);
   const [bookingTime, setBookingTime] = useState("");
   const [bookingType, setBookingType] = useState<"Appointment" | "Video Consultation" | "Walk-in">("Appointment");
@@ -575,6 +593,11 @@ export function PatientDashboard() {
 
   const updateApptMutation = useUpdateAppointment(rescheduleApptId || cancelApptId || "");
 
+  const targetDoc = getSelectedDoctor();
+  const docObjId = targetDoc?._id || targetDoc?.id || selectedDoctorId;
+  const { data: bookedSlotsRaw } = useBookedSlots(docObjId, bookingDate);
+  const bookedSlots = bookedSlotsRaw || [];
+
   const isCancellationAllowed = (dateVal: string | Date, timeStr?: string): boolean => {
     if (!dateVal) return false;
     const apptDate = new Date(dateVal);
@@ -596,7 +619,6 @@ export function PatientDashboard() {
 
   // Reception-style Appointments Sub-tab & Calendar State
   const [apptSubTab, setApptSubTab] = useState<"scheduled" | "book" | "calendar" | "completed">("scheduled");
-  const [selectedDeptFilter, setSelectedDeptFilter] = useState("all");
   const [apptSearchQuery, setApptSearchQuery] = useState("");
   const [calendarViewDate, setCalendarViewDate] = useState(new Date());
   const [selectedCalendarDayAppts, setSelectedCalendarDayAppts] = useState<{ day: number; appts: any[] } | null>(null);
@@ -958,13 +980,20 @@ export function PatientDashboard() {
     }
 
     let timeToUse = bookingTime;
+    if (timeToUse && bookedSlots.some((b: string) => normalizeTime(b) === normalizeTime(timeToUse))) {
+      toast.error("The selected time slot is already booked for this doctor. Please choose a different slot.");
+      return;
+    }
+
     if (!timeToUse) {
-      const availSlots = getAvailableTimeSlots(dateToUse, docId);
+      const availSlots = getAvailableTimeSlots(dateToUse, docId).filter(
+        (slot: string) => !bookedSlots.some((b: string) => normalizeTime(b) === normalizeTime(slot))
+      );
       if (availSlots.length > 0) {
         timeToUse = availSlots[0];
         setBookingTime(timeToUse);
       } else {
-        toast.error("No available time slots for the selected date. (All past slots for today are hidden). Please pick a future date.");
+        toast.error("No available unbooked time slots for the selected date. Please pick a future date or doctor.");
         return;
       }
     }
@@ -1493,7 +1522,7 @@ export function PatientDashboard() {
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", color: "#fff", fontSize: "12px" }} />
+                      <Tooltip content={<CustomPatientTooltip />} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -1534,7 +1563,7 @@ export function PatientDashboard() {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                       <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#64748b" }} />
                       <YAxis tick={{ fontSize: 10, fill: "#64748b" }} />
-                      <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", color: "#fff", fontSize: "12px" }} />
+                      <Tooltip content={<CustomPatientTooltip />} />
                       <Area type="monotone" dataKey="totalBilled" name="Total Billed (₹)" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#patientBillingGrad)" />
                       <Area type="monotone" dataKey="amountPaid" name="Paid (₹)" stroke="#3b82f6" strokeWidth={2} fillOpacity={0.1} fill="#3b82f6" />
                     </AreaChart>
@@ -1573,7 +1602,7 @@ export function PatientDashboard() {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                       <XAxis dataKey="category" tick={{ fontSize: 9, fill: "#64748b" }} interval={0} />
                       <YAxis tick={{ fontSize: 10, fill: "#64748b" }} />
-                      <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", color: "#fff", fontSize: "12px" }} />
+                      <Tooltip content={<CustomPatientTooltip />} />
                       <Bar dataKey="count" fill="#3b82f6" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -2459,7 +2488,25 @@ export function PatientDashboard() {
                         return (
                           <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5 pt-1">
                             {slots.map((slot) => {
+                              const isBooked = bookedSlots.some(
+                                (b: string) => normalizeTime(b) === normalizeTime(slot)
+                              );
                               const isSelected = bookingTime === slot || (!!bookingTime && !!slot && normalizeTime(bookingTime) === normalizeTime(slot));
+
+                              if (isBooked) {
+                                return (
+                                  <button
+                                    key={slot}
+                                    type="button"
+                                    disabled
+                                    title="This slot is already booked"
+                                    className="rounded-xl border border-slate-200 bg-slate-100/80 text-slate-400 font-semibold cursor-not-allowed opacity-60 line-through py-2.5 text-center text-xs"
+                                  >
+                                    {slot}
+                                  </button>
+                                );
+                              }
+
                               return (
                                 <button
                                   key={slot}
@@ -4297,7 +4344,25 @@ export function PatientDashboard() {
                   return (
                     <div className="grid grid-cols-4 gap-2 max-h-36 overflow-y-auto p-1 border rounded-lg bg-slate-50">
                       {modalSlots.map((slot) => {
-                        const isSelected = bookingTime === slot;
+                        const isBooked = bookedSlots.some(
+                          (b: string) => normalizeTime(b) === normalizeTime(slot)
+                        );
+                        const isSelected = bookingTime === slot || (!!bookingTime && !!slot && normalizeTime(bookingTime) === normalizeTime(slot));
+
+                        if (isBooked) {
+                          return (
+                            <button
+                              key={slot}
+                              type="button"
+                              disabled
+                              title="This slot is already booked"
+                              className="rounded-lg border border-slate-200 bg-slate-100/80 text-slate-400 font-semibold cursor-not-allowed opacity-60 line-through py-1.5 text-center text-xs"
+                            >
+                              {slot}
+                            </button>
+                          );
+                        }
+
                         return (
                           <button
                             key={slot}

@@ -687,6 +687,26 @@ export const getBookedSlots = catchAsync(async (req: Request, res: Response) => 
   if (!doctorId || !date) {
     throw new AppError("doctorId and date are required query parameters.", 400);
   }
+
+  let doctorQuery: any = doctorId;
+  if (Types.ObjectId.isValid(doctorId)) {
+    const docDoc = await Doctor.findOne({
+      $or: [{ _id: doctorId }, { user: doctorId }],
+      hospital: req.hospitalFilter!.hospital
+    });
+    if (docDoc) {
+      doctorQuery = docDoc._id;
+    }
+  } else {
+    const docDoc = await Doctor.findOne({
+      name: new RegExp(doctorId.replace(/^dr\.\s*/i, ""), "i"),
+      hospital: req.hospitalFilter!.hospital
+    });
+    if (docDoc) {
+      doctorQuery = docDoc._id;
+    }
+  }
+
   const parsedDate = new Date(date);
   const startOfDay = new Date(parsedDate);
   startOfDay.setHours(0, 0, 0, 0);
@@ -695,12 +715,12 @@ export const getBookedSlots = catchAsync(async (req: Request, res: Response) => 
 
   const appointments = await Appointment.find({
     hospital: req.hospitalFilter!.hospital,
-    doctor: doctorId,
+    doctor: doctorQuery,
     date: { $gte: startOfDay, $lte: endOfDay },
-    status: { $in: ["scheduled", "checked_in", "in_consultation"] }
+    status: { $nin: ["cancelled", "no_show"] }
   }).select("time");
 
-  const bookedSlots = appointments.map(appt => appt.time);
+  const bookedSlots = appointments.map(appt => appt.time?.trim()).filter(Boolean);
   res.json({ status: "success", data: { bookedSlots } });
 });
 
