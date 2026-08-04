@@ -207,10 +207,11 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
   }
 
   const referenceId = await generateReferenceId(hospitalId.toString(), new Date(body.date));
-
+  const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
   const appointment = await Appointment.create({
     ...body,
     hospital: hospitalId,
+    branch: branchId,
     referenceId,
   });
 

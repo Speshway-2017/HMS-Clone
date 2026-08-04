@@ -133,7 +133,8 @@ export const listPatients = catchAsync(async (req: Request, res: Response) => {
 
 export const createPatient = catchAsync(async (req: Request, res: Response) => {
   const body = patientSchema.parse(req.body);
-  const patient = await Patient.create({ ...body, hospital: req.hospitalFilter!.hospital });
+  const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
+  const patient = await Patient.create({ ...body, hospital: req.hospitalFilter!.hospital, branch: branchId });
 
   if (req.hospitalFilter?.hospital) {
     emitToHospital(req.hospitalFilter.hospital, "patient_created", { patientId: patient._id, name: patient.name, uhid: patient.uhid });

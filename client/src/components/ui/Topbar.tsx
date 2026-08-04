@@ -2,6 +2,7 @@ import { LogOut, Menu } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useMyHospital } from "../../features/hospitals";
 import { NotificationPanel } from "./NotificationPanel";
+import { BranchSwitcher } from "../layout/BranchSwitcher";
 
 interface TopbarProps {
   onMenuClick?: () => void;
@@ -44,6 +45,9 @@ export function Topbar({ onMenuClick }: TopbarProps) {
 
       {/* Master Top-Right Header (Receptionist Reference Standard) */}
       <div className="flex items-center gap-4">
+        {/* Branch Context Switcher */}
+        <BranchSwitcher />
+
         {/* 1. Notification Bell */}
         <NotificationPanel />
 

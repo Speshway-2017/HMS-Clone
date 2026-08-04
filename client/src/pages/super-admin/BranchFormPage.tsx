@@ -15,7 +15,7 @@ export function BranchFormPage() {
   const isEdit = !!id;
   const navigate = useNavigate();
   const { data: branch } = useBranch(id);
-  const { data: hospitalsData } = useHospitals({ page: 1 });
+  const { data: hospitalsData } = useHospitals({ page: 1, limit: 100 });
   const createBranch = useCreateBranch();
   const updateBranch = useUpdateBranch(id ?? "");
 

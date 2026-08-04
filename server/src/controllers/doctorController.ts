@@ -71,9 +71,10 @@ export const listDoctors = catchAsync(async (req: Request, res: Response) => {
 export const createDoctor = catchAsync(async (req: Request, res: Response) => {
   const body = doctorSchema.parse(req.body);
   const hospitalId = req.hospitalFilter!.hospital;
+  const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
 
   // Create the Doctor profile record
-  const doctor = await Doctor.create({ ...body, hospital: hospitalId });
+  const doctor = await Doctor.create({ ...body, hospital: hospitalId, branch: branchId });
 
   // Auto-create a login User account if an email is provided
   let tempPassword: string | undefined;
@@ -86,6 +87,7 @@ export const createDoctor = catchAsync(async (req: Request, res: Response) => {
       passwordHash,
       role: "doctor",
       hospital: hospitalId,
+      branch: branchId,
     });
   }
 
