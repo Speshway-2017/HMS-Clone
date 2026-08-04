@@ -1125,6 +1125,10 @@ export class ReceptionService {
       details: `Simulated Dr. Calling Patient Token ${queueItem.tokenNumber}`
     });
 
+    emitToHospital(hospitalId.toString(), "queue_updated", { queueItem });
+    emitToHospital(hospitalId.toString(), "appointment_updated", { appointmentId: queueItem.appointment, status: "in_consultation" });
+    emitToHospital(hospitalId.toString(), "dashboard_update", { action: "simulate_doctor_call", queueId });
+
     return queueItem;
   }
 
@@ -1220,6 +1224,10 @@ export class ReceptionService {
       action: "SIMULATE_DOCTOR_COMPLETE",
       details: `Simulated consult completion for Token ${queueItem.tokenNumber}. Outcome: ${outcome}`
     });
+
+    emitToHospital(hospitalId.toString(), "queue_updated", { queueItem });
+    emitToHospital(hospitalId.toString(), "appointment_updated", { appointmentId: queueItem.appointment, status: "completed" });
+    emitToHospital(hospitalId.toString(), "dashboard_update", { action: "simulate_doctor_complete", queueId });
 
     return { opVisit, outcome };
   }

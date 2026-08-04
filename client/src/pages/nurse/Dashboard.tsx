@@ -2363,7 +2363,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
          ========================================== */}
       {activeDrawer && createPortal(
         <div
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[999] transition-opacity duration-300 flex justify-end animate-in fade-in"
+          className="fixed inset-0 bg-transparent z-[999] transition-opacity duration-300 flex justify-end animate-in fade-in"
           onClick={() => setActiveDrawer(null)}
         >
           {/* Drawer Content Body */}

@@ -24,7 +24,7 @@ const patientRegistrationSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().min(5, "Phone is required"),
-  age: z.coerce.number().min(0, "Age must be positive"),
+  age: z.coerce.number().min(0, "Age must be at least 0").max(150, "Age cannot exceed 150 years"),
   gender: z.string().min(1, "Gender is required"),
   bloodGroup: z.string().default(""),
   address: z.string().default(""),

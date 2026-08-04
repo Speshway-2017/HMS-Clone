@@ -1610,6 +1610,10 @@ export const startConsultationSession = catchAsync(async (req: Request, res: Res
     { status: "called" }
   );
 
+  emitToHospital(hospitalId.toString(), "appointment_updated", { appointmentId, status: "in_consultation" });
+  emitToHospital(hospitalId.toString(), "queue_updated", { appointmentId, status: "called" });
+  emitToHospital(hospitalId.toString(), "dashboard_update", { action: "start_consultation", appointmentId });
+
   res.json({ status: "success", data: session });
 });
 
@@ -1702,6 +1706,9 @@ export const cancelConsultationSession = catchAsync(async (req: Request, res: Re
     );
 
     await dbSession.commitTransaction();
+    emitToHospital(hospitalId.toString(), "appointment_updated", { appointmentId: session.appointment, status: "checked_in" });
+    emitToHospital(hospitalId.toString(), "queue_updated", { appointmentId: session.appointment, status: "waiting" });
+    emitToHospital(hospitalId.toString(), "dashboard_update", { action: "cancel_consultation", appointmentId: session.appointment });
     res.json({ status: "success", data: session });
   } catch (err) {
     await dbSession.abortTransaction();
@@ -2011,6 +2018,9 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
     );
 
     await dbSession.commitTransaction();
+    emitToHospital(hospitalId.toString(), "appointment_updated", { appointmentId: appointment._id, status: "completed" });
+    emitToHospital(hospitalId.toString(), "queue_updated", { appointmentId: appointment._id, status: "completed" });
+    emitToHospital(hospitalId.toString(), "dashboard_update", { action: "complete_consultation", appointmentId: appointment._id });
     res.json({ status: "success", data: appointment, prescription });
   } catch (err) {
     await dbSession.abortTransaction();

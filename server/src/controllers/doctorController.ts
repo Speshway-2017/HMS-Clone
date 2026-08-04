@@ -15,6 +15,7 @@ import { getDoctorDynamicStatus, getBusyDoctorIds } from "../utils/doctorStatus"
 const doctorSchema = z.object({
   department: z.string().optional().nullable(),
   name: z.string().min(1),
+  gender: z.string().min(1, "Gender is required").default("Male"),
   email: z.string().optional().default(""),
   phone: z.string().optional().default(""),
   photoUrl: z.string().optional().default(""),
