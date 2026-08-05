@@ -19,6 +19,7 @@ import {
 import { useDepartments } from "../../features/departments";
 import { useMyHospital } from "../../features/hospitals";
 import { useCheckInAppointment } from "../../features/appointments";
+import { generateTimeSlots, isSlotBooked, formatSlot12Hour } from "../../lib/slotUtils";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -194,88 +195,12 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const [rescheduleRemarks, setRescheduleRemarks] = useState("");
   const [rescheduleErrors, setRescheduleErrors] = useState<Record<string, string>>({});
 
-  const ALL_SLOTS = ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "14:00", "14:30", "15:00", "15:30", "16:00"];
-
-  const generateSlots = (from: string, to: string, duration: number, breakTime?: string) => {
-    const slots: string[] = [];
-    const [startH, startM] = from.split(":").map(Number);
-    const [endH, endM] = to.split(":").map(Number);
-    
-    let current = startH * 60 + startM;
-    const end = endH * 60 + endM;
-    
-    let breakStart = -1;
-    let breakEnd = -1;
-    if (breakTime) {
-      const [breakH, breakM] = breakTime.split(":").map(Number);
-      breakStart = breakH * 60 + breakM;
-      breakEnd = breakStart + 60; // 1 hour break
-    }
-    
-    while (current + duration <= end) {
-      if (breakStart !== -1 && current >= breakStart && current < breakEnd) {
-        current += duration;
-        continue;
-      }
-      
-      const h = Math.floor(current / 60);
-      const m = current % 60;
-      const timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-      slots.push(timeStr);
-      current += duration;
-    }
-    return slots;
-  };
-
+  // Slot generation delegates to the shared generateTimeSlots utility (slotUtils.ts).
+  // This is the SAME function used by the Patient Dashboard, ensuring both
+  // dashboards display an identical slot list for any given doctor+date combination.
   const getAvailableSlots = (dateStr: string, doctorId?: string) => {
-    if (!doctorId) {
-      return ALL_SLOTS;
-    }
     const selectedDoc = doctors?.find((d: any) => d._id === doctorId);
-    if (!selectedDoc) {
-      return ALL_SLOTS;
-    }
-
-    let from = "09:00";
-    let to = "17:00";
-    
-    const monthlyOverride = selectedDoc.monthlyAvailability?.find((ma: any) => ma.date === dateStr);
-    if (monthlyOverride) {
-      if (!monthlyOverride.active) {
-        return [];
-      }
-      from = monthlyOverride.from || "09:00";
-      to = monthlyOverride.to || "17:00";
-    } else {
-      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      const dateObj = new Date(dateStr);
-      const dayName = days[dateObj.getDay()];
-
-      const daySchedule = selectedDoc.workingHours?.find((wh: any) => wh.day === dayName);
-
-      // If day is off duty or schedule not active, return no slots
-      if (daySchedule && !daySchedule.active) {
-        return [];
-      }
-
-      from = daySchedule?.from && daySchedule.from !== "—" ? daySchedule.from : "09:00";
-      to = daySchedule?.to && daySchedule.to !== "—" ? daySchedule.to : "17:00";
-    }
-
-    const duration = selectedDoc.consultationSettings?.slotDuration ?? 15;
-    const breakTime = selectedDoc.consultationSettings?.breakTime ?? "13:00";
-
-    let generated = generateSlots(from, to, duration, breakTime);
-
-    const todayStr = new Date().toISOString().split("T")[0];
-    if (dateStr === todayStr) {
-      const now = new Date();
-      generated = generated.filter((slot) => {
-        const [h, m] = slot.split(":").map(Number);
-        return h > now.getHours() || (h === now.getHours() && m > now.getMinutes());
-      });
-    }
-    return generated;
+    return generateTimeSlots(selectedDoc, dateStr);
   };
 
   const openDialog = (row: any) => {
@@ -521,8 +446,8 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const isDuplicate = !isFollowUp && dupCheck?.isDuplicate === true;
   const duplicateMessage = dupCheck?.message || "";
 
-  const getFilteredSlots = () => {
-    if (!selectedDate) return ALL_SLOTS;
+  const getFilteredSlots = (): string[] => {
+    if (!selectedDate) return [];
     return getAvailableSlots(selectedDate, selectedDoctorId);
   };
 
@@ -1196,8 +1121,8 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                     </div>
                   ) : (
                     <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
-                      {getFilteredSlots().map((slot) => {
-                        const isBooked = bookedSlots?.includes(slot);
+                      {getFilteredSlots().map((slot: string) => {
+                        const isBooked = isSlotBooked(slot, bookedSlots || []);
                         const isSelected = watch("time") === slot;
 
                         return (
@@ -1208,15 +1133,15 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                             onClick={() => {
                               setValue("time", slot, { shouldValidate: true });
                             }}
-                            className={`flex flex-col items-center justify-center rounded-lg border py-2 text-xs font-semibold shadow-sm transition-all focus:outline-none ${
+                            className={`flex flex-col items-center justify-center rounded-lg border py-2 text-xs font-semibold shadow-xs transition-all focus:outline-none ${
                               isBooked
-                                ? "border-rose-100 bg-rose-50 text-rose-450 line-through cursor-not-allowed"
+                                ? "border-rose-100 bg-rose-50 text-rose-450 line-through cursor-not-allowed opacity-60"
                                 : isSelected
                                 ? "border-navy-600 bg-navy-600 text-white ring-2 ring-navy-100"
                                 : "border-emerald-200 bg-emerald-50/50 text-emerald-700 hover:border-emerald-400 hover:bg-emerald-100 active:scale-95"
                             }`}
                           >
-                            <span>{slot}</span>
+                            <span>{formatSlot12Hour(slot)}</span>
                             {isBooked && <span className="text-[8px] font-bold tracking-tight mt-0.5 opacity-80">Booked</span>}
                           </button>
                         );

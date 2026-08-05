@@ -8,6 +8,7 @@ import {
   updateAppointment,
   deleteAppointment,
   getInvoiceByAppointmentId,
+  getAvailableSlots,
 } from "../controllers/appointmentController";
 
 const router = Router();
@@ -15,6 +16,14 @@ const router = Router();
 router.use(protect, restrictTo("hospital_admin", "doctor", "receptionist", "accountant", "pharmacist", "laboratory", "nurse", "patient"), scopeToHospital);
 
 router.get("/:id/invoice", getInvoiceByAppointmentId);
+
+/**
+ * GET /appointments/available-slots?doctorId=&date=
+ * Single source of truth for booked slot data.
+ * Accessible by both patient and receptionist roles.
+ * Frontend must NEVER use cached data — always fetch fresh.
+ */
+router.get("/available-slots", restrictTo("hospital_admin", "receptionist", "patient"), getAvailableSlots);
 
 router.route("/")
   .get(listAppointments)
@@ -26,3 +35,4 @@ router.route("/:id")
   .delete(restrictTo("hospital_admin"), deleteAppointment);
 
 export default router;
+

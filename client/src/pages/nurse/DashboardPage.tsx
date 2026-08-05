@@ -897,7 +897,7 @@ export function NurseDashboardPage() {
 
       {/* 5. Custom Shift Handover Confirmation Modal Dialog */}
       {isHandoverDialogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-transparent overflow-y-auto">
           <div className="w-full max-w-4xl rounded-2xl bg-white p-6 shadow-2xl my-8 flex flex-col border border-slate-100 max-h-[90vh] overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b mb-4 shrink-0">
               <div>

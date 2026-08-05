@@ -245,8 +245,8 @@ export default function NotificationsPage() {
           <button
             type="button"
             onClick={handleMarkAllRead}
-            disabled={unreadCount === 0}
-            className="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-705 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-sm"
+            disabled={(notifications || []).length === 0}
+            className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-md"
           >
             <CheckCheck className="h-4 w-4" />
             Mark All Read
@@ -479,7 +479,7 @@ export default function NotificationsPage() {
         </div>
       {/* Handover Details Modal */}
       {selectedHandover && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-transparent">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl border border-slate-100 overflow-hidden text-xs">
             {/* Header */}
             <div className="bg-gradient-to-r from-navy-800 to-navy-950 p-4 text-white flex justify-between items-center shrink-0">

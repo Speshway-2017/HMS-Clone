@@ -11,10 +11,11 @@ interface WrapperProps {
 }
 
 export function FieldWrapper({ label, required, hint, children }: WrapperProps) {
+  const cleanLabel = (label || "").replace(/[\s\*\^]+$/, "").trim();
   return (
     <div>
       <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {label}
+        {cleanLabel}
         {required && <span className="text-red-500"> *</span>}
       </label>
       {children}

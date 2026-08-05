@@ -207,6 +207,9 @@ export function useBookAppointment() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reception"] });
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      // Invalidate the shared slot cache so Patient Dashboard immediately
+      // sees slots booked by the Receptionist as unavailable.
+      queryClient.invalidateQueries({ queryKey: ["appointment-slots"] });
     }
   });
 }
@@ -276,8 +279,12 @@ export function useDoctorsAvailability() {
 export function useBookedSlots(doctorId?: string, date?: string) {
   return useQuery({
     queryKey: ["reception", "appointments", "booked-slots", doctorId, date],
+    // Slot availability data is booking-critical: never serve from cache.
+    staleTime: 0,           // Always re-fetch from server
+    gcTime: 0,              // Evict immediately when component unmounts
+    refetchInterval: 30_000, // Auto-refresh every 30s while booking panel is open
     queryFn: async () => {
-      if (!doctorId || !date) return [];
+      if (!doctorId || !date) return [] as string[];
       const res = await api.get<{ data: { bookedSlots: string[] } }>("/reception/appointments/booked-slots", {
         params: { doctorId, date }
       });
@@ -570,6 +577,9 @@ export function useCancelAppointment() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reception"] });
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      // Releasing a slot: invalidate both cache keys so both dashboards
+      // immediately show the slot as available again.
+      queryClient.invalidateQueries({ queryKey: ["appointment-slots"] });
     }
   });
 }
@@ -607,6 +617,9 @@ export function useRescheduleAppointment() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reception"] });
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      // Old slot released, new slot booked: invalidate both cache keys so
+      // both dashboards immediately reflect the updated availability.
+      queryClient.invalidateQueries({ queryKey: ["appointment-slots"] });
     }
   });
 }

@@ -147,7 +147,7 @@ export function DoctorSettingsPage() {
     qualification:  "",
     licenseNo:      "",
     bio:            "",
-    consultationFee:"₹500",
+    consultationFee:"500",
     languages:      "English, Hindi",
     opExpiryLimit:  10,
   });
@@ -222,7 +222,7 @@ export function DoctorSettingsPage() {
         qualification: doctorProfile.qualification || "",
         licenseNo: doctorProfile.licenseNo || "",
         bio: doctorProfile.bio || "",
-        consultationFee: doctorProfile.consultationFee || "₹500",
+        consultationFee: doctorProfile.consultationFee ? String(doctorProfile.consultationFee).replace(/[^0-9.]/g, "") : "500",
         languages: doctorProfile.languages || "English, Hindi",
         opExpiryLimit: doctorProfile.opExpiryLimit ?? 10,
       });

@@ -29,18 +29,31 @@ export function DashboardLayout() {
   }, [hospital?.logoUrl]);
 
   useEffect(() => {
-    if (user?.hospital) {
-      socket.emit("join_hospital", user.hospital);
-    }
-    if (user?.role === "doctor" && doctorProfile?._id) {
-      socket.emit("join_doctor", doctorProfile._id);
-    }
+    const rawHosp = user?.hospital;
+    const hospId = rawHosp
+      ? (typeof rawHosp === "object" ? (rawHosp as any)._id || (rawHosp as any).id : rawHosp).toString()
+      : null;
+
+    const joinRooms = () => {
+      if (hospId) {
+        socket.emit("join_hospital", hospId);
+      }
+      if (user?.role === "doctor" && doctorProfile?._id) {
+        socket.emit("join_doctor", doctorProfile._id.toString());
+      }
+    };
+
+    joinRooms();
+    socket.on("connect", joinRooms);
+    return () => {
+      socket.off("connect", joinRooms);
+    };
   }, [user, doctorProfile]);
 
   useEffect(() => {
     const handleUpdate = (data: unknown) => {
       console.log("Real-time update received via Socket.IO:", data);
-      // Invalidate all query keys to trigger real-time auto-updates
+      // Invalidate all query keys to trigger real-time auto-updates across dashboards
       queryClient.invalidateQueries();
     };
 
@@ -50,26 +63,38 @@ export function DashboardLayout() {
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
     };
 
-    socket.on("dashboard_update", handleUpdate);
-    socket.on("admission:request:created", handleUpdate);
-    socket.on("admission_request_update", handleUpdate);
-    socket.on("prescription:new", handleUpdate);
-    socket.on("prescription:updated", handleUpdate);
-    socket.on("prescription:dispensed", handleUpdate);
-    socket.on("notification:new", handleUpdate);
-    // Department real-time events
+    const events = [
+      "dashboard_update",
+      "appointment_created",
+      "appointment_updated",
+      "queue_updated",
+      "patient_updated",
+      "billing_updated",
+      "ip_billing_update",
+      "ip_bill_update",
+      "lab_order_created",
+      "lab_result_updated",
+      "vitals_updated",
+      "inventory_updated",
+      "new_admission_request",
+      "admission_request_update",
+      "discharge_requested",
+      "new_appointment",
+      "attendance:updated",
+      "leave:updated",
+      "prescription:new",
+      "prescription:updated",
+      "prescription:dispensed",
+      "notification:new"
+    ];
+
+    events.forEach((evt) => socket.on(evt, handleUpdate));
     socket.on("department:updated", handleDeptUpdate);
     socket.on("department:statusChanged", handleDeptUpdate);
     socket.on("department:deleted", handleDeptUpdate);
 
     return () => {
-      socket.off("dashboard_update", handleUpdate);
-      socket.off("admission:request:created", handleUpdate);
-      socket.off("admission_request_update", handleUpdate);
-      socket.off("prescription:new", handleUpdate);
-      socket.off("prescription:updated", handleUpdate);
-      socket.off("prescription:dispensed", handleUpdate);
-      socket.off("notification:new", handleUpdate);
+      events.forEach((evt) => socket.off(evt, handleUpdate));
       socket.off("department:updated", handleDeptUpdate);
       socket.off("department:statusChanged", handleDeptUpdate);
       socket.off("department:deleted", handleDeptUpdate);

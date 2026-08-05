@@ -36,6 +36,7 @@ export function StaffFormPage() {
 
   const [form, setForm] = useState({
     name: "",
+    gender: "Male",
     email: "",
     phone: "",
     photoUrl: "",
@@ -52,6 +53,7 @@ export function StaffFormPage() {
     if (staff) {
       setForm({
         name: staff.name,
+        gender: (staff as any).gender || "Male",
         email: staff.email,
         phone: staff.phone,
         photoUrl: staff.photoUrl,
@@ -189,6 +191,11 @@ export function StaffFormPage() {
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             placeholder="e.g. Sarah Jenkins"
           />
+          <SelectField label="Gender *" required value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </SelectField>
           <InputField
             label="Email Address (used for login)"
             type="email"

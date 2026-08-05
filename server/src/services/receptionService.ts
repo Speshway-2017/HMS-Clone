@@ -442,9 +442,14 @@ export class ReceptionService {
       }
     }
     // 5. Doctor slot occupancy check (other patients in same time slot)
+    //    Uses the updated ReceptionRepository.checkDoctorSlotOverlap which now applies
+    //    the same $nin status filter as the display layer (AppointmentSlotService).
     const overlap = await ReceptionRepository.checkDoctorSlotOverlap(hospitalId, doctorId, bookingDate, time);
     if (overlap) {
-      throw new AppError("Doctor is already booked for this time slot. Please choose a different slot.", 400);
+      throw new AppError(
+        "This appointment slot has already been booked. Please choose another available slot.",
+        409
+      );
     }
 
     // 6. Generate unique auto-incremented appointment reference ID: APT-YYYYMMDD-XXXXXX (we'll reserve this for later)
@@ -1134,6 +1139,10 @@ export class ReceptionService {
       details: `Simulated Dr. Calling Patient Token ${queueItem.tokenNumber}`
     });
 
+    emitToHospital(hospitalId.toString(), "queue_updated", { queueItem });
+    emitToHospital(hospitalId.toString(), "appointment_updated", { appointmentId: queueItem.appointment, status: "in_consultation" });
+    emitToHospital(hospitalId.toString(), "dashboard_update", { action: "simulate_doctor_call", queueId });
+
     return queueItem;
   }
 
@@ -1229,6 +1238,10 @@ export class ReceptionService {
       action: "SIMULATE_DOCTOR_COMPLETE",
       details: `Simulated consult completion for Token ${queueItem.tokenNumber}. Outcome: ${outcome}`
     });
+
+    emitToHospital(hospitalId.toString(), "queue_updated", { queueItem });
+    emitToHospital(hospitalId.toString(), "appointment_updated", { appointmentId: queueItem.appointment, status: "completed" });
+    emitToHospital(hospitalId.toString(), "dashboard_update", { action: "simulate_doctor_complete", queueId });
 
     return { opVisit, outcome };
   }
@@ -2128,7 +2141,10 @@ export class ReceptionService {
     // ── 3. Slot occupancy check (doctor already booked for this slot) ──────────
     const slotOverlap = await ReceptionRepository.checkDoctorSlotOverlap(hospitalId, doctorId, parsedDate, newTime);
     if (slotOverlap && slotOverlap._id.toString() !== appointmentId) {
-      throw new AppError("The doctor is already booked for this date and time slot. Please choose a different slot.", 400);
+      throw new AppError(
+        "This appointment slot has already been booked. Please choose another available slot.",
+        409
+      );
     }
 
     // ── 4. Open transaction ────────────────────────────────────────────────────
