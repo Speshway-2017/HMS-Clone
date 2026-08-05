@@ -4,6 +4,7 @@ import { scopeToHospital } from "../middleware/scopeToHospital";
 import {
   listHospitals,
   createHospital,
+  getHospitalCode,
   getHospital,
   updateHospital,
   deleteHospital,
@@ -39,6 +40,7 @@ router.patch("/me", protect, restrictTo("hospital_admin", "laboratory"), updateM
 
 router.use(protect, restrictTo("super_admin"));
 
+router.get("/generate-code", getHospitalCode);
 router.get("/unassigned-admins", listUnassignedHospitalAdmins);
 router.route("/").get(listHospitals).post(createHospital);
 router.route("/:id").get(getHospital).patch(updateHospital).delete(deleteHospital);

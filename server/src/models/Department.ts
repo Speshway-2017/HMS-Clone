@@ -62,3 +62,6 @@ departmentSchema.index(
 
 export type Department = InferSchemaType<typeof departmentSchema> & { _id: Types.ObjectId };
 export const Department = model("Department", departmentSchema);
+
+// Drop legacy hospital_1_code_1 index if it lacks partialFilterExpression
+Department.collection.dropIndex("hospital_1_code_1").catch(() => {});
