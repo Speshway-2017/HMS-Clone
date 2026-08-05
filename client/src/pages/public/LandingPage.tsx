@@ -894,11 +894,10 @@ export function LandingPage() {
                       return (
                         <div
                           key={idx}
-                          className={`rounded-2xl border transition-all duration-300 overflow-hidden ${
-                            isOpen
+                          className={`rounded-2xl border transition-all duration-300 overflow-hidden ${isOpen
                               ? "border-[#0505a9] bg-white shadow-md ring-2 ring-[#0505a9]/10"
                               : "border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:shadow-md"
-                          }`}
+                            }`}
                         >
                           <button
                             type="button"
@@ -909,9 +908,8 @@ export function LandingPage() {
                               {faq.q}
                             </span>
                             <div
-                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-transform duration-300 ${
-                                isOpen ? "bg-[#0505a9] text-white rotate-180" : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
-                              }`}
+                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-transform duration-300 ${isOpen ? "bg-[#0505a9] text-white rotate-180" : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
+                                }`}
                             >
                               <ChevronDown className="h-4 w-4" />
                             </div>
