@@ -10,7 +10,7 @@ const roomSchema = new Schema(
     floor: { type: Number, required: true },
     roomType: {
       type: String,
-      enum: ["General", "Semi-Private", "Private", "ICU", "NICU", "Emergency"],
+      enum: ["General", "Semi Private", "Semi-Private", "Private", "Deluxe", "Suite", "ICU", "NICU", "PICU", "Emergency", "Isolation"],
       required: true
     },
     acType: {
@@ -18,9 +18,31 @@ const roomSchema = new Schema(
       enum: ["AC", "Non AC"],
       default: "Non AC"
     },
+    acSubTypes: [
+      {
+        type: String,
+        enum: ["Central AC", "Split AC", "Temperature Controlled"]
+      }
+    ],
     capacity: { type: Number, required: true },
     description: { type: String, default: "" },
-    status: { type: String, enum: ["Active", "Inactive"], default: "Active" }
+    status: {
+      type: String,
+      enum: ["Available", "Occupied", "Cleaning", "Maintenance", "Blocked", "Active", "Inactive"],
+      default: "Active"
+    },
+    tariff: {
+      roomChargePerDay: { type: Number, default: 0 },
+      admissionDeposit: { type: Number, default: 0 },
+      extraBedCharge: { type: Number, default: 0 },
+      nursingCharge: { type: Number, default: 0 },
+      serviceCharge: { type: Number, default: 0 },
+      emergencyCharge: { type: Number, default: 0 },
+      discountPercent: { type: Number, default: 0 },
+      gstPercent: { type: Number, default: 0 },
+      effectiveFrom: { type: Date, default: Date.now },
+      status: { type: String, enum: ["Active", "Inactive"], default: "Active" }
+    }
   },
   { timestamps: true }
 );

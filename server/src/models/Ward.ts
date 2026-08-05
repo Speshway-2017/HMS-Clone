@@ -7,7 +7,22 @@ const wardSchema = new Schema(
     code: { type: String, required: true },
     wardType: {
       type: String,
-      enum: ["General Ward", "Semi-Private Ward", "Private Ward", "ICU", "NICU", "Emergency Ward"],
+      enum: [
+        "General Ward",
+        "Semi-Private Ward",
+        "Private Ward",
+        "ICU",
+        "NICU",
+        "PICU",
+        "Emergency",
+        "Emergency Ward",
+        "Operation Theatre",
+        "Labour Ward",
+        "Semi Private",
+        "Private",
+        "Deluxe",
+        "VIP"
+      ],
       required: true
     },
     floorNumber: { type: Number, required: true },

@@ -48,6 +48,16 @@ export const listWards = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+export const getWard = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital;
+  const { id } = req.params;
+  const ward = await Ward.findOne({ _id: id, hospital: hospitalId });
+  if (!ward) {
+    throw new AppError("Ward not found.", 404);
+  }
+  res.json({ status: "success", data: { ward } });
+});
+
 export const createWard = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital;
   const { name, code, wardType, floorNumber, description, status } = req.body;
