@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 import { api } from "../lib/api";
 import { Doctor, Paginated } from "../types/domain";
 import { useAuth } from "../context/AuthContext";
@@ -80,7 +81,14 @@ export function useDeleteDoctor() {
     mutationFn: async (id: string) => {
       await api.delete(`/doctors/${id}`);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["doctors"] }),
+    onSuccess: () => {
+      toast.success("Doctor deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["doctors"] });
+      queryClient.invalidateQueries({ queryKey: ["public", "doctors"] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || "Failed to delete doctor.");
+    }
   });
 }
 

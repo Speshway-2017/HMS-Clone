@@ -25,18 +25,80 @@ const staffSchema = z.object({
   rating: z.coerce.number().min(0).max(5).optional(),
 });
 
+import { Doctor } from "../models/Doctor";
+
+export async function syncDoctorStaffRecords() {
+  try {
+    const doctorStaffList = await Staff.find({
+      $or: [
+        { role: { $regex: /^doctor$/i } },
+        { role: { $regex: /doctor/i } }
+      ]
+    });
+
+    for (const s of doctorStaffList) {
+      let existingDoc = await Doctor.findOne({
+        hospital: s.hospital,
+        $or: [
+          ...(s.email ? [{ email: s.email.toLowerCase() }] : []),
+          ...(s.employeeId ? [{ licenseNo: s.employeeId }] : []),
+          { name: s.name, hospital: s.hospital }
+        ]
+      });
+
+      if (!existingDoc) {
+        await Doctor.create({
+          hospital: s.hospital,
+          branch: s.branch,
+          name: s.name,
+          gender: s.gender || "Male",
+          email: s.email || "",
+          phone: s.phone || "",
+          photoUrl: s.photoUrl || "",
+          department: s.department || null,
+          qualification: s.qualifications || "",
+          licenseNo: s.employeeId || "",
+          rating: s.rating || 0,
+          status: s.dutyStatus === "on_leave" ? "on_leave" : s.dutyStatus === "off_duty" ? "off_duty" : "on_duty",
+          isActive: true,
+        });
+      }
+
+      if (s.email) {
+        await User.findOneAndUpdate(
+          { email: s.email.toLowerCase() },
+          { role: "doctor" }
+        );
+      }
+
+      await Staff.deleteOne({ _id: s._id });
+    }
+  } catch (err) {
+    console.error("Error syncing doctor staff records:", err);
+  }
+}
+
 export const listStaff = catchAsync(async (req: Request, res: Response) => {
+  await syncDoctorStaffRecords();
+
   const { page, limit, skip } = getPagination(req, 20);
   const { role, search } = req.query as Record<string, string | undefined>;
 
   const filter: Record<string, unknown> = { ...req.hospitalFilter };
-  if (role) filter.role = role;
+  if (role) {
+    filter.role = role;
+  } else {
+    filter.role = { $nin: ["doctor", "Doctor", "DOC", "doc"] };
+  }
   if (search) filter.name = new RegExp(search, "i");
 
   const [staff, total, dutyCounts] = await Promise.all([
     Staff.find(filter).populate("department", "name").sort({ createdAt: -1 }).skip(skip).limit(limit),
     Staff.countDocuments(filter),
-    Staff.aggregate([{ $match: req.hospitalFilter as Record<string, unknown> }, { $group: { _id: "$dutyStatus", count: { $sum: 1 } } }]),
+    Staff.aggregate([
+      { $match: { ...(req.hospitalFilter as Record<string, unknown>), role: { $nin: ["doctor", "Doctor", "DOC", "doc"] } } },
+      { $group: { _id: "$dutyStatus", count: { $sum: 1 } } }
+    ]),
   ]);
 
   const countByStatus = (key: string) => dutyCounts.find((c) => c._id === key)?.count ?? 0;
@@ -72,7 +134,14 @@ export const listStaff = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const getTopStaff = catchAsync(async (req: Request, res: Response) => {
-  const staff = await Staff.find(req.hospitalFilter as Record<string, unknown>)
+  await syncDoctorStaffRecords();
+
+  const filter = {
+    ...(req.hospitalFilter as Record<string, unknown>),
+    role: { $nin: ["doctor", "Doctor", "DOC", "doc"] }
+  };
+
+  const staff = await Staff.find(filter)
     .sort({ rating: -1 })
     .limit(3);
   res.json({ status: "success", data: { staff } });
@@ -80,8 +149,9 @@ export const getTopStaff = catchAsync(async (req: Request, res: Response) => {
 
 export const getNextEmployeeId = catchAsync(async (req: Request, res: Response) => {
   const role = (req.query.role as string) || "staff";
-  const hospitalId = req.hospitalFilter!.hospital;
-  const employeeId = await generateUniqueEmployeeId(role, hospitalId);
+  const hospitalId = req.hospitalFilter?.hospital || (req.query.hospital as string);
+  const branchId = req.hospitalFilter?.branch || (req.query.branch as string) || null;
+  const employeeId = await generateUniqueEmployeeId(role, hospitalId, branchId);
   res.json({ status: "success", data: { employeeId } });
 });
 
@@ -90,35 +160,85 @@ export const createStaff = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital;
   const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
 
+  const isDoctorRole = (body.role || "").toLowerCase().includes("doctor");
+
   let employeeId = body.employeeId?.trim();
   if (!employeeId) {
-    employeeId = await generateUniqueEmployeeId(body.role || "staff", hospitalId);
+    employeeId = await generateUniqueEmployeeId(body.role || "staff", hospitalId, branchId);
   }
 
-  const staff = await Staff.create({ ...body, employeeId, hospital: hospitalId, branch: branchId });
-
-  // Auto-create a login User account for staff members with an email
+  let createdRecord: any;
   let tempPassword: string | undefined;
-  if (body.email) {
-    tempPassword = generateTempPassword();
-    const passwordHash = await bcrypt.hash(tempPassword, 10);
-    
-    const userRole = body.role || "receptionist";
 
-    await User.create({
-      name: body.name,
-      email: body.email,
-      passwordHash,
-      role: userRole,
-      employeeId,
+  if (isDoctorRole) {
+    let doc = await Doctor.findOne({
       hospital: hospitalId,
-      branch: branchId,
+      $or: [
+        ...(body.email ? [{ email: body.email.toLowerCase() }] : []),
+        { licenseNo: employeeId }
+      ]
     });
+
+    if (!doc) {
+      doc = await Doctor.create({
+        hospital: hospitalId,
+        branch: branchId,
+        name: body.name,
+        gender: body.gender || "Male",
+        email: body.email || "",
+        phone: body.phone || "",
+        photoUrl: body.photoUrl || "",
+        department: body.department || null,
+        qualification: body.qualifications || "",
+        licenseNo: employeeId,
+        rating: body.rating || 0,
+        status: body.dutyStatus === "on_leave" ? "on_leave" : body.dutyStatus === "off_duty" ? "off_duty" : "on_duty",
+        isActive: true,
+      });
+    }
+    createdRecord = doc.toObject();
+
+    if (body.email) {
+      tempPassword = generateTempPassword();
+      const passwordHash = await bcrypt.hash(tempPassword, 10);
+      const existingUser = await User.findOne({ email: body.email.toLowerCase() });
+      if (!existingUser) {
+        await User.create({
+          name: body.name,
+          email: body.email,
+          passwordHash,
+          role: "doctor",
+          employeeId,
+          hospital: hospitalId,
+          branch: branchId,
+        });
+      }
+    }
+  } else {
+    const staff = await Staff.create({ ...body, employeeId, hospital: hospitalId, branch: branchId });
+    createdRecord = staff.toObject();
+
+    if (body.email) {
+      tempPassword = generateTempPassword();
+      const passwordHash = await bcrypt.hash(tempPassword, 10);
+      const existingUser = await User.findOne({ email: body.email.toLowerCase() });
+      if (!existingUser) {
+        await User.create({
+          name: body.name,
+          email: body.email,
+          passwordHash,
+          role: body.role || "receptionist",
+          employeeId,
+          hospital: hospitalId,
+          branch: branchId,
+        });
+      }
+    }
   }
 
   res.status(201).json({
     status: "success",
-    data: { staff, tempPassword: tempPassword ?? null },
+    data: { staff: createdRecord, tempPassword: tempPassword ?? null },
   });
 });
 

@@ -35,9 +35,20 @@ function generateDigits(length: number): string {
   return out;
 }
 
+function parseHospitalAndBranch(filterOrId: any): { targetHospital: any; targetBranch: any } {
+  if (filterOrId && typeof filterOrId === "object" && (filterOrId.hospital || "branch" in filterOrId)) {
+    return {
+      targetHospital: filterOrId.hospital,
+      targetBranch: filterOrId.branch !== undefined ? filterOrId.branch : null,
+    };
+  }
+  return { targetHospital: filterOrId, targetBranch: null };
+}
+
 export class ReceptionService {
   // ── Dashboard Statistics ──
-  static async getStats(hospitalId: Types.ObjectId) {
+  static async getStats(filterOrId: any) {
+    const filter = typeof filterOrId === "object" && (filterOrId.hospital || "branch" in filterOrId) ? filterOrId : { hospital: filterOrId };
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
@@ -60,33 +71,33 @@ export class ReceptionService {
       completedIpBillsCount
     ] = await Promise.all([
       // Today's Registrations
-      Patient.countDocuments({ hospital: hospitalId, createdAt: { $gte: today, $lt: tomorrow } }),
+      Patient.countDocuments({ ...filter, createdAt: { $gte: today, $lt: tomorrow } }),
       // Today's OP Visits
-      ReceptionRepository.getOPHistory(hospitalId, 1, 1).then(r => r?.total ?? 0),
+      ReceptionRepository.getOPHistory(filter, 1, 1).then(r => r?.total ?? 0),
       // Current IP Admissions (all currently admitted inpatients)
-      Admission.countDocuments({ hospital: hospitalId, status: "admitted" }),
+      Admission.countDocuments({ ...filter, status: "admitted" }),
       // Invoices for pending/paid status check
-      Invoice.find({ hospital: hospitalId }),
+      Invoice.find(filter),
       // Today's collections from payment
-      Payment.find({ hospital: hospitalId, paidAt: { $gte: today, $lt: tomorrow } }),
+      Payment.find({ ...filter, paidAt: { $gte: today, $lt: tomorrow } }),
       // Today's Appointments
-      ReceptionRepository.listAppointments(hospitalId, today).then(r => r.length),
+      ReceptionRepository.listAppointments(filter, today).then(r => r.length),
       // Waiting Queue
-      Queue.countDocuments({ hospital: hospitalId, status: "waiting", createdAt: { $gte: today, $lt: tomorrow } }),
+      Queue.countDocuments({ ...filter, status: "waiting", createdAt: { $gte: today, $lt: tomorrow } }),
       // Emergency Queue
-      Queue.countDocuments({ hospital: hospitalId, type: "emergency", status: "waiting", createdAt: { $gte: today, $lt: tomorrow } }),
+      Queue.countDocuments({ ...filter, type: "emergency", status: "waiting", createdAt: { $gte: today, $lt: tomorrow } }),
       // Doctors Status
-      Doctor.find({ hospital: hospitalId }),
+      Doctor.find(filter),
       // Active rooms
-      Room.find({ hospital: hospitalId, status: { $in: ["active", "Active"] } }),
+      Room.find({ ...filter, status: { $in: ["active", "Active"] } }),
       // Bed counts
-      Bed.find({ hospital: hospitalId }),
+      Bed.find(filter),
       // Today's IP collections from IPBillPayment
-      IPBillPayment.find({ hospital: hospitalId, paidAt: { $gte: today, $lt: tomorrow } }),
+      IPBillPayment.find({ ...filter, paidAt: { $gte: today, $lt: tomorrow } }),
       // Pending IP bills
-      IPBill.countDocuments({ hospital: hospitalId, status: "Generated", outstanding: { $gt: 0 } }),
+      IPBill.countDocuments({ ...filter, status: "Generated", outstanding: { $gt: 0 } }),
       // Completed IP bills
-      IPBill.countDocuments({ hospital: hospitalId, status: "Paid" })
+      IPBill.countDocuments({ ...filter, status: "Paid" })
     ]);
 
     const pendingPaymentsCount = invoices.filter((inv: any) => inv.status === "pending" || inv.status === "partially_paid").length + pendingIpBillsCount;
@@ -95,7 +106,7 @@ export class ReceptionService {
       collectionsToday.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) +
       ipCollectionsToday.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
-    const busyDoctorIds = await getBusyDoctorIds(hospitalId);
+    const busyDoctorIds = await getBusyDoctorIds(filter.hospital || filterOrId);
     const resolvedDoctors = doctorsCount.map((d: any) => {
       return { ...d.toObject(), status: getDoctorDynamicStatus(d, busyDoctorIds) };
     });
@@ -141,7 +152,8 @@ export class ReceptionService {
   }
 
   // ── Patient Registration ──
-  static async registerPatient(hospitalId: Types.ObjectId, patientData: any, userId: Types.ObjectId) {
+  static async registerPatient(filterOrId: any, patientData: any, userId: Types.ObjectId) {
+    const { targetHospital, targetBranch } = parseHospitalAndBranch(filterOrId);
     const uhid = `UHID-${generateDigits(10)}`;
     const patientCode = `PAT-${generateDigits(6)}`;
     const qrCode = `HMS|${uhid}|${patientData.name}|${patientData.phone}`;
@@ -168,7 +180,8 @@ export class ReceptionService {
     const newPatient = await ReceptionRepository.createPatient({
       ...patientData,
       ...(linkedUserId ? { user: linkedUserId } : {}),
-      hospital: hospitalId,
+      hospital: targetHospital,
+      branch: targetBranch || patientData.branch || null,
       uhid,
       patientCode,
       qrCode,
@@ -176,7 +189,8 @@ export class ReceptionService {
     });
 
     await ReceptionRepository.createAuditLog({
-      hospital: hospitalId,
+      hospital: targetHospital,
+      branch: targetBranch,
       user: userId,
       action: "PATIENT_REGISTER",
       details: `Registered patient ${newPatient.name} with UHID ${uhid}`

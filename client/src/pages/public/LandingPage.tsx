@@ -213,6 +213,13 @@ export function LandingPage() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace("#", "");
+      if (hash === "book") {
+        window.location.hash = "#doctors";
+        setActiveTab("doctors");
+        setMobileMenuOpen(false);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
       const validTabs = [
         "home",
         "about",
@@ -220,7 +227,6 @@ export function LandingPage() {
         "doctors",
         "services",
         "blog",
-        "book",
         "contact",
         "privacy",
         "terms",
@@ -944,21 +950,25 @@ export function LandingPage() {
                   const fee = String((doc.consultationSettings as any)?.fee || doc.consultationFee || doc.fee || 500).replace(/[^0-9]/g, "") || "500";
 
                   return (
+<<<<<<< Updated upstream
                     <div key={doc._id || doc.id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between hover:border-navy-200 transition-all hover:shadow-md">
+=======
+                    <div key={doc._id || doc.id} className="doctor-card-smooth group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between transition-all duration-300">
+>>>>>>> Stashed changes
                       <div className="space-y-4">
                         <div className="flex items-center gap-4">
                           {photo ? (
-                            <img src={photo} alt={docName} className="h-16 w-16 rounded-full object-cover border border-slate-200 shadow-sm" />
+                            <img src={photo} alt={docName} className="h-16 w-16 rounded-full object-cover border border-slate-200 shadow-sm transition-transform duration-300 group-hover:scale-105" />
                           ) : (
-                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-navy-50 text-navy-700 font-bold border border-navy-100 shadow-sm text-xl">
+                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-navy-50 text-navy-700 font-bold border border-navy-100 shadow-sm text-xl transition-transform duration-300 group-hover:scale-105">
                               {docName.charAt(0).toUpperCase()}
                             </div>
                           )}
                           <div>
-                            <span className="inline-block rounded-full bg-navy-50 px-2.5 py-0.5 text-[9px] font-bold text-navy-700 uppercase">
+                            <span className="inline-block rounded-full bg-navy-50 px-2.5 py-0.5 text-[9px] font-bold text-navy-700 uppercase transition-colors duration-300 group-hover:bg-navy-100">
                               {deptName}
                             </span>
-                            <h3 className="text-lg font-bold text-slate-850 mt-1">Dr. {docName.replace(/^dr\.\s*/i, "")}</h3>
+                            <h3 className="text-lg font-bold text-slate-850 mt-1 transition-colors duration-300 group-hover:text-navy-900">Dr. {docName.replace(/^dr\.\s*/i, "")}</h3>
                             <span className="block text-xs font-semibold text-slate-500">{specName}</span>
                           </div>
                         </div>
@@ -984,7 +994,7 @@ export function LandingPage() {
                       <div className="pt-6 border-t border-slate-100 mt-6">
                         <Link
                           to={`/doctors/${doc._id || doc.id}`}
-                          className="w-full flex items-center justify-center gap-2 rounded-xl bg-navy-700 py-3 text-xs font-bold text-white shadow-sm hover:bg-navy-800 active:scale-95 transition-all"
+                          className="w-full flex items-center justify-center gap-2 rounded-xl bg-navy-700 py-3 text-xs font-bold text-white shadow-sm hover:bg-navy-850 active:scale-[0.98] transition-all duration-200"
                         >
                           <Calendar className="h-4 w-4" /> Book Appointment
                         </Link>
@@ -1124,230 +1134,7 @@ export function LandingPage() {
           </div>
         )}
 
-        {/* --- VIEW: BOOK APPOINTMENT --- */}
-        {activeTab === "book" && (
-          <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12">
-            <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-8 shadow-lg relative">
 
-              <div className="text-center space-y-2 mb-8">
-                <span className="text-xs font-bold uppercase tracking-wider text-navy-700">Online OPD Request</span>
-                <h1 className="text-2xl font-extrabold text-slate-900">Book Appointment</h1>
-                <p className="text-xs text-slate-550">Please fill in patient parameters to book a scheduled consultation slot with our specialists.</p>
-              </div>
-
-              {bookingSuccessData ? (
-                <div className="text-center py-6 space-y-6">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm">
-                    <CheckCircle2 className="h-7 w-7" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-bold text-slate-850">Appointment Booking Confirmed!</h3>
-                    <p className="text-xs text-slate-550">Your scheduled OPD consultation token has been generated successfully.</p>
-                  </div>
-
-                  {/* Confirmed Details */}
-                  <div className="bg-slate-50 border border-slate-250/50 rounded-xl p-5 text-left text-xs font-medium space-y-3">
-                    <div className="flex justify-between border-b pb-2">
-                      <span className="text-slate-450">Appointment Reference:</span>
-                      <span className="font-bold text-navy-700 font-mono">{bookingSuccessData.referenceId}</span>
-                    </div>
-                    <div className="flex justify-between border-b pb-2">
-                      <span className="text-slate-450">Scheduled Date:</span>
-                      <span className="font-bold text-slate-800">{new Date(bookingSuccessData.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
-                    </div>
-                    <div className="flex justify-between border-b pb-2">
-                      <span className="text-slate-450">Time Slot:</span>
-                      <span className="font-bold text-slate-800">{bookingSuccessData.time}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-450">Attending Doctor:</span>
-                      <span className="font-bold text-slate-800">
-                        {doctors.find(d => d._id === bookingSuccessData.doctor)?.name || "Attending Specialist"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2 pt-2">
-                    <button
-                      onClick={() => setBookingSuccessData(null)}
-                      className="rounded-lg bg-navy-700 py-3 text-xs font-bold text-white hover:bg-navy-850"
-                    >
-                      Book Another Appointment
-                    </button>
-                    <button onClick={() => changeTab("home")} className="text-xs font-bold text-navy-750 hover:underline">
-                      Return to Home
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <form onSubmit={handleBookingSubmit} className="space-y-4 text-xs font-medium text-slate-700">
-
-                  {/* Patient Name */}
-                  <div>
-                    <label className="block mb-1">Patient Full Name <span className="text-rose-500">*</span></label>
-                    <input
-                      type="text"
-                      required
-                      value={bookingForm.name}
-                      onChange={(e) => setBookingForm({ ...bookingForm, name: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
-                      placeholder="e.g. Rahul Sharma"
-                    />
-                  </div>
-
-                  {/* Phone & Email */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block mb-1">Contact Phone <span className="text-rose-500">*</span></label>
-                      <input
-                        type="tel"
-                        required
-                        value={bookingForm.phone}
-                        onChange={(e) => setBookingForm({ ...bookingForm, phone: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
-                        placeholder="e.g. 9876543210"
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-1">Email Address</label>
-                      <input
-                        type="email"
-                        value={bookingForm.email}
-                        onChange={(e) => setBookingForm({ ...bookingForm, email: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
-                        placeholder="you@example.com"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Age & Gender */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block mb-1">Patient Age <span className="text-rose-500">*</span></label>
-                      <input
-                        type="number"
-                        required
-                        min="0"
-                        max="125"
-                        value={bookingForm.age}
-                        onChange={(e) => setBookingForm({ ...bookingForm, age: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
-                        placeholder="e.g. 28"
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-1">Gender <span className="text-rose-500">*</span></label>
-                      <select
-                        value={bookingForm.gender}
-                        onChange={(e) => setBookingForm({ ...bookingForm, gender: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500 bg-white"
-                      >
-                        <option>Male</option>
-                        <option>Female</option>
-                        <option>Other</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Department & Doctor */}
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="block mb-1">Select Department <span className="text-rose-500">*</span></label>
-                      <select
-                        required
-                        value={bookingForm.departmentId}
-                        onChange={(e) => setBookingForm({ ...bookingForm, departmentId: e.target.value, doctorId: "" })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500 bg-white"
-                      >
-                        <option value="">-- Choose Department --</option>
-                        {departments.map((dept) => (
-                          <option key={dept._id} value={dept._id}>{dept.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block mb-1">Select Doctor <span className="text-rose-500">*</span></label>
-                      <select
-                        required
-                        value={bookingForm.doctorId}
-                        onChange={(e) => setBookingForm({ ...bookingForm, doctorId: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500 bg-white"
-                        disabled={!bookingForm.departmentId}
-                      >
-                        <option value="">-- Choose Doctor --</option>
-                        {filteredDoctors.map((doc) => (
-                          <option key={doc._id} value={doc._id}>{doc.name} ({doc.specialization || "Specialist"})</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Date & Time */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block mb-1">Select Date <span className="text-rose-500">*</span></label>
-                      <input
-                        type="date"
-                        required
-                        min={new Date().toISOString().split("T")[0]}
-                        value={bookingForm.date}
-                        onChange={(e) => setBookingForm({ ...bookingForm, date: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500 bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-1">Select Time Slot <span className="text-rose-500">*</span></label>
-                      <select
-                        required
-                        value={bookingForm.time}
-                        onChange={(e) => setBookingForm({ ...bookingForm, time: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500 bg-white"
-                      >
-                        <option value="">-- Slot --</option>
-                        <option>09:00</option>
-                        <option>09:30</option>
-                        <option>10:00</option>
-                        <option>10:30</option>
-                        <option>11:00</option>
-                        <option>11:30</option>
-                        <option>12:00</option>
-                        <option>12:30</option>
-                        <option>14:00</option>
-                        <option>14:30</option>
-                        <option>15:00</option>
-                        <option>15:30</option>
-                        <option>16:00</option>
-                        <option>16:30</option>
-                        <option>17:00</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Chief Complaint */}
-                  <div>
-                    <label className="block mb-1">Chief Complaint / Symptoms</label>
-                    <textarea
-                      rows={3}
-                      value={bookingForm.chiefComplaint}
-                      onChange={(e) => setBookingForm({ ...bookingForm, chiefComplaint: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
-                      placeholder="e.g. Fever, persistent cough for 3 days..."
-                    />
-                  </div>
-
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    className="w-full py-3 text-sm bg-navy-700 mt-2 transition-all duration-300 hover:bg-navy-800"
-                    disabled={appointmentMutation.isPending}
-                  >
-                    {appointmentMutation.isPending ? "Scheduling Consultation..." : "Submit Appointment Request"}
-                  </Button>
-                </form>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* --- VIEW: CONTACT US --- */}
         {activeTab === "contact" && (
@@ -1591,7 +1378,7 @@ export function LandingPage() {
                 </button>
               </li>
               <li>
-                <button onClick={() => changeTab("book")} className="hover:text-navy-700 text-left text-navy-700 font-bold">
+                <button onClick={() => changeTab("doctors")} className="hover:text-navy-700 text-left">
                   Book Appointment
                 </button>
               </li>

@@ -14,9 +14,11 @@ import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 
+import { generateUniqueHospitalCode } from "../utils/idGenerator";
+
 const hospitalSchema = z.object({
   name: z.string().min(1),
-  code: z.string().min(1),
+  code: z.string().optional().default(""),
   address: z.string().optional().default(""),
   contactEmail: z.string().email().optional().or(z.literal("")).default(""),
   contactPhone: z.string().optional().default(""),
@@ -84,11 +86,28 @@ export const listHospitals = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+export const getHospitalCode = catchAsync(async (req: Request, res: Response) => {
+  const name = (req.query.name as string) || "";
+  const code = await generateUniqueHospitalCode(name);
+  res.json({ status: "success", data: { code } });
+});
+
 export const createHospital = catchAsync(async (req: Request, res: Response) => {
   const body = hospitalSchema.parse(req.body);
-  const { primaryAdminId, ...hospitalFields } = body;
+  let { code, primaryAdminId, ...hospitalFields } = body;
 
-  const hospital = await Hospital.create({ ...hospitalFields, createdBy: req.user!._id });
+  let generatedCode = code?.trim();
+  if (!generatedCode) {
+    generatedCode = await generateUniqueHospitalCode(body.name);
+  } else if (await Hospital.exists({ code: generatedCode.toUpperCase() })) {
+    generatedCode = await generateUniqueHospitalCode(body.name);
+  }
+
+  const hospital = await Hospital.create({
+    ...hospitalFields,
+    code: generatedCode.toUpperCase(),
+    createdBy: req.user!._id,
+  });
 
   if (primaryAdminId) {
     await User.findOneAndUpdate({ _id: primaryAdminId, role: "hospital_admin", hospital: null }, { hospital: hospital._id });
@@ -215,23 +234,17 @@ export const getPublicHospitalDepartments = catchAsync(async (_req: Request, res
 
 export const getPublicHospitalDoctors = catchAsync(async (_req: Request, res: Response) => {
   try {
-    let doctors = await Doctor.find({
+    const doctors = await Doctor.find({
+      isActive: { $ne: false },
       $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }]
     })
       .populate("department", "name consultationFee")
       .sort({ createdAt: -1 });
 
-    if (!doctors || doctors.length === 0) {
-      doctors = await Doctor.find({})
-        .populate("department", "name consultationFee")
-        .sort({ createdAt: -1 });
-    }
-
     return res.json({ status: "success", data: { doctors: doctors || [] } });
   } catch (err: any) {
     console.error("Error fetching public doctors:", err);
-    const fallbackDoctors = await Doctor.find({}).catch(() => []);
-    return res.json({ status: "success", data: { doctors: fallbackDoctors || [] } });
+    return res.json({ status: "success", data: { doctors: [] } });
   }
 });
 

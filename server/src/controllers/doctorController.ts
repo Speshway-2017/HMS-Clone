@@ -8,9 +8,10 @@ import { Prescription } from "../models/Prescription";
 import { DiagnosticReport } from "../models/DiagnosticReport";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
-import { generateTempPassword } from "../utils/idGenerator";
+import { generateTempPassword, generateUniqueEmployeeId } from "../utils/idGenerator";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 import { getDoctorDynamicStatus, getBusyDoctorIds } from "../utils/doctorStatus";
+import { syncDoctorStaffRecords } from "./staffController";
 
 const doctorSchema = z.object({
   department: z.string().optional().nullable(),
@@ -28,10 +29,16 @@ const doctorSchema = z.object({
 });
 
 export const listDoctors = catchAsync(async (req: Request, res: Response) => {
+  await syncDoctorStaffRecords();
+
   const { page, limit, skip } = getPagination(req, 20);
   const { department, status, search } = req.query as Record<string, string | undefined>;
 
-  const filter: Record<string, unknown> = { ...req.hospitalFilter };
+  const filter: Record<string, unknown> = {
+    ...req.hospitalFilter,
+    isActive: { $ne: false },
+    $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }]
+  };
   if (department) filter.department = department;
   if (status) filter.status = status;
   if (search) filter.name = new RegExp(search, "i");
@@ -73,22 +80,41 @@ export const createDoctor = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital;
   const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
 
+  let licenseNo = body.licenseNo?.trim();
+  if (!licenseNo) {
+    licenseNo = await generateUniqueEmployeeId("doctor", hospitalId, branchId);
+  }
+
   // Create the Doctor profile record
-  const doctor = await Doctor.create({ ...body, hospital: hospitalId, branch: branchId });
+  const doctor = await Doctor.create({
+    ...body,
+    licenseNo,
+    hospital: hospitalId,
+    branch: branchId
+  });
 
   // Auto-create a login User account if an email is provided
   let tempPassword: string | undefined;
   if (body.email) {
     tempPassword = generateTempPassword();
     const passwordHash = await bcrypt.hash(tempPassword, 10);
-    await User.create({
-      name: body.name,
-      email: body.email,
-      passwordHash,
-      role: "doctor",
-      hospital: hospitalId,
-      branch: branchId,
-    });
+    const existingUser = await User.findOne({ email: body.email.toLowerCase() });
+    if (!existingUser) {
+      await User.create({
+        name: body.name,
+        email: body.email,
+        passwordHash,
+        role: "doctor",
+        employeeId: licenseNo,
+        hospital: hospitalId,
+        branch: branchId,
+      });
+    } else {
+      await User.findOneAndUpdate(
+        { email: body.email.toLowerCase() },
+        { employeeId: licenseNo, hospital: hospitalId, branch: branchId, role: "doctor" }
+      );
+    }
   }
 
   res.status(201).json({
@@ -176,26 +202,30 @@ export const updateDoctor = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const deleteDoctor = catchAsync(async (req: Request, res: Response) => {
-  const doctor = await Doctor.findOneAndUpdate(
-    { _id: req.params.id, ...req.hospitalFilter },
-    {
-      isActive: false,
-      deletedAt: new Date(),
-      deletedBy: req.user!._id,
-      status: "INACTIVE"
-    },
-    { new: true }
-  );
+  let doctor = await Doctor.findOneAndDelete({ _id: req.params.id, ...req.hospitalFilter });
+  if (!doctor) {
+    doctor = await Doctor.findByIdAndDelete(req.params.id);
+  }
+  
+  if (!doctor) {
+    // If doctor record was soft-deleted previously, try finding by ID and deleting
+    const softDeletedDoc = await Doctor.findById(req.params.id);
+    if (softDeletedDoc) {
+      await Doctor.deleteOne({ _id: req.params.id });
+      doctor = softDeletedDoc;
+    }
+  }
+
   if (!doctor) {
     throw new AppError("Doctor not found.", 404);
   }
 
-  // Deactivate associated login account if exists
+  // Delete associated login account if exists
   if (doctor.email) {
-    await User.findOneAndUpdate({ email: doctor.email.toLowerCase() }, { status: "inactive" });
+    await User.findOneAndDelete({ email: doctor.email.toLowerCase() });
   }
 
-  res.status(204).send();
+  res.status(200).json({ status: "success", message: "Doctor deleted successfully." });
 });
 
 export const getDoctorPerformance = catchAsync(async (req: Request, res: Response) => {

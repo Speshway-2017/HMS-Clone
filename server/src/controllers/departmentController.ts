@@ -96,10 +96,11 @@ export const listDepartments = catchAsync(async (req: Request, res: Response) =>
 
 export const createDepartment = catchAsync(async (req: Request, res: Response) => {
   const body = departmentSchema.parse(req.body);
-  const hospital = (body.hospital && body.hospital.trim()) || (req.hospitalFilter?.hospital as string | undefined);
-  if (!hospital) {
+  const hospitalRaw = (body.hospital && body.hospital.trim()) || req.hospitalFilter?.hospital || req.user?.hospital;
+  if (!hospitalRaw) {
     throw new AppError("A hospital must be specified.", 400);
   }
+  const hospital = hospitalRaw.toString();
 
   // Uniqueness check for name
   const trimmedName = body.name.trim();
@@ -108,20 +109,32 @@ export const createDepartment = catchAsync(async (req: Request, res: Response) =
     throw new AppError(`A department named "${trimmedName}" already exists.`, 409);
   }
 
-  // Uniqueness check for code (if provided)
-  if (body.code && body.code.trim()) {
-    const existingCode = await Department.findOne({ hospital, code: body.code.trim() });
-    if (existingCode) {
-      throw new AppError(`Department code "${body.code.trim()}" is already in use.`, 409);
+  // Auto-generate code if empty, or enforce uniqueness
+  let code = body.code?.trim() ?? "";
+  if (!code) {
+    const cleanWords = trimmedName.replace(/[^a-zA-Z0-9\s]/g, "").split(/\s+/).filter(Boolean);
+    const baseCode = (cleanWords[0]?.slice(0, 6) || "DEPT").toUpperCase();
+    let num = 1;
+    let candidate = `${baseCode}-${String(num).padStart(2, "0")}`;
+    while (await Department.exists({ hospital, code: candidate })) {
+      num++;
+      candidate = `${baseCode}-${String(num).padStart(2, "0")}`;
     }
+    code = candidate;
+  } else {
+    const existingCode = await Department.findOne({ hospital, code: code.toUpperCase() });
+    if (existingCode) {
+      throw new AppError(`Department code "${code.toUpperCase()}" is already in use.`, 409);
+    }
+    code = code.toUpperCase();
   }
 
   const cleanBody = {
     ...body,
     name: trimmedName,
-    code: body.code?.trim() ?? "",
+    code,
     hospital,
-    branch: (body.branch && body.branch.trim()) || null,
+    branch: (body.branch && body.branch.trim()) || (req.hospitalFilter?.branch ? req.hospitalFilter.branch.toString() : null),
     departmentHead: body.departmentHead || null,
   };
 

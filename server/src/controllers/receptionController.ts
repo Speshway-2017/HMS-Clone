@@ -104,15 +104,15 @@ export const getPatientDetail = catchAsync(async (req: Request, res: Response) =
 });
 
 export const getDashboardStats = catchAsync(async (req: Request, res: Response) => {
-  await ReceptionService.generateScheduledAlerts(req.hospitalFilter!.hospital as any);
-  const stats = await ReceptionService.getStats(req.hospitalFilter!.hospital as any);
+  await ReceptionService.generateScheduledAlerts(req.hospitalFilter as any);
+  const stats = await ReceptionService.getStats(req.hospitalFilter as any);
   res.json({ status: "success", data: stats });
 });
 
 export const registerPatient = catchAsync(async (req: Request, res: Response) => {
   const patientData = patientRegistrationSchema.parse(req.body);
   const patient = await ReceptionService.registerPatient(
-    req.hospitalFilter!.hospital as any,
+    req.hospitalFilter as any,
     patientData,
     req.user!._id
   );
@@ -132,7 +132,7 @@ export const registerPatient = catchAsync(async (req: Request, res: Response) =>
 
 export const searchPatients = catchAsync(async (req: Request, res: Response) => {
   const query = (req.query.query as string) || "";
-  const patients = await ReceptionService.searchPatients(req.hospitalFilter!.hospital as any, query);
+  const patients = await ReceptionService.searchPatients(req.hospitalFilter as any, query);
   res.json({ status: "success", data: { patients } });
 });
 
@@ -140,7 +140,7 @@ export const listPatients = catchAsync(async (req: Request, res: Response) => {
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
   const search = (req.query.search as string) || "";
-  const result = await ReceptionService.listPatients(req.hospitalFilter!.hospital as any, page, limit, search);
+  const result = await ReceptionService.listPatients(req.hospitalFilter as any, page, limit, search);
   res.json({
     status: "success",
     data: result.data,

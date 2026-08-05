@@ -9,12 +9,7 @@ export const BranchSwitcher: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Only show branch switcher for hospital admins (not super admin)
-  if (!user || user.role !== "hospital_admin") {
-    return null;
-  }
-
-  // Close dropdown on outside click
+  // Close dropdown on outside click (hook called unconditionally)
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -24,6 +19,11 @@ export const BranchSwitcher: React.FC = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Only show branch switcher if hospital has 1 or more registered branches (after all hooks)
+  if (!user || user.role !== "hospital_admin" || !branches || branches.length === 0) {
+    return null;
+  }
 
   const hospitalName = typeof user.hospital === "object" && user.hospital ? (user.hospital as any).name : "Main Hospital";
 

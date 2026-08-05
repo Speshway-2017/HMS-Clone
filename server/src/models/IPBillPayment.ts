@@ -3,6 +3,7 @@ import { Schema, model, InferSchemaType, Types } from "mongoose";
 const ipBillPaymentSchema = new Schema(
   {
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
+    branch: { type: Schema.Types.ObjectId, ref: "Branch", default: null },
     bill: { type: Schema.Types.ObjectId, ref: "IPBill", required: true },
     patient: { type: Schema.Types.ObjectId, ref: "Patient", required: true },
     amount: { type: Number, required: true },

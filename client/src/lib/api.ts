@@ -11,7 +11,7 @@ api.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   const activeBranchId = localStorage.getItem("hms_active_branch_id");
-  if (activeBranchId && activeBranchId !== "all" && activeBranchId !== "main") {
+  if (activeBranchId && activeBranchId !== "all") {
     config.headers["X-Branch-ID"] = activeBranchId;
   }
   return config;

@@ -232,8 +232,8 @@ export function StaffFormPage() {
             label="Employee ID (Auto-Generated)"
             value={form.employeeId}
             onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
-            placeholder={form.role ? `${getRolePrefix(form.role)}-2026-0001` : "Select a role to auto-generate ID"}
-            hint={form.role ? `Role prefix: ${getRolePrefix(form.role)} (Unique role-based ID)` : "Selecting a role above automatically generates a unique role-prefixed Employee ID"}
+            placeholder={form.role ? "Auto-generating unique Employee ID..." : "Select a role to auto-generate ID"}
+            hint={form.role ? `Unique auto-generated ID formatted for hospital & branch` : "Selecting a role above automatically generates a unique role-prefixed Employee ID"}
           />
           <SelectField
             label="Department"
