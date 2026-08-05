@@ -1145,7 +1145,6 @@ export function LandingPage() {
 
                   return (
                     <div key={doc._id || doc.id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between hover:border-navy-200 transition-all hover:shadow-md">
-                    <div key={doc._id || doc.id} className="holographic-card rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
                       <div className="space-y-4">
                         <div className="flex items-center gap-4">
                           {photo ? (
