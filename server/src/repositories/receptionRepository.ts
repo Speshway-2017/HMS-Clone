@@ -11,18 +11,26 @@ import { AuditLog } from "../models/AuditLog";
 import { DbNotification } from "../models/DbNotification";
 import { Types } from "mongoose";
 
+function toFilter(filterOrId: any): any {
+  if (!filterOrId) return {};
+  if (typeof filterOrId === "object" && (filterOrId.hospital || "branch" in filterOrId)) {
+    return filterOrId;
+  }
+  return { hospital: filterOrId };
+}
+
 export class ReceptionRepository {
   // ── Patient Operations ──
   static async createPatient(data: any) {
     return await Patient.create(data);
   }
 
-  static async findPatientById(hospitalId: Types.ObjectId, id: string) {
-    return await Patient.findOne({ _id: id, hospital: hospitalId }).populate("assignedDoctor", "name");
+  static async findPatientById(hospitalId: any, id: string) {
+    return await Patient.findOne({ _id: id, ...toFilter(hospitalId) }).populate("assignedDoctor", "name");
   }
 
-  static async searchPatients(hospitalId: Types.ObjectId, queryStr: string) {
-    const filter: any = { hospital: hospitalId };
+  static async searchPatients(hospitalId: any, queryStr: string) {
+    const filter: any = { ...toFilter(hospitalId) };
     let patientIds: any[] = [];
     if (queryStr) {
       const regex = new RegExp(queryStr, "i");
@@ -35,7 +43,7 @@ export class ReceptionRepository {
 
       // Find any appointments matching referenceId
       const matchedAppts = await Appointment.find({
-        hospital: hospitalId,
+        ...toFilter(hospitalId),
         referenceId: regex
       }).select("patient");
       if (matchedAppts.length > 0) {
@@ -44,7 +52,7 @@ export class ReceptionRepository {
 
       // Find any queue tokens matching tokenNumber
       const matchedTokens = await Queue.find({
-        hospital: hospitalId,
+        ...toFilter(hospitalId),
         tokenNumber: regex
       }).select("patient");
       if (matchedTokens.length > 0) {
@@ -62,8 +70,8 @@ export class ReceptionRepository {
     return await Patient.find(filter).sort({ name: 1 }).limit(50);
   }
 
-  static async listPatients(hospitalId: Types.ObjectId, page: number, limit: number, search?: string) {
-    const filter: any = { hospital: hospitalId };
+  static async listPatients(hospitalId: any, page: number, limit: number, search?: string) {
+    const filter: any = { ...toFilter(hospitalId) };
     if (search) {
       const regex = new RegExp(search, "i");
       filter.$or = [
@@ -89,18 +97,18 @@ export class ReceptionRepository {
   // the booking guard are always consistent.
   static readonly SLOT_RELEASED_STATUSES = ["cancelled", "no_show"] as const;
 
-  static async checkDoctorSlotOverlap(hospitalId: Types.ObjectId, doctorId: string, date: Date, time: string) {
+  static async checkDoctorSlotOverlap(hospitalId: any, doctorId: string, date: Date, time: string) {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
     return await Appointment.findOne({
-      hospital: hospitalId,
+      ...toFilter(hospitalId),
       doctor: doctorId,
       date: { $gte: startOfDay, $lte: endOfDay },
-      time: time.trim(),
-      status: { $nin: ReceptionRepository.SLOT_RELEASED_STATUSES },
+      timeSlot: time.trim(),
+      status: { $nin: [...ReceptionRepository.SLOT_RELEASED_STATUSES] }
     });
   }
 
@@ -108,27 +116,27 @@ export class ReceptionRepository {
     return await Appointment.create(data);
   }
 
-  static async findAppointmentById(hospitalId: Types.ObjectId, id: string) {
-    return await Appointment.findOne({ _id: id, hospital: hospitalId })
-      .populate("patient", "name uhid phone gender age")
+  static async findAppointmentById(hospitalId: any, id: string) {
+    return await Appointment.findOne({ _id: id, ...toFilter(hospitalId) })
+      .populate("patient", "name uhid age gender phone email")
       .populate("doctor", "name specialization")
       .populate("department", "name");
   }
 
-  static async listAppointments(hospitalId: Types.ObjectId, date: Date) {
+  static async listAppointments(hospitalId: any, date: Date) {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
     return await Appointment.find({
-      hospital: hospitalId,
+      ...toFilter(hospitalId),
       date: { $gte: startOfDay, $lte: endOfDay }
     })
-      .populate("patient", "name uhid phone gender age medicalHistory createdAt")
+      .populate("patient", "name uhid age gender phone email")
       .populate("doctor", "name specialization")
       .populate("department", "name")
-      .sort({ time: 1 });
+      .sort({ timeSlot: 1 });
   }
 
   // ── OP Visit Operations ──

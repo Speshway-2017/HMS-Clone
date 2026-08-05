@@ -6,6 +6,7 @@ import { FormSection } from "../../components/ui/FormSection";
 import { InputField, SelectField } from "../../components/ui/Field";
 import { FileUpload } from "../../components/ui/FileUpload";
 import { Button } from "../../components/ui/Button";
+import { api } from "../../lib/api";
 
 export function HospitalFormPage() {
   const { id } = useParams();
@@ -45,6 +46,30 @@ export function HospitalFormPage() {
     }
   }, [data]);
 
+  const handleNameChange = async (newName: string) => {
+    setForm((prev) => {
+      const updated = { ...prev, name: newName };
+      if (!isEdit && newName.trim()) {
+        const clean = newName.trim().replace(/[^a-zA-Z0-9\s]/g, "");
+        const firstWord = clean.split(/\s+/)[0]?.toUpperCase()?.slice(0, 6) || "HOSP";
+        const baseCode = firstWord.length >= 3 ? firstWord : "HOSP";
+        updated.code = `${baseCode}-01`;
+      }
+      return updated;
+    });
+
+    if (!isEdit && newName.trim().length >= 2) {
+      try {
+        const res = await api.get("/hospitals/generate-code", { params: { name: newName } });
+        if (res.data?.data?.code) {
+          setForm((prev) => ({ ...prev, code: res.data.data.code }));
+        }
+      } catch (e) {
+        // Fallback to local code
+      }
+    }
+  };
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -81,15 +106,16 @@ export function HospitalFormPage() {
             label="Hospital Name"
             required
             value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="e.g. Mayo Clinic Health"
+            onChange={(e) => handleNameChange(e.target.value)}
+            placeholder="e.g. Speshway Hospitals"
           />
           <InputField
-            label="Hospital Code"
+            label="Hospital Code (Auto-Generated)"
             required
             value={form.code}
             onChange={(e) => setForm({ ...form, code: e.target.value })}
-            placeholder="e.g. HOS-2024"
+            placeholder={form.name ? "Auto-generating code..." : "e.g. SPESH-01"}
+            hint={!isEdit ? "Automatically derived from Hospital Name" : undefined}
           />
           <InputField
             label="Total Bed Capacity"

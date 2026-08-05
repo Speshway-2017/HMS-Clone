@@ -8,6 +8,7 @@ import { InputField, SelectField } from "../../components/ui/Field";
 import { FileUpload } from "../../components/ui/FileUpload";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
+import { api } from "../../lib/api";
 
 export function AdminFormPage() {
   const { id } = useParams();
@@ -45,6 +46,23 @@ export function AdminFormPage() {
       });
     }
   }, [admin]);
+
+  const handleHospitalChange = async (selectedHospitalId: string) => {
+    setForm((prev) => ({ ...prev, hospital: selectedHospitalId }));
+    if (!isEdit && selectedHospitalId) {
+      try {
+        const res = await api.get("/staff/next-employee-id", {
+          params: { role: "hospital_admin", hospital: selectedHospitalId },
+        });
+        const nextId = res.data.data?.employeeId;
+        if (nextId) {
+          setForm((prev) => ({ ...prev, hospital: selectedHospitalId, employeeId: nextId }));
+        }
+      } catch (e) {
+        // Fallback
+      }
+    }
+  };
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -126,7 +144,13 @@ export function AdminFormPage() {
             placeholder="jsmith@hms-enterprise.com"
           />
           <InputField label="Contact Number" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+1 (555) 000-0000" />
-          <InputField label="Employee ID (optional)" value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} placeholder="HMS-2024-000" />
+          <InputField
+            label="Employee ID (Auto-Generated)"
+            value={form.employeeId}
+            onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
+            placeholder={form.hospital ? "Auto-generating Employee ID..." : "Select assigned hospital below to generate ID"}
+            hint={form.hospital ? "Auto-generated unique ID for assigned hospital" : "Select an assigned hospital below to auto-generate Employee ID"}
+          />
           <div className="sm:col-span-2">
             <FileUpload label="Profile Photo" folder="admin-avatars" value={form.avatarUrl} onChange={(url) => setForm({ ...form, avatarUrl: url })} />
           </div>
@@ -143,7 +167,7 @@ export function AdminFormPage() {
             </div>
             <p className="text-xs text-slate-400">Super Admins can only create Hospital Administrator accounts.</p>
           </div>
-          <SelectField label="Assigned Hospital" required value={form.hospital} onChange={(e) => setForm({ ...form, hospital: e.target.value })}>
+          <SelectField label="Assigned Hospital" required value={form.hospital} onChange={(e) => handleHospitalChange(e.target.value)}>
             <option value="">Select Hospital</option>
             {hospitalsData?.data.map((h) => (
               <option key={h._id} value={h._id}>

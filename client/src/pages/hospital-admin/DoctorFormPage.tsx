@@ -8,6 +8,7 @@ import { InputField, SelectField, TextareaField } from "../../components/ui/Fiel
 import { FileUpload } from "../../components/ui/FileUpload";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
+import { api } from "../../lib/api";
 
 export function DoctorFormPage() {
   const { id } = useParams();
@@ -35,6 +36,19 @@ export function DoctorFormPage() {
   });
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ email: string; tempPassword: string } | null>(null);
+
+  useEffect(() => {
+    if (!isEdit) {
+      api.get("/staff/next-employee-id", { params: { role: "doctor" } })
+        .then((res) => {
+          const nextId = res.data.data?.employeeId;
+          if (nextId) {
+            setForm((prev) => ({ ...prev, licenseNo: nextId }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isEdit]);
 
   useEffect(() => {
     if (data?.doctor) {
@@ -188,7 +202,13 @@ export function DoctorFormPage() {
           </SelectField>
           <InputField label="Specialization" value={form.specialization} onChange={(e) => setForm({ ...form, specialization: e.target.value })} placeholder="e.g. Cardiology" />
           <InputField label="Qualification" value={form.qualification} onChange={(e) => setForm({ ...form, qualification: e.target.value })} placeholder="e.g. MD, FACC, PhD" />
-          <InputField label="License No." value={form.licenseNo} onChange={(e) => setForm({ ...form, licenseNo: e.target.value })} placeholder="e.g. MED-2024-001" />
+          <InputField
+            label="Doctor / License ID (Auto-Generated)"
+            value={form.licenseNo}
+            onChange={(e) => setForm({ ...form, licenseNo: e.target.value })}
+            placeholder="Auto-generating Doctor ID..."
+            hint="Role prefix: DOC (Unique hospital & branch doctor ID)"
+          />
           <InputField
             label="Patient Satisfaction Rating (0-100)"
             type="number"

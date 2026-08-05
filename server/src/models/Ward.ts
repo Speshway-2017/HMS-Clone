@@ -3,11 +3,27 @@ import { Schema, model, InferSchemaType, Types } from "mongoose";
 const wardSchema = new Schema(
   {
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
+    branch: { type: Schema.Types.ObjectId, ref: "Branch", default: null },
     name: { type: String, required: true },
     code: { type: String, required: true },
     wardType: {
       type: String,
-      enum: ["General Ward", "Semi-Private Ward", "Private Ward", "ICU", "NICU", "Emergency Ward"],
+      enum: [
+        "General Ward",
+        "Semi-Private Ward",
+        "Private Ward",
+        "ICU",
+        "NICU",
+        "PICU",
+        "Emergency",
+        "Emergency Ward",
+        "Operation Theatre",
+        "Labour Ward",
+        "Semi Private",
+        "Private",
+        "Deluxe",
+        "VIP"
+      ],
       required: true
     },
     floorNumber: { type: Number, required: true },

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { User } from "../models/User";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
-import { generateTempPassword } from "../utils/idGenerator";
+import { generateTempPassword, generateUniqueEmployeeId } from "../utils/idGenerator";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 
 const ADMIN_ROLES = ["hospital_admin", "accountant"] as const;
@@ -66,12 +66,17 @@ export const createAdmin = catchAsync(async (req: Request, res: Response) => {
   const tempPassword = generateTempPassword();
   const passwordHash = await bcrypt.hash(tempPassword, 10);
 
-  const admin = await User.create({ ...body, passwordHash });
+  let employeeId = body.employeeId?.trim();
+  if (!employeeId && body.hospital) {
+    employeeId = await generateUniqueEmployeeId("hospital_admin", body.hospital);
+  }
+
+  const admin = await User.create({ ...body, employeeId, passwordHash });
 
   res.status(201).json({
     status: "success",
     data: {
-      admin: { id: admin._id, name: admin.name, email: admin.email, role: admin.role },
+      admin: { id: admin._id, name: admin.name, email: admin.email, role: admin.role, employeeId: admin.employeeId },
       tempPassword,
     },
   });

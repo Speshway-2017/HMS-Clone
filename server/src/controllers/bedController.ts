@@ -37,6 +37,8 @@ export const listBeds = catchAsync(async (req: Request, res: Response) => {
     Bed.find(query)
       .populate("ward", "name code")
       .populate("room", "roomNumber roomName")
+      .populate("patient", "name uhid patientCode phone")
+      .populate("admission", "admissionNumber admissionDate status")
       .sort({ bedNumber: 1 })
       .skip(skip)
       .limit(limitNum)
@@ -56,6 +58,18 @@ export const listBeds = catchAsync(async (req: Request, res: Response) => {
       }
     }
   });
+});
+
+export const getBed = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital;
+  const { id } = req.params;
+  const bed = await Bed.findOne({ _id: id, hospital: hospitalId })
+    .populate("ward", "name code")
+    .populate("room", "roomNumber roomName capacity");
+  if (!bed) {
+    throw new AppError("Bed not found.", 404);
+  }
+  res.json({ status: "success", data: { bed } });
 });
 
 export const createBed = catchAsync(async (req: Request, res: Response) => {

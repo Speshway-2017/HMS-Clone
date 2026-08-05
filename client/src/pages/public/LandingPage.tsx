@@ -6,6 +6,8 @@ import DepthParallaxWords from "../../components/ui/DepthParallaxWords";
 import GlowHoverCard from "../../components/ui/GlowHoverCard";
 import SocialSelector from "../../components/ui/SocialSelector";
 import GooeyPopover from "../../components/ui/GooeyPopover";
+import { MotionAccordion } from "../../components/ui/MotionAccordion";
+import { DepartmentTiltCard } from "../../components/ui/DepartmentTiltCard";
 import {
   Building2,
   Stethoscope,
@@ -231,6 +233,13 @@ export function LandingPage() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace("#", "");
+      if (hash === "book") {
+        window.location.hash = "#doctors";
+        setActiveTab("doctors");
+        setMobileMenuOpen(false);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
       const validTabs = [
         "home",
         "about",
@@ -238,7 +247,6 @@ export function LandingPage() {
         "doctors",
         "services",
         "blog",
-        "book",
         "contact",
         "privacy",
         "terms",
@@ -881,7 +889,7 @@ export function LandingPage() {
                 <div className="max-w-4xl mx-auto space-y-4">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-200/80 mb-6">
                     <h3 className="text-xl font-extrabold text-slate-900">Common Patient Questions</h3>
-                    <span className="text-xs font-bold text-navy-700 bg-navy-50 px-3 py-1 rounded-md">{displayFaqs.length} FAQs</span>
+                    <span className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1 rounded-full">{displayFaqs.length} FAQs</span>
                   </div>
 
                   {displayFaqs.length === 0 ? (
@@ -889,41 +897,14 @@ export function LandingPage() {
                       No FAQs have been published for this hospital yet.
                     </div>
                   ) : (
-                    displayFaqs.map((faq: any, idx: number) => {
-                      const isOpen = activeFaq === idx;
-                      return (
-                        <div
-                          key={idx}
-                          className={`rounded-2xl border transition-all duration-300 overflow-hidden ${isOpen
-                              ? "border-[#0505a9] bg-white shadow-md ring-2 ring-[#0505a9]/10"
-                              : "border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:shadow-md"
-                            }`}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => setActiveFaq(isOpen ? null : idx)}
-                            className="flex w-full items-center justify-between px-6 py-5 text-left transition-colors cursor-pointer group"
-                          >
-                            <span className={`text-sm lg:text-base font-bold pr-4 transition-colors ${isOpen ? "text-[#0505a9]" : "text-slate-800 group-hover:text-[#0505a9]"}`}>
-                              {faq.q}
-                            </span>
-                            <div
-                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-transform duration-300 ${isOpen ? "bg-[#0505a9] text-white rotate-180" : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
-                                }`}
-                            >
-                              <ChevronDown className="h-4 w-4" />
-                            </div>
-                          </button>
-
-                          {/* Animated Smooth Dropdown Answer */}
-                          <div className={`faq-answer-dropdown ${isOpen ? "is-open" : ""}`}>
-                            <div className="faq-answer-inner border-t border-slate-100 px-6 py-4 text-xs lg:text-sm leading-relaxed text-slate-650 bg-slate-50/70">
-                              {faq.a}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
+                    <MotionAccordion
+                      items={displayFaqs.map((faq: any) => ({
+                        question: faq.q,
+                        answer: faq.a,
+                      }))}
+                      gap={12}
+                      defaultOpenIndex={0}
+                    />
                   )}
                 </div>
               </div>
@@ -986,24 +967,20 @@ export function LandingPage() {
               {/* FAQs accordion */}
               <div className="space-y-6">
                 <h2 className="text-xl font-bold text-slate-800 border-b pb-3">Frequently Asked Questions</h2>
-                <div className="space-y-4">
-                  {faqs.map((faq, idx) => (
-                    <div key={idx} className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                      <button
-                        onClick={() => setActiveFaq(activeFaq === idx ? null : idx)}
-                        className="flex w-full items-center justify-between px-6 py-4 text-left text-sm font-bold text-slate-850 hover:bg-slate-50"
-                      >
-                        <span>{faq.q}</span>
-                        <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${activeFaq === idx ? "rotate-180" : ""}`} />
-                      </button>
-                      {activeFaq === idx && (
-                        <div className="border-t border-slate-100 px-6 py-4 text-xs leading-relaxed text-slate-600 bg-slate-50/50">
-                          {faq.a}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                {faqs.length === 0 ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500 font-medium text-sm shadow-sm">
+                    No FAQs have been published for this hospital yet.
+                  </div>
+                ) : (
+                  <MotionAccordion
+                    items={faqs.map((faq: any) => ({
+                      question: faq.q,
+                      answer: faq.a,
+                    }))}
+                    gap={12}
+                    defaultOpenIndex={0}
+                  />
+                )}
               </div>
 
             </div>
@@ -1022,47 +999,20 @@ export function LandingPage() {
                 <p className="text-slate-600 text-sm max-w-md mx-auto">Discover our active clinical branches, operating wards, head doctors, and specialized consulting fees.</p>
               </div>
 
-              {/* Departments Grid */}
+              {/* Departments Grid with Tilt Card Effect */}
               <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
                 {departments.map((dept) => (
-                  <div key={dept._id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between hover:border-navy-200 transition-colors">
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-start">
-                        <span className="inline-block rounded-full bg-navy-50 px-2.5 py-0.5 text-[9px] font-bold text-navy-700 uppercase">
-                          {dept.category || "General"}
-                        </span>
-                        {dept.isEmergency && (
-                          <span className="rounded bg-rose-50 border border-rose-100 px-2 py-0.5 text-[9px] font-bold text-rose-600">EMERGENCY</span>
-                        )}
-                      </div>
-                      <h3 className="text-lg font-bold text-slate-850">{dept.name}</h3>
-                      <p className="text-xs text-slate-600 leading-relaxed">
-                        {dept.description || "Our department provides comprehensive clinical checks and consulting services under experienced medical supervisors."}
-                      </p>
-
-                      <div className="space-y-2 pt-2 border-t border-slate-100">
-                        <div className="flex justify-between text-xs text-slate-550">
-                          <span>Specialization:</span>
-                          <span className="font-bold text-slate-700">{dept.specialization || "General Medicine"}</span>
-                        </div>
-                        {dept.headName && (
-                          <div className="flex justify-between text-xs text-slate-550">
-                            <span>Department Head:</span>
-                            <span className="font-bold text-slate-750">{dept.headName}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between text-xs text-slate-550">
-                          <span>Building Location:</span>
-                          <span className="font-bold text-slate-750">{dept.building ? `${dept.building}, Fl ${dept.floor || 1}` : "Main Building"}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-6 border-t border-slate-100 mt-6 flex justify-between items-center text-xs font-bold text-slate-800">
-                      <span className="text-slate-500">Consultation Fee:</span>
-                      <span className="text-navy-700 text-sm">₹{dept.consultationFee || 300}</span>
-                    </div>
-                  </div>
+                  <DepartmentTiltCard
+                    key={dept._id}
+                    title={dept.name}
+                    category={dept.category || "Specialty"}
+                    specialization={dept.specialization || "General Medicine"}
+                    description={dept.description || "Our department provides comprehensive clinical checks and consulting services under experienced medical supervisors."}
+                    headName={dept.headName}
+                    location={dept.building ? `${dept.building}, Fl ${dept.floor || 1}` : "Main Building"}
+                    fee={dept.consultationFee || 300}
+                    isEmergency={dept.isEmergency}
+                  />
                 ))}
 
                 {departments.length === 0 && (
@@ -1138,21 +1088,21 @@ export function LandingPage() {
                   const fee = String((doc.consultationSettings as any)?.fee || doc.consultationFee || doc.fee || 500).replace(/[^0-9]/g, "") || "500";
 
                   return (
-                    <div key={doc._id || doc.id} className="holographic-card rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
+                    <div key={doc._id || doc.id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between hover:border-navy-200 transition-all hover:shadow-md">
                       <div className="space-y-4">
                         <div className="flex items-center gap-4">
                           {photo ? (
-                            <img src={photo} alt={docName} className="h-16 w-16 rounded-full object-cover border border-slate-200 shadow-sm" />
+                            <img src={photo} alt={docName} className="h-16 w-16 rounded-full object-cover border border-slate-200 shadow-sm transition-transform duration-300 group-hover:scale-105" />
                           ) : (
-                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-navy-50 text-navy-700 font-bold border border-navy-100 shadow-sm text-xl">
+                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-navy-50 text-navy-700 font-bold border border-navy-100 shadow-sm text-xl transition-transform duration-300 group-hover:scale-105">
                               {docName.charAt(0).toUpperCase()}
                             </div>
                           )}
                           <div>
-                            <span className="inline-block rounded-full bg-navy-50 px-2.5 py-0.5 text-[9px] font-bold text-navy-700 uppercase">
+                            <span className="inline-block rounded-full bg-navy-50 px-2.5 py-0.5 text-[9px] font-bold text-navy-700 uppercase transition-colors duration-300 group-hover:bg-navy-100">
                               {deptName}
                             </span>
-                            <h3 className="text-lg font-bold text-slate-850 mt-1">Dr. {docName.replace(/^dr\.\s*/i, "")}</h3>
+                            <h3 className="text-lg font-bold text-slate-850 mt-1 transition-colors duration-300 group-hover:text-navy-900">Dr. {docName.replace(/^dr\.\s*/i, "")}</h3>
                             <span className="block text-xs font-semibold text-slate-500">{specName}</span>
                           </div>
                         </div>
@@ -1178,7 +1128,7 @@ export function LandingPage() {
                       <div className="pt-6 border-t border-slate-100 mt-6">
                         <Link
                           to={`/doctors/${doc._id || doc.id}`}
-                          className="w-full flex items-center justify-center gap-2 rounded-xl bg-navy-700 py-3 text-xs font-bold text-white shadow-sm hover:bg-navy-800 active:scale-95 transition-all"
+                          className="w-full flex items-center justify-center gap-2 rounded-xl bg-navy-700 py-3 text-xs font-bold text-white shadow-sm hover:bg-navy-850 active:scale-[0.98] transition-all duration-200"
                         >
                           <Calendar className="h-4 w-4" /> Book Appointment
                         </Link>
@@ -1198,41 +1148,94 @@ export function LandingPage() {
         )}
         {/* --- VIEW: SERVICES --- */}
         {activeTab === "services" && (
-          <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-white">
-            <div className="mx-auto max-w-[1600px] space-y-12">
-              <div className="text-center space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-navy-700">Clinical Catalog</span>
-                <h1 className="text-4xl font-extrabold text-slate-900">
-                  Services Offered
+          <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-slate-50 min-h-screen">
+            <style>{`
+              .services-perspective-container {
+                perspective: 1200px;
+                transform-style: preserve-3d;
+              }
+
+              .service-3d-wrapper {
+                perspective: 1200px;
+                transform-style: preserve-3d;
+                height: 100%;
+              }
+
+              .service-3d-card {
+                position: relative;
+                height: 100%;
+                transform-style: preserve-3d;
+                transform: rotateX(42deg) translateY(-25px) translateZ(-35px);
+                transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.4s ease;
+                box-shadow: 0px 25px 50px -10px rgba(15, 23, 42, 0.25);
+                will-change: transform, box-shadow;
+              }
+
+              .service-3d-wrapper:hover .service-3d-card {
+                transform: rotateX(0deg) translateY(0) translateZ(0) scale(1.04);
+                box-shadow: 0px 20px 45px -5px rgba(37, 99, 235, 0.3);
+                border-color: rgba(37, 99, 235, 0.6) !important;
+              }
+            `}</style>
+            <div className="mx-auto max-w-[1600px] space-y-16">
+              <div className="text-center space-y-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-50 border border-blue-200/60 px-3.5 py-1 rounded-full inline-block">
+                  Clinical Catalog
+                </span>
+                <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">
+                  <span className="text-blue-600">Clin</span>
+                  <span className="text-sky-500">ical</span>{" "}
+                  <span className="text-emerald-500">Serv</span>
+                  <span className="text-indigo-600">ices</span>{" "}
+                  <span className="text-purple-600">&</span>{" "}
+                  <span className="text-rose-500">Cata</span>
+                  <span className="text-amber-500">log</span>
                 </h1>
-                <p className="text-slate-600 text-sm max-w-md mx-auto">A comprehensive listing of diagnostic and clinical services aggregated dynamically from our operating specialties.</p>
+                <p className="text-slate-600 text-sm max-w-md mx-auto">
+                  A comprehensive listing of diagnostic and clinical services aggregated dynamically from our operating specialties.
+                </p>
               </div>
 
-              {/* Grouped Services */}
-              <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-                {departments.map((dept) => {
+              {/* Grouped Services with 3D Perspective */}
+              <div className="services-perspective-container grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-3 pt-8 pb-16">
+                {departments.map((dept, cardIdx) => {
                   const deptServices = dept.services || [];
                   if (deptServices.length === 0) return null;
+
+                  const cardGradients = [
+                    "from-amber-500/10 via-orange-500/5 to-white border-amber-200/60",
+                    "from-indigo-500/10 via-purple-500/5 to-white border-indigo-200/60",
+                    "from-rose-500/10 via-red-500/5 to-white border-rose-200/60",
+                    "from-emerald-500/10 via-teal-500/5 to-white border-emerald-200/60",
+                    "from-cyan-500/10 via-blue-500/5 to-white border-cyan-200/60",
+                    "from-fuchsia-500/10 via-pink-500/5 to-white border-fuchsia-200/60",
+                  ];
+                  const gradientClass = cardGradients[cardIdx % cardGradients.length];
+
                   return (
-                    <div key={dept._id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy-50 text-navy-700">
-                          <Stethoscope className="h-5 w-5" />
+                    <div key={dept._id} className="service-3d-wrapper">
+                      <div
+                        className={`service-3d-card rounded-2xl border bg-gradient-to-br ${gradientClass} p-7 space-y-5`}
+                      >
+                        <div className="flex items-center gap-3.5">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
+                            <Stethoscope className="h-6 w-6" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-extrabold text-slate-900">{dept.name}</h3>
+                            <span className="block text-[10px] font-bold text-blue-600 uppercase tracking-wider">{dept.specialization || "Clinical"}</span>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="text-base font-extrabold text-slate-850">{dept.name}</h3>
-                          <span className="block text-[9px] font-bold text-slate-450 uppercase">{dept.specialization || "Clinical"}</span>
-                        </div>
+                        <hr className="border-slate-200/70" />
+                        <ul className="space-y-3 text-xs font-semibold text-slate-700">
+                          {deptServices.map((srv: string, idx: number) => (
+                            <li key={idx} className="flex items-center gap-2.5">
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                              <span>{srv}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
-                      <hr className="border-slate-100" />
-                      <ul className="space-y-2.5 text-xs text-slate-600">
-                        {deptServices.map((srv: string, idx: number) => (
-                          <li key={idx} className="flex items-center gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                            <span>{srv}</span>
-                          </li>
-                        ))}
-                      </ul>
                     </div>
                   );
                 })}
@@ -1318,230 +1321,7 @@ export function LandingPage() {
           </div>
         )}
 
-        {/* --- VIEW: BOOK APPOINTMENT --- */}
-        {activeTab === "book" && (
-          <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12">
-            <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-8 shadow-lg relative">
 
-              <div className="text-center space-y-2 mb-8">
-                <span className="text-xs font-bold uppercase tracking-wider text-navy-700">Online OPD Request</span>
-                <h1 className="text-2xl font-extrabold text-slate-900">Book Appointment</h1>
-                <p className="text-xs text-slate-550">Please fill in patient parameters to book a scheduled consultation slot with our specialists.</p>
-              </div>
-
-              {bookingSuccessData ? (
-                <div className="text-center py-6 space-y-6">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm">
-                    <CheckCircle2 className="h-7 w-7" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-bold text-slate-850">Appointment Booking Confirmed!</h3>
-                    <p className="text-xs text-slate-550">Your scheduled OPD consultation token has been generated successfully.</p>
-                  </div>
-
-                  {/* Confirmed Details */}
-                  <div className="bg-slate-50 border border-slate-250/50 rounded-xl p-5 text-left text-xs font-medium space-y-3">
-                    <div className="flex justify-between border-b pb-2">
-                      <span className="text-slate-450">Appointment Reference:</span>
-                      <span className="font-bold text-navy-700 font-mono">{bookingSuccessData.referenceId}</span>
-                    </div>
-                    <div className="flex justify-between border-b pb-2">
-                      <span className="text-slate-450">Scheduled Date:</span>
-                      <span className="font-bold text-slate-800">{new Date(bookingSuccessData.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
-                    </div>
-                    <div className="flex justify-between border-b pb-2">
-                      <span className="text-slate-450">Time Slot:</span>
-                      <span className="font-bold text-slate-800">{bookingSuccessData.time}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-450">Attending Doctor:</span>
-                      <span className="font-bold text-slate-800">
-                        {doctors.find(d => d._id === bookingSuccessData.doctor)?.name || "Attending Specialist"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2 pt-2">
-                    <button
-                      onClick={() => setBookingSuccessData(null)}
-                      className="rounded-lg bg-navy-700 py-3 text-xs font-bold text-white hover:bg-navy-850"
-                    >
-                      Book Another Appointment
-                    </button>
-                    <button onClick={() => changeTab("home")} className="text-xs font-bold text-navy-750 hover:underline">
-                      Return to Home
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <form onSubmit={handleBookingSubmit} className="space-y-4 text-xs font-medium text-slate-700">
-
-                  {/* Patient Name */}
-                  <div>
-                    <label className="block mb-1">Patient Full Name <span className="text-rose-500">*</span></label>
-                    <input
-                      type="text"
-                      required
-                      value={bookingForm.name}
-                      onChange={(e) => setBookingForm({ ...bookingForm, name: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
-                      placeholder="e.g. Rahul Sharma"
-                    />
-                  </div>
-
-                  {/* Phone & Email */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block mb-1">Contact Phone <span className="text-rose-500">*</span></label>
-                      <input
-                        type="tel"
-                        required
-                        value={bookingForm.phone}
-                        onChange={(e) => setBookingForm({ ...bookingForm, phone: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
-                        placeholder="e.g. 9876543210"
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-1">Email Address</label>
-                      <input
-                        type="email"
-                        value={bookingForm.email}
-                        onChange={(e) => setBookingForm({ ...bookingForm, email: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
-                        placeholder="you@example.com"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Age & Gender */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block mb-1">Patient Age <span className="text-rose-500">*</span></label>
-                      <input
-                        type="number"
-                        required
-                        min="0"
-                        max="125"
-                        value={bookingForm.age}
-                        onChange={(e) => setBookingForm({ ...bookingForm, age: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
-                        placeholder="e.g. 28"
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-1">Gender <span className="text-rose-500">*</span></label>
-                      <select
-                        value={bookingForm.gender}
-                        onChange={(e) => setBookingForm({ ...bookingForm, gender: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500 bg-white"
-                      >
-                        <option>Male</option>
-                        <option>Female</option>
-                        <option>Other</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Department & Doctor */}
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="block mb-1">Select Department <span className="text-rose-500">*</span></label>
-                      <select
-                        required
-                        value={bookingForm.departmentId}
-                        onChange={(e) => setBookingForm({ ...bookingForm, departmentId: e.target.value, doctorId: "" })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500 bg-white"
-                      >
-                        <option value="">-- Choose Department --</option>
-                        {departments.map((dept) => (
-                          <option key={dept._id} value={dept._id}>{dept.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block mb-1">Select Doctor <span className="text-rose-500">*</span></label>
-                      <select
-                        required
-                        value={bookingForm.doctorId}
-                        onChange={(e) => setBookingForm({ ...bookingForm, doctorId: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500 bg-white"
-                        disabled={!bookingForm.departmentId}
-                      >
-                        <option value="">-- Choose Doctor --</option>
-                        {filteredDoctors.map((doc) => (
-                          <option key={doc._id} value={doc._id}>{doc.name} ({doc.specialization || "Specialist"})</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Date & Time */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block mb-1">Select Date <span className="text-rose-500">*</span></label>
-                      <input
-                        type="date"
-                        required
-                        min={new Date().toISOString().split("T")[0]}
-                        value={bookingForm.date}
-                        onChange={(e) => setBookingForm({ ...bookingForm, date: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500 bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-1">Select Time Slot <span className="text-rose-500">*</span></label>
-                      <select
-                        required
-                        value={bookingForm.time}
-                        onChange={(e) => setBookingForm({ ...bookingForm, time: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500 bg-white"
-                      >
-                        <option value="">-- Slot --</option>
-                        <option>09:00</option>
-                        <option>09:30</option>
-                        <option>10:00</option>
-                        <option>10:30</option>
-                        <option>11:00</option>
-                        <option>11:30</option>
-                        <option>12:00</option>
-                        <option>12:30</option>
-                        <option>14:00</option>
-                        <option>14:30</option>
-                        <option>15:00</option>
-                        <option>15:30</option>
-                        <option>16:00</option>
-                        <option>16:30</option>
-                        <option>17:00</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Chief Complaint */}
-                  <div>
-                    <label className="block mb-1">Chief Complaint / Symptoms</label>
-                    <textarea
-                      rows={3}
-                      value={bookingForm.chiefComplaint}
-                      onChange={(e) => setBookingForm({ ...bookingForm, chiefComplaint: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
-                      placeholder="e.g. Fever, persistent cough for 3 days..."
-                    />
-                  </div>
-
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    className="w-full py-3 text-sm bg-navy-700 mt-2 transition-all duration-300 hover:bg-navy-800"
-                    disabled={appointmentMutation.isPending}
-                  >
-                    {appointmentMutation.isPending ? "Scheduling Consultation..." : "Submit Appointment Request"}
-                  </Button>
-                </form>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* --- VIEW: CONTACT US --- */}
         {activeTab === "contact" && (
@@ -1785,7 +1565,7 @@ export function LandingPage() {
                 </button>
               </li>
               <li>
-                <button onClick={() => changeTab("book")} className="hover:text-navy-700 text-left text-navy-700 font-bold">
+                <button onClick={() => changeTab("doctors")} className="hover:text-navy-700 text-left">
                   Book Appointment
                 </button>
               </li>
