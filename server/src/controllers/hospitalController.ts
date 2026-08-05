@@ -339,6 +339,7 @@ export const createPublicEnquiry = catchAsync(async (req: Request, res: Response
   if (!hospital) {
     hospital = await Hospital.create({
       name: "Sunrise Hospital",
+      code: "MAIN",
       tagline: "Advanced Healthcare & Patient Care",
       status: "active"
     });
@@ -355,8 +356,8 @@ export const createPublicEnquiry = catchAsync(async (req: Request, res: Response
   
   // Emit socket event for real-time admin dashboard update
   try {
-    emitToHospital(hospital._id, "new_enquiry", enquiry);
-    emitToHospital(hospital._id, "dashboard_update", enquiry);
+    emitToHospital(hospital._id.toString(), "new_enquiry", enquiry);
+    emitToHospital(hospital._id.toString(), "dashboard_update", enquiry);
   } catch (err) {
     console.error("Socket emit error:", err);
   }
