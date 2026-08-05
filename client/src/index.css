@@ -348,42 +348,41 @@ body {
 }
 
 
-/* --- Department Split-Slide Card Hover Effect --- */
+/* --- Department Split-Slide Card Hover Effect (CodePen Style) --- */
 .dept-slide-card {
   position: relative;
   width: 100%;
-  height: 240px;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-  transition: box-shadow 0.4s ease, border-color 0.4s ease, transform 0.4s ease;
+  height: 380px;
+  margin: 0 auto;
   cursor: pointer;
 }
 
-.dept-slide-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 16px 35px rgba(5, 5, 169, 0.25);
-  border-color: #0505a9;
+/* Common Slide Styling */
+.dept-slide-card .slide {
+  width: 100%;
+  height: 190px;
+  border-radius: 20px;
+  transition: transform 0.7s cubic-bezier(0.165, 0.84, 0.44, 1), box-shadow 0.7s ease, border-color 0.4s ease;
+  box-sizing: border-box;
 }
 
-/* Slide 1: Header / Icon / Category & Name (Full Height initially) */
+/* Slide 1: Header / Icon / Category & Name (Sits in middle initially) */
 .dept-slide-card .slide.slide1 {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, #1e3a8a 0%, #0505a9 100%);
-  color: #ffffff;
-  z-index: 2;
-  transition: height 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 2;
+  transform: translateY(95px);
+  background: linear-gradient(135deg, #1e3a8a 0%, #0505a9 100%);
+  color: #ffffff;
+  box-shadow: 0 10px 30px rgba(5, 5, 169, 0.35);
   padding: 20px;
-  box-sizing: border-box;
+}
+
+.dept-slide-card:hover .slide.slide1 {
+  transform: translateY(0px);
+  box-shadow: 0 15px 35px rgba(5, 5, 169, 0.45);
 }
 
 .dept-slide-card .slide.slide1 .content {
@@ -392,48 +391,40 @@ body {
   align-items: center;
   justify-content: center;
   text-align: center;
-  gap: 8px;
-  transition: transform 0.5s ease;
+  gap: 10px;
 }
 
-/* On hover, slide1 shrinks to top 48% height */
-.dept-slide-card:hover .slide.slide1 {
-  height: 48%;
-}
-
-/* Slide 2: Bottom Details (Hidden below initially) */
+/* Slide 2: Bottom Details (Tucked behind Slide 1 initially) */
 .dept-slide-card .slide.slide2 {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 52%;
-  background: #ffffff;
-  z-index: 1;
-  transform: translateY(100%);
-  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  padding: 16px 20px 20px 20px;
-  box-sizing: border-box;
+  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  padding: 24px 20px 24px 20px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  z-index: 1;
+  transform: translateY(-95px);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
 }
 
-/* On hover, slide2 slides up to fill bottom 52% */
 .dept-slide-card:hover .slide.slide2 {
-  transform: translateY(0%);
+  transform: translateY(0px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  border-color: #cbd5e1;
 }
 
+/* Bottom Blue Accent Line */
 .dept-slide-card .slide.slide2::after {
   content: "";
   position: absolute;
-  width: 40px;
+  width: 44px;
   height: 4px;
-  bottom: 8px;
+  bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
   background: #0505a9;
-  border-radius: 2px;
+  border-radius: 4px;
 }
 
 .dept-slide-card .slide.slide2 .content {
