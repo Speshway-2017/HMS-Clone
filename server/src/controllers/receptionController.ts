@@ -105,7 +105,6 @@ export const getPatientDetail = catchAsync(async (req: Request, res: Response) =
 });
 
 export const getDashboardStats = catchAsync(async (req: Request, res: Response) => {
-  await ReceptionService.generateScheduledAlerts(req.hospitalFilter as any);
   const stats = await ReceptionService.getStats(req.hospitalFilter as any);
   res.json({ status: "success", data: stats });
 });

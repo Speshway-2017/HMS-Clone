@@ -121,9 +121,11 @@ export class ReceptionService {
     // Rooms availability: count active rooms that contain at least one bed and at least one bed is vacant
     const roomBedsMap: Record<string, any[]> = {};
     for (const bed of bedsAvailable) {
-      const rId = bed.room.toString();
-      if (!roomBedsMap[rId]) roomBedsMap[rId] = [];
-      roomBedsMap[rId].push(bed);
+      if (bed.room) {
+        const rId = bed.room.toString();
+        if (!roomBedsMap[rId]) roomBedsMap[rId] = [];
+        roomBedsMap[rId].push(bed);
+      }
     }
 
     let roomsAvailableCount = 0;

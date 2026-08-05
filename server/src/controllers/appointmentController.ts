@@ -5,6 +5,7 @@ import { Doctor } from "../models/Doctor";
 import { Invoice } from "../models/Invoice";
 import { Patient } from "../models/Patient";
 import { Payment } from "../models/Payment";
+import { Queue } from "../models/Queue";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
@@ -67,11 +68,6 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
   if (req.user!.role === "doctor") {
     const loggedDoctor = await getLoggedDoctor(req);
     filter.doctor = loggedDoctor._id;
-    if (filter.status === "pending_payment") {
-      filter.status = "never_match_status";
-    } else if (!status) {
-      filter.status = { $ne: "pending_payment" };
-    }
   }
 
   // Enforce patient data isolation for appointment listing
@@ -340,6 +336,35 @@ export const updateAppointment = catchAsync(async (req: Request, res: Response) 
   });
   if (!appointment) {
     throw new AppError("Appointment not found or unauthorized.", 404);
+  }
+
+  if (body.status) {
+    const queueStatusMap: Record<string, string> = {
+      completed: "completed",
+      in_consultation: "called",
+      checked_in: "waiting",
+      cancelled: "skipped",
+      no_show: "skipped"
+    };
+    const newQueueStatus = queueStatusMap[body.status];
+    if (newQueueStatus) {
+      await Queue.updateMany(
+        { appointment: appointment._id },
+        { status: newQueueStatus }
+      );
+      const todayStart = new Date(appointment.date || new Date());
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(todayStart);
+      todayEnd.setHours(23, 59, 59, 999);
+      await Queue.updateMany(
+        {
+          patient: appointment.patient,
+          doctor: appointment.doctor,
+          createdAt: { $gte: todayStart, $lte: todayEnd }
+        },
+        { status: newQueueStatus }
+      );
+    }
   }
 
   const targetHospital = req.hospitalFilter?.hospital || (appointment.hospital || "").toString();

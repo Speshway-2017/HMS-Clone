@@ -751,6 +751,18 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                     <span>Total Bill:</span>
                     <span>{formatINR(invoice.totals?.total)}</span>
                   </div>
+                  {(() => {
+                    const totalVal = Number(invoice.totals?.total) || 0;
+                    const balVal = invoice.totals?.patientBalance !== undefined ? Number(invoice.totals.patientBalance) : totalVal;
+                    const paidVal = Math.max(0, totalVal - balVal);
+                    if (paidVal <= 0) return null;
+                    return (
+                      <div className="flex justify-between w-48 text-emerald-700 font-bold text-xs pt-1">
+                        <span>Paid Amount:</span>
+                        <span>{formatINR(paidVal)}</span>
+                      </div>
+                    );
+                  })()}
                   {invoice.totals?.patientBalance !== undefined && invoice.totals.patientBalance < invoice.totals?.total && (
                     <div className="flex justify-between w-48 text-amber-700 font-bold text-xs pt-1">
                       <span>Remaining Due:</span>

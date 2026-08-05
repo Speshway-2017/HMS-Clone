@@ -30,7 +30,7 @@ const invoiceSchema = z.object({
 });
 
 function computeTotals(
-  invoice: { items: { quantity: number; amount: number }[]; taxRate: number; serviceFee: number; insuranceCoveragePercent: number; discount?: number },
+  invoice: { items: { quantity: number; amount: number }[]; taxRate: number; serviceFee: number; insuranceCoveragePercent: number; discount?: number; status?: string; totals?: any },
   totalPaid: number = 0
 ) {
   const subtotal = invoice.items.reduce((sum, i) => sum + i.quantity * i.amount, 0);
@@ -38,7 +38,9 @@ function computeTotals(
   const discount = invoice.discount || 0;
   const total = Math.max(0, subtotal + taxAmount + invoice.serviceFee - discount);
   const insuranceCovered = total * (invoice.insuranceCoveragePercent / 100);
-  const patientBalance = Math.max(0, total - insuranceCovered - totalPaid);
+
+  const isPaidInDb = (invoice.status || "").toLowerCase() === "paid" || invoice.totals?.patientBalance === 0;
+  const patientBalance = isPaidInDb ? 0 : Math.max(0, total - insuranceCovered - totalPaid);
   return { subtotal, taxAmount, total, insuranceCovered, patientBalance };
 }
 
@@ -387,7 +389,11 @@ export const getInvoice = catchAsync(async (req: Request, res: Response) => {
 export const updateInvoice = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital!;
   const body = invoiceSchema.partial().parse(req.body);
-  const invoice = await Invoice.findOneAndUpdate({ _id: req.params.id, ...req.hospitalFilter }, body, {
+  const updatePayload: any = { ...body };
+  if (body.status && body.status.toLowerCase() === "paid") {
+    updatePayload["totals.patientBalance"] = 0;
+  }
+  const invoice = await Invoice.findOneAndUpdate({ _id: req.params.id, ...req.hospitalFilter }, updatePayload, {
     new: true,
     runValidators: true,
   });
