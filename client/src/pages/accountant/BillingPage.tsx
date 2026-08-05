@@ -1393,7 +1393,9 @@ export function AccountantBillingPage() {
                   <th className="px-4 py-3">Patient</th>
                   <th className="px-4 py-3">Department/Type</th>
                   <th className="px-4 py-3">Date Issued</th>
-                  <th className="px-4 py-3">Amount</th>
+                  <th className="px-4 py-3">Total Amount</th>
+                  <th className="px-4 py-3">Paid Amount</th>
+                  <th className="px-4 py-3">Balance Due</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
@@ -1401,45 +1403,63 @@ export function AccountantBillingPage() {
               <tbody className="divide-y divide-slate-100">
                 {filteredInvoices.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                    <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
                       No invoices found for this criteria.
                     </td>
                   </tr>
                 ) : (
-                  filteredInvoices.map((inv) => (
-                    <tr key={inv._id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                        {inv._id.slice(-8).toUpperCase()}
-                      </td>
-                      <td className="px-4 py-3 font-medium text-slate-700">
-                        {inv.patient && typeof inv.patient === "object" ? inv.patient.name : "Walk-in"}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        <span className="capitalize">{(inv as any).billingType || inv.items[0]?.category.toUpperCase() || "OP"}</span>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {new Date(inv.issuedAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3 font-medium text-slate-800">
-                        ₹{(inv.totals?.total ?? 0).toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge tone={STATUS_TONE[inv.status as keyof typeof STATUS_TONE] || "info"} className="w-36">{inv.status.replace("_", " ")}</Badge>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => {
-                            setSelectedInvoice(inv);
-                            setIsInvoiceDetailsOpen(true);
-                          }}
-                          className="rounded-lg p-1.5 text-navy-700 hover:bg-navy-50"
-                          title="View details"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  filteredInvoices.map((inv) => {
+                    const statusLower = (inv.status || "").toLowerCase();
+                    const isFullyPaid = statusLower === "paid";
+                    const totalVal = Number(inv.totals?.total) || 0;
+                    const balVal = isFullyPaid 
+                      ? 0 
+                      : (inv.totals?.patientBalance !== undefined 
+                          ? Number(inv.totals.patientBalance) 
+                          : totalVal);
+                    const paidVal = isFullyPaid ? totalVal : Math.max(0, totalVal - (inv.totals?.insuranceCovered || 0) - balVal);
+
+                    return (
+                      <tr key={inv._id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                          {inv._id.slice(-8).toUpperCase()}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-700">
+                          {inv.patient && typeof inv.patient === "object" ? inv.patient.name : "Walk-in"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          <span className="capitalize">{(inv as any).billingType || inv.items[0]?.category.toUpperCase() || "OP"}</span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {new Date(inv.issuedAt).toLocaleDateString()}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-800">
+                          {formatINR(totalVal)}
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-emerald-700">
+                          {formatINR(paidVal)}
+                        </td>
+                        <td className={`px-4 py-3 font-bold ${balVal > 0 ? "text-amber-700" : "text-slate-500"}`}>
+                          {formatINR(balVal)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge tone={STATUS_TONE[inv.status as keyof typeof STATUS_TONE] || "info"} className="w-36">{inv.status.replace("_", " ")}</Badge>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => {
+                              setSelectedInvoice(inv);
+                              setIsInvoiceDetailsOpen(true);
+                            }}
+                            className="rounded-lg p-1.5 text-navy-700 hover:bg-navy-50"
+                            title="View details"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

@@ -329,26 +329,53 @@ export const getAccountantDashboard = catchAsync(async (req: Request, res: Respo
       },
       {
         $addFields: {
+          statusLower: { $toLower: { $ifNull: ["$status", ""] } },
           totalPaid: { $sum: "$payments.amount" },
         },
       },
       {
         $addFields: {
+          isPaidInDb: {
+            $or: [
+              { $eq: ["$statusLower", "paid"] },
+              { $eq: ["$totals.patientBalance", 0] }
+            ]
+          }
+        }
+      },
+      {
+        $addFields: {
           computedBalance: {
-            $max: [0, { $subtract: ["$totals.total", "$totalPaid"] }],
+            $cond: [
+              "$isPaidInDb",
+              0,
+              {
+                $cond: [
+                  { $gt: ["$totals.patientBalance", null] },
+                  "$totals.patientBalance",
+                  { $max: [0, { $subtract: ["$totals.total", "$totalPaid"] }] }
+                ]
+              }
+            ]
           },
           derivedStatus: {
             $cond: [
-              { $eq: [{ $max: [0, { $subtract: ["$totals.total", "$totalPaid"] }] }, 0] },
+              "$isPaidInDb",
               "paid",
               {
                 $cond: [
-                  { $gt: ["$totalPaid", 0] },
-                  "partially_paid",
-                  "$status",
-                ],
-              },
-            ],
+                  { $eq: [{ $max: [0, { $subtract: ["$totals.total", "$totalPaid"] }] }, 0] },
+                  "paid",
+                  {
+                    $cond: [
+                      { $gt: ["$totalPaid", 0] },
+                      "partially_paid",
+                      "$status"
+                    ]
+                  }
+                ]
+              }
+            ]
           },
         },
       },

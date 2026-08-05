@@ -15,6 +15,7 @@ const STATUS_BADGE: Record<string, { tone: "success" | "warning" | "info" | "neu
   in_consultation: { tone: "warning",  label: "In Consultation" },
   checked_in:      { tone: "info",     label: "Checked In"      },
   scheduled:       { tone: "neutral",  label: "Scheduled"       },
+  pending_payment: { tone: "neutral",  label: "Pending Payment" },
   cancelled:       { tone: "danger",   label: "Cancelled"       },
   no_show:         { tone: "danger",   label: "No Show"         },
 };
@@ -42,7 +43,7 @@ export function OPManagementPage() {
     if (status === "completed") return "completed";
     if (status === "in_consultation") return "in_progress";
     if (status === "checked_in") return "waiting";
-    if (status === "scheduled") return "scheduled";
+    if (status === "scheduled" || status === "pending_payment") return "scheduled";
     return "cancelled"; // fallback for cancelled/no_show
   };
 

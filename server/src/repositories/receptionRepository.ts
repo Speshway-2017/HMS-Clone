@@ -153,19 +153,19 @@ export class ReceptionRepository {
     return await OPVisit.create(data);
   }
 
-  static async findOPVisitById(hospitalId: Types.ObjectId, id: string) {
-    return await OPVisit.findOne({ _id: id, hospital: hospitalId })
+  static async findOPVisitById(hospitalId: any, id: string) {
+    return await OPVisit.findOne({ _id: id, ...toFilter(hospitalId) })
       .populate("patient", "name uhid phone age gender bloodGroup address emergencyContact insurance allergies medicalHistory photoUrl")
       .populate("doctor", "name specialization")
       .populate("department", "name");
   }
 
-  static async getOPHistory(hospitalId: Types.ObjectId, page: number, limit: number, search?: string) {
-    const filter: any = { hospital: hospitalId };
+  static async getOPHistory(hospitalId: any, page: number, limit: number, search?: string) {
+    const filter: any = { ...toFilter(hospitalId) };
     if (search) {
       const regex = new RegExp(search, "i");
       // Search on populated patient fields would require aggregation, but we can search patient IDs
-      const patients = await Patient.find({ hospital: hospitalId, name: regex }).select("_id");
+      const patients = await Patient.find({ ...toFilter(hospitalId), name: regex }).select("_id");
       filter.patient = { $in: patients.map(p => p._id) };
     }
     const skip = (page - 1) * limit;
@@ -183,24 +183,24 @@ export class ReceptionRepository {
   }
 
   // ── Room & Bed Operations ──
-  static async listRooms(hospitalId: Types.ObjectId) {
-    return await Room.find({ hospital: hospitalId, status: { $in: ["active", "Active"] } }).sort({ wardName: 1, roomNumber: 1 });
+  static async listRooms(hospitalId: any) {
+    return await Room.find({ ...toFilter(hospitalId), status: { $in: ["active", "Active"] } }).sort({ wardName: 1, roomNumber: 1 });
   }
 
-  static async listBedsByRoom(hospitalId: Types.ObjectId, roomId: string) {
-    return await Bed.find({ hospital: hospitalId, room: roomId }).sort({ bedNumber: 1 });
+  static async listBedsByRoom(hospitalId: any, roomId: string) {
+    return await Bed.find({ ...toFilter(hospitalId), room: roomId }).sort({ bedNumber: 1 });
   }
 
-  static async findBedById(hospitalId: Types.ObjectId, id: string) {
-    return await Bed.findOne({ _id: id, hospital: hospitalId }).populate("room");
+  static async findBedById(hospitalId: any, id: string) {
+    return await Bed.findOne({ _id: id, ...toFilter(hospitalId) }).populate("room");
   }
 
-  static async getRoomsAvailability(hospitalId: Types.ObjectId) {
-    const rooms = await Room.find({ hospital: hospitalId, status: { $in: ["active", "Active"] } }).lean();
-    const beds = await Bed.find({ hospital: hospitalId }).lean();
+  static async getRoomsAvailability(hospitalId: any) {
+    const rooms = await Room.find({ ...toFilter(hospitalId), status: { $in: ["active", "Active"] } }).lean();
+    const beds = await Bed.find(toFilter(hospitalId)).lean();
 
     return rooms.map(room => {
-      const roomBeds = beds.filter(b => b.room.toString() === room._id.toString());
+      const roomBeds = beds.filter(b => b.room && b.room.toString() === room._id.toString());
       const totalBeds = roomBeds.length;
       const occupiedBeds = roomBeds.filter(b => b.isOccupied).length;
       const availableBeds = totalBeds - occupiedBeds;
@@ -214,19 +214,19 @@ export class ReceptionRepository {
     });
   }
 
-  static async updateBedOccupancy(hospitalId: Types.ObjectId, bedId: string, isOccupied: boolean) {
+  static async updateBedOccupancy(hospitalId: any, bedId: string, isOccupied: boolean) {
     const status = isOccupied ? "Occupied" : "Available";
-    return await Bed.findOneAndUpdate({ _id: bedId, hospital: hospitalId }, { isOccupied, status }, { new: true });
+    return await Bed.findOneAndUpdate({ _id: bedId, ...toFilter(hospitalId) }, { isOccupied, status }, { new: true });
   }
 
-  static async getQueueByDate(hospitalId: Types.ObjectId, targetDate: Date) {
+  static async getQueueByDate(hospitalId: any, targetDate: Date) {
     const startOfDay = new Date(targetDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(targetDate);
     endOfDay.setHours(23, 59, 59, 999);
 
     const queueTokens = await Queue.find({
-      hospital: hospitalId,
+      ...toFilter(hospitalId),
       $or: [
         { date: { $gte: startOfDay, $lte: endOfDay } },
         { createdAt: { $gte: startOfDay, $lte: endOfDay } }
@@ -235,14 +235,46 @@ export class ReceptionRepository {
       .populate("patient", "name uhid phone age gender")
       .populate("doctor", "name specialization department")
       .populate("department", "name")
+      .populate("appointment")
       .sort({ createdAt: 1 });
 
     if (queueTokens.length > 0) {
-      return queueTokens;
+      const apptIds = queueTokens.map((q: any) => q.appointment?._id || q.appointment).filter(Boolean);
+      const appts = await Appointment.find({
+        ...toFilter(hospitalId),
+        $or: [
+          { _id: { $in: apptIds } },
+          { date: { $gte: startOfDay, $lte: endOfDay } }
+        ]
+      });
+      const apptStatusMap = new Map<string, string>();
+      const patientApptStatusMap = new Map<string, string>();
+      appts.forEach((a: any) => {
+        apptStatusMap.set(a._id.toString(), a.status);
+        if (a.patient) {
+          patientApptStatusMap.set(a.patient.toString(), a.status);
+        }
+      });
+
+      return queueTokens.map((q: any) => {
+        const plain = q.toObject ? q.toObject() : q;
+        const apptId = q.appointment?._id ? q.appointment._id.toString() : (q.appointment ? q.appointment.toString() : null);
+        const patId = q.patient?._id ? q.patient._id.toString() : (q.patient ? q.patient.toString() : null);
+        const statusFromAppt = (apptId && apptStatusMap.get(apptId)) || (patId && patientApptStatusMap.get(patId));
+
+        if (statusFromAppt === "completed") {
+          plain.status = "completed";
+        } else if (statusFromAppt === "in_consultation") {
+          plain.status = "called";
+        } else if (statusFromAppt === "cancelled" || statusFromAppt === "no_show") {
+          plain.status = "skipped";
+        }
+        return plain;
+      });
     }
 
     const todayAppts = await Appointment.find({
-      hospital: hospitalId,
+      ...toFilter(hospitalId),
       date: { $gte: startOfDay, $lte: endOfDay }
     })
       .populate("patient", "name uhid phone age gender")

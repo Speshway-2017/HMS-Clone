@@ -2447,12 +2447,12 @@ export const getAnalytics = catchAsync(async (req: Request, res: Response) => {
   };
 
   // Filter metrics
-  const todayAppts = appointments.filter(a => a.date >= startOfToday && a.date <= endOfToday && a.status !== "pending_payment");
-  const yesterdayAppts = appointments.filter(a => a.date >= startOfYesterday && a.date <= endOfYesterday && a.status !== "pending_payment");
+  const todayAppts = appointments.filter(a => a.date >= startOfToday && a.date <= endOfToday && a.status !== "cancelled");
+  const yesterdayAppts = appointments.filter(a => a.date >= startOfYesterday && a.date <= endOfYesterday && a.status !== "cancelled");
   
   const lastWeekSameDayStart = new Date(startOfToday); lastWeekSameDayStart.setDate(lastWeekSameDayStart.getDate() - 7);
   const lastWeekSameDayEnd = new Date(endOfToday); lastWeekSameDayEnd.setDate(lastWeekSameDayEnd.getDate() - 7);
-  const lastWeekSameDayAppts = appointments.filter(a => a.date >= lastWeekSameDayStart && a.date <= lastWeekSameDayEnd && a.status !== "pending_payment");
+  const lastWeekSameDayAppts = appointments.filter(a => a.date >= lastWeekSameDayStart && a.date <= lastWeekSameDayEnd && a.status !== "cancelled");
 
   const queuesToday = await Queue.find({
     hospital: hospitalId,
@@ -2474,7 +2474,7 @@ export const getAnalytics = catchAsync(async (req: Request, res: Response) => {
 
   const followups = appointments.filter(a => a.date > endOfToday && ["scheduled", "checked_in"].includes(a.status));
 
-  const appointmentsSparkline = getDailyCounts(appointments.filter(a => a.status !== "pending_payment"), "date");
+  const appointmentsSparkline = getDailyCounts(appointments.filter(a => a.status !== "cancelled"), "date");
   const completedSparkline = getDailyCounts(appointments.filter(a => a.status === "completed"), "date");
   const surgeriesSparkline = getDailyCounts(appointments.filter(a => a.type?.toLowerCase() === "surgery"), "date");
   const prescriptionsSparkline = getDailyCounts(prescriptions, "createdAt");
@@ -2531,7 +2531,7 @@ export const getAnalytics = catchAsync(async (req: Request, res: Response) => {
   const allDoctorAppts = await Appointment.find({
     hospital: hospitalId,
     doctor: doctor._id,
-    status: { $ne: "pending_payment" }
+    status: { $nin: ["cancelled", "no_show"] }
   }).select("patient");
 
   const doctorApptFrequencyMap = new Map<string, number>();
