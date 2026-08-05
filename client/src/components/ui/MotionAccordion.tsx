@@ -1,5 +1,6 @@
 import * as React from "react";
 import { motion } from "motion/react";
+import { ChevronDown } from "lucide-react";
 
 export interface MotionAccordionItem {
   question: React.ReactNode;
@@ -48,7 +49,6 @@ function AccordionItem({
           : "border-slate-200/80 shadow-sm hover:border-slate-300 hover:shadow"
       }`}
       transition={{ type: "spring", stiffness: 280, damping: 28, mass: 0.9 }}
-      animate={{ scale: isOpen ? 1 : 0.985 }}
       initial={false}
       style={{ originX: 0.5, originY: 0 }}
     >
@@ -73,44 +73,13 @@ function AccordionItem({
           initial={false}
           animate={{
             rotate: isOpen ? 180 : 0,
-            scale: isOpen ? 1.05 : 1,
           }}
           transition={{ type: "spring", stiffness: 480, damping: 28 }}
           className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors ${
             isOpen ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500"
           }`}
         >
-          {isOpen ? (
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 14 2"
-              fill="none"
-              aria-hidden
-            >
-              <path
-                d="M1 1h12"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-          ) : (
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 14 14"
-              fill="none"
-              aria-hidden
-            >
-              <path
-                d="M7 1v12M1 7h12"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-          )}
+          <ChevronDown className="h-5 w-5" />
         </motion.span>
       </button>
 

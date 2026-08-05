@@ -70,10 +70,11 @@ export default function AnimatedInput({
         borderColor: "transparent",
         color: "#2563eb", // Blue color
         scale: 0.85,
-        y: -24,
+        y: -22,
+        x: icon ? -24 : 0,
       };
     }
-    return { color: "#6b7280", scale: 1, y: 0 };
+    return { color: "#6b7280", scale: 1, y: "-50%", x: 0 };
   };
 
   const getLabelStyle = () => {
@@ -84,12 +85,12 @@ export default function AnimatedInput({
       return {
         borderColor: "transparent",
         color: "#2563eb", // Blue color
-        transform: "translateY(-24px) scale(0.85)",
+        transform: `translateY(-22px) scale(0.85) ${icon ? "translateX(-24px)" : ""}`,
       };
     }
     return {
       color: "#6b7280",
-      transform: "translateY(0) scale(1)",
+      transform: "translateY(-50%) scale(1)",
     };
   };
 
@@ -175,8 +176,8 @@ export default function AnimatedInput({
       ) : null}
       <motion.label
         animate={getLabelAnimation()}
-        className={`pointer-events-none absolute top-1/2 origin-left -translate-y-1/2 rounded-md bg-white px-1 text-sm font-medium leading-none flex h-4 items-center transition-all ${
-          icon && !isFloating ? "left-10" : "left-3"
+        className={`pointer-events-none absolute top-1/2 origin-left rounded-md bg-white px-1 text-sm font-medium leading-none flex items-center transition-all ${
+          icon ? "left-10" : "left-3.5"
         } ${labelClassName}`}
         htmlFor={inputId}
         style={{
