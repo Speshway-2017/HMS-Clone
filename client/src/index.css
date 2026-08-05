@@ -212,6 +212,31 @@ body {
   }
 }
 
+/* --- Reverse Blob Button Variant (Blue initial, White on hover) --- */
+.blob-btn--reverse {
+  color: #ffffff;
+  box-shadow: 0 10px 25px -5px rgba(5, 5, 169, 0.4);
+  transition: color 0.5s, box-shadow 0.3s;
+}
+
+.blob-btn--reverse:before {
+  border-color: #0505A9;
+}
+
+.blob-btn--reverse .blob-btn__inner {
+  background: #0505A9;
+}
+
+.blob-btn--reverse .blob-btn__blob {
+  background: #ffffff;
+}
+
+.blob-btn--reverse:hover {
+  color: #0505A9;
+  box-shadow: 0 12px 30px -5px rgba(5, 5, 169, 0.25);
+}
+
+
 /* --- Green Bubbly Button Styling --- */
 .bubbly-button {
   font-family: inherit;

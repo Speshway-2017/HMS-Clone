@@ -428,7 +428,7 @@ export function LandingPage() {
             </Link>
             <button
               onClick={() => changeTab("doctors")}
-              className="blob-btn blob-btn--sm"
+              className="blob-btn blob-btn--sm blob-btn--reverse"
             >
               <span className="relative z-10 inline-flex items-center gap-1.5 whitespace-nowrap">
                 Book Appointment
@@ -523,7 +523,7 @@ export function LandingPage() {
                   <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row lg:justify-start">
                     <button
                       onClick={() => changeTab("doctors")}
-                      className="blob-btn w-full sm:w-auto"
+                      className="blob-btn blob-btn--reverse w-full sm:w-auto"
                     >
                       <span className="relative z-10 inline-flex items-center gap-2">
                         Book Appointment Online
@@ -1148,94 +1148,44 @@ export function LandingPage() {
         )}
         {/* --- VIEW: SERVICES --- */}
         {activeTab === "services" && (
-          <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-slate-50 min-h-screen">
-            <style>{`
-              .services-perspective-container {
-                perspective: 1200px;
-                transform-style: preserve-3d;
-              }
-
-              .service-3d-wrapper {
-                perspective: 1200px;
-                transform-style: preserve-3d;
-                height: 100%;
-              }
-
-              .service-3d-card {
-                position: relative;
-                height: 100%;
-                transform-style: preserve-3d;
-                transform: rotateX(42deg) translateY(-25px) translateZ(-35px);
-                transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.4s ease;
-                box-shadow: 0px 25px 50px -10px rgba(15, 23, 42, 0.25);
-                will-change: transform, box-shadow;
-              }
-
-              .service-3d-wrapper:hover .service-3d-card {
-                transform: rotateX(0deg) translateY(0) translateZ(0) scale(1.04);
-                box-shadow: 0px 20px 45px -5px rgba(37, 99, 235, 0.3);
-                border-color: rgba(37, 99, 235, 0.6) !important;
-              }
-            `}</style>
-            <div className="mx-auto max-w-[1600px] space-y-16">
-              <div className="text-center space-y-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-50 border border-blue-200/60 px-3.5 py-1 rounded-full inline-block">
-                  Clinical Catalog
-                </span>
-                <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">
-                  <span className="text-blue-600">Clin</span>
-                  <span className="text-sky-500">ical</span>{" "}
-                  <span className="text-emerald-500">Serv</span>
-                  <span className="text-indigo-600">ices</span>{" "}
-                  <span className="text-purple-600">&</span>{" "}
-                  <span className="text-rose-500">Cata</span>
-                  <span className="text-amber-500">log</span>
+          <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-white">
+            <div className="mx-auto max-w-[1600px] space-y-12">
+              <div className="text-center space-y-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-navy-700">Clinical Catalog</span>
+                <h1 className="text-4xl font-extrabold text-slate-900">
+                  Services Offered
                 </h1>
                 <p className="text-slate-600 text-sm max-w-md mx-auto">
                   A comprehensive listing of diagnostic and clinical services aggregated dynamically from our operating specialties.
                 </p>
               </div>
 
-              {/* Grouped Services with 3D Perspective */}
-              <div className="services-perspective-container grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-3 pt-8 pb-16">
-                {departments.map((dept, cardIdx) => {
+              {/* Grouped Services */}
+              <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+                {departments.map((dept) => {
                   const deptServices = dept.services || [];
                   if (deptServices.length === 0) return null;
 
-                  const cardGradients = [
-                    "from-amber-500/10 via-orange-500/5 to-white border-amber-200/60",
-                    "from-indigo-500/10 via-purple-500/5 to-white border-indigo-200/60",
-                    "from-rose-500/10 via-red-500/5 to-white border-rose-200/60",
-                    "from-emerald-500/10 via-teal-500/5 to-white border-emerald-200/60",
-                    "from-cyan-500/10 via-blue-500/5 to-white border-cyan-200/60",
-                    "from-fuchsia-500/10 via-pink-500/5 to-white border-fuchsia-200/60",
-                  ];
-                  const gradientClass = cardGradients[cardIdx % cardGradients.length];
-
                   return (
-                    <div key={dept._id} className="service-3d-wrapper">
-                      <div
-                        className={`service-3d-card rounded-2xl border bg-gradient-to-br ${gradientClass} p-7 space-y-5`}
-                      >
-                        <div className="flex items-center gap-3.5">
-                          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
-                            <Stethoscope className="h-6 w-6" />
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-extrabold text-slate-900">{dept.name}</h3>
-                            <span className="block text-[10px] font-bold text-blue-600 uppercase tracking-wider">{dept.specialization || "Clinical"}</span>
-                          </div>
+                    <div key={dept._id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy-50 text-navy-700">
+                          <Stethoscope className="h-5 w-5" />
                         </div>
-                        <hr className="border-slate-200/70" />
-                        <ul className="space-y-3 text-xs font-semibold text-slate-700">
-                          {deptServices.map((srv: string, idx: number) => (
-                            <li key={idx} className="flex items-center gap-2.5">
-                              <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                              <span>{srv}</span>
-                            </li>
-                          ))}
-                        </ul>
+                        <div>
+                          <h3 className="text-base font-extrabold text-slate-850">{dept.name}</h3>
+                          <span className="block text-[9px] font-bold text-slate-450 uppercase">{dept.specialization || "Clinical"}</span>
+                        </div>
                       </div>
+                      <hr className="border-slate-100" />
+                      <ul className="space-y-2.5 text-xs text-slate-600">
+                        {deptServices.map((srv: string, idx: number) => (
+                          <li key={idx} className="flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                            <span>{srv}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   );
                 })}

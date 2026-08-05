@@ -98,79 +98,78 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <div className="flex w-full grid-cols-12 lg:grid">
-        {/* --- LEFT PANEL: SaaS Info (Hidden on mobile) --- */}
-        <div className="relative hidden flex-col justify-between bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 p-12 text-white lg:col-span-5 lg:flex xl:col-span-4 overflow-hidden">
-          {/* Background overlay shapes */}
-          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl pointer-events-none" />
-          <div className="absolute -left-10 bottom-10 h-48 w-48 rounded-full bg-blue-400/15 blur-2xl pointer-events-none" />
+    <div className="h-screen w-full flex overflow-hidden bg-slate-50 font-sans">
+      {/* --- LEFT PANEL: SaaS Info (Hidden on mobile) --- */}
+      <div className="relative hidden lg:flex flex-col justify-between bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 p-8 lg:w-[360px] xl:w-[420px] shrink-0 h-full overflow-hidden text-white">
+        {/* Background overlay shapes */}
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl pointer-events-none" />
+        <div className="absolute -left-10 bottom-10 h-48 w-48 rounded-full bg-blue-400/15 blur-2xl pointer-events-none" />
 
-          {/* Logo Branding */}
-          <Link to="/" className="flex items-center gap-3 text-lg font-extrabold tracking-tight relative z-10">
-            {logoUrl ? (
-              <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover shadow-sm" />
-            ) : (
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-sm shadow-md border border-blue-400/20">
-                <Activity className="h-4 w-4 text-blue-200" />
-              </div>
-            )}
-            <span className="bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
-              {hospitalName}
+        {/* Logo Branding */}
+        <Link to="/" className="flex items-center gap-3 text-lg font-extrabold tracking-tight relative z-10">
+          {logoUrl ? (
+            <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover shadow-sm" />
+          ) : (
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-sm shadow-md border border-blue-400/20">
+              <Activity className="h-4 w-4 text-blue-200" />
+            </div>
+          )}
+          <span className="bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
+            {hospitalName}
+          </span>
+        </Link>
+
+        {/* Marketing rotating text */}
+        <div className="my-auto space-y-6 relative z-10 py-4">
+          <div className="space-y-3">
+            <span className="inline-block rounded-full bg-blue-500/10 border border-blue-400/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-300">
+              Enterprise Health Architecture
             </span>
-          </Link>
-
-          {/* Marketing rotating text */}
-          <div className="my-auto space-y-10 relative z-10">
-            <div className="space-y-4">
-              <span className="inline-block rounded-full bg-blue-500/10 border border-blue-400/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-300">
-                Enterprise Health Architecture
-              </span>
-              <h2 className="text-3xl font-extrabold leading-tight tracking-tight text-white block">
-                <SpringScaleIn delay={200} stagger={70}>
-                  One Platform. Seamless Compliance.
-                </SpringScaleIn>
-              </h2>
-              <p className="text-sm leading-relaxed text-slate-300 block">
-                <SpringScaleIn delay={500} stagger={30}>
-                  HMS Enterprise integrates outpatient reception desks, clinician workspaces, and accountant audit ledgers into a unified clinical software matrix.
-                </SpringScaleIn>
-              </p>
-            </div>
-
-            {/* Carousel Promo */}
-            <div className="rounded-xl border border-blue-500/20 bg-blue-900/20 p-5 backdrop-blur-md min-h-[120px] transition-all duration-300">
-              <span className="text-[9px] font-bold text-blue-400 uppercase tracking-widest block mb-1">
-                SYSTEM BENEFIT
-              </span>
-              <h4 className="text-sm font-bold flex items-center gap-1.5 text-white">
-                <ShieldCheck className="h-4.5 w-4.5 text-blue-400" />
-                {promos[activePromoIdx].title}
-              </h4>
-              <p className="mt-2 text-xs text-slate-300 leading-relaxed">
-                {promos[activePromoIdx].desc}
-              </p>
-            </div>
-
-            {/* Quick trust metrics */}
-            <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-6 text-xs text-slate-300">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-blue-400" /> 100% HIPAA Isolated
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-blue-400" /> AES-256 Encrypted
-              </div>
-            </div>
+            <h2 className="text-2xl xl:text-3xl font-extrabold leading-tight tracking-tight text-white block">
+              <SpringScaleIn delay={200} stagger={70}>
+                One Platform. Seamless Compliance.
+              </SpringScaleIn>
+            </h2>
+            <p className="text-xs leading-relaxed text-slate-300 block">
+              <SpringScaleIn delay={500} stagger={30}>
+                HMS Enterprise integrates outpatient reception desks, clinician workspaces, and accountant audit ledgers into a unified clinical software matrix.
+              </SpringScaleIn>
+            </p>
           </div>
 
-          {/* Footer of Left Panel */}
-          <div className="text-[10px] text-slate-400 relative z-10">
-            © {new Date().getFullYear()} {hospitalName}. Managed Clinical Network.
+          {/* Carousel Promo */}
+          <div className="rounded-xl border border-blue-500/20 bg-blue-900/20 p-4 backdrop-blur-md min-h-[110px] transition-all duration-300">
+            <span className="text-[9px] font-bold text-blue-400 uppercase tracking-widest block mb-1">
+              SYSTEM BENEFIT
+            </span>
+            <h4 className="text-xs font-bold flex items-center gap-1.5 text-white">
+              <ShieldCheck className="h-4 w-4 text-blue-400" />
+              {promos[activePromoIdx].title}
+            </h4>
+            <p className="mt-1.5 text-xs text-slate-300 leading-relaxed">
+              {promos[activePromoIdx].desc}
+            </p>
+          </div>
+
+          {/* Quick trust metrics */}
+          <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-4 text-xs text-slate-300">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-blue-400" /> 100% HIPAA Isolated
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-blue-400" /> AES-256 Encrypted
+            </div>
           </div>
         </div>
 
-        {/* --- RIGHT PANEL: Login Form --- */}
-        <div className="flex flex-1 flex-col justify-center px-6 py-12 lg:col-span-7 xl:col-span-8 bg-slate-50">
+        {/* Footer of Left Panel */}
+        <div className="text-[10px] text-slate-400 relative z-10">
+          © {new Date().getFullYear()} {hospitalName}. Managed Clinical Network.
+        </div>
+      </div>
+
+      {/* --- RIGHT PANEL: Login Form --- */}
+      <div className="flex-1 h-full overflow-y-auto px-6 py-12 bg-slate-50 flex flex-col justify-center">
           <div className="mx-auto w-full max-w-[420px] space-y-8">
             {/* Header branding for mobile / small screen */}
             <div className="text-center space-y-2 lg:text-left">
@@ -203,7 +202,6 @@ export function LoginPage() {
                     label="Email Address or Phone Number"
                     value={identifier}
                     onChange={setIdentifier}
-                    placeholder="e.g. user@example.com or 9876543210"
                     required
                     autoComplete="username"
                   />
@@ -223,7 +221,6 @@ export function LoginPage() {
                     label="Security Password"
                     value={password}
                     onChange={setPassword}
-                    placeholder="Enter your password"
                     required
                     autoComplete="current-password"
                     endIcon={
@@ -283,6 +280,5 @@ export function LoginPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }
