@@ -3,6 +3,21 @@ import { api } from "../lib/api";
 import { RoomInfo } from "./rooms";
 import { WardInfo } from "./wards";
 
+export interface BedPatientInfo {
+  _id: string;
+  name: string;
+  uhid: string;
+  patientCode?: string;
+  phone?: string;
+}
+
+export interface BedAdmissionInfo {
+  _id: string;
+  admissionNumber: string;
+  admissionDate?: string;
+  status?: string;
+}
+
 export interface BedInfo {
   _id: string;
   ward: string | WardInfo;
@@ -10,8 +25,11 @@ export interface BedInfo {
   bedNumber: string;
   bedCode: string;
   bedType: string;
-  status: "Available" | "Occupied" | "Reserved" | "Cleaning" | "Maintenance";
+  status: "Available" | "Occupied" | "Reserved" | "Cleaning" | "Maintenance" | "Blocked";
   isOccupied: boolean;
+  patient?: BedPatientInfo | null;
+  admission?: BedAdmissionInfo | null;
+  lastSanitized?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -52,6 +70,7 @@ export function useCreateBed() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["beds"] });
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
       queryClient.invalidateQueries({ queryKey: ["reception", "rooms"] });
     }
   });
@@ -62,6 +81,7 @@ export interface UpdateBedPayload {
   roomId?: string;
   bedType?: string;
   status?: string;
+  lastSanitized?: string;
 }
 
 export function useUpdateBed() {
@@ -73,6 +93,7 @@ export function useUpdateBed() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["beds"] });
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
       queryClient.invalidateQueries({ queryKey: ["reception", "rooms"] });
     }
   });
@@ -86,6 +107,7 @@ export function useDeleteBed() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["beds"] });
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
       queryClient.invalidateQueries({ queryKey: ["reception", "rooms"] });
     }
   });

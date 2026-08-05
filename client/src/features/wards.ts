@@ -1,11 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 
+export type WardType = 
+  | "General Ward" 
+  | "Semi-Private Ward" 
+  | "Private Ward" 
+  | "ICU" 
+  | "NICU" 
+  | "PICU" 
+  | "Emergency" 
+  | "Emergency Ward" 
+  | "Operation Theatre" 
+  | "Labour Ward" 
+  | "Semi Private" 
+  | "Private" 
+  | "Deluxe" 
+  | "VIP";
+
 export interface WardInfo {
   _id: string;
   name: string;
   code: string;
-  wardType: "General Ward" | "Semi-Private Ward" | "Private Ward" | "ICU" | "NICU" | "Emergency Ward";
+  wardType: WardType;
   floorNumber: number;
   description: string;
   status: "Active" | "Inactive";
@@ -73,7 +89,7 @@ export function useUpdateWard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["wards"] });
-      queryClient.invalidateQueries({ queryKey: ["rooms"] }); // linked room wardName might have updated
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
     }
   });
 }

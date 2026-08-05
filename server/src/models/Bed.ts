@@ -11,10 +11,13 @@ const bedSchema = new Schema(
     bedType: { type: String, default: "Standard" },
     status: {
       type: String,
-      enum: ["Available", "Occupied", "Reserved", "Cleaning", "Maintenance"],
+      enum: ["Available", "Occupied", "Reserved", "Cleaning", "Maintenance", "Blocked"],
       default: "Available"
     },
-    isOccupied: { type: Boolean, default: false }
+    isOccupied: { type: Boolean, default: false },
+    patient: { type: Schema.Types.ObjectId, ref: "Patient", default: null },
+    admission: { type: Schema.Types.ObjectId, ref: "Admission", default: null },
+    lastSanitized: { type: Date, default: Date.now }
   },
   { timestamps: true }
 );
