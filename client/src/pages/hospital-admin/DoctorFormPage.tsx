@@ -15,7 +15,7 @@ export function DoctorFormPage() {
   const isEdit = !!id;
   const navigate = useNavigate();
   const { data } = useDoctor(id);
-  const { data: departments } = useDepartments();
+  const { data: departments } = useDepartments({ activeOnly: true });
   const createDoctor = useCreateDoctor();
   const updateDoctor = useUpdateDoctor(id ?? "");
 

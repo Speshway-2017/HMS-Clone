@@ -3,11 +3,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { Department } from "../types/domain";
 
-export function useDepartments(hospitalId?: string) {
+export function useDepartments(hospitalId?: string | { hospitalId?: string; activeOnly?: boolean }, activeOnly?: boolean) {
+  const hId = typeof hospitalId === "string" ? hospitalId : hospitalId?.hospitalId;
+  const isOnlyActive = typeof hospitalId === "object" ? hospitalId?.activeOnly : activeOnly;
+
   return useQuery({
-    queryKey: ["departments", hospitalId],
+    queryKey: ["departments", hId, isOnlyActive],
     queryFn: async () => {
-      const res = await api.get("/departments", { params: hospitalId ? { hospitalId } : {} });
+      const params: Record<string, string> = {};
+      if (hId) params.hospitalId = hId;
+      if (isOnlyActive) params.activeOnly = "true";
+
+      const res = await api.get("/departments", { params });
       return res.data.data.departments as Department[];
     },
   });

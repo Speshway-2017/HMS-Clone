@@ -22,10 +22,10 @@ const bedSchema = new Schema(
   { timestamps: true }
 );
 
-// Composite unique index for bedNumber in a room
-bedSchema.index({ hospital: 1, room: 1, bedNumber: 1 }, { unique: true });
-// Unique bedCode in a hospital
-bedSchema.index({ hospital: 1, bedCode: 1 }, { unique: true });
+// Composite unique index for bedNumber in a room per hospital & branch
+bedSchema.index({ hospital: 1, branch: 1, room: 1, bedNumber: 1 }, { unique: true });
+// Unique bedCode in a hospital & branch
+bedSchema.index({ hospital: 1, branch: 1, bedCode: 1 }, { unique: true });
 
 // Sync status and isOccupied fields
 bedSchema.pre("save", function (next) {
@@ -39,3 +39,7 @@ bedSchema.pre("save", function (next) {
 
 export type Bed = InferSchemaType<typeof bedSchema> & { _id: Types.ObjectId };
 export const Bed = model("Bed", bedSchema);
+
+// Drop old legacy single-hospital indexes if they exist
+Bed.collection.dropIndex("hospital_1_room_1_bedNumber_1").catch(() => {});
+Bed.collection.dropIndex("hospital_1_bedCode_1").catch(() => {});

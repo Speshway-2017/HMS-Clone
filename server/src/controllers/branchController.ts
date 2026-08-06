@@ -6,6 +6,8 @@ import { catchAsync } from "../utils/catchAsync";
 import { generateBranchId } from "../utils/idGenerator";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 
+import { syncBranchDepartmentsForBranch } from "../utils/branchDepartmentSync";
+
 const branchSchema = z.object({
   hospital: z.string().min(1),
   name: z.string().min(1),
@@ -49,6 +51,10 @@ export const listBranches = catchAsync(async (req: Request, res: Response) => {
 export const createBranch = catchAsync(async (req: Request, res: Response) => {
   const body = branchSchema.parse(req.body);
   const branch = await Branch.create({ ...body, branchId: generateBranchId() });
+
+  // Automatically inherit active departments from Parent Hospital
+  await syncBranchDepartmentsForBranch(branch._id, branch.hospital);
+
   res.status(201).json({ status: "success", data: { branch } });
 });
 
