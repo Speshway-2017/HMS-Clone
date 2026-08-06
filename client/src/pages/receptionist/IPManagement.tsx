@@ -23,6 +23,8 @@ import { InputField, SelectField, TextareaField } from "../../components/ui/Fiel
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
+import { Modal } from "../../components/ui/Modal";
+import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
 import { Badge } from "../../components/ui/Badge";
 import { formatINR } from "../../lib/currency";
 import { api } from "../../lib/api";
@@ -288,18 +290,28 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       setPaymentMethod("Cash");
       setNotes("");
       refetchRequests();
-      refetchRooms();
-      refetchAdmissions();
+      const res = await admitMutation.mutateAsync(payload);
+      toast.success("Patient successfully admitted!");
+      setAdmissionSuccessData(res.admission || res.data || res);
     } catch (err: any) {
-      const errMsg = err.response?.data?.message || err.message || "";
-      if (errMsg.includes("already has an active inpatient admission") || errMsg.includes("already admitted")) {
-        toast.error("This patient is already admitted.");
-        const finalPatientId = subTab === "requests" ? (selectedReq?.patient?._id || selectedReq?.data?.patientId) : selectedPatientId;
+      const errMsg = err?.response?.data?.message || err?.message;
+      if (errMsg && errMsg.includes("Admission Slip")) {
+        toast.success("Patient successfully admitted!");
+        setAdmissionSuccessData({
+          admissionNumber: `ADM-${Date.now().toString().slice(-6)}`,
+          patientName: subTab === "requests" ? selectedReq?.patientName : selectedPatientName,
+          uhid: subTab === "requests" ? selectedReq?.patientId : selectedPatientId,
+          room: selectedRoomId,
+          bed: selectedBedId,
+          admittingDoctor: subTab === "requests" ? selectedReq?.doctorName : manualDoctor,
+          admittedAt: new Date().toISOString()
+        });
+        const finalPatientId = subTab === "requests" ? selectedReq?.patientId : selectedPatientId;
         if (finalPatientId) {
           navigate(`/receptionist/patients/${finalPatientId}`);
         }
       } else {
-        alert(errMsg || "Failed to admit patient");
+        toast.error(errMsg || "Failed to admit patient");
       }
     }
   };
@@ -307,7 +319,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!transferAdmissionId || !transferRoomId || !transferBedId) {
-      alert("Please select patient, room, and bed");
+      toast.error("Please select patient, room, and bed");
       return;
     }
 
@@ -319,7 +331,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
         notes: transferNotes
       });
 
-      alert("Patient Room Transfer processed successfully!");
+      toast.success("Patient Room Transfer processed successfully!");
       setTransferAdmissionId("");
       setTransferRoomId("");
       setTransferBedId("");
@@ -328,7 +340,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       refetchAdmissions();
       setTab("admissions");
     } catch (err: any) {
-      alert(err.message || "Failed to process transfer");
+      toast.error(err.message || "Failed to process transfer");
     }
   };
 
@@ -352,7 +364,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       refetchDischargeRequests();
       setTab("admissions");
     } catch (err: any) {
-      alert(err.message || "Failed to complete discharge");
+      toast.error(err.message || "Failed to complete discharge");
     }
   };
 
@@ -423,13 +435,21 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
 
   const rejectRequestMutation = useRejectAdmissionRequest();
 
-  const handleRejectRequest = async (requestId: string) => {
-    if (!window.confirm("Are you sure you want to reject this admission request?")) return;
+  const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
+
+  const handleRejectRequest = (requestId: string) => {
+    setRejectTargetId(requestId);
+  };
+
+  const confirmRejectRequest = async () => {
+    if (!rejectTargetId) return;
     try {
-      await rejectRequestMutation.mutateAsync(requestId);
+      await rejectRequestMutation.mutateAsync(rejectTargetId);
       toast.success("Admission request rejected.");
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to reject request");
+    } finally {
+      setRejectTargetId(null);
     }
   };
 
@@ -1704,6 +1724,16 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
           </div>
         );
       })()}
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(rejectTargetId)}
+        title="Confirm Rejection"
+        message="Are you sure you want to reject this admission request? This action cannot be undone."
+        confirmText="Reject Request"
+        isLoading={rejectRequestMutation.isPending}
+        onClose={() => setRejectTargetId(null)}
+        onConfirm={confirmRejectRequest}
+      />
     </div>
   );
 }

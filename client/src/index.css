@@ -18,12 +18,20 @@ body {
 
 /* --- Premium Print Mode Styles --- */
 @media print {
-  /* Hide all generic page content, navbars, sidebars, modal backdrops, and action buttons */
+  html, body {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Hide all generic page content, navbars, sidebars, modal backdrops */
   body * {
     visibility: hidden !important;
   }
 
-  /* Force display only targeted print blocks and their descendants */
+  /* Force display target print blocks and all their descendant elements */
+  #payslip-print-area,
+  #payslip-print-area *,
   #pharmacy-invoice-print,
   #pharmacy-invoice-print *,
   #invoice-print-area,
@@ -37,40 +45,55 @@ body {
   #patient-card-print,
   #patient-card-print *,
   #consolidated-patient-statement-print,
-  #consolidated-patient-statement-print * {
+  #consolidated-patient-statement-print *,
+  .printable-area,
+  .printable-area * {
     visibility: visible !important;
   }
 
-  /* Force patient card print to display block (bypassing tailwind hidden print:block conflict) */
+  /* Force patient card print to display block */
   #patient-card-print {
     display: block !important;
   }
 
-  /* Make print-area span full sheet width and height, aligned to the top-left corner */
+  /* Exclude action buttons, footer controls, and print-hidden elements from print output */
+  .print\:hidden,
+  .print-hidden,
+  .no-print,
+  button,
+  [role="button"] {
+    visibility: hidden !important;
+    display: none !important;
+  }
+
+  /* Format print targets as full width documents shifted down from page top */
+  #payslip-print-area,
   #pharmacy-invoice-print,
   #invoice-print-area,
   #receipt-print-area,
   #admission-slip-print,
   #opd-receipt-print,
   #patient-card-print,
-  #consolidated-patient-statement-print {
+  #consolidated-patient-statement-print,
+  .printable-area {
     position: absolute !important;
     left: 0 !important;
-    top: 0 !important;
+    top: 20px !important; /* Shifts printed document down from the top edge */
     width: 100% !important;
     max-width: 100% !important;
     height: auto !important;
     border: none !important;
     box-shadow: none !important;
-    padding: 0 !important;
+    padding: 10px 20px !important;
     margin: 0 !important;
-    background: white !important;
-    color: black !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
   }
 
-  /* Optional: standard print margin tuning */
+  /* Standard print margin tuning */
   @page {
-    margin: 15mm;
+    margin: 10mm 15mm 15mm 15mm;
   }
 }
 
@@ -872,4 +895,16 @@ body {
     fill: #17b978;
     transform: scale(1);
   }
+}
+
+/* Permanent Toast Container Transparency (Removes any black/dark backdrop behind toasts) */
+div[aria-live="polite"],
+div[aria-live="assertive"],
+[data-toaster],
+.toaster-container,
+#toast-container {
+  background: transparent !important;
+  background-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }

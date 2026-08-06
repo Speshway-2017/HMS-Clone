@@ -28,6 +28,7 @@ import { Card } from "../../components/ui/Card";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { Badge } from "../../components/ui/Badge";
 import { Modal } from "../../components/ui/Modal";
+import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
 import { DataTable, Column } from "../../components/ui/DataTable";
 import { Pagination } from "../../components/ui/Pagination";
 
@@ -129,33 +130,57 @@ export function BedsPage() {
 
   const [viewRoomDetails, setViewRoomDetails] = useState<RoomInfo | null>(null);
 
+  const [deleteConfirmConfig, setDeleteConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => Promise<void>;
+  }>({
+    isOpen: false,
+    title: "Confirm Deletion",
+    message: "",
+    onConfirm: async () => {},
+  });
+
+  const [isDeletingEntity, setIsDeletingEntity] = useState(false);
+
   // ── Ward Deletion Handler ─────────────────────────────────────────────
-  const handleDeleteWard = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this ward?")) {
-      try {
-        await deleteWardMutation.mutateAsync(id);
-        toast.success("✓ Ward Deleted Successfully");
-      } catch (err: any) {
-        toast.error(err.response?.data?.message || "Failed to delete ward.");
-      }
-    }
+  const handleDeleteWard = (id: string) => {
+    setDeleteConfirmConfig({
+      isOpen: true,
+      title: "Delete Ward",
+      message: "Are you sure you want to delete this ward? This action cannot be undone.",
+      onConfirm: async () => {
+        try {
+          await deleteWardMutation.mutateAsync(id);
+          toast.success("✓ Ward Deleted Successfully");
+        } catch (err: any) {
+          toast.error(err.response?.data?.message || "Failed to delete ward.");
+        }
+      },
+    });
   };
 
   // ── Room Deletion Handler ─────────────────────────────────────────────
-  const handleDeleteRoom = async (room: RoomInfo) => {
+  const handleDeleteRoom = (room: RoomInfo) => {
     if (room.occupiedBeds && room.occupiedBeds > 0) {
-      alert(`Cannot delete Room ${room.roomNumber} because ${room.occupiedBeds} patient(s) are currently admitted.`);
+      toast.error(`Cannot delete Room ${room.roomNumber} because ${room.occupiedBeds} patient(s) are currently admitted.`);
       return;
     }
 
-    if (window.confirm(`Are you sure you want to delete Room ${room.roomNumber} and its vacant beds?`)) {
-      try {
-        await deleteRoomMutation.mutateAsync(room._id);
-        toast.success("✓ Room Deleted Successfully");
-      } catch (err: any) {
-        toast.error(err.response?.data?.message || "Failed to delete room.");
-      }
-    }
+    setDeleteConfirmConfig({
+      isOpen: true,
+      title: "Delete Room",
+      message: `Are you sure you want to delete Room ${room.roomNumber} and its vacant beds? This action cannot be undone.`,
+      onConfirm: async () => {
+        try {
+          await deleteRoomMutation.mutateAsync(room._id);
+          toast.success("✓ Room Deleted Successfully");
+        } catch (err: any) {
+          toast.error(err.response?.data?.message || "Failed to delete room.");
+        }
+      },
+    });
   };
 
   // ── Bed Status Handlers ─────────────────────────────────────
@@ -191,14 +216,29 @@ export function BedsPage() {
     }
   };
 
-  const handleDeleteBed = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this bed entry?")) {
-      try {
-        await deleteBedMutation.mutateAsync(id);
-        toast.success("✓ Bed Deleted Successfully");
-      } catch (err: any) {
-        toast.error(err.response?.data?.message || "Failed to delete bed.");
-      }
+  const handleDeleteBed = (id: string) => {
+    setDeleteConfirmConfig({
+      isOpen: true,
+      title: "Delete Bed Entry",
+      message: "Are you sure you want to delete this bed entry? This action cannot be undone.",
+      onConfirm: async () => {
+        try {
+          await deleteBedMutation.mutateAsync(id);
+          toast.success("✓ Bed Deleted Successfully");
+        } catch (err: any) {
+          toast.error(err.response?.data?.message || "Failed to delete bed.");
+        }
+      },
+    });
+  };
+
+  const handleExecuteDeleteConfirm = async () => {
+    setIsDeletingEntity(true);
+    try {
+      await deleteConfirmConfig.onConfirm();
+    } finally {
+      setIsDeletingEntity(false);
+      setDeleteConfirmConfig((prev) => ({ ...prev, isOpen: false }));
     }
   };
 
@@ -703,6 +743,15 @@ export function BedsPage() {
           </div>
         </Modal>
       )}
+
+      <ConfirmDeleteModal
+        isOpen={deleteConfirmConfig.isOpen}
+        title={deleteConfirmConfig.title}
+        message={deleteConfirmConfig.message}
+        isLoading={isDeletingEntity}
+        onClose={() => setDeleteConfirmConfig((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={handleExecuteDeleteConfirm}
+      />
     </div>
   );
 }

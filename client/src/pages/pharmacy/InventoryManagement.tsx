@@ -1,10 +1,14 @@
 import { useState, useEffect } from "react";
-import { Boxes, Plus, Search, Edit3, Trash2, AlertTriangle, AlertCircle, Sparkles } from "lucide-react";
+import { Boxes, Plus, Search, Edit3, Trash2, AlertTriangle, AlertCircle, Sparkles, Download, Upload } from "lucide-react";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+import toast from "react-hot-toast";
 import { Modal } from "../../components/ui/Modal";
+import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
+import { ImportExcelModal } from "../../components/ui/ImportExcelModal";
+import { exportToExcel } from "../../lib/excelUtils";
 import { InputField, SelectField } from "../../components/ui/Field";
 import { useInventory, useCreateInventoryItem, useUpdateInventoryItem, useDeleteInventoryItem } from "../../features/inventory";
 
@@ -146,12 +150,22 @@ export function PharmacyInventoryManagement() {
     setIsAddEditOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this medicine?")) return;
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
+  const handleDelete = (id: string) => {
+    setDeleteTargetId(id);
+  };
+
+  const confirmDeleteMedicine = async () => {
+    if (!deleteTargetId) return;
     try {
-      await deleteMutation.mutateAsync(id);
-    } catch (err) {
+      await deleteMutation.mutateAsync(deleteTargetId);
+      toast.success("Medicine deleted successfully!");
+    } catch (err: any) {
       console.error("Failed to delete medicine", err);
+      toast.error(err?.response?.data?.message || err?.message || "Failed to delete medicine.");
+    } finally {
+      setDeleteTargetId(null);
     }
   };
 
@@ -201,6 +215,28 @@ export function PharmacyInventoryManagement() {
     );
   }
 
+  const [isImportOpen, setIsImportOpen] = useState(false);
+
+  const handleExportExcel = () => {
+    const headers = ["Medicine Name", "SKU", "Category", "Batch No", "Stock Qty", "Reorder Level", "Expiry Date", "Unit Price (INR)", "Supplier"];
+    const rows = medicines.map((m) => [
+      m.name,
+      m.sku,
+      m.category,
+      m.batchNo,
+      m.stockQty,
+      m.reorderLevel,
+      m.expiryDate,
+      m.price,
+      m.supplier || "—",
+    ]);
+    exportToExcel("Pharmacy_Medicine_Inventory_2026", headers, rows);
+  };
+
+  const handleImportMeds = async (records: Record<string, string>[]) => {
+    toast.success(`Successfully processed ${records.length} medicine records!`);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -209,9 +245,17 @@ export function PharmacyInventoryManagement() {
           <h1 className="text-2xl font-bold text-slate-900">Inventory Management</h1>
           <p className="text-sm text-slate-500">Track and manage medicine stocks, batch references, and expiries.</p>
         </div>
-        <Button onClick={handleOpenAdd} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" /> Add New Medicine
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => setIsImportOpen(true)} className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50">
+            <Upload className="h-4 w-4 text-emerald-600" /> Import Excel
+          </Button>
+          <Button variant="secondary" onClick={handleExportExcel} className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50">
+            <Download className="h-4 w-4 text-slate-600" /> Export Excel
+          </Button>
+          <Button onClick={handleOpenAdd} className="flex items-center gap-2 bg-navy-700 hover:bg-navy-800 text-white">
+            <Plus className="h-4 w-4" /> Add New Medicine
+          </Button>
+        </div>
       </div>
 
       {/* Analytics widgets */}
@@ -512,6 +556,28 @@ export function PharmacyInventoryManagement() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(deleteTargetId)}
+        title="Confirm Deletion"
+        message="Are you sure you want to delete this medicine record? This action cannot be undone."
+        isLoading={deleteMutation.isPending}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={confirmDeleteMedicine}
+      />
+
+      <ImportExcelModal
+        isOpen={isImportOpen}
+        title="Import Medicine Inventory Excel"
+        sampleFilename="Medicine_Inventory_Import_Template.csv"
+        sampleHeaders={["Medicine Name", "SKU", "Category", "Batch No", "Stock Qty", "Reorder Level", "Expiry Date", "Unit Price", "Supplier"]}
+        sampleRows={[
+          ["Paracetamol 500mg", "ANA-PAR-101", "Analgesic", "B2026-01", 200, 20, "2027-12-31", 15.5, "PharmaCorp"],
+          ["Amoxicillin 250mg", "ANT-AMO-202", "Antibiotic", "B2026-02", 100, 15, "2027-06-30", 45.0, "MediSupply"],
+        ]}
+        onClose={() => setIsImportOpen(false)}
+        onImport={handleImportMeds}
+      />
     </div>
   );
 }

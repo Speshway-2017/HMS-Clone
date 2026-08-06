@@ -507,9 +507,13 @@ function HospitalSettingsCard() {
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold uppercase text-slate-400">Contact Phone</label>
             <input
-              type="text"
+              type="tel"
               value={contactPhone}
-              onChange={(e) => setContactPhone(e.target.value)}
+              onKeyDown={(e) => {
+                const allowed = ["Backspace", "Delete", "Tab", "Escape", "Enter", "ArrowLeft", "ArrowRight", "+"];
+                if (!allowed.includes(e.key) && !e.ctrlKey && !e.metaKey && !/^[0-9]$/.test(e.key)) e.preventDefault();
+              }}
+              onChange={(e) => setContactPhone(e.target.value.replace(/(?!^\+)[^\d]/g, ""))}
               className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
             />
           </div>

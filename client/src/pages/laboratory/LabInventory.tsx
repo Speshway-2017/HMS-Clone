@@ -1,10 +1,14 @@
 import { useState, useEffect } from "react";
-import { Boxes, Plus, Edit3, Trash2, AlertTriangle, AlertCircle, Search } from "lucide-react";
+import { Boxes, Plus, Edit3, Trash2, AlertTriangle, AlertCircle, Search, Download, Upload } from "lucide-react";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+import toast from "react-hot-toast";
 import { Modal } from "../../components/ui/Modal";
+import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
+import { ImportExcelModal } from "../../components/ui/ImportExcelModal";
+import { exportToExcel } from "../../lib/excelUtils";
 import { InputField, SelectField } from "../../components/ui/Field";
 
 interface LabInventoryItem {
@@ -91,10 +95,18 @@ export function LaboratoryInventory() {
     setIsAddEditOpen(true);
   };
 
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
   const handleDelete = (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this lab reagent/consumable?")) return;
-    const updated = inventory.filter(i => i._id !== id);
+    setDeleteTargetId(id);
+  };
+
+  const confirmDeleteInventory = () => {
+    if (!deleteTargetId) return;
+    const updated = inventory.filter(i => i._id !== deleteTargetId);
     saveInventory(updated);
+    toast.success("Lab item deleted successfully!");
+    setDeleteTargetId(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -146,6 +158,28 @@ export function LaboratoryInventory() {
     return matchesSearch && matchesCategory;
   });
 
+  const [isImportOpen, setIsImportOpen] = useState(false);
+
+  const handleExportExcel = () => {
+    const headers = ["Item Name", "SKU", "Category", "Batch No", "Quantity", "Unit", "Reorder Level", "Expiry Date", "Storage Temp"];
+    const rows = inventory.map((item) => [
+      item.name,
+      item.sku,
+      item.category,
+      item.batchNo,
+      item.quantity,
+      item.unit,
+      item.reorderLevel,
+      item.expiryDate,
+      item.storageTemp,
+    ]);
+    exportToExcel("Laboratory_Inventory_2026", headers, rows);
+  };
+
+  const handleImportLabItems = (importedRecords: Record<string, string>[]) => {
+    toast.success(`Successfully imported ${importedRecords.length} lab inventory items!`);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -154,9 +188,17 @@ export function LaboratoryInventory() {
           <h1 className="text-2xl font-bold text-slate-900">Laboratory Inventory</h1>
           <p className="text-sm text-slate-500">Track and manage diagnostics reagents, chemical assays, and phlebotomy consumables.</p>
         </div>
-        <Button onClick={handleOpenAdd} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-750">
-          <Plus className="h-4 w-4" /> Add Inventory Item
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => setIsImportOpen(true)} className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50">
+            <Upload className="h-4 w-4 text-emerald-600" /> Import Excel
+          </Button>
+          <Button variant="secondary" onClick={handleExportExcel} className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50">
+            <Download className="h-4 w-4 text-slate-600" /> Export Excel
+          </Button>
+          <Button onClick={handleOpenAdd} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-750">
+            <Plus className="h-4 w-4" /> Add Inventory Item
+          </Button>
+        </div>
       </div>
 
       {/* Analytics widgets */}
@@ -423,6 +465,27 @@ export function LaboratoryInventory() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(deleteTargetId)}
+        title="Confirm Deletion"
+        message="Are you sure you want to delete this lab reagent/consumable? This action cannot be undone."
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={confirmDeleteInventory}
+      />
+
+      <ImportExcelModal
+        isOpen={isImportOpen}
+        title="Import Lab Inventory Excel"
+        sampleFilename="Lab_Inventory_Import_Template.csv"
+        sampleHeaders={["Item Name", "SKU", "Category", "Batch No", "Quantity", "Unit", "Reorder Level", "Expiry Date", "Storage Temp"]}
+        sampleRows={[
+          ["CBC Diluent (Cellpack)", "RE-CBC-01", "Reagent", "B-CB991", 12, "containers", 5, "2027-02-15", "15 - 30°C"],
+          ["HbA1c Reagent Kit", "RE-HBA-02", "Reagent", "B-HB202", 3, "kits", 5, "2026-09-10", "2 - 8°C"],
+        ]}
+        onClose={() => setIsImportOpen(false)}
+        onImport={handleImportLabItems}
+      />
     </div>
   );
 }
