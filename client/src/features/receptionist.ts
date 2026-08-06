@@ -66,16 +66,21 @@ export interface QueueToken {
 export interface RoomAvailability {
   _id: string;
   roomNumber: string;
-  roomType: "General" | "Semi-Private" | "Private" | "ICU";
-  acType?: "AC" | "Non AC";
+  roomType: string;
+  acType?: string;
   wardName: string;
   totalBeds: number;
   occupiedBeds: number;
   availableBeds: number;
+  tariff?: {
+    roomChargePerDay?: number;
+    admissionDeposit?: number;
+  };
   beds: {
     _id: string;
     bedNumber: string;
     isOccupied: boolean;
+    status?: string;
   }[];
 }
 

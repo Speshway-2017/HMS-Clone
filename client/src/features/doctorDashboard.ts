@@ -27,22 +27,48 @@ export interface DbNotification {
   createdAt: string;
 }
 
-// Additional TypeScript definitions
 export interface Prescription {
   _id: string;
   hospital: string;
   patient: Patient | string;
-  doctor: string;
+  doctor: any;
+  department?: any;
+  prescriptionNumber?: string;
   diagnosis: string;
-  medicines: {
+  chiefComplaint?: string;
+  clinicalNotes?: string;
+  advice?: string;
+  followUpDate?: string;
+  medicines?: {
     name: string;
-    dosage: string;
-    frequency: string;
-    duration: string;
+    strength?: string;
+    dosage?: string;
+    frequency?: string;
+    duration?: string;
+    quantity?: number;
+    instructions?: string;
+    status?: string;
+    prescribedAt?: string;
   }[];
-  status: "pending" | "completed";
-  notes: string;
-  date: string;
+  medications?: {
+    name: string;
+    strength?: string;
+    dosage?: string;
+    frequency?: string;
+    duration?: string;
+    quantity?: number;
+    instructions?: string;
+    status?: string;
+    prescribedAt?: string;
+  }[];
+  status: string;
+  dispensedBy?: any;
+  dispensedByName?: string;
+  dispensedAt?: string;
+  notes?: string;
+  pdfUrl?: string;
+  downloadUrl?: string;
+  date?: string;
   createdAt: string;
 }
 
@@ -300,7 +326,8 @@ export function useCreatePrescription() {
       appointmentId?: string;
       patientId: string;
       diagnosis: string;
-      medicines: any[];
+      medicines?: any[];
+      medications?: any[];
       notes?: string;
       advice?: string;
       followUpDate?: Date | null;

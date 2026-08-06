@@ -290,7 +290,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
         if (draft.prescriptions && draft.prescriptions.length > 0) {
           setPrescriptionMeds(draft.prescriptions.map((p: any, idx: number) => ({
             key: p._id || p.key || `draft-med-${idx}`,
-            name: p.name || "",
+            name: p.name || p.medicineName || "",
             strength: p.strength || "",
             dosage: p.dosage || "",
             frequency: p.frequency || "",
@@ -300,6 +300,22 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
             afternoon: !!p.afternoon,
             night: !!p.night,
           })));
+        } else if (workspaceData.prescriptions && workspaceData.prescriptions.length > 0) {
+          const latestRx = workspaceData.prescriptions[0];
+          if (latestRx.medications && latestRx.medications.length > 0) {
+            setPrescriptionMeds(latestRx.medications.map((p: any, idx: number) => ({
+              key: p._id || `rx-med-${idx}`,
+              name: p.name || p.medicineName || "",
+              strength: p.strength || "",
+              dosage: p.dosage || "",
+              frequency: p.frequency || "",
+              duration: p.duration || "",
+              instructions: p.instructions || "",
+              morning: !!p.morning,
+              afternoon: !!p.afternoon,
+              night: !!p.night,
+            })));
+          }
         }
 
         if (draft.labOrders && draft.labOrders.length > 0) {
@@ -365,17 +381,19 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
       clinicalNotes,
       treatmentPlan,
       advice,
-      prescriptions: prescriptionMeds.map(p => ({
-        name: p.name,
-        strength: p.strength,
-        dosage: p.dosage,
-        frequency: p.frequency,
-        duration: p.duration,
-        instructions: p.instructions,
-        morning: !!p.morning,
-        afternoon: !!p.afternoon,
-        night: !!p.night,
-      })),
+      prescriptions: prescriptionMeds
+        .map(p => ({
+          name: (p.name || p.medicineName || "").trim(),
+          strength: p.strength || "",
+          dosage: p.dosage || "",
+          frequency: p.frequency || "",
+          duration: p.duration || "",
+          instructions: p.instructions || "",
+          morning: !!p.morning,
+          afternoon: !!p.afternoon,
+          night: !!p.night,
+        }))
+        .filter(p => p.name.length > 0),
       labOrders: selectedLabTests,
       radiologyOrders: selectedRadiologyStudies.map((study) => ({
         type: study,
@@ -696,25 +714,58 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
 
   const handleGeneratePrescription = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (prescriptionMeds.some((m) => !m.name.trim())) {
-      toast.error("Please enter medicine names");
+    const validMeds = prescriptionMeds
+      .map((m) => ({
+        name: (m.name || m.medicineName || "").trim(),
+        strength: m.strength || "",
+        dosage: m.dosage || "",
+        frequency: m.frequency || "",
+        duration: m.duration || "",
+        instructions: m.instructions || "",
+        morning: !!m.morning,
+        afternoon: !!m.afternoon,
+        night: !!m.night,
+      }))
+      .filter((m) => m.name.length > 0);
+
+    if (validMeds.length === 0) {
+      toast.error("Please enter at least one valid medicine name");
       return;
     }
-    if (!workspaceData?.draftSession) {
-      toast.error("No active draft session. Please start consultation.");
-      return;
-    }
+
     try {
-      await updateDraftMutation.mutateAsync({
-        consultationId: workspaceData.draftSession._id,
-        updateData: {
-          prescriptions: prescriptionMeds,
-        },
+      if (workspaceData?.draftSession) {
+        await updateDraftMutation.mutateAsync({
+          consultationId: workspaceData.draftSession._id,
+          updateData: {
+            prescriptions: validMeds,
+          },
+          appointmentId: appointment._id,
+        });
+      }
+
+      const res = await prescriptionMutation.mutateAsync({
         appointmentId: appointment._id,
+        patientId: patient._id,
+        medications: validMeds,
+        diagnosis: diagnosis || "Consultation",
+        notes: clinicalNotes || "",
+        advice: advice || "",
       });
-      toast.success("Prescription draft saved successfully!");
+
+      if (res?.pdfUrl || res?.downloadUrl) {
+        setSuccessInfo({
+          show: true,
+          isCompleted: false,
+          pdfUrl: res.pdfUrl || "",
+          downloadUrl: res.downloadUrl || "",
+        });
+      }
+
+      toast.success("Prescription generated and sent to Pharmacy successfully!");
+      refetch();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to save prescription draft");
+      toast.error(err.response?.data?.message || err.message || "Failed to generate prescription");
     }
   };
 
@@ -1293,6 +1344,95 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                   </div>
                 </Card>
               </form>
+
+              {/* Issued Prescriptions History List / Display */}
+              <Card className="p-6 space-y-4">
+                <h3 className="text-sm font-bold text-slate-800 border-b pb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Pill className="h-4 w-4 text-indigo-600" /> Prescriptions History ({prescriptions?.length || 0})
+                  </span>
+                  <span className="text-xs text-slate-400 font-normal">Real-time Dispense Status &amp; Medication Records</span>
+                </h3>
+
+                {(!prescriptions || prescriptions.length === 0) ? (
+                  <div className="py-8 text-center text-xs text-slate-400 border border-dashed rounded-xl bg-slate-50/50">
+                    No prescriptions available
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {prescriptions.map((rx: any) => (
+                      <div key={rx._id} className="border border-slate-200 rounded-xl p-4 bg-white shadow-xs space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-bold text-slate-800">
+                              {rx.prescriptionNumber || `#${rx._id.slice(-8).toUpperCase()}`}
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              • {new Date(rx.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {rx.dispensedAt && (
+                              <span className="text-[11px] text-emerald-700 font-medium bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                                Dispensed: {new Date(rx.dispensedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })} {new Date(rx.dispensedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                            <Badge tone={rx.status === "Dispensed" || rx.status === "Completed" ? "success" : rx.status === "Partially Dispensed" ? "info" : "warning"}>
+                              {rx.status || "Pending"}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {/* Medications Table */}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs whitespace-nowrap">
+                            <thead>
+                              <tr className="text-[10px] font-bold uppercase text-slate-400 border-b pb-1">
+                                <th className="py-1">Medicine Name</th>
+                                <th className="py-1">Strength</th>
+                                <th className="py-1">Dosage</th>
+                                <th className="py-1">Frequency</th>
+                                <th className="py-1">Duration</th>
+                                <th className="py-1 text-center">Quantity</th>
+                                <th className="py-1">Instructions</th>
+                                <th className="py-1 text-center">Dispense Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-slate-700">
+                              {(rx.medications || rx.medicines || []).map((m: any, idx: number) => {
+                                const calculatedQty = m.quantity || ((parseFloat(m.dosage) || 1) * (parseFloat(m.frequency) || 1) * (parseFloat(m.duration) || 1));
+                                const itemStatus = m.status || rx.status || "Pending";
+                                return (
+                                  <tr key={idx} className="hover:bg-slate-50/60">
+                                    <td className="py-2 font-bold text-slate-800">{m.name}</td>
+                                    <td className="py-2 text-slate-600">{m.strength || "—"}</td>
+                                    <td className="py-2 text-slate-600">{m.dosage || "—"}</td>
+                                    <td className="py-2 text-slate-600">{m.frequency || "—"}</td>
+                                    <td className="py-2 text-slate-600">{m.duration || "—"}</td>
+                                    <td className="py-2 text-center font-semibold font-mono text-slate-800">{calculatedQty}</td>
+                                    <td className="py-2 text-slate-500 italic max-w-[150px] truncate" title={m.instructions}>{m.instructions || "—"}</td>
+                                    <td className="py-2 text-center">
+                                      <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded ${
+                                        itemStatus === "Dispensed" || itemStatus === "Completed"
+                                          ? "bg-emerald-100 text-emerald-800"
+                                          : itemStatus === "Partially Dispensed"
+                                          ? "bg-blue-100 text-blue-800"
+                                          : "bg-amber-100 text-amber-800"
+                                      }`}>
+                                        {itemStatus}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
 
               {/* Printable Prescription Template (Hidden on screen, shown in ref) */}
               <div className="hidden">

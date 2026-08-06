@@ -4,6 +4,7 @@ import { OPVisit } from "../models/OPVisit";
 import { Admission } from "../models/Admission";
 import { Room } from "../models/Room";
 import { Bed } from "../models/Bed";
+import { Ward } from "../models/Ward";
 import { Invoice } from "../models/Invoice";
 import { Payment } from "../models/Payment";
 import { Queue } from "../models/Queue";
@@ -187,20 +188,55 @@ export class ReceptionRepository {
   }
 
   static async getRoomsAvailability(hospitalId: any) {
-    const rooms = await Room.find({ ...toFilter(hospitalId), status: { $in: ["active", "Active"] } }).lean();
-    const beds = await Bed.find(toFilter(hospitalId)).lean();
+    let filter = toFilter(hospitalId);
+    let hId = filter.hospital || filter._id || hospitalId;
 
-    return rooms.map(room => {
-      const roomBeds = beds.filter(b => b.room && b.room.toString() === room._id.toString());
-      const totalBeds = roomBeds.length;
-      const occupiedBeds = roomBeds.filter(b => b.isOccupied).length;
-      const availableBeds = totalBeds - occupiedBeds;
+    let rooms = await Room.find({ ...filter, status: { $ne: "Inactive" } }).populate("ward").lean();
+
+    if (!rooms || rooms.length === 0) {
+      await ReceptionRepository.seedDefaultWardsAndRooms(hId);
+      rooms = await Room.find({ ...filter, status: { $ne: "Inactive" } }).populate("ward").lean();
+    }
+
+    const beds = await Bed.find(filter).lean();
+    const bedsByRoom: Record<string, any[]> = {};
+    beds.forEach((b: any) => {
+      const rId = String(b.room);
+      if (!bedsByRoom[rId]) bedsByRoom[rId] = [];
+      bedsByRoom[rId].push(b);
+    });
+
+    return rooms.map((r: any) => {
+      const roomBeds = bedsByRoom[String(r._id)] || [];
+      const occupiedCount = roomBeds.filter((b: any) => b.isOccupied || b.status === "Occupied").length;
+      const totalCount = roomBeds.length || r.capacity || 1;
+      const availableCount = Math.max(0, totalCount - occupiedCount);
+
       return {
-        ...room,
-        totalBeds,
-        occupiedBeds,
-        availableBeds,
-        beds: roomBeds
+        ...r,
+        _id: r._id,
+        roomNumber: r.roomNumber,
+        roomName: r.roomName || `Room ${r.roomNumber}`,
+        roomType: r.roomType || "General",
+        acType: r.acType || "Non AC",
+        wardName: (r.ward as any)?.name || r.wardName || "General Ward",
+        wardId: (r.ward as any)?._id || r.ward,
+        floor: r.floor || 1,
+        capacity: r.capacity || totalCount,
+        totalBeds: totalCount,
+        occupiedBeds: occupiedCount,
+        availableBeds: availableCount,
+        tariff: r.tariff || { roomChargePerDay: 500, admissionDeposit: 1000 },
+        beds: roomBeds.map((b: any) => ({
+          _id: b._id,
+          bedNumber: b.bedNumber,
+          bedCode: b.bedCode || b.bedNumber,
+          bedType: b.bedType || "Standard",
+          isOccupied: !!(b.isOccupied || b.status === "Occupied"),
+          status: b.status || (b.isOccupied ? "Occupied" : "Available"),
+          patient: b.patient || null,
+          admission: b.admission || null
+        }))
       };
     });
   }
@@ -398,6 +434,114 @@ export class ReceptionRepository {
     return await Invoice.find({ hospital: hospitalId, status: "pending" })
       .populate("patient", "name uhid phone")
       .sort({ createdAt: -1 });
+  }
+
+  // ── Wards, Rooms & Beds Availability ──
+  static async seedDefaultWardsAndRooms(hospitalId: Types.ObjectId) {
+    let generalWard = await Ward.findOne({ hospital: hospitalId, name: "General Ward" });
+    if (!generalWard) {
+      generalWard = await Ward.create({
+        hospital: hospitalId,
+        name: "General Ward",
+        code: "GW",
+        wardType: "General Ward",
+        floorNumber: 1,
+        status: "Active"
+      });
+    }
+
+    let semiPrivateWard = await Ward.findOne({ hospital: hospitalId, name: "Semi-Private Ward" });
+    if (!semiPrivateWard) {
+      semiPrivateWard = await Ward.create({
+        hospital: hospitalId,
+        name: "Semi-Private Ward",
+        code: "SPW",
+        wardType: "Semi-Private Ward",
+        floorNumber: 2,
+        status: "Active"
+      });
+    }
+
+    let privateWard = await Ward.findOne({ hospital: hospitalId, name: "Private Ward" });
+    if (!privateWard) {
+      privateWard = await Ward.create({
+        hospital: hospitalId,
+        name: "Private Ward",
+        code: "PW",
+        wardType: "Private Ward",
+        floorNumber: 3,
+        status: "Active"
+      });
+    }
+
+    let icuWard = await Ward.findOne({ hospital: hospitalId, name: "ICU" });
+    if (!icuWard) {
+      icuWard = await Ward.create({
+        hospital: hospitalId,
+        name: "ICU",
+        code: "ICU",
+        wardType: "ICU",
+        floorNumber: 2,
+        status: "Active"
+      });
+    }
+
+    const createRoomWithBeds = async (
+      roomNum: string,
+      wardDoc: any,
+      roomType: string,
+      acType: string,
+      floor: number,
+      capacity: number,
+      roomCharge: number
+    ) => {
+      let room = await Room.findOne({ hospital: hospitalId, roomNumber: roomNum });
+      if (!room) {
+        room = await Room.create({
+          hospital: hospitalId,
+          roomNumber: roomNum,
+          roomName: `Room ${roomNum}`,
+          ward: wardDoc._id,
+          wardName: wardDoc.name,
+          floor,
+          roomType,
+          acType,
+          capacity,
+          tariff: {
+            roomChargePerDay: roomCharge,
+            admissionDeposit: roomCharge * 2,
+            effectiveFrom: new Date(),
+            status: "Active"
+          },
+          status: "Active"
+        });
+
+        for (let i = 0; i < capacity; i++) {
+          const letter = String.fromCharCode(65 + i);
+          const bedNum = `${roomNum}-${letter}`;
+          const bedCode = `BED-${roomNum}-${letter}`;
+
+          await Bed.create({
+            hospital: hospitalId,
+            ward: wardDoc._id,
+            room: room._id,
+            bedNumber: bedNum,
+            bedCode,
+            bedType: roomType === "ICU" ? "ICU Bed" : "Standard",
+            status: "Available",
+            isOccupied: false
+          });
+        }
+      }
+    };
+
+    await createRoomWithBeds("101", generalWard, "General", "Non AC", 1, 4, 500);
+    await createRoomWithBeds("102", generalWard, "General", "AC", 1, 4, 800);
+    await createRoomWithBeds("201", semiPrivateWard, "Semi Private", "Non AC", 2, 2, 1200);
+    await createRoomWithBeds("202", semiPrivateWard, "Semi Private", "AC", 2, 2, 1800);
+    await createRoomWithBeds("301", privateWard, "Private", "AC", 3, 1, 3000);
+    await createRoomWithBeds("302", privateWard, "Private", "AC", 3, 1, 3500);
+    await createRoomWithBeds("ICU-1", icuWard, "ICU", "AC", 2, 2, 5000);
   }
 
   // ── Queue (Token) Operations ──

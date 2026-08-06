@@ -1379,11 +1379,11 @@ export class ReceptionService {
       if (!room) {
         throw new AppError("Selected room not found.", 404);
       }
-      if (room.status !== "Active") {
-        throw new AppError("Selected room is currently inactive.", 400);
+      if (room.status === "Inactive" || room.status === "Blocked" || room.status === "Maintenance") {
+        throw new AppError(`Selected room is currently ${room.status.toLowerCase()}.`, 400);
       }
-      if (room.wardName !== ward) {
-        throw new AppError("Selected room does not belong to the selected ward.", 400);
+      if (ward && room.wardName && room.wardName !== ward && room.ward.toString() !== ward && room.wardName.trim().toLowerCase() !== ward.trim().toLowerCase()) {
+        throw new AppError(`Selected room (${room.roomNumber}) does not belong to the selected ward.`, 400);
       }
 
       // 2b. Validate ward status
@@ -1391,7 +1391,7 @@ export class ReceptionService {
       if (!wardRecord) {
         throw new AppError("Associated ward not found.", 404);
       }
-      if (wardRecord.status !== "Active") {
+      if (wardRecord.status === "Inactive") {
         throw new AppError("Selected ward is currently inactive.", 400);
       }
 
@@ -1822,7 +1822,7 @@ export class ReceptionService {
       }
 
       const newRoom = await Room.findOne({ _id: newRoomId, hospital: hospitalId }).session(session);
-      if (!newRoom || newRoom.status !== "Active") {
+      if (!newRoom || newRoom.status === "Inactive" || newRoom.status === "Blocked" || newRoom.status === "Maintenance") {
         throw new AppError("Selected room is not active or not found.", 404);
       }
 

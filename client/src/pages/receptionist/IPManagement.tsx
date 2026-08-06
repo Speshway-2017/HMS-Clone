@@ -1106,8 +1106,13 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                           required
                           value={selectedRoomId}
                           onChange={(e) => {
-                            setSelectedRoomId(e.target.value);
+                            const rId = e.target.value;
+                            setSelectedRoomId(rId);
                             setSelectedBedId("");
+                            const selRoom = rooms?.find((r: any) => r._id === rId);
+                            if (selRoom?.tariff?.roomChargePerDay) {
+                              setDailyTariff(selRoom.tariff.roomChargePerDay);
+                            }
                           }}
                         >
                           <option value="">Select Room</option>
@@ -1135,7 +1140,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                           label="Daily Tariff"
                           disabled
                           readOnly
-                          value={dailyTariff > 0 ? `₹${dailyTariff}/day` : "₹0/day (Not Configured)"}
+                          value={dailyTariff > 0 ? `₹${dailyTariff}/day` : "₹0/day"}
                         />
                       </div>
                     </Card>
