@@ -67,6 +67,7 @@ export function PharmacyInventoryManagement() {
   // Add/Edit State
   const [selectedMed, setSelectedMed] = useState<Medicine | null>(null);
   const [isAddEditOpen, setIsAddEditOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   // Form Fields
   const [name, setName] = useState("");
@@ -214,8 +215,6 @@ export function PharmacyInventoryManagement() {
       </div>
     );
   }
-
-  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const handleExportExcel = () => {
     const headers = ["Medicine Name", "SKU", "Category", "Batch No", "Stock Qty", "Reorder Level", "Expiry Date", "Unit Price (INR)", "Supplier"];

@@ -292,14 +292,14 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       refetchRequests();
       const res = await admitMutation.mutateAsync(payload);
       toast.success("Patient successfully admitted!");
-      setAdmissionSuccessData(res.admission || res.data || res);
+      setSuccessData(res.admission || res.data || res);
     } catch (err: any) {
       const errMsg = err?.response?.data?.message || err?.message;
       if (errMsg && errMsg.includes("Admission Slip")) {
         toast.success("Patient successfully admitted!");
-        setAdmissionSuccessData({
+        setSuccessData({
           admissionNumber: `ADM-${Date.now().toString().slice(-6)}`,
-          patientName: subTab === "requests" ? selectedReq?.patientName : selectedPatientName,
+          patientName: subTab === "requests" ? selectedReq?.patientName : (patientDetail?.patient?.name || patientSearchQuery),
           uhid: subTab === "requests" ? selectedReq?.patientId : selectedPatientId,
           room: selectedRoomId,
           bed: selectedBedId,

@@ -10,7 +10,9 @@ import {
   startProcessing,
   uploadReport,
   verifyReport,
-  publishReport
+  publishReport,
+  collectSample,
+  submitResults
 } from "../controllers/laboratoryController";
 
 const router = Router();
@@ -35,8 +37,10 @@ router.get("/requests", restrictTo("laboratory", "hospital_admin"), getRequests)
 router.use(restrictTo("laboratory"));
 
 router.post("/:requestId/accept", acceptRequest);
+router.post("/:requestId/collect-sample", collectSample);
 router.post("/:requestId/reject", rejectRequest);
 router.post("/:requestId/start-processing", startProcessing);
+router.post("/:requestId/results", submitResults);
 router.post("/:requestId/upload-report", uploader.any(), uploadReport);
 router.post("/:requestId/verify", verifyReport);
 router.post("/:requestId/publish", publishReport);

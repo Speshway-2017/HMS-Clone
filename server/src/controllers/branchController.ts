@@ -7,6 +7,7 @@ import { generateBranchId } from "../utils/idGenerator";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 
 import { syncBranchDepartmentsForBranch } from "../utils/branchDepartmentSync";
+import { emitToHospital } from "../config/socket";
 
 const branchSchema = z.object({
   hospital: z.string().min(1),
@@ -55,6 +56,8 @@ export const createBranch = catchAsync(async (req: Request, res: Response) => {
   // Automatically inherit active departments from Parent Hospital
   await syncBranchDepartmentsForBranch(branch._id, branch.hospital);
 
+  emitToHospital(branch.hospital, "branch:created", branch);
+
   res.status(201).json({ status: "success", data: { branch } });
 });
 
@@ -72,6 +75,7 @@ export const updateBranch = catchAsync(async (req: Request, res: Response) => {
   if (!branch) {
     throw new AppError("Branch not found.", 404);
   }
+  emitToHospital(branch.hospital, "branch:updated", branch);
   res.json({ status: "success", data: { branch } });
 });
 
@@ -80,5 +84,6 @@ export const deleteBranch = catchAsync(async (req: Request, res: Response) => {
   if (!branch) {
     throw new AppError("Branch not found.", 404);
   }
+  emitToHospital(branch.hospital, "branch:deleted", { id: branch._id });
   res.status(204).send();
 });

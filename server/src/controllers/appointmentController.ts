@@ -106,13 +106,22 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
     }
   }
 
-  if (dateMode === "other_days") {
-    const today = new Date();
-    const startOfToday = new Date(today);
+  if (dateMode === "today") {
+    const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
-
-    filter.date = { $gte: startOfToday };
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+    filter.date = { $gte: startOfToday, $lte: endOfToday };
+  } else if (dateMode === "other_days" || dateMode === "scheduled") {
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+    filter.date = { $gt: endOfToday };
     filter.status = { $nin: ["completed", "cancelled", "no_show"] };
+  } else if (dateMode === "past" || dateMode === "missed") {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    filter.date = { $lt: startOfToday };
+    filter.status = { $nin: ["completed", "cancelled"] };
   } else if (dateMode === "completed") {
     filter.status = { $in: ["completed", "cancelled", "no_show"] };
   } else if (from || to) {

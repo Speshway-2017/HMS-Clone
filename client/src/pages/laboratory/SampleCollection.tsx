@@ -23,35 +23,28 @@ interface TestRequest {
   collectionTime?: string;
 }
 
+import { useLaboratoryRequests, useCollectSample } from "../../features/laboratory";
+import toast from "react-hot-toast";
+
 export function LaboratorySampleCollection() {
-  const [requests, setRequests] = useState<TestRequest[]>([]);
+  const { data: realRequests = [], isLoading } = useLaboratoryRequests();
+  const collectSampleMutation = useCollectSample();
+
   const [search, setSearch] = useState("");
   const [isCollectModalOpen, setIsCollectModalOpen] = useState(false);
-  const [selectedReq, setSelectedReq] = useState<TestRequest | null>(null);
+  const [selectedReq, setSelectedReq] = useState<any | null>(null);
 
   // Form State
   const [sampleType, setSampleType] = useState("Whole Blood (EDTA)");
   const [containerType, setContainerType] = useState("Purple Top Tube");
-  const [collectorName, setCollectorName] = useState("Sarah Jenkins (Phlebotomist)");
+  const [collectorName, setCollectorName] = useState("Phlebotomist");
   const [remarks, setRemarks] = useState("");
 
   // Barcode Print Modal
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
-  const [activeBarcodeReq, setActiveBarcodeReq] = useState<TestRequest | null>(null);
+  const [activeBarcodeReq, setActiveBarcodeReq] = useState<any | null>(null);
 
-  useEffect(() => {
-    const saved = localStorage.getItem("hms_laboratory_requests");
-    if (saved) {
-      setRequests(JSON.parse(saved));
-    }
-  }, []);
-
-  const saveRequests = (updated: TestRequest[]) => {
-    setRequests(updated);
-    localStorage.setItem("hms_laboratory_requests", JSON.stringify(updated));
-  };
-
-  const handleOpenCollect = (req: TestRequest) => {
+  const handleOpenCollect = (req: any) => {
     setSelectedReq(req);
     setSampleType("Whole Blood (EDTA)");
     setContainerType("Purple Top Tube");
@@ -59,35 +52,34 @@ export function LaboratorySampleCollection() {
     setIsCollectModalOpen(true);
   };
 
-  const handleCollectSubmit = (e: React.FormEvent) => {
+  const handleCollectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedReq) return;
 
-    const sampleId = `SMP-${selectedReq.patientName.slice(0, 3).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const collectionTime = new Date().toLocaleString();
+    const sampleId = `SMP-${selectedReq.patientName ? selectedReq.patientName.slice(0, 3).toUpperCase() : "LAB"}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const updated = requests.map(r => 
-      r._id === selectedReq._id 
-        ? { 
-            ...r, 
-            status: "In Progress", 
-            sampleId, 
-            sampleType: `${sampleType} (${containerType})`,
-            collectionTime
-          } 
-        : r
-    );
+    try {
+      await collectSampleMutation.mutateAsync({
+        requestId: selectedReq._id,
+        sampleId,
+        sampleType: `${sampleType} (${containerType})`,
+        collectedBy: collectorName
+      });
 
-    saveRequests(updated);
-    setIsCollectModalOpen(false);
-    
-    // Auto-open print barcode modal for convenience
-    const updatedReq = updated.find(r => r._id === selectedReq._id);
-    if (updatedReq) {
-      setActiveBarcodeReq(updatedReq);
+      toast.success("Sample registered & status updated!");
+      setIsCollectModalOpen(false);
+
+      setActiveBarcodeReq({
+        ...selectedReq,
+        sampleId,
+        sampleType: `${sampleType} (${containerType})`,
+        collectionTime: new Date().toLocaleString()
+      });
       setIsBarcodeModalOpen(true);
+      setSelectedReq(null);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to register sample collection.");
     }
-    setSelectedReq(null);
   };
 
   const handlePrintBarcode = (req: TestRequest) => {
@@ -95,13 +87,20 @@ export function LaboratorySampleCollection() {
     setIsBarcodeModalOpen(true);
   };
 
-  // Filter requests that are Accepted/Sample Collected or In Progress (since they have sample info)
-  const collectionQueue = requests.filter(r => r.status === "Sample Collected");
-  const collectionHistory = requests.filter(r => r.status !== "Pending Request" && r.status !== "Sample Collected" && r.status !== "Rejected" && r._id);
+  // Filter real requests from backend API
+  const collectionQueue = realRequests.filter((r: any) => {
+    const s = (r.status || "").toLowerCase();
+    return s === "pending" || s === "accepted" || s === "sample collection";
+  });
 
-  const filteredHistory = collectionHistory.filter(r => 
-    r.patientName.toLowerCase().includes(search.toLowerCase()) || 
-    r.sampleId?.toLowerCase().includes(search.toLowerCase())
+  const collectionHistory = realRequests.filter((r: any) => {
+    const s = (r.status || "").toLowerCase();
+    return s !== "pending" && s !== "rejected" && s !== "cancelled";
+  });
+
+  const filteredHistory = collectionHistory.filter((r: any) => 
+    (r.patientName || "").toLowerCase().includes(search.toLowerCase()) || 
+    (r.sampleId || r._id || "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -206,7 +205,7 @@ export function LaboratorySampleCollection() {
               {
                 header: "Status",
                 render: (r) => (
-                  <Badge tone={r.status === "Completed" ? "success" : "warning"}>
+                  <Badge tone={(r.status || "").toLowerCase() === "completed" ? "success" : "warning"}>
                     {r.status}
                   </Badge>
                 )

@@ -14,6 +14,7 @@ import { getDoctorDynamicStatus, getBusyDoctorIds } from "../utils/doctorStatus"
 import { syncDoctorStaffRecords } from "./staffController";
 
 import { Department } from "../models/Department";
+import { emitToHospital } from "../config/socket";
 
 const doctorSchema = z.object({
   department: z.string().optional().nullable(),
@@ -130,6 +131,8 @@ export const createDoctor = catchAsync(async (req: Request, res: Response) => {
     }
   }
 
+  emitToHospital(hospitalId, "doctor:created", doctor);
+
   res.status(201).json({
     status: "success",
     data: { doctor, tempPassword: tempPassword ?? null },
@@ -222,6 +225,7 @@ export const updateDoctor = catchAsync(async (req: Request, res: Response) => {
   if (!doctor) {
     throw new AppError("Doctor not found.", 404);
   }
+  emitToHospital(doctor.hospital, "doctor:updated", doctor);
   res.json({ status: "success", data: { doctor } });
 });
 
@@ -248,6 +252,8 @@ export const deleteDoctor = catchAsync(async (req: Request, res: Response) => {
   if (doctor.email) {
     await User.findOneAndDelete({ email: doctor.email.toLowerCase() });
   }
+
+  emitToHospital(doctor.hospital, "doctor:deleted", { id: doctor._id });
 
   res.status(200).json({ status: "success", message: "Doctor deleted successfully." });
 });
@@ -334,6 +340,8 @@ export const updateDoctorProfileMe = catchAsync(async (req: Request, res: Respon
 
   const busyDoctorIds = await getBusyDoctorIds(doctor.hospital);
   const resolvedDoctor = { ...doctor.toObject(), status: getDoctorDynamicStatus(doctor, busyDoctorIds) };
+
+  emitToHospital(doctor.hospital, "doctor:updated", resolvedDoctor);
 
   res.json({ status: "success", data: { doctor: resolvedDoctor } });
 });
