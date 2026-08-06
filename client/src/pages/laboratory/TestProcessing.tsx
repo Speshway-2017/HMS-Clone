@@ -21,8 +21,11 @@ export function LaboratoryTestProcessing() {
     }
   };
 
-  // Filter requests that are in "accepted" or "processing" state
-  const processingQueue = requests.filter(r => r.status === "accepted" || r.status === "processing");
+  // Filter requests that are in active processing states
+  const processingQueue = requests.filter(r => {
+    const s = (r.status || "").toLowerCase();
+    return s === "accepted" || s === "processing" || s === "sample collection" || s === "quality check";
+  });
 
   if (isLoading) {
     return (

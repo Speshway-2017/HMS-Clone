@@ -793,3 +793,64 @@ export const getPatientReports = catchAsync(async (req: Request, res: Response) 
 
   res.json({ status: "success", data: reports });
 });
+
+export const collectSample = catchAsync(async (req: Request, res: Response) => {
+  const { requestId } = req.params;
+  const hospitalId = req.hospitalFilter!.hospital;
+  const { sampleId, sampleType, collectedBy } = req.body;
+
+  const { order } = await findOrder(requestId);
+  if (!order) throw new AppError("Request not found", 404);
+
+  const sampleDetails = {
+    sampleId: sampleId || `SMP-${Date.now().toString().slice(-6)}`,
+    sampleType: sampleType || "Blood",
+    collectedBy: collectedBy || (req.user as any)?.name || "Lab Technician",
+    collectedAt: new Date(),
+  };
+
+  if (order.appointment) {
+    await LabOrder.updateMany(
+      { appointment: order.appointment, hospital: hospitalId },
+      { status: "Sample Collection", sampleStatus: "Collected", sampleDetails }
+    );
+  } else {
+    order.status = "Sample Collection";
+    order.sampleStatus = "Collected";
+    order.sampleDetails = sampleDetails;
+    await order.save();
+  }
+
+  if (hospitalId) {
+    emitToHospital(hospitalId, "lab_order_updated", { requestId, status: "Sample Collection", sampleStatus: "Collected" });
+  }
+
+  res.json({ status: "success", data: order });
+});
+
+export const submitResults = catchAsync(async (req: Request, res: Response) => {
+  const { requestId } = req.params;
+  const hospitalId = req.hospitalFilter!.hospital;
+  const { results } = req.body;
+
+  const { order } = await findOrder(requestId);
+  if (!order) throw new AppError("Request not found", 404);
+
+  if (order.appointment) {
+    await LabOrder.updateMany(
+      { appointment: order.appointment, hospital: hospitalId },
+      { status: "Quality Check", sampleStatus: "Processing", results: results || [] }
+    );
+  } else {
+    order.status = "Quality Check";
+    order.sampleStatus = "Processing";
+    if (results) order.results = results;
+    await order.save();
+  }
+
+  if (hospitalId) {
+    emitToHospital(hospitalId, "lab_order_updated", { requestId, status: "Quality Check" });
+  }
+
+  res.json({ status: "success", data: order });
+});

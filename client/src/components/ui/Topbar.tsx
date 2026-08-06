@@ -8,13 +8,24 @@ interface TopbarProps {
   onMenuClick?: () => void;
 }
 
+export function getAvatarInitials(name?: string): string {
+  if (!name || !name.trim()) return "U";
+  const cleanName = name.replace(/^Dr\.\s*|^Dr\s+/i, "").trim();
+  const parts = cleanName.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "U";
+  if (parts.length === 1) {
+    return parts[0].charAt(0).toUpperCase();
+  }
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+
 export function Topbar({ onMenuClick }: TopbarProps) {
   const { user, logout } = useAuth();
   const { data: hospital } = useMyHospital({ enabled: !!user?.hospital });
 
-  // Master display name based on logged-in user or role (e.g., 'receptionist', 'doctor', 'nurse', 'admin')
-  const displayName = user?.name || (user as any)?.username || user?.role || "user";
-  const userInitial = displayName.charAt(0).toUpperCase();
+  // Always display user's Full Name (or fallback to email prefix if name is missing)
+  const displayName = (user?.name && user.name.trim()) ? user.name.trim() : (user?.email ? user.email.split("@")[0] : "User");
+  const userInitials = getAvatarInitials(displayName);
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-100 bg-white px-4 md:px-6 sticky top-0 z-40">
@@ -43,7 +54,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         </div>
       </div>
 
-      {/* Master Top-Right Header (Receptionist Reference Standard) */}
+      {/* Master Top-Right Header */}
       <div className="flex items-center gap-4">
         {/* Branch Context Switcher */}
         <BranchSwitcher />
@@ -56,7 +67,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           {user?.avatarUrl ? (
             <img src={user.avatarUrl} alt={displayName} className="h-8 w-8 rounded-full object-cover" />
           ) : (
-            <span>{userInitial}</span>
+            <span>{userInitials}</span>
           )}
         </div>
 

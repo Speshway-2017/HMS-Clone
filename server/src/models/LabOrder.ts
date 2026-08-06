@@ -3,24 +3,43 @@ import { Schema, model, InferSchemaType, Types } from "mongoose";
 const labOrderSchema = new Schema(
   {
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
+    branch: { type: Schema.Types.ObjectId, ref: "Branch", default: null },
+    department: { type: Schema.Types.ObjectId, ref: "Department", default: null },
     patient: { type: Schema.Types.ObjectId, ref: "Patient", required: true },
     doctor: { type: Schema.Types.ObjectId, ref: "Doctor", required: true },
     appointment: { type: Schema.Types.ObjectId, ref: "Appointment", default: null },
+    tokenNumber: { type: String, default: "" },
     tests: { type: [String], required: true },
     priority: { type: String, enum: ["Routine", "Urgent", "STAT"], default: "Routine" },
     sampleStatus: { type: String, enum: ["Pending", "Collected", "Processing", "Completed", "Rejected"], default: "Pending" },
+    sampleDetails: {
+      sampleId: { type: String, default: "" },
+      sampleType: { type: String, default: "Blood" },
+      collectedBy: { type: String, default: "" },
+      collectedAt: { type: Date, default: null },
+    },
     results: [
       {
         testName: { type: String, required: true },
-        value: { type: String, required: true },
+        value: { type: String, default: "" },
+        unit: { type: String, default: "" },
         referenceRange: { type: String, default: "" },
-        status: { type: String, enum: ["normal", "elevated", "high", "low", "borderline", "pending"], default: "pending" },
+        flag: { type: String, enum: ["Normal", "High", "Low", "Critical", "Pending"], default: "Pending" },
+        status: { type: String, default: "pending" },
+      },
+    ],
+    attachments: [
+      {
+        name: { type: String, default: "" },
+        url: { type: String, default: "" },
+        fileType: { type: String, default: "application/pdf" },
+        uploadedAt: { type: Date, default: Date.now },
       },
     ],
     status: { 
       type: String, 
-      enum: ["pending", "accepted", "processing", "report_uploaded", "verified", "completed", "rejected"], 
-      default: "pending" 
+      enum: ["Pending", "Sample Collection", "Processing", "Quality Check", "Completed", "Cancelled", "pending", "accepted", "processing", "report_uploaded", "verified", "completed", "rejected"], 
+      default: "Pending" 
     },
     rejectionReason: { type: String, default: "" },
     date: { type: Date, default: Date.now },

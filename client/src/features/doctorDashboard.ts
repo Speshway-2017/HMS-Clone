@@ -931,4 +931,21 @@ export function useMarkDoctorNotificationRead() {
   });
 }
 
+export function useUpdatePrescriptionStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const res = await api.patch<{ status: string; data: { prescription: any } }>(
+        `/prescriptions/${id}/status`,
+        { status }
+      );
+      return res.data.data.prescription;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["prescriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
+    },
+  });
+}
+
 

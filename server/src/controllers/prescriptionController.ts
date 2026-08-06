@@ -590,6 +590,62 @@ export const downloadPrescription = catchAsync(async (req: Request, res: Respons
 });
 
 /**
+ * Controller endpoint: Update Prescription Status (Pharmacist / Doctor)
+ */
+export const updatePrescriptionStatus = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital;
+  const prescriptionId = req.params.id;
+  const { status } = req.body;
+
+  const validStatuses = ["Pending", "Preparing", "Ready for Pickup", "Partially Dispensed", "Dispensed", "Completed", "Cancelled"];
+  if (!status || !validStatuses.includes(status)) {
+    throw new AppError("Invalid prescription status specified.", 400);
+  }
+
+  const prescription = await Prescription.findOne({
+    _id: prescriptionId,
+    ...req.hospitalFilter
+  }).populate("patient doctor department");
+
+  if (!prescription) {
+    throw new AppError("Prescription not found.", 404);
+  }
+
+  prescription.status = status;
+  if (req.user) {
+    prescription.dispensedBy = req.user._id as any;
+    prescription.dispensedByName = req.user.name || "Pharmacist";
+    if (status === "Dispensed" || status === "Completed") {
+      prescription.dispensedAt = new Date();
+    }
+  }
+  await prescription.save();
+
+  // Create notifications for Doctor & Patient
+  await DbNotification.create({
+    hospital: hospitalId,
+    title: `Prescription Status Updated: ${status}`,
+    message: `Prescription ${prescription.prescriptionNumber || prescription._id} is now ${status}.`,
+    type: "general",
+    recipientRole: "doctor",
+    recipientDoctor: prescription.doctor._id
+  });
+
+  emitToHospital(hospitalId.toString(), "prescription:updated", prescription);
+  emitToHospital(hospitalId.toString(), "dashboard_update", {
+    type: "PRESCRIPTION_STATUS_CHANGED",
+    prescriptionId: prescription._id,
+    status: prescription.status,
+    timestamp: new Date()
+  });
+
+  res.json({
+    status: "success",
+    data: { prescription }
+  });
+});
+
+/**
  * Controller endpoint: Dispense Medicines (Pharmacist)
  */
 export const dispensePrescription = catchAsync(async (req: Request, res: Response) => {

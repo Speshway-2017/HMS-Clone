@@ -127,7 +127,7 @@ const WORKING_HOURS = [
 ];
 
 export function DoctorSettingsPage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { mutate, isPending } = useChangePassword();
 
   // Security tab state
@@ -263,6 +263,7 @@ export function DoctorSettingsPage() {
         languages: profileForm.languages,
         opExpiryLimit: Number(profileForm.opExpiryLimit),
       });
+      await refreshUser();
       showToast("success", "Profile updated successfully!");
     } catch (err: any) {
       showToast("error", err?.response?.data?.message || err?.message || "Failed to update profile.");

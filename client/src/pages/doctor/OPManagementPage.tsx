@@ -10,6 +10,8 @@ import { Button } from "../../components/ui/Button";
 import { useDoctorProfileMe } from "../../features/doctors";
 import { useAppointments, useUpdateAppointment, mapAppointmentTypeForDisplay } from "../../features/appointments";
 
+import { isTodayDate, isFutureDate, isPastDate, formatDisplayDate } from "../../lib/appointmentDateUtils";
+
 const STATUS_BADGE: Record<string, { tone: "success" | "warning" | "info" | "neutral" | "danger"; label: string }> = {
   completed:       { tone: "success",  label: "Completed"       },
   in_consultation: { tone: "warning",  label: "In Consultation" },
@@ -54,7 +56,30 @@ export function OPManagementPage() {
       const token = (appt as any).tokenNumber || (appt as any).appointmentNumber || appt._id.slice(-6);
       const matchSearch = name.toLowerCase().includes(search.toLowerCase()) || token.toLowerCase().includes(search.toLowerCase());
       const mapped = mapStatus(appt.status);
-      const matchStatus = statusFilter === "all" || mapped === statusFilter || (statusFilter === "today" && mapped !== "completed" && mapped !== "cancelled");
+
+      const isToday = isTodayDate(appt.date);
+      const isFuture = isFutureDate(appt.date);
+      const isPast = isPastDate(appt.date);
+
+      let matchStatus = false;
+      if (statusFilter === "all") {
+        matchStatus = true;
+      } else if (statusFilter === "today") {
+        matchStatus = isToday && mapped !== "completed" && mapped !== "cancelled";
+      } else if (statusFilter === "waiting") {
+        matchStatus = isToday && mapped === "waiting";
+      } else if (statusFilter === "in_progress") {
+        matchStatus = isToday && mapped === "in_progress";
+      } else if (statusFilter === "scheduled") {
+        matchStatus = isFuture && mapped !== "completed" && mapped !== "cancelled";
+      } else if (statusFilter === "missed") {
+        matchStatus = isPast && mapped !== "completed" && mapped !== "cancelled";
+      } else if (statusFilter === "completed") {
+        matchStatus = mapped === "completed";
+      } else if (statusFilter === "cancelled") {
+        matchStatus = mapped === "cancelled";
+      }
+
       return matchSearch && matchStatus;
     });
   }, [appointments, search, statusFilter]);
@@ -183,7 +208,7 @@ export function OPManagementPage() {
                       />
                     </div>
                     <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
-                      {["today", "waiting", "in_progress", "scheduled", "completed", "cancelled"].map((s) => (
+                      {["today", "waiting", "in_progress", "scheduled", "completed", "cancelled", "missed"].map((s) => (
                         <button
                           key={s}
                           onClick={() => setStatusFilter(s)}
@@ -238,8 +263,8 @@ export function OPManagementPage() {
                             <Badge tone={STATUS_BADGE[appt.status]?.tone || "neutral"}>
                               {STATUS_BADGE[appt.status]?.label || appt.status}
                             </Badge>
-                            <p className="mt-1 text-xs text-slate-400 flex items-center justify-end gap-1">
-                              <Clock className="h-3 w-3" /> {new Date(appt.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {appt.time}
+                            <p className="mt-1 text-xs text-slate-500 font-medium flex items-center justify-end gap-1">
+                              <Clock className="h-3 w-3 text-slate-400" /> {formatDisplayDate(appt.date)} · {appt.time}
                             </p>
                           </div>
                           <ChevronRight className="h-4 w-4 text-slate-300" />

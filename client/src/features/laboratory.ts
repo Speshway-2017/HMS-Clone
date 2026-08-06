@@ -38,10 +38,13 @@ export interface UnifiedRequest {
   tests: string[];
   priority: "Routine" | "Urgent" | "STAT";
   date: string;
-  status: "pending" | "accepted" | "processing" | "report_uploaded" | "verified" | "completed" | "rejected" | "cancelled";
+  status: "pending" | "accepted" | "processing" | "report_uploaded" | "verified" | "completed" | "rejected" | "cancelled" | "Pending" | "Sample Collection" | "Processing" | "Quality Check" | "Completed" | "Cancelled";
   requestType: "Laboratory" | "Radiology" | "Combined";
   rejectionReason?: string;
   sampleStatus?: string;
+  sampleId?: string;
+  sampleType?: string;
+  collectionTime?: string;
   appointment?: any;
   notes?: string;
 }
@@ -156,6 +159,32 @@ export function usePatientReports(patientId: string | undefined) {
         params: { patientId }
       });
       return res.data.data;
+    },
+  });
+}
+
+export function useCollectSample() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ requestId, sampleId, sampleType, collectedBy }: { requestId: string; sampleId?: string; sampleType?: string; collectedBy?: string }) => {
+      const res = await api.post(`/laboratory/${requestId}/collect-sample`, { sampleId, sampleType, collectedBy });
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["laboratory", "requests"] });
+    },
+  });
+}
+
+export function useSubmitResults() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ requestId, results }: { requestId: string; results: any[] }) => {
+      const res = await api.post(`/laboratory/${requestId}/results`, { results });
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["laboratory", "requests"] });
     },
   });
 }

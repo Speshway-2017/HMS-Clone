@@ -17,7 +17,7 @@ interface Prescription {
   department: string;
   medicines: string[];
   date: string;
-  status: "Pending" | "Partially Dispensed" | "Dispensed" | "Completed" | "Cancelled";
+  status: "Pending" | "Preparing" | "Ready for Pickup" | "Partially Dispensed" | "Dispensed" | "Completed" | "Cancelled";
 }
 
 export function PharmacyPrescriptionVerification() {
@@ -46,9 +46,9 @@ export function PharmacyPrescriptionVerification() {
   });
 
   const filtered = prescriptions.filter(p => {
-    const isCompleted = p.status === "Completed";
+    const isCompleted = p.status === "Completed" || p.status === "Dispensed";
     const isCancelled = p.status === "Cancelled";
-    const isActive = p.status === "Pending" || p.status === "Partially Dispensed" || p.status === "Dispensed";
+    const isActive = p.status === "Pending" || p.status === "Preparing" || p.status === "Ready for Pickup" || p.status === "Partially Dispensed";
 
     const matchesTab = 
       (activeTab === "Active" && isActive) ||
@@ -75,11 +75,14 @@ export function PharmacyPrescriptionVerification() {
   const getStatusBadgeTone = (status: Prescription["status"]) => {
     switch (status) {
       case "Pending":
-        return "info"; // Waiting
+        return "info";
+      case "Preparing":
+        return "warning";
+      case "Ready for Pickup":
+        return "info";
       case "Partially Dispensed":
         return "warning";
       case "Dispensed":
-        return "info";
       case "Completed":
         return "success";
       case "Cancelled":
