@@ -13,6 +13,8 @@ import { getPagination, paginatedResponse } from "../utils/pagination";
 import { getDoctorDynamicStatus, getBusyDoctorIds } from "../utils/doctorStatus";
 import { syncDoctorStaffRecords } from "./staffController";
 
+import { Department } from "../models/Department";
+
 const doctorSchema = z.object({
   department: z.string().optional().nullable(),
   name: z.string().min(1),
@@ -80,6 +82,16 @@ export const createDoctor = catchAsync(async (req: Request, res: Response) => {
   const body = doctorSchema.parse(req.body);
   const hospitalId = req.hospitalFilter!.hospital;
   const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
+
+  if (body.department) {
+    const dept = await Department.findOne({ _id: body.department, ...req.hospitalFilter });
+    if (!dept) {
+      throw new AppError("Selected department does not exist in this branch.", 400);
+    }
+    if (dept.isDisabled) {
+      throw new AppError(`Department "${dept.name}" is disabled in this branch and cannot be assigned to doctors.`, 400);
+    }
+  }
 
   let licenseNo = body.licenseNo?.trim();
   if (!licenseNo) {
@@ -192,6 +204,17 @@ export const getDoctor = catchAsync(async (req: Request, res: Response) => {
 
 export const updateDoctor = catchAsync(async (req: Request, res: Response) => {
   const body = doctorSchema.partial().parse(req.body);
+
+  if (body.department) {
+    const dept = await Department.findOne({ _id: body.department, ...req.hospitalFilter });
+    if (!dept) {
+      throw new AppError("Selected department does not exist in this branch.", 400);
+    }
+    if (dept.isDisabled) {
+      throw new AppError(`Department "${dept.name}" is disabled in this branch and cannot be assigned to doctors.`, 400);
+    }
+  }
+
   const doctor = await Doctor.findOneAndUpdate({ _id: req.params.id, ...req.hospitalFilter }, body, {
     new: true,
     runValidators: true,

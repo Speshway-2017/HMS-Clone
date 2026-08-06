@@ -83,8 +83,18 @@ function pickAuditFields(doc: Record<string, unknown>): Record<string, unknown> 
 // Controllers
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { Branch } from "../models/Branch";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Controllers
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const listDepartments = catchAsync(async (req: Request, res: Response) => {
   const filter: Record<string, unknown> = { ...req.hospitalFilter };
+
+  if (req.query.activeOnly === "true" || req.query.active === "true") {
+    filter.isDisabled = { $ne: true };
+  }
 
   const departments = await Department.find(filter)
     .populate("hospital", "name")
@@ -101,12 +111,17 @@ export const createDepartment = catchAsync(async (req: Request, res: Response) =
     throw new AppError("A hospital must be specified.", 400);
   }
   const hospital = hospitalRaw.toString();
+  const targetBranch = (body.branch && body.branch.trim()) || (req.hospitalFilter?.branch ? req.hospitalFilter.branch.toString() : null);
 
-  // Uniqueness check for name
+  // Uniqueness check for name within hospital & branch
   const trimmedName = body.name.trim();
-  const existingName = await Department.findOne({ hospital, name: { $regex: `^${trimmedName}$`, $options: "i" } });
+  const existingName = await Department.findOne({
+    hospital,
+    branch: targetBranch,
+    name: { $regex: `^${trimmedName}$`, $options: "i" },
+  });
   if (existingName) {
-    throw new AppError(`A department named "${trimmedName}" already exists.`, 409);
+    throw new AppError(`A department named "${trimmedName}" already exists for this hospital/branch.`, 409);
   }
 
   // Auto-generate code if empty, or enforce uniqueness
@@ -116,29 +131,70 @@ export const createDepartment = catchAsync(async (req: Request, res: Response) =
     const baseCode = (cleanWords[0]?.slice(0, 6) || "DEPT").toUpperCase();
     let num = 1;
     let candidate = `${baseCode}-${String(num).padStart(2, "0")}`;
-    while (await Department.exists({ hospital, code: candidate })) {
+    while (await Department.exists({ hospital, branch: targetBranch, code: candidate })) {
       num++;
       candidate = `${baseCode}-${String(num).padStart(2, "0")}`;
     }
     code = candidate;
   } else {
-    const existingCode = await Department.findOne({ hospital, code: code.toUpperCase() });
+    const existingCode = await Department.findOne({ hospital, branch: targetBranch, code: code.toUpperCase() });
     if (existingCode) {
       throw new AppError(`Department code "${code.toUpperCase()}" is already in use.`, 409);
     }
     code = code.toUpperCase();
   }
 
+  const isBranchOnly = targetBranch !== null;
+
   const cleanBody = {
     ...body,
     name: trimmedName,
     code,
     hospital,
-    branch: (body.branch && body.branch.trim()) || (req.hospitalFilter?.branch ? req.hospitalFilter.branch.toString() : null),
+    branch: targetBranch,
     departmentHead: body.departmentHead || null,
+    isBranchOnly,
+    isBranchCustomized: false,
+    parentDepartment: null,
   };
 
   const department = await Department.create(cleanBody);
+
+  // SYNC RULE: If Parent Hospital creates a new Department, automatically replicate to active branches
+  if (targetBranch === null) {
+    const activeBranches = await Branch.find({ hospital, status: "active" });
+    for (const b of activeBranches) {
+      const existsInBranch = await Department.findOne({
+        hospital,
+        branch: b._id,
+        $or: [
+          { parentDepartment: department._id },
+          { name: { $regex: `^${trimmedName}$`, $options: "i" } },
+        ],
+      });
+      if (!existsInBranch) {
+        await Department.create({
+          hospital,
+          branch: b._id,
+          parentDepartment: department._id,
+          name: department.name,
+          code: `${department.code}-${String(b._id).slice(-4)}`,
+          description: department.description,
+          specialization: department.specialization,
+          category: department.category,
+          consultationFee: department.consultationFee,
+          isEmergency: department.isEmergency,
+          colorTheme: department.colorTheme,
+          displayOrder: department.displayOrder,
+          status: department.status,
+          isDisabled: false,
+          isBranchCustomized: false,
+          isBranchOnly: false,
+        });
+      }
+    }
+  }
+
   res.status(201).json({ status: "success", data: { department } });
 });
 
@@ -162,6 +218,7 @@ export const updateDepartment = catchAsync(async (req: Request, res: Response) =
   }
 
   const hospital = (existing.hospital as unknown as string).toString();
+  const targetBranch = existing.branch ? existing.branch.toString() : null;
 
   // ── Uniqueness validation ────────────────────────────────────────────────
 
@@ -172,11 +229,12 @@ export const updateDepartment = catchAsync(async (req: Request, res: Response) =
     }
     const dupName = await Department.findOne({
       hospital,
+      branch: targetBranch,
       name: { $regex: `^${trimmedName}$`, $options: "i" },
       _id: { $ne: existing._id },
     });
     if (dupName) {
-      throw new AppError(`A department named "${trimmedName}" already exists.`, 409);
+      throw new AppError(`A department named "${trimmedName}" already exists in this scope.`, 409);
     }
     body.name = trimmedName;
   }
@@ -188,6 +246,7 @@ export const updateDepartment = catchAsync(async (req: Request, res: Response) =
     }
     const dupCode = await Department.findOne({
       hospital,
+      branch: targetBranch,
       code: trimmedCode,
       _id: { $ne: existing._id },
     });
@@ -207,6 +266,11 @@ export const updateDepartment = catchAsync(async (req: Request, res: Response) =
   if (body.branch === "") cleanBody.branch = null;
   if (body.departmentHead === "" || body.departmentHead === null) cleanBody.departmentHead = null;
 
+  // Branch Admin editing department: mark as customized so parent updates won't overwrite it
+  if (targetBranch !== null) {
+    cleanBody.isBranchCustomized = true;
+  }
+
   // ── Capture old values for audit ─────────────────────────────────────────
   const oldValues = pickAuditFields(existing.toObject() as Record<string, unknown>);
 
@@ -219,6 +283,26 @@ export const updateDepartment = catchAsync(async (req: Request, res: Response) =
 
   if (!updated) {
     throw new AppError("Department not found.", 404);
+  }
+
+  // SYNC RULE: If Parent Hospital updates a Department, propagate changes to non-customized branch departments
+  if (targetBranch === null) {
+    const cascadePayload: Record<string, unknown> = {};
+    if (cleanBody.name !== undefined) cascadePayload.name = cleanBody.name;
+    if (cleanBody.description !== undefined) cascadePayload.description = cleanBody.description;
+    if (cleanBody.specialization !== undefined) cascadePayload.specialization = cleanBody.specialization;
+    if (cleanBody.category !== undefined) cascadePayload.category = cleanBody.category;
+    if (cleanBody.consultationFee !== undefined) cascadePayload.consultationFee = cleanBody.consultationFee;
+    if (cleanBody.isEmergency !== undefined) cascadePayload.isEmergency = cleanBody.isEmergency;
+    if (cleanBody.colorTheme !== undefined) cascadePayload.colorTheme = cleanBody.colorTheme;
+    if (cleanBody.displayOrder !== undefined) cascadePayload.displayOrder = cleanBody.displayOrder;
+
+    if (Object.keys(cascadePayload).length > 0) {
+      await Department.updateMany(
+        { parentDepartment: existing._id, isBranchCustomized: { $ne: true } },
+        { $set: cascadePayload }
+      );
+    }
   }
 
   const newValues = pickAuditFields(updated.toObject() as Record<string, unknown>);
@@ -293,12 +377,20 @@ export const deleteDepartment = catchAsync(async (req: Request, res: Response) =
 
   const deptId = department._id;
   const hospital = department.hospital.toString();
+  const isParent = department.branch === null;
+
+  // Gather all department IDs to check for dependency guard
+  let targetDeptIds = [deptId];
+  if (isParent) {
+    const branchDepts = await Department.find({ parentDepartment: deptId }).select("_id");
+    targetDeptIds = targetDeptIds.concat(branchDepts.map((d) => d._id));
+  }
 
   // ── Dependency guard ─────────────────────────────────────────────────────
   const [doctorCount, appointmentCount, admissionCount] = await Promise.all([
-    Doctor.countDocuments({ department: deptId }),
-    Appointment.countDocuments({ department: deptId }),
-    Admission.countDocuments({ department: deptId }),
+    Doctor.countDocuments({ department: { $in: targetDeptIds } }),
+    Appointment.countDocuments({ department: { $in: targetDeptIds } }),
+    Admission.countDocuments({ department: { $in: targetDeptIds } }),
   ]);
 
   if (doctorCount > 0 || appointmentCount > 0 || admissionCount > 0) {
@@ -307,12 +399,24 @@ export const deleteDepartment = catchAsync(async (req: Request, res: Response) =
     if (appointmentCount > 0) parts.push(`${appointmentCount} appointment(s)`);
     if (admissionCount > 0) parts.push(`${admissionCount} admission(s)`);
     throw new AppError(
-      `This department is already in use and cannot be deleted. It is referenced by: ${parts.join(", ")}.`,
+      `This department is in use and cannot be hard deleted. It is referenced by: ${parts.join(", ")}. Please disable it instead.`,
       409,
     );
   }
 
-  await Department.findByIdAndDelete(deptId);
+  // Safe to delete
+  if (isParent) {
+    // Delete parent department AND its non-customized inherited branch department copies
+    await Department.deleteMany({
+      $or: [
+        { _id: deptId },
+        { parentDepartment: deptId, isBranchCustomized: { $ne: true } }
+      ]
+    });
+  } else {
+    // Delete target branch department
+    await Department.findByIdAndDelete(deptId);
+  }
 
   // Audit log
   if (req.user) {

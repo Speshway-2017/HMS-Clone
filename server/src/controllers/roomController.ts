@@ -18,10 +18,9 @@ function getBedLetter(index: number): string {
 }
 
 export const listRooms = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
   const { search, ward, status, page = 1, limit = 10 } = req.query;
 
-  const query: any = { hospital: hospitalId };
+  const query: any = { ...req.hospitalFilter };
 
   if (search) {
     query.$or = [
@@ -49,7 +48,7 @@ export const listRooms = catchAsync(async (req: Request, res: Response) => {
 
   // Fetch bed statistics for these rooms
   const roomIds = rooms.map((r) => r._id);
-  const beds = await Bed.find({ hospital: hospitalId, room: { $in: roomIds } }).select("room status isOccupied").lean();
+  const beds = await Bed.find({ ...req.hospitalFilter, room: { $in: roomIds } }).select("room status isOccupied").lean();
 
   const bedsMap: Record<string, { totalBeds: number; occupiedBeds: number; availableBeds: number }> = {};
   for (const b of beds) {
@@ -92,14 +91,13 @@ export const listRooms = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const getRoom = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
   const { id } = req.params;
-  const room = await Room.findOne({ _id: id, hospital: hospitalId }).populate("ward", "name code wardType").lean();
+  const room = await Room.findOne({ _id: id, ...req.hospitalFilter }).populate("ward", "name code wardType").lean();
   if (!room) {
     throw new AppError("Room not found.", 404);
   }
 
-  const beds = await Bed.find({ hospital: hospitalId, room: id }).select("status isOccupied").lean();
+  const beds = await Bed.find({ ...req.hospitalFilter, room: id }).select("status isOccupied").lean();
   const occupiedCount = beds.filter((b) => b.isOccupied || b.status === "Occupied").length;
   const actualCapacity = room.capacity || beds.length || 1;
 
@@ -119,6 +117,7 @@ export const getRoom = catchAsync(async (req: Request, res: Response) => {
 
 export const createRoom = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital;
+  const branchId = req.hospitalFilter?.branch ?? null;
   const {
     roomNumber,
     roomName,
@@ -143,9 +142,9 @@ export const createRoom = catchAsync(async (req: Request, res: Response) => {
     throw new AppError("Room Number, Ward, Floor, Room Category, and Capacity are required.", 400);
   }
 
-  const ward = await Ward.findOne({ _id: wardId, hospital: hospitalId });
+  const ward = await Ward.findOne({ _id: wardId, ...req.hospitalFilter });
   if (!ward) {
-    throw new AppError("Selected ward does not exist.", 404);
+    throw new AppError("Selected ward does not exist in this branch.", 404);
   }
 
   // Real-world rules enforcement
@@ -167,10 +166,10 @@ export const createRoom = catchAsync(async (req: Request, res: Response) => {
     throw new AppError("Operation Theatre rooms should not allow Non AC.", 400);
   }
 
-  // Check unique room number in hospital
-  const existingRoom = await Room.findOne({ hospital: hospitalId, roomNumber: roomNumber.trim() });
+  // Check unique room number in hospital & branch
+  const existingRoom = await Room.findOne({ ...req.hospitalFilter, roomNumber: roomNumber.trim() });
   if (existingRoom) {
-    throw new AppError(`Room number "${roomNumber}" already exists in this hospital.`, 400);
+    throw new AppError(`Room number "${roomNumber}" already exists in this branch.`, 400);
   }
 
   const parsedCapacity = Number(capacity);
@@ -194,6 +193,7 @@ export const createRoom = catchAsync(async (req: Request, res: Response) => {
 
   const room = await Room.create({
     hospital: hospitalId,
+    branch: branchId,
     roomNumber: roomNumber.trim(),
     roomName: roomName ? roomName.trim() : "",
     ward: wardId,
@@ -218,6 +218,7 @@ export const createRoom = catchAsync(async (req: Request, res: Response) => {
 
       const bed = await Bed.create({
         hospital: hospitalId,
+        branch: branchId,
         ward: wardId,
         room: room._id,
         bedNumber,
@@ -233,7 +234,7 @@ export const createRoom = catchAsync(async (req: Request, res: Response) => {
   // Sync with RoomTariff model for IP Billing compatibility
   try {
     await RoomTariff.findOneAndUpdate(
-      { hospital: hospitalId, ward: ward.name, roomType: resolvedAcType },
+      { hospital: hospitalId, branch: branchId, ward: ward.name, roomType: resolvedAcType },
       {
         tariff: roomTariffData.roomChargePerDay,
         nursingTariff: roomTariffData.nursingCharge,
@@ -243,7 +244,6 @@ export const createRoom = catchAsync(async (req: Request, res: Response) => {
       { upsert: true, new: true }
     );
   } catch (err) {
-    // Non-blocking sync log
     console.error("RoomTariff sync notice:", err);
   }
 
@@ -258,6 +258,7 @@ export const createRoom = catchAsync(async (req: Request, res: Response) => {
 
 export const updateRoom = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital;
+  const branchId = req.hospitalFilter?.branch ?? null;
   const { id } = req.params;
   const {
     roomNumber,
@@ -274,7 +275,7 @@ export const updateRoom = catchAsync(async (req: Request, res: Response) => {
     autoGenerateBeds = true
   } = req.body;
 
-  const room = await Room.findOne({ _id: id, hospital: hospitalId });
+  const room = await Room.findOne({ _id: id, ...req.hospitalFilter });
   if (!room) {
     throw new AppError("Room not found.", 404);
   }
@@ -283,9 +284,9 @@ export const updateRoom = catchAsync(async (req: Request, res: Response) => {
   let targetWardName = room.wardName;
 
   if (wardId && String(wardId) !== String(room.ward)) {
-    const ward = await Ward.findOne({ _id: wardId, hospital: hospitalId });
+    const ward = await Ward.findOne({ _id: wardId, ...req.hospitalFilter });
     if (!ward) {
-      throw new AppError("Selected ward does not exist.", 404);
+      throw new AppError("Selected ward does not exist in this branch.", 404);
     }
     targetWardId = ward._id;
     targetWardName = ward.name;
@@ -294,9 +295,9 @@ export const updateRoom = catchAsync(async (req: Request, res: Response) => {
   }
 
   if (roomNumber && roomNumber.trim() !== room.roomNumber) {
-    const existing = await Room.findOne({ hospital: hospitalId, roomNumber: roomNumber.trim() });
+    const existing = await Room.findOne({ ...req.hospitalFilter, roomNumber: roomNumber.trim(), _id: { $ne: id } });
     if (existing) {
-      throw new AppError(`Room number "${roomNumber}" already exists in this hospital.`, 400);
+      throw new AppError(`Room number "${roomNumber}" already exists in this branch.`, 400);
     }
     room.roomNumber = roomNumber.trim();
   }
@@ -305,7 +306,7 @@ export const updateRoom = catchAsync(async (req: Request, res: Response) => {
   let targetAcType = acType || room.acType;
   let targetAcSubTypes = acSubTypes !== undefined ? acSubTypes : room.acSubTypes;
 
-  const currentWard = await Ward.findById(targetWardId);
+  const currentWard = await Ward.findOne({ _id: targetWardId, ...req.hospitalFilter });
   if (currentWard) {
     if (targetRoomType === "ICU" || currentWard.wardType === "ICU") {
       targetAcType = "AC";
@@ -328,7 +329,7 @@ export const updateRoom = catchAsync(async (req: Request, res: Response) => {
       throw new AppError("Room capacity must be at least 1.", 400);
     }
 
-    const existingBeds = await Bed.find({ hospital: hospitalId, room: id });
+    const existingBeds = await Bed.find({ ...req.hospitalFilter, room: id });
     const occupiedCount = existingBeds.filter((b) => b.isOccupied || b.status === "Occupied").length;
 
     if (newCap < occupiedCount) {
@@ -339,7 +340,6 @@ export const updateRoom = catchAsync(async (req: Request, res: Response) => {
     }
 
     if (newCap > existingBeds.length && autoGenerateBeds) {
-      // Regenerate missing beds without deleting occupied ones
       const currentBedNumbers = new Set(existingBeds.map((b) => b.bedNumber));
       for (let i = 0; i < newCap; i++) {
         const letter = getBedLetter(i);
@@ -348,6 +348,7 @@ export const updateRoom = catchAsync(async (req: Request, res: Response) => {
           const bedCode = `Bed-${room.roomNumber}-${letter}`;
           await Bed.create({
             hospital: hospitalId,
+            branch: branchId,
             ward: targetWardId,
             room: id,
             bedNumber: bNum,
@@ -359,14 +360,13 @@ export const updateRoom = catchAsync(async (req: Request, res: Response) => {
         }
       }
     } else if (newCap < existingBeds.length) {
-      // Safely trim excess unassigned / available beds
       const availableBeds = existingBeds.filter((b) => !b.isOccupied && b.status === "Available");
       const bedsToRemoveCount = existingBeds.length - newCap;
       const bedsToRemove = availableBeds.slice(0, bedsToRemoveCount);
       const removeIds = bedsToRemove.map((b) => b._id);
 
       if (removeIds.length > 0) {
-        await Bed.deleteMany({ _id: { $in: removeIds }, hospital: hospitalId });
+        await Bed.deleteMany({ _id: { $in: removeIds }, ...req.hospitalFilter });
       }
     }
 
@@ -398,21 +398,18 @@ export const updateRoom = catchAsync(async (req: Request, res: Response) => {
 
   await room.save();
 
-  // Also update ward and bed references if ward changed
   if (wardId && String(wardId) !== String(room.ward)) {
-    await Bed.updateMany({ hospital: hospitalId, room: id }, { ward: targetWardId });
+    await Bed.updateMany({ ...req.hospitalFilter, room: id }, { ward: targetWardId });
   }
 
   res.json({ status: "success", data: { room } });
 });
 
 export const deleteRoom = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
   const { id } = req.params;
 
-  // Real-world validation: Cannot delete room if patients are admitted
   const occupiedBedsCount = await Bed.countDocuments({
-    hospital: hospitalId,
+    ...req.hospitalFilter,
     room: id,
     $or: [{ isOccupied: true }, { status: "Occupied" }]
   });
@@ -421,10 +418,9 @@ export const deleteRoom = catchAsync(async (req: Request, res: Response) => {
     throw new AppError("Room cannot be deleted because patients are currently admitted in this room.", 400);
   }
 
-  // Remove beds associated with this room safely
-  await Bed.deleteMany({ hospital: hospitalId, room: id });
+  await Bed.deleteMany({ ...req.hospitalFilter, room: id });
 
-  const room = await Room.findOneAndDelete({ _id: id, hospital: hospitalId });
+  const room = await Room.findOneAndDelete({ _id: id, ...req.hospitalFilter });
   if (!room) {
     throw new AppError("Room not found.", 404);
   }

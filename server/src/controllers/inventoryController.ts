@@ -56,7 +56,7 @@ export const listInventory = catchAsync(async (req: Request, res: Response) => {
 
 export const createInventoryItem = catchAsync(async (req: Request, res: Response) => {
   const body = inventoryItemSchema.parse(req.body);
-  const item = await InventoryItem.create({ ...body, hospital: req.hospitalFilter!.hospital });
+  const item = await InventoryItem.create({ ...body, ...req.hospitalFilter });
 
   if (req.hospitalFilter?.hospital) {
     emitToHospital(req.hospitalFilter.hospital, "inventory_updated", { itemId: item._id, name: item.name });

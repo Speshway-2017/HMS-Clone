@@ -48,8 +48,11 @@ const roomSchema = new Schema(
   { timestamps: true }
 );
 
-// Composite unique key for room numbers within a hospital
-roomSchema.index({ hospital: 1, roomNumber: 1 }, { unique: true });
+// Composite unique key for room numbers within a hospital & branch
+roomSchema.index({ hospital: 1, branch: 1, roomNumber: 1 }, { unique: true });
 
 export type Room = InferSchemaType<typeof roomSchema> & { _id: Types.ObjectId };
 export const Room = model("Room", roomSchema);
+
+// Drop old legacy index if exists
+Room.collection.dropIndex("hospital_1_roomNumber_1").catch(() => {});

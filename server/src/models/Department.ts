@@ -46,22 +46,26 @@ const departmentSchema = new Schema(
     colorTheme: { type: String, default: "" },
     displayOrder: { type: Number, default: 0 },
 
-    // ── Soft-disable (never hard-delete if in use) ────────────────────────
+    // ── Soft-disable & Multi-branch Inheritance ───────────────────────────
     isDisabled: { type: Boolean, default: false },
     disabledAt: { type: Date, default: null },
     disabledBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    parentDepartment: { type: Schema.Types.ObjectId, ref: "Department", default: null },
+    isBranchCustomized: { type: Boolean, default: false },
+    isBranchOnly: { type: Boolean, default: false },
   },
   { timestamps: true },
 );
 
-// Sparse unique index: code must be unique per hospital (skip empty strings)
+// Sparse unique index: code must be unique per hospital & branch (skip empty strings)
 departmentSchema.index(
-  { hospital: 1, code: 1 },
+  { hospital: 1, branch: 1, code: 1 },
   { unique: true, sparse: true, partialFilterExpression: { code: { $gt: "" } } },
 );
 
 export type Department = InferSchemaType<typeof departmentSchema> & { _id: Types.ObjectId };
 export const Department = model("Department", departmentSchema);
 
-// Drop legacy hospital_1_code_1 index if it lacks partialFilterExpression
+// Drop legacy hospital_1_code_1 index if it exists
 Department.collection.dropIndex("hospital_1_code_1").catch(() => {});
+Department.collection.dropIndex("hospital_1_branch_1_code_1").catch(() => {});
