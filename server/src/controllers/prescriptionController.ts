@@ -21,6 +21,7 @@ import { InventoryItem } from "../models/InventoryItem";
 import { Invoice } from "../models/Invoice";
 import { AuditLog } from "../models/AuditLog";
 import { DbNotification } from "../models/DbNotification";
+import { ConsultationSession } from "../models/ConsultationSession";
 
 async function getLoggedDoctor(req: Request) {
   const doctor = await Doctor.findOne({ email: req.user!.email, isActive: { $ne: false } });
@@ -28,6 +29,46 @@ async function getLoggedDoctor(req: Request) {
     throw new AppError("Doctor profile not found for the logged-in user.", 404);
   }
   return doctor;
+}
+
+export function formatAndSanitizeMedications(rawMeds: any[]) {
+  if (!Array.isArray(rawMeds)) return [];
+  return rawMeds
+    .map((m: any) => {
+      const name = String(m.name || m.medicineName || "").trim();
+      if (!name) return null;
+
+      const strength = String(m.strength || "").trim();
+      const dosage = String(m.dosage || "").trim();
+      const frequency = String(m.frequency || "").trim();
+      const duration = String(m.duration || "").trim();
+      const instructions = String(m.instructions || "").trim();
+
+      // Compute total recommended quantity if missing
+      let qty = Number(m.quantity);
+      if (!qty || isNaN(qty) || qty <= 0) {
+        const dNum = parseFloat(dosage) || 1;
+        const fNum = parseFloat(frequency) || 1;
+        const durNum = parseFloat(duration) || 1;
+        qty = dNum * fNum * durNum;
+      }
+
+      return {
+        name,
+        strength,
+        dosage,
+        frequency,
+        duration,
+        quantity: Math.max(1, Math.round(qty)),
+        instructions,
+        status: m.status || "Pending",
+        prescribedAt: m.prescribedAt ? new Date(m.prescribedAt) : new Date(),
+        morning: !!m.morning,
+        afternoon: !!m.afternoon,
+        night: !!m.night,
+      };
+    })
+    .filter((m): m is NonNullable<typeof m> => m !== null);
 }
 
 /**
@@ -51,30 +92,13 @@ export async function createOrUpdatePrescriptionCore(
   },
   reqHostUrl: string
 ) {
-  // 1. Validation
-  const hasMed = data.medications && data.medications.length > 0;
+  // 1. Sanitize medications
+  const medsFormatted = formatAndSanitizeMedications(data.medications || []);
+  const hasMed = medsFormatted.length > 0;
   const hasLab = data.labOrders && data.labOrders.length > 0 && data.labOrders.some(l => l && l.trim());
   const hasRadio = data.radiologyOrders && data.radiologyOrders.length > 0 && data.radiologyOrders.some(r => r && r.trim());
 
-  if (hasMed) {
-    for (const m of data.medications) {
-      if (!m.name || !m.name.trim()) {
-        throw new AppError("Medicine name is required for all rows.", 400);
-      }
-      if (!m.strength || !m.strength.trim()) {
-        throw new AppError(`Strength is required for ${m.name}.`, 400);
-      }
-      if (!m.frequency || !m.frequency.trim()) {
-        throw new AppError(`Frequency is required for ${m.name}.`, 400);
-      }
-      if (!m.duration || !m.duration.trim()) {
-        throw new AppError(`Duration is required for ${m.name}.`, 400);
-      }
-      if (!m.instructions || !m.instructions.trim()) {
-        throw new AppError(`Instructions are required for ${m.name}.`, 400);
-      }
-    }
-  } else if (!hasLab && !hasRadio) {
+  if (!hasMed && !hasLab && !hasRadio) {
     throw new AppError("Cannot save empty prescription. At least one medicine, lab test, or radiology order must be prescribed.", 400);
   }
 
@@ -99,15 +123,6 @@ export async function createOrUpdatePrescriptionCore(
   // 3. Find existing or instantiate new prescription
   let prescription = await Prescription.findOne({ appointment: appointmentId, hospital: hospitalId }).session(session);
   const isNew = !prescription;
-
-  const medsFormatted = (data.medications || []).map(m => ({
-    name: m.name,
-    strength: m.strength || "",
-    dosage: m.dosage || "",
-    frequency: m.frequency || "",
-    duration: m.duration || "",
-    instructions: m.instructions || "",
-  }));
 
   const diagnosisVal = data.diagnosis || appointment.diagnosis || "Consultation visit";
   const chiefComplaintVal = data.chiefComplaint || appointment.chiefComplaint || "";
@@ -166,6 +181,20 @@ export async function createOrUpdatePrescriptionCore(
     };
     await prescription.save({ session });
   }
+
+  // Also sync ConsultationSession draft if present
+  await ConsultationSession.findOneAndUpdate(
+    { appointment: appointmentId, hospital: hospitalId },
+    {
+      $set: {
+        prescriptions: medsFormatted,
+        diagnosis: diagnosisVal,
+        clinicalNotes: clinicalNotesVal,
+        advice: adviceVal
+      }
+    },
+    { session }
+  );
 
   // Narrow the prescription type for the compiler
   if (!prescription) {
@@ -612,6 +641,11 @@ export const updatePrescriptionStatus = catchAsync(async (req: Request, res: Res
   }
 
   prescription.status = status;
+  if (Array.isArray(prescription.medications)) {
+    prescription.medications.forEach((m: any) => {
+      m.status = status;
+    });
+  }
   if (req.user) {
     prescription.dispensedBy = req.user._id as any;
     prescription.dispensedByName = req.user.name || "Pharmacist";
@@ -620,6 +654,13 @@ export const updatePrescriptionStatus = catchAsync(async (req: Request, res: Res
     }
   }
   await prescription.save();
+
+  if (prescription.appointment) {
+    await ConsultationSession.findOneAndUpdate(
+      { appointment: prescription.appointment, hospital: hospitalId },
+      { $set: { "prescriptions.$[].status": status } }
+    );
+  }
 
   // Create notifications for Doctor & Patient
   await DbNotification.create({
@@ -735,8 +776,27 @@ export const dispensePrescription = catchAsync(async (req: Request, res: Respons
 
     // Determine status (Partial vs Complete)
     const isPartial = req.body.isPartial || false;
-    prescription.status = isPartial ? "Partially Dispensed" : "Completed";
+    const finalStatus = isPartial ? "Partially Dispensed" : "Dispensed";
+    prescription.status = finalStatus;
+    prescription.dispensedAt = new Date();
+    if (req.user) {
+      prescription.dispensedBy = req.user._id as any;
+      prescription.dispensedByName = req.user.name || "Pharmacist";
+    }
+    if (Array.isArray(prescription.medications)) {
+      prescription.medications.forEach((m: any) => {
+        m.status = finalStatus;
+      });
+    }
     await prescription.save({ session });
+
+    if (prescription.appointment) {
+      await ConsultationSession.findOneAndUpdate(
+        { appointment: prescription.appointment, hospital: hospitalId },
+        { $set: { "prescriptions.$[].status": finalStatus } },
+        { session }
+      );
+    }
 
     // Generate Invoice Items and totals
     const roundToTwo = (num: number): number => Math.round((num + Number.EPSILON) * 100) / 100;

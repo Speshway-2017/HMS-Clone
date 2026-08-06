@@ -19,7 +19,7 @@ import { catchAsync } from "../utils/catchAsync";
 import mongoose, { Types } from "mongoose";
 import { emitToHospital } from "../config/socket";
 import { logAudit } from "../utils/auditLogger";
-import { createOrUpdatePrescriptionCore } from "./prescriptionController";
+import { createOrUpdatePrescriptionCore, formatAndSanitizeMedications } from "./prescriptionController";
 
 
 async function getLoggedDoctor(req: Request) {
@@ -733,7 +733,7 @@ export const getWorkspace = catchAsync(async (req: Request, res: Response) => {
 
   const [queueItem, prescriptions, labOrders, radiologyOrders, admissions, admissionRequests] = await Promise.all([
     Queue.findOne({ appointment: appointmentId, hospital: hospitalId, doctor: doctorId }),
-    Prescription.find({ patient: patientId, doctor: doctorId, hospital: hospitalId }),
+    Prescription.find({ patient: patientId, doctor: doctorId, hospital: hospitalId }).sort({ createdAt: -1 }),
     LabOrder.find({ patient: patientId, doctor: doctorId, hospital: hospitalId }),
     RadiologyOrder.find({ patient: patientId, doctor: doctorId, hospital: hospitalId }),
     Admission.find({ patient: patientId, hospital: hospitalId }),
@@ -909,13 +909,17 @@ export const recommendAdmission = catchAsync(async (req: Request, res: Response)
     requestNumber,
     patient: patient._id,
     doctor: doctor._id,
-    department: department._id,
+    requestedBy: doctor._id,
+    appointment: appointment._id,
+    department: department ? department._id : null,
     priority,
     preferredWard,
     preferredBedType,
     expectedStay,
+    diagnosis: primaryDiagnosis,
     primaryDiagnosis,
     clinicalNotes,
+    notes: clinicalNotes || "",
     admissionReason: admissionReason || primaryDiagnosis,
     specialInstructions,
     status: "Admission Requested"
@@ -1657,12 +1661,15 @@ export const updateConsultationDraft = catchAsync(async (req: Request, res: Resp
   const { consultationId } = req.params;
   const doctor = await getLoggedDoctor(req);
 
-  const updateData = req.body;
+  const updateData = { ...req.body };
+  if (Array.isArray(updateData.prescriptions)) {
+    updateData.prescriptions = formatAndSanitizeMedications(updateData.prescriptions);
+  }
 
   const session = await ConsultationSession.findOneAndUpdate(
     { _id: consultationId, hospital: hospitalId, doctor: doctor._id, status: "IN_PROGRESS" },
     { $set: updateData },
-    { new: true }
+    { new: true, runValidators: true }
   );
 
   if (!session) {
@@ -1941,6 +1948,9 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
           }
           const requestNumber = `${prefix}${String(nextSerial).padStart(6, "0")}`;
 
+          const diagVal = rec.primaryDiagnosis || draft.diagnosis || "Admission Required";
+          const notesVal = rec.clinicalNotes || draft.clinicalNotes || "";
+
           await AdmissionRequest.create(
             [
               {
@@ -1948,14 +1958,18 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
                 requestNumber,
                 patient: patient._id,
                 doctor: doctor._id,
+                requestedBy: doctor._id,
+                appointment: appointment._id,
                 department: department ? department._id : null,
                 priority: rec.priority || "Routine",
                 preferredWard: rec.preferredWard || "General",
                 preferredBedType: rec.preferredBedType || "General",
                 expectedStay: rec.expectedStay || "",
-                primaryDiagnosis: rec.primaryDiagnosis || draft.diagnosis,
-                clinicalNotes: rec.clinicalNotes || draft.clinicalNotes,
-                admissionReason: rec.admissionReason || rec.primaryDiagnosis || draft.diagnosis,
+                diagnosis: diagVal,
+                primaryDiagnosis: diagVal,
+                clinicalNotes: notesVal,
+                notes: notesVal,
+                admissionReason: rec.admissionReason || diagVal,
                 specialInstructions: rec.specialInstructions || "",
                 status: "Admission Requested"
               }
