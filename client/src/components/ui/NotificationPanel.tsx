@@ -170,19 +170,18 @@ function NotificationItem({
             </p>
           </div>
 
-          {/* Right Action Area: Unread Dot OR Delete Trash Icon when Read */}
-          <div className="flex items-center gap-1 shrink-0 pt-0.5">
-            {!isRead ? (
+          {/* Right Action Area: Unread Dot + Always Accessible Delete Trash Icon */}
+          <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+            {!isRead && (
               <span className={`h-2.5 w-2.5 rounded-full ${styles.dot}`} title="Unread" />
-            ) : (
-              <button
-                onClick={handleDeleteClick}
-                className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all cursor-pointer opacity-80 group-hover:opacity-100"
-                title="Delete Notification"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
             )}
+            <button
+              onClick={handleDeleteClick}
+              className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all cursor-pointer opacity-70 group-hover:opacity-100"
+              title="Delete Notification"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
       )}
@@ -195,6 +194,7 @@ function NotificationItem({
 export function NotificationPanel() {
   const [open, setOpen] = useState(false);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   const panelRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -207,7 +207,7 @@ export function NotificationPanel() {
   const { data, isLoading: isGeneralLoading } = useNotifications();
 
   // Format notifications depending on role
-  const notifications: AppNotification[] = isNurse
+  const rawNotifications: AppNotification[] = isNurse
     ? (nurseNotifsData || []).map((n: any) => ({
         id: n._id || n.id || Math.random().toString(),
         type: "general" as NotificationType,
@@ -219,12 +219,15 @@ export function NotificationPanel() {
       }))
     : (data?.data?.notifications ?? []);
 
-  const total = isNurse ? (nurseNotifsData || []).length : (data?.data?.total ?? 0);
+  // Filter out locally deleted notifications immediately
+  const notifications = rawNotifications.filter((n) => !deletedIds.has(n.id));
+
+  const total = notifications.length;
   const isLoading = isNurse ? false : isGeneralLoading;
 
   // Compute unreadCount based on role
   const unreadCount = isNurse
-    ? (nurseNotifsData || []).filter(n => !n.isRead && !readIds.has(n._id || (n as any).id)).length
+    ? (nurseNotifsData || []).filter(n => !n.isRead && !readIds.has(n._id || (n as any).id) && !deletedIds.has(n._id || (n as any).id)).length
     : notifications.filter((n) => !readIds.has(n.id)).length;
 
   // Close on outside click
@@ -398,12 +401,16 @@ export function NotificationPanel() {
   const deleteNotifMutation = useDeleteNotification();
 
   const handleDeleteNotification = async (id: string) => {
-    await deleteNotifMutation.mutateAsync(id);
-    setReadIds((prev) => {
+    setDeletedIds((prev) => {
       const next = new Set(prev);
       next.add(id);
       return next;
     });
+    try {
+      await deleteNotifMutation.mutateAsync(id);
+    } catch (err: any) {
+      console.error("Error deleting notification:", err);
+    }
   };
 
   // Group by severity for visual ordering: critical first
@@ -505,24 +512,18 @@ export function NotificationPanel() {
           {/* Footer */}
           {!isLoading && (
             <div className="border-t border-slate-100 px-4 py-2.5 flex items-center justify-between bg-slate-50/50">
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  if (user?.role === "nurse") {
+              {user?.role?.toLowerCase() === "nurse" && (
+                <button
+                  onClick={() => {
+                    setOpen(false);
                     navigate("/nurse/notifications");
-                  } else if (user?.role === "doctor") {
-                    navigate("/doctor/ip-management");
-                  } else if (user?.role === "receptionist") {
-                    navigate("/receptionist/appointments");
-                  } else {
-                    navigate("/admin/dashboard");
-                  }
-                }}
-                className="text-xs font-extrabold text-navy-700 hover:text-navy-900 transition-colors cursor-pointer flex items-center gap-1"
-              >
-                View All Notifications →
-              </button>
-              <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                  }}
+                  className="text-xs font-extrabold text-navy-700 hover:text-navy-900 transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  View All Notifications →
+                </button>
+              )}
+              <p className="text-[10px] text-slate-400 flex items-center gap-1 ml-auto">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 Live Sync
               </p>

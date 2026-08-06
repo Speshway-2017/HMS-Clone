@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useInvoices } from "../../features/invoices";
 import { useAccountantDashboard } from "../../features/accountantDashboard";
+import { exportToExcel } from "../../lib/excelUtils";
 import { Card } from "../../components/ui/Card";
 import { ChartCard } from "../../components/ui/ChartCard";
 import { 
@@ -59,22 +60,17 @@ export function AccountantAnalyticsPage() {
 
   const taxSummary = dashboardData?.charts?.taxComplianceSeries || [];
 
-  // CSV Exporter
+  // Excel/CSV Exporter
   const handleExportCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Reporting Month,Subtotal (INR),Service Fee (INR),Tax Collected (INR),Total Collections (INR)\r\n";
-    
-    taxSummary.forEach((row: any) => {
-      csvContent += `${row.month},${row.subtotal},${row.serviceFee},${row.taxCollected},${row.total}\r\n`;
-    });
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "Hospital_Financial_Summary_2026.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const headers = ["Reporting Month", "Subtotal (INR)", "Service Fee (INR)", "Tax Collected (INR)", "Total Collections (INR)"];
+    const rows = taxSummary.map((row: any) => [
+      row.month,
+      row.subtotal,
+      row.serviceFee,
+      row.taxCollected,
+      row.total,
+    ]);
+    exportToExcel("Hospital_Financial_Summary_2026", headers, rows);
   };
 
   return (

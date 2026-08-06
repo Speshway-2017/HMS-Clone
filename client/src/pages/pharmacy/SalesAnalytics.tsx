@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
-import { BarChart3, TrendingUp, TrendingDown, ArrowDownRight, ArrowUpRight, DollarSign, Pill, Award, Clipboard, Download, Calendar } from "lucide-react";
+import { BarChart3, TrendingUp, TrendingDown, ArrowDownRight, ArrowUpRight, DollarSign, Pill, Award, Clipboard, Download, Calendar, Upload } from "lucide-react";
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Card } from "../../components/ui/Card";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { ChartCard } from "../../components/ui/ChartCard";
 import { Button } from "../../components/ui/Button";
 import { useInvoices } from "../../features/invoices";
+import { exportToExcel, exportToPDFReport } from "../../lib/excelUtils";
+import { ImportExcelModal } from "../../components/ui/ImportExcelModal";
+import toast from "react-hot-toast";
 
 interface MedicineSales {
   name: string;
@@ -155,8 +158,22 @@ export function PharmacySalesAnalytics() {
     );
   }
 
-  const handleExport = (type: "pdf" | "excel") => {
-    alert(`Simulation: Exporting Sales Report as ${type.toUpperCase()}. Downloading file...`);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+  const handleExportExcel = () => {
+    const headers = ["Medicine Name", "Category", "Quantity Sold", "Revenue (INR)"];
+    const rows = topMeds.map((m) => [m.name, m.category, m.qtySold, m.revenue]);
+    exportToExcel("Pharmacy_Sales_Analytics_2026", headers, rows);
+  };
+
+  const handleExportPDF = () => {
+    const headers = ["Medicine Name", "Category", "Quantity Sold", "Revenue (INR)"];
+    const rows = topMeds.map((m) => [m.name, m.category, m.qtySold, `₹${m.revenue.toLocaleString("en-IN")}`]);
+    exportToPDFReport("Pharmacy Sales & Stock Movement Report", headers, rows);
+  };
+
+  const handleImportSales = (importedRecords: Record<string, string>[]) => {
+    toast.success(`Successfully imported ${importedRecords.length} pharmacy sales logs!`);
   };
 
   return (
@@ -168,10 +185,10 @@ export function PharmacySalesAnalytics() {
           <p className="text-sm text-slate-500">Analyze daily sales, top-selling formulations, and stock movement logs.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => handleExport("excel")} className="flex items-center gap-1.5 text-xs py-1.5">
-            <Download className="h-3.5 w-3.5" /> Export Excel
+          <Button variant="secondary" onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-1.5 text-xs py-1.5 bg-white border border-slate-200 hover:bg-slate-50">
+            <Upload className="h-3.5 w-3.5 text-emerald-600" /> Import Excel
           </Button>
-          <Button onClick={() => handleExport("pdf")} className="flex items-center gap-1.5 text-xs py-1.5">
+          <Button onClick={handleExportPDF} className="flex items-center gap-1.5 text-xs py-1.5 bg-navy-700 hover:bg-navy-800 text-white">
             <Download className="h-3.5 w-3.5" /> Export PDF
           </Button>
         </div>
@@ -441,6 +458,19 @@ export function PharmacySalesAnalytics() {
           </div>
         </Card>
       </div>
+
+      <ImportExcelModal
+        isOpen={isImportModalOpen}
+        title="Import Pharmacy Sales / Stock Logs"
+        sampleFilename="Pharmacy_Sales_Import_Template.csv"
+        sampleHeaders={["Medicine Name", "Category", "Quantity Sold", "Revenue"]}
+        sampleRows={[
+          ["Dolo 650mg", "Analgesic", 150, 450],
+          ["Augmentin 625mg", "Antibiotic", 40, 1800],
+        ]}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleImportSales}
+      />
     </div>
   );
 }

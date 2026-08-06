@@ -5,6 +5,7 @@ import { useBlogs, useDeleteBlog } from "../../features/blogs";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import toast from "react-hot-toast";
+import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
 
 export function BlogsPage() {
   const navigate = useNavigate();
@@ -19,14 +20,21 @@ export function BlogsPage() {
     return b.tags?.includes(selectedTag);
   });
 
-  const handleDelete = async (id: string, title: string) => {
-    if (window.confirm(`Are you sure you want to delete "${title}"?`)) {
-      try {
-        await deleteBlog.mutateAsync(id);
-        toast.success("Blog post deleted successfully.");
-      } catch {
-        toast.error("Failed to delete blog post.");
-      }
+  const [deleteTargetBlog, setDeleteTargetBlog] = useState<{ id: string; title: string } | null>(null);
+
+  const handleDelete = (id: string, title: string) => {
+    setDeleteTargetBlog({ id, title });
+  };
+
+  const confirmDeleteBlog = async () => {
+    if (!deleteTargetBlog) return;
+    try {
+      await deleteBlog.mutateAsync(deleteTargetBlog.id);
+      toast.success("Blog post deleted successfully.");
+    } catch {
+      toast.error("Failed to delete blog post.");
+    } finally {
+      setDeleteTargetBlog(null);
     }
   };
 
@@ -178,6 +186,15 @@ export function BlogsPage() {
           ))}
         </div>
       )}
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(deleteTargetBlog)}
+        title="Confirm Deletion"
+        message={`Are you sure you want to delete "${deleteTargetBlog?.title || "this blog post"}"? This action cannot be undone.`}
+        isLoading={deleteBlog.isPending}
+        onClose={() => setDeleteTargetBlog(null)}
+        onConfirm={confirmDeleteBlog}
+      />
     </div>
   );
 }

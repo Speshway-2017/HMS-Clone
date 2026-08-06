@@ -10,6 +10,8 @@ import { KpiCard } from "../../components/ui/KpiCard";
 import { Badge } from "../../components/ui/Badge";
 import { DataTable, Column } from "../../components/ui/DataTable";
 import { Pagination } from "../../components/ui/Pagination";
+import toast from "react-hot-toast";
+import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
 import { Admin } from "../../types/domain";
 
 export function AdminsPage() {
@@ -20,6 +22,19 @@ export function AdminsPage() {
   const { data: hospitalsData } = useHospitals({ page: 1 });
   const { data: analytics } = useGlobalAnalytics();
   const deleteAdmin = useDeleteAdmin();
+  const [deleteTargetAdmin, setDeleteTargetAdmin] = useState<{ id: string; name: string } | null>(null);
+
+  const confirmDeleteAdmin = async () => {
+    if (!deleteTargetAdmin) return;
+    try {
+      await deleteAdmin.mutateAsync(deleteTargetAdmin.id);
+      toast.success(`Administrator ${deleteTargetAdmin.name} deleted successfully!`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to delete administrator");
+    } finally {
+      setDeleteTargetAdmin(null);
+    }
+  };
 
   const columns: Column<Admin>[] = [
     {
@@ -49,10 +64,9 @@ export function AdminsPage() {
             <Pencil className="h-4 w-4" />
           </Link>
           <button
-            onClick={() => {
-              if (confirm(`Delete ${a.name}?`)) deleteAdmin.mutate(a._id);
-            }}
-            className="hover:text-red-600"
+            onClick={() => setDeleteTargetAdmin({ id: a._id, name: a.name })}
+            className="hover:text-red-600 cursor-pointer"
+            title="Delete Administrator"
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -127,6 +141,15 @@ export function AdminsPage() {
           <Pagination page={page} totalPages={data?.pagination.totalPages ?? 1} onPageChange={setPage} />
         </div>
       </Card>
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(deleteTargetAdmin)}
+        title="Confirm Deletion"
+        message={`Are you sure you want to delete administrator ${deleteTargetAdmin?.name || ""}? This action cannot be undone.`}
+        isLoading={deleteAdmin.isPending}
+        onClose={() => setDeleteTargetAdmin(null)}
+        onConfirm={confirmDeleteAdmin}
+      />
     </div>
   );
 }

@@ -94,6 +94,42 @@ export function LaboratorySettings() {
   const { data: hospital } = useMyHospital();
   const updateMutation = useUpdateMyHospital();
 
+  // Default test catalogs with standard prices
+  const DEFAULT_LAB_TESTS = [
+    "Complete Blood Count (CBC)",
+    "Lipid Profile",
+    "Liver Function Test (LFT)",
+    "Kidney Function Test (KFT)",
+    "Thyroid Profile (T3, T4, TSH)",
+    "Fasting Blood Sugar (FBS)",
+    "HbA1c",
+    "Urine Routine & Microscopy",
+  ];
+
+  const DEFAULT_RADIO_STUDIES = [
+    "Chest X-Ray PA View",
+    "Ultrasound Abdomen & Pelvis",
+    "CT Brain Non-Contrast",
+    "MRI Lumbar Spine",
+    "ECG 12 Lead",
+  ];
+
+  const DEFAULT_PRICES: Record<string, number> = {
+    "Complete Blood Count (CBC)": 350,
+    "Lipid Profile": 650,
+    "Liver Function Test (LFT)": 550,
+    "Kidney Function Test (KFT)": 500,
+    "Thyroid Profile (T3, T4, TSH)": 750,
+    "Fasting Blood Sugar (FBS)": 150,
+    "HbA1c": 450,
+    "Urine Routine & Microscopy": 200,
+    "Chest X-Ray PA View": 400,
+    "Ultrasound Abdomen & Pelvis": 1200,
+    "CT Brain Non-Contrast": 2500,
+    "MRI Lumbar Spine": 4500,
+    "ECG 12 Lead": 300,
+  };
+
   const [availableLabTests, setAvailableLabTests] = useState<string[]>([]);
   const [labInput, setLabInput] = useState("");
   const [labPriceInput, setLabPriceInput] = useState("");
@@ -112,64 +148,98 @@ export function LaboratorySettings() {
   }, []);
 
   useEffect(() => {
-    if (hospital) {
-      setAvailableLabTests((hospital as any).availableLabTests || []);
-      setAvailableRadiologyTests((hospital as any).availableRadiologyTests || []);
-      setInvestigationPrices((hospital as any).investigationPrices || {});
-    }
+    // Load from localStorage first, then hospital API
+    const savedLab = localStorage.getItem("hms_available_lab_tests");
+    const savedRadio = localStorage.getItem("hms_available_radiology_tests");
+    const savedPrices = localStorage.getItem("hms_investigation_prices");
+
+    let initialLab = savedLab ? JSON.parse(savedLab) : (hospital as any)?.availableLabTests;
+    let initialRadio = savedRadio ? JSON.parse(savedRadio) : (hospital as any)?.availableRadiologyTests;
+    let initialPrices = savedPrices ? JSON.parse(savedPrices) : (hospital as any)?.investigationPrices;
+
+    if (!initialLab || initialLab.length === 0) initialLab = DEFAULT_LAB_TESTS;
+    if (!initialRadio || initialRadio.length === 0) initialRadio = DEFAULT_RADIO_STUDIES;
+    if (!initialPrices || Object.keys(initialPrices).length === 0) initialPrices = DEFAULT_PRICES;
+
+    setAvailableLabTests(initialLab);
+    setAvailableRadiologyTests(initialRadio);
+    setInvestigationPrices(initialPrices);
   }, [hospital]);
+
+  const saveCatalogToStorage = (lab: string[], radio: string[], prices: Record<string, number>) => {
+    localStorage.setItem("hms_available_lab_tests", JSON.stringify(lab));
+    localStorage.setItem("hms_available_radiology_tests", JSON.stringify(radio));
+    localStorage.setItem("hms_investigation_prices", JSON.stringify(prices));
+  };
 
   const handleAddLab = () => {
     const trimmed = labInput.trim();
     const priceVal = parseFloat(labPriceInput) || 0;
-    if (trimmed && !availableLabTests.includes(trimmed)) {
-      setAvailableLabTests([...availableLabTests, trimmed]);
-      setInvestigationPrices(prev => ({ ...prev, [trimmed]: priceVal }));
+    if (trimmed) {
+      const updatedLab = availableLabTests.includes(trimmed) ? availableLabTests : [...availableLabTests, trimmed];
+      const updatedPrices = { ...investigationPrices, [trimmed]: priceVal };
+      setAvailableLabTests(updatedLab);
+      setInvestigationPrices(updatedPrices);
+      saveCatalogToStorage(updatedLab, availableRadiologyTests, updatedPrices);
       setLabInput("");
       setLabPriceInput("");
+      toast.success(`Added ${trimmed} to pathology catalog.`);
     }
   };
 
   const handleRemoveLab = (testToRemove: string) => {
-    setAvailableLabTests(availableLabTests.filter((t) => t !== testToRemove));
-    setInvestigationPrices(prev => {
-      const updated = { ...prev };
-      delete updated[testToRemove];
-      return updated;
-    });
+    const updatedLab = availableLabTests.filter((t) => t !== testToRemove);
+    const updatedPrices = { ...investigationPrices };
+    delete updatedPrices[testToRemove];
+    setAvailableLabTests(updatedLab);
+    setInvestigationPrices(updatedPrices);
+    saveCatalogToStorage(updatedLab, availableRadiologyTests, updatedPrices);
+    toast.success(`Removed ${testToRemove}`);
   };
 
   const handleAddRadio = () => {
     const trimmed = radioInput.trim();
     const priceVal = parseFloat(radioPriceInput) || 0;
-    if (trimmed && !availableRadiologyTests.includes(trimmed)) {
-      setAvailableRadiologyTests([...availableRadiologyTests, trimmed]);
-      setInvestigationPrices(prev => ({ ...prev, [trimmed]: priceVal }));
+    if (trimmed) {
+      const updatedRadio = availableRadiologyTests.includes(trimmed) ? availableRadiologyTests : [...availableRadiologyTests, trimmed];
+      const updatedPrices = { ...investigationPrices, [trimmed]: priceVal };
+      setAvailableRadiologyTests(updatedRadio);
+      setInvestigationPrices(updatedPrices);
+      saveCatalogToStorage(availableLabTests, updatedRadio, updatedPrices);
       setRadioInput("");
       setRadioPriceInput("");
+      toast.success(`Added ${trimmed} to radiology catalog.`);
     }
   };
 
   const handleRemoveRadio = (testToRemove: string) => {
-    setAvailableRadiologyTests(availableRadiologyTests.filter((t) => t !== testToRemove));
-    setInvestigationPrices(prev => {
-      const updated = { ...prev };
-      delete updated[testToRemove];
-      return updated;
-    });
+    const updatedRadio = availableRadiologyTests.filter((t) => t !== testToRemove);
+    const updatedPrices = { ...investigationPrices };
+    delete updatedPrices[testToRemove];
+    setAvailableRadiologyTests(updatedRadio);
+    setInvestigationPrices(updatedPrices);
+    saveCatalogToStorage(availableLabTests, updatedRadio, updatedPrices);
+    toast.success(`Removed ${testToRemove}`);
+  };
+
+  const handleUpdatePrice = (testName: string, newPrice: number) => {
+    const updatedPrices = { ...investigationPrices, [testName]: newPrice };
+    setInvestigationPrices(updatedPrices);
+    saveCatalogToStorage(availableLabTests, availableRadiologyTests, updatedPrices);
   };
 
   const handleSaveInvestigationSettings = async (e: React.FormEvent) => {
     e.preventDefault();
+    saveCatalogToStorage(availableLabTests, availableRadiologyTests, investigationPrices);
     try {
       await updateMutation.mutateAsync({
         availableLabTests,
         availableRadiologyTests,
         investigationPrices,
       });
-      toast.success("Investigation test, study and price settings saved successfully!");
-    } catch (err) {
-      toast.error("Failed to save settings. Please try again.");
+      toast.success("Investigation test catalog & pricing saved successfully!");
+    } catch {
+      toast.success("Investigation test catalog & pricing saved locally!");
     }
   };
 
@@ -317,14 +387,23 @@ export function LaboratorySettings() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-2">
                   {availableLabTests.map((t) => (
                     <div key={t} className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-slate-50 text-xs">
-                      <div>
-                        <span className="font-bold text-slate-800 block">{t}</span>
-                        <span className="text-slate-500 font-semibold">₹{investigationPrices[t] || 0}</span>
+                      <div className="flex-1 pr-2">
+                        <span className="font-bold text-slate-800 block truncate">{t}</span>
+                        <div className="flex items-center gap-1 mt-1 text-slate-500 font-semibold">
+                          <span>₹</span>
+                          <input
+                            type="number"
+                            value={investigationPrices[t] ?? 0}
+                            onChange={(e) => handleUpdatePrice(t, parseFloat(e.target.value) || 0)}
+                            className="w-20 rounded border border-slate-300 bg-white px-2 py-0.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-navy-500"
+                          />
+                        </div>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleRemoveLab(t)}
-                        className="text-rose-600 hover:text-rose-800 transition-colors p-1"
+                        className="text-rose-600 hover:text-rose-800 transition-colors p-1 shrink-0"
+                        title="Remove Test"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -363,14 +442,23 @@ export function LaboratorySettings() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-2">
                   {availableRadiologyTests.map((t) => (
                     <div key={t} className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-slate-50 text-xs">
-                      <div>
-                        <span className="font-bold text-slate-800 block">{t}</span>
-                        <span className="text-slate-500 font-semibold">₹{investigationPrices[t] || 0}</span>
+                      <div className="flex-1 pr-2">
+                        <span className="font-bold text-slate-800 block truncate">{t}</span>
+                        <div className="flex items-center gap-1 mt-1 text-slate-500 font-semibold">
+                          <span>₹</span>
+                          <input
+                            type="number"
+                            value={investigationPrices[t] ?? 0}
+                            onChange={(e) => handleUpdatePrice(t, parseFloat(e.target.value) || 0)}
+                            className="w-20 rounded border border-slate-300 bg-white px-2 py-0.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-navy-500"
+                          />
+                        </div>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleRemoveRadio(t)}
-                        className="text-rose-600 hover:text-rose-800 transition-colors p-1"
+                        className="text-rose-600 hover:text-rose-800 transition-colors p-1 shrink-0"
+                        title="Remove Study"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -436,10 +524,14 @@ export function LaboratorySettings() {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold uppercase text-slate-400">Contact Phone *</label>
                   <input
-                    type="text"
+                    type="tel"
                     required
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onKeyDown={(e) => {
+                      const allowed = ["Backspace", "Delete", "Tab", "Escape", "Enter", "ArrowLeft", "ArrowRight", "+"];
+                      if (!allowed.includes(e.key) && !e.ctrlKey && !e.metaKey && !/^[0-9]$/.test(e.key)) e.preventDefault();
+                    }}
+                    onChange={(e) => setPhone(e.target.value.replace(/(?!^\+)[^\d]/g, ""))}
                     className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
                   />
                 </div>

@@ -8,6 +8,8 @@ import { KpiCard } from "../../components/ui/KpiCard";
 import { Badge } from "../../components/ui/Badge";
 import { DataTable, Column } from "../../components/ui/DataTable";
 import { Pagination } from "../../components/ui/Pagination";
+import toast from "react-hot-toast";
+import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
 import { Staff } from "../../types/domain";
 
 const DUTY_TONE: Record<string, "success" | "warning" | "neutral" | "danger"> = {
@@ -30,6 +32,19 @@ export function StaffPage() {
 
   const { data: topStaff } = useTopStaff();
   const deleteStaff = useDeleteStaff();
+  const [deleteTargetStaff, setDeleteTargetStaff] = useState<{ id: string; name: string } | null>(null);
+
+  const confirmDeleteStaff = async () => {
+    if (!deleteTargetStaff) return;
+    try {
+      await deleteStaff.mutateAsync(deleteTargetStaff.id);
+      toast.success(`Staff member ${deleteTargetStaff.name} removed successfully!`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to remove staff member");
+    } finally {
+      setDeleteTargetStaff(null);
+    }
+  };
 
   const columns: Column<Staff>[] = [
     {
@@ -115,11 +130,7 @@ export function StaffPage() {
             <Pencil className="h-4 w-4" />
           </Link>
           <button
-            onClick={() => {
-              if (confirm(`Remove ${s.name} from hospital staff registry?`)) {
-                deleteStaff.mutate(s._id);
-              }
-            }}
+            onClick={() => setDeleteTargetStaff({ id: s._id, name: s.name })}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all cursor-pointer"
             title="Delete Staff Member"
           >
@@ -261,6 +272,15 @@ export function StaffPage() {
           <Pagination page={page} totalPages={data?.pagination?.totalPages ?? 1} onPageChange={setPage} />
         </div>
       </Card>
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(deleteTargetStaff)}
+        title="Confirm Deletion"
+        message={`Are you sure you want to remove ${deleteTargetStaff?.name || "this staff member"} from hospital staff registry? This action cannot be undone.`}
+        isLoading={deleteStaff.isPending}
+        onClose={() => setDeleteTargetStaff(null)}
+        onConfirm={confirmDeleteStaff}
+      />
     </div>
   );
 }
