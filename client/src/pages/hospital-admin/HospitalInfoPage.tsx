@@ -23,8 +23,9 @@ export function HospitalInfoPage() {
       facebook: "",
       twitter: "",
       linkedin: "",
-      instagram: ""
-    },
+      instagram: "",
+      google: ""
+    } as Record<string, string>,
     faqs: [] as { q: string; a: string }[],
     heroTitle: "",
     heroSub: "",
@@ -38,6 +39,24 @@ export function HospitalInfoPage() {
 
   useEffect(() => {
     if (hospital) {
+      const socialData = (hospital as any)?.socialLinks;
+      const getFieldValue = (keys: string[]) => {
+        if (!socialData) return "";
+        if (typeof socialData.get === "function") {
+          for (const k of keys) {
+            const v = socialData.get(k);
+            if (v && typeof v === "string") return v;
+          }
+        }
+        if (typeof socialData === "object") {
+          for (const k of keys) {
+            const v = socialData[k] || socialData[k.toLowerCase()];
+            if (v && typeof v === "string") return v;
+          }
+        }
+        return "";
+      };
+
       setFormData({
         name: hospital.name || "",
         logoUrl: hospital.logoUrl || "",
@@ -50,11 +69,12 @@ export function HospitalInfoPage() {
         workingHours: (hospital as any).workingHours || "",
         footerText: (hospital as any).footerText || "",
         socialLinks: {
-          facebook: (hospital as any).socialLinks?.facebook || "",
-          twitter: (hospital as any).socialLinks?.twitter || "",
-          linkedin: (hospital as any).socialLinks?.linkedin || "",
-          instagram: (hospital as any).socialLinks?.instagram || ""
-        },
+          facebook: getFieldValue(["facebook", "fb"]),
+          twitter: getFieldValue(["twitter", "x"]),
+          linkedin: getFieldValue(["linkedin", "linkedIn", "LinkedIn"]),
+          instagram: getFieldValue(["instagram", "insta"]),
+          youtube: getFieldValue(["youtube", "youTube", "google"])
+        } as Record<string, string>,
         faqs: (hospital as any).faqs || [],
         heroTitle: (hospital as any).heroTitle || "",
         heroSub: (hospital as any).heroSub || "",
@@ -424,6 +444,17 @@ export function HospitalInfoPage() {
                 onChange={handleSocialChange}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-navy-500"
                 placeholder="https://instagram.com/..."
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">YouTube Link</label>
+              <input
+                type="text"
+                name="youtube"
+                value={formData.socialLinks.youtube || ""}
+                onChange={handleSocialChange}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-navy-500"
+                placeholder="https://youtube.com/..."
               />
             </div>
           </div>

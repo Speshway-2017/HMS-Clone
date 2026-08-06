@@ -908,3 +908,402 @@ div[aria-live="assertive"],
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+
+/* --- Social Media Dynamic Icon Hover Effect (3D Rotate & Background Fill) --- */
+ul.social-hover-list {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex-wrap: nowrap;
+}
+
+ul.social-hover-list li {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+ul.social-hover-list li a {
+  width: 44px;
+  height: 44px;
+  background-color: #ffffff;
+  text-align: center;
+  line-height: 44px;
+  font-size: 19px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  position: relative;
+  overflow: hidden;
+  border: 2px solid #ffffff;
+  z-index: 1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
+  text-decoration: none;
+}
+
+ul.social-hover-list li a .icon {
+  position: relative;
+  color: #262626;
+  transition: transform 0.5s ease, color 0.5s ease;
+  z-index: 3;
+  display: inline-block;
+}
+
+ul.social-hover-list li a:hover .icon {
+  color: #ffffff;
+  transform: rotateY(360deg);
+}
+
+ul.social-hover-list li a:before {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #f00;
+  transition: top 0.5s ease;
+  z-index: 2;
+}
+
+ul.social-hover-list li a:hover:before {
+  top: 0;
+}
+
+ul.social-hover-list li:nth-child(1) a:before,
+ul.social-hover-list li.facebook-item a:before {
+  background: #3b5999;
+}
+
+ul.social-hover-list li:nth-child(2) a:before,
+ul.social-hover-list li.twitter-item a:before {
+  background: #55acee;
+}
+
+ul.social-hover-list li:nth-child(3) a:before,
+ul.social-hover-list li.linkedin-item a:before {
+  background: #0077b5;
+}
+
+ul.social-hover-list li:nth-child(4) a:before,
+ul.social-hover-list li.youtube-item a:before {
+  background: #ff0000;
+}
+
+ul.social-hover-list li:nth-child(5) a:before,
+ul.social-hover-list li.instagram-item a:before {
+  background: #e4405f;
+}
+
+/* --- Ultra-Smooth About Us Hover Card Effects --- */
+.smooth-about-card {
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.5s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease;
+  background-color: #ffffff;
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0px 10px 25px -5px rgba(15, 23, 42, 0.05);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  will-change: transform, box-shadow;
+}
+
+.smooth-about-card:hover {
+  box-shadow: 0px 25px 40px -10px rgba(5, 5, 169, 0.15);
+  transform: translateY(-6px) scale(1.03);
+  border-color: rgba(37, 99, 235, 0.4);
+}
+
+.smooth-about-card .card__img-wrapper {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  overflow: hidden;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  background-color: #f1f5f9;
+}
+
+.smooth-about-card .card__img--hover {
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+.smooth-about-card:hover .card__img--hover {
+  transform: scale(1.08);
+  opacity: 0.95;
+}
+
+.smooth-about-card .card__info-hover {
+  position: absolute;
+  padding: 16px 20px;
+  width: 100%;
+  opacity: 0;
+  top: 0;
+  left: 0;
+  z-index: 10;
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateY(-8px);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.smooth-about-card:hover .card__info-hover {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.smooth-about-card .card__info {
+  z-index: 2;
+  position: relative;
+  background-color: #ffffff;
+  border-bottom-left-radius: 20px;
+  border-bottom-right-radius: 20px;
+  padding: 20px 24px 24px 24px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.smooth-about-card .card__category {
+  font-family: inherit;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+  color: #0505a9;
+}
+
+.smooth-about-card .card__title {
+  margin-top: 4px;
+  margin-bottom: 8px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+/* --- Neon Blue Animated Border Button for Doctors Book Appointment --- */
+.neon-blue-border-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 20px;
+  background: #ffffff; /* Starting white background */
+  color: #0505a9; /* Blue text */
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.4s ease;
+  border: 1.5px solid rgba(37, 99, 235, 0.35);
+  box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.12);
+}
+
+.neon-blue-border-btn:hover {
+  background: #0505a9; /* Blue background on hover */
+  color: #ffffff; /* White text on hover */
+  border-color: #2563eb;
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.5), 0 0 28px rgba(37, 99, 235, 0.3);
+}
+
+.neon-blue-border-btn span.neon-line {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+}
+
+.neon-blue-border-btn span.neon-line:nth-child(1) {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #60a5fa);
+  animation: neon-animate1 1s linear infinite;
+}
+
+@keyframes neon-animate1 {
+  0% {
+    left: -100%;
+  }
+  50%, 100% {
+    left: 100%;
+  }
+}
+
+.neon-blue-border-btn span.neon-line:nth-child(2) {
+  top: -100%;
+  right: 0;
+  width: 2px;
+  height: 100%;
+  background: linear-gradient(180deg, transparent, #60a5fa);
+  animation: neon-animate2 1s linear infinite;
+  animation-delay: 0.25s;
+}
+
+@keyframes neon-animate2 {
+  0% {
+    top: -100%;
+  }
+  50%, 100% {
+    top: 100%;
+  }
+}
+
+.neon-blue-border-btn span.neon-line:nth-child(3) {
+  bottom: 0;
+  right: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(270deg, transparent, #60a5fa);
+  animation: neon-animate3 1s linear infinite;
+  animation-delay: 0.5s;
+}
+
+@keyframes neon-animate3 {
+  0% {
+    right: -100%;
+  }
+  50%, 100% {
+    right: 100%;
+  }
+}
+
+.neon-blue-border-btn span.neon-line:nth-child(4) {
+  bottom: -100%;
+  left: 0;
+  width: 2px;
+  height: 100%;
+  background: linear-gradient(360deg, transparent, #60a5fa);
+  animation: neon-animate4 1s linear infinite;
+  animation-delay: 0.75s;
+}
+
+/* --- Rounded Chevron Animated CTA Button for Book Appointment --- */
+.skew-cta-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 20px;
+  text-decoration: none;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  color: #ffffff;
+  background: #0505a9;
+  transition: all 0.35s ease;
+  box-shadow: 0 4px 14px -2px rgba(5, 5, 169, 0.3);
+  border-radius: 9999px;
+  border: 1.5px solid #0505a9;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.skew-cta-btn:focus {
+  outline: none;
+}
+
+.skew-cta-btn:hover {
+  transition: 0.35s ease;
+  background: #1d4ed8;
+  box-shadow: 0 6px 20px -2px rgba(29, 78, 216, 0.5);
+  border-color: #38bdf8;
+  transform: translateY(-2px);
+}
+
+.skew-cta-btn span.cta-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.skew-cta-btn span.cta-arrow {
+  margin-left: 10px;
+  display: flex;
+  align-items: center;
+  transition: margin-right 0.35s ease;
+  position: relative;
+}
+
+.skew-cta-btn:hover span.cta-arrow {
+  transition: 0.35s ease;
+  margin-right: 4px;
+}
+
+/* SVG Chevron Path Animations */
+.skew-cta-btn path.one {
+  transition: 0.4s;
+  transform: translateX(-60%);
+  fill: #ffffff;
+}
+
+.skew-cta-btn path.two {
+  transition: 0.5s;
+  transform: translateX(-30%);
+  fill: #ffffff;
+}
+
+.skew-cta-btn path.three {
+  transition: 0.4s;
+  fill: #ffffff;
+}
+
+.skew-cta-btn:hover path.three {
+  animation: cta_color_anim 1s infinite 0.2s;
+}
+
+.skew-cta-btn:hover path.one {
+  transform: translateX(0%);
+  animation: cta_color_anim 1s infinite 0.6s;
+}
+
+.skew-cta-btn:hover path.two {
+  transform: translateX(0%);
+  animation: cta_color_anim 1s infinite 0.4s;
+}
+
+@keyframes cta_color_anim {
+  0% {
+    fill: #ffffff;
+  }
+  50% {
+    fill: #38bdf8;
+  }
+  100% {
+    fill: #ffffff;
+  }
+}
+
+@keyframes neon-animate4 {
+  0% {
+    bottom: -100%;
+  }
+  50%, 100% {
+    bottom: 100%;
+  }
+}
+

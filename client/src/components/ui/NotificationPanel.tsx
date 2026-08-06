@@ -1,17 +1,25 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  motion,
+  AnimatePresence,
+  LayoutGroup,
+  type Variants,
+} from "framer-motion";
+import {
   Bell,
   CalendarClock,
   Package,
   Receipt,
   UserPlus,
   X,
+  Check,
   CheckCheck,
   Loader2,
   BellOff,
   Trash2,
   AlertTriangle,
+  Pin,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { socket } from "../../lib/socket";
@@ -59,6 +67,32 @@ const SEVERITY_STYLES: Record<NotificationSeverity, { bg: string; icon: string; 
   },
 };
 
+const itemVariants: Variants = {
+  hidden: { opacity: 0, scale: 0.96, y: -6 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: { type: "spring", stiffness: 380, damping: 20, mass: 0.8 },
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.96,
+    y: -4,
+    transition: { duration: 0.18, ease: "easeIn" },
+  },
+};
+
+const headingVariants: Variants = {
+  hidden: { opacity: 0, y: -6 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring", stiffness: 400, damping: 22 },
+  },
+  exit: { opacity: 0, y: -4, transition: { duration: 0.15, ease: "easeIn" } },
+};
+
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
 function NotificationSkeleton() {
@@ -78,13 +112,19 @@ function NotificationSkeleton() {
 function NotificationItem({
   notification,
   isRead,
+  pinned,
   onNavigate,
   onDelete,
+  onMarkRead,
+  onTogglePin,
 }: {
   notification: AppNotification;
   isRead: boolean;
+  pinned: boolean;
   onNavigate: (link: string) => void;
   onDelete: (id: string) => Promise<void>;
+  onMarkRead?: (id: string) => void;
+  onTogglePin: (id: string) => void;
 }) {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -118,9 +158,21 @@ function NotificationItem({
   };
 
   return (
-    <div className={`relative border-b border-slate-100 transition-all ${styles.bg} ${isRead ? "opacity-75" : ""}`}>
+    <motion.div
+      layoutId={notification.id}
+      layout
+      variants={itemVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      className={`relative border-b transition-all ${
+        pinned
+          ? "bg-indigo-50/90 border-l-4 border-l-indigo-600 border-indigo-100/80 hover:bg-indigo-100/70"
+          : `${styles.bg} border-slate-100`
+      } ${isRead ? "opacity-75" : ""}`}
+    >
       {showConfirmDelete ? (
-        /* Inline On-Screen Confirmation Box (No Browser Alerts!) */
+        /* Inline On-Screen Confirmation Box */
         <div className="p-3 bg-rose-50 border-l-4 border-rose-600 animate-in fade-in duration-200">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -155,7 +207,11 @@ function NotificationItem({
           className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-slate-100/60 cursor-pointer group transition-colors"
         >
           {/* Icon */}
-          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${styles.icon}`}>
+          <div
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-bold ${
+              pinned ? "bg-indigo-600 text-white shadow-xs" : styles.icon
+            }`}
+          >
             <Icon className="h-4 w-4" />
           </div>
 
@@ -170,11 +226,35 @@ function NotificationItem({
             </p>
           </div>
 
-          {/* Right Action Area: Unread Dot + Always Accessible Delete Trash Icon */}
-          <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+          {/* Right Action Area: Pin Toggle + Unread Dot + Tick Mark + Delete Trash Icon */}
+          <div className="flex items-center gap-1 shrink-0 pt-0.5">
             {!isRead && (
-              <span className={`h-2.5 w-2.5 rounded-full ${styles.dot}`} title="Unread" />
+              <span className={`h-2.5 w-2.5 rounded-full ${styles.dot} mr-1`} title="Unread" />
             )}
+
+            {/* Pin Toggle Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePin(notification.id);
+              }}
+              aria-label={pinned ? `Unpin ${notification.title}` : `Pin ${notification.title}`}
+              className={`p-1 rounded-lg transition-colors duration-200 cursor-pointer ${
+                pinned
+                  ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-2xs"
+                  : "text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 opacity-70 group-hover:opacity-100"
+              }`}
+              title={pinned ? "Unpin Notification" : "Pin Notification"}
+            >
+              <Pin
+                className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                  pinned ? "-rotate-45" : ""
+                }`}
+              />
+            </button>
+
+            {/* Delete Trash Icon */}
             <button
               onClick={handleDeleteClick}
               className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all cursor-pointer opacity-70 group-hover:opacity-100"
@@ -185,7 +265,7 @@ function NotificationItem({
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -195,6 +275,13 @@ export function NotificationPanel() {
   const [open, setOpen] = useState(false);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
+  const [showPinnedSection, setShowPinnedSection] = useState(false);
+  const [showAllSection, setShowAllSection] = useState(true);
+
+  const pinnedLengthRef = useRef(0);
+  const unpinnedLengthRef = useRef(0);
+
   const panelRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -205,6 +292,7 @@ export function NotificationPanel() {
   const nurseMarkAllReadMutation = useMarkAllNotificationsRead();
 
   const { data, isLoading: isGeneralLoading } = useNotifications();
+  const deleteNotifMutation = useDeleteNotification();
 
   // Format notifications depending on role
   const rawNotifications: AppNotification[] = isNurse
@@ -229,6 +317,37 @@ export function NotificationPanel() {
   const unreadCount = isNurse
     ? (nurseNotifsData || []).filter(n => !n.isRead && !readIds.has(n._id || (n as any).id) && !deletedIds.has(n._id || (n as any).id)).length
     : notifications.filter((n) => !readIds.has(n.id)).length;
+
+  // Sort: newest first
+  const sorted = [...notifications].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
+  const pinnedItems = sorted.filter((i) => pinnedIds.has(i.id));
+  const unpinnedItems = sorted.filter((i) => !pinnedIds.has(i.id));
+
+  pinnedLengthRef.current = pinnedItems.length;
+  unpinnedLengthRef.current = unpinnedItems.length;
+
+  const togglePin = (id: string) => {
+    setPinnedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (pinnedItems.length > 0) setShowPinnedSection(true);
+  }, [pinnedItems.length]);
+
+  useEffect(() => {
+    if (unpinnedItems.length > 0) setShowAllSection(true);
+  }, [unpinnedItems.length]);
 
   // Close on outside click
   useEffect(() => {
@@ -255,35 +374,46 @@ export function NotificationPanel() {
     if (user?.role !== "doctor") return;
 
     const handleNewDoctorNotif = (notif: any) => {
-      // Play audio alert if critical
       if (notif.severity === "critical" || notif.data?.priority === "High") {
         try {
           const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+          audio.volume = 0.6;
           audio.play().catch(() => {});
-        } catch (e) {}
+        } catch (_) {}
 
         toast.custom((t) => (
-          <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-rose-600 text-white shadow-2xl rounded-2xl pointer-events-auto p-4 border-2 border-white flex flex-col gap-2`}>
-            <div className="flex items-start gap-3">
-              <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center font-black text-lg shrink-0">!</div>
-              <div>
-                <p className="text-xs font-black uppercase tracking-wider">{notif.title || "Critical Patient Alert"}</p>
-                <p className="text-xs font-bold mt-0.5 leading-relaxed">{notif.message}</p>
+          <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-red-950 text-white shadow-2xl rounded-2xl pointer-events-auto flex ring-2 ring-red-500/50 p-4 border border-red-500/30`}>
+            <div className="flex-1 w-0 p-1">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 pt-0.5">
+                  <div className="h-10 w-10 rounded-full bg-red-600/30 flex items-center justify-center border border-red-500/50">
+                    <span className="text-xl">🚨</span>
+                  </div>
+                </div>
+                <div className="ml-3 flex-1">
+                  <p className="text-sm font-black text-red-200 uppercase tracking-wider">{notif.title}</p>
+                  <p className="mt-1 text-xs text-red-100 leading-relaxed">{notif.message}</p>
+                  {notif.data?.patientName && (
+                    <p className="mt-2 text-xs font-bold text-amber-300 bg-red-900/60 py-1 px-2.5 rounded-lg border border-red-700/50 inline-block">
+                      Patient: {notif.data.patientName} {notif.data.bedNumber ? `(Bed: ${notif.data.bedNumber})` : ""}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
-            <div className="flex justify-end gap-2 pt-1 border-t border-white/20">
+            <div className="flex border-l border-red-900/60 pl-3 flex-col justify-center gap-2">
               <button
                 onClick={() => {
                   toast.dismiss(t.id);
                   navigate(notif.link || "/doctor/ip-management");
                 }}
-                className="px-3 py-1 bg-white text-rose-700 font-extrabold text-xs rounded-lg shadow-sm cursor-pointer"
+                className="w-full bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-md transition-colors"
               >
-                View Patient
+                View Now
               </button>
               <button
                 onClick={() => toast.dismiss(t.id)}
-                className="px-3 py-1 bg-white/20 hover:bg-white/30 text-white font-bold text-xs rounded-lg cursor-pointer"
+                className="w-full bg-red-900/40 hover:bg-red-900/60 text-red-300 text-xs font-semibold px-3 py-1 rounded-xl transition-colors"
               >
                 Dismiss
               </button>
@@ -348,121 +478,68 @@ export function NotificationPanel() {
 
   function handleNavigate(link: string) {
     let targetLink = link;
-    if (user?.role === "pharmacist") {
-      if (link.startsWith("/admin/inventory")) {
-        targetLink = "/pharmacy/inventory";
-      } else if (link.startsWith("/admin/finance") || link.startsWith("/admin/invoices")) {
-        targetLink = "/pharmacy/billing";
-      } else if (link.startsWith("/admin/patients")) {
-        targetLink = "/pharmacy/prescriptions";
-      } else if (link.startsWith("/admin/dashboard")) {
-        targetLink = "/pharmacy";
-      }
-    } else if (user?.role === "laboratory") {
-      if (link.startsWith("/admin/inventory")) {
-        targetLink = "/laboratory/inventory";
-      } else if (link.startsWith("/admin/patients")) {
-        targetLink = "/laboratory/requests";
-      } else if (link.startsWith("/admin/dashboard")) {
-        targetLink = "/laboratory";
-      }
-    } else if (user?.role === "accountant") {
-      if (link.startsWith("/admin/finance")) {
-        targetLink = "/accountant/billing";
-      } else if (link.startsWith("/admin/appointments")) {
-        targetLink = "/accountant/dashboard";
-      } else if (link.startsWith("/admin/patients")) {
-        targetLink = "/accountant/billing";
-      } else if (link.startsWith("/admin/inventory")) {
-        targetLink = "/accountant/expenses";
-      }
-    } else if (user?.role === "receptionist") {
-      if (link.startsWith("/admin/appointments") || link.startsWith("/reception/appointments")) {
-        targetLink = "/receptionist/appointments";
-      } else if (link.startsWith("/admin/patients") || link.startsWith("/reception/patients")) {
-        targetLink = "/receptionist/patients";
-      } else if (link.startsWith("/admin/finance") || link.startsWith("/admin/invoices") || link.startsWith("/reception/billing")) {
-        targetLink = "/receptionist/billing";
-      } else if (link.startsWith("/admin/admissions") || link.startsWith("/reception/admissions")) {
-        targetLink = "/receptionist/ip";
-      } else {
-        targetLink = "/receptionist/dashboard";
-      }
+
+    if (user?.role === "nurse" && link.includes("/doctor/ip-management")) {
+      targetLink = "/nurse/ip-management";
     }
-    navigate(targetLink);
-    setOpen(false);
-    setReadIds((prev) => {
-      const next = new Set(prev);
-      notifications.forEach((n) => { if (n.link === link) next.add(n.id); });
-      return next;
-    });
+
+    if (targetLink) {
+      setOpen(false);
+      navigate(targetLink);
+    }
   }
 
-  const deleteNotifMutation = useDeleteNotification();
-
   const handleDeleteNotification = async (id: string) => {
-    setDeletedIds((prev) => {
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
-    try {
-      await deleteNotifMutation.mutateAsync(id);
-    } catch (err: any) {
-      console.error("Error deleting notification:", err);
+    setDeletedIds((prev) => new Set([...prev, id]));
+    if (!isNurse) {
+      try {
+        await deleteNotifMutation.mutateAsync(id);
+      } catch (e) {
+        setDeletedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        throw e;
+      }
     }
   };
 
-  // Group by severity for visual ordering: critical first
-  const sorted = [...notifications].sort((a, b) => {
-    const order = { critical: 0, warning: 1, info: 2 };
-    return order[a.severity] - order[b.severity];
-  });
-
   return (
-    <div ref={panelRef} className="relative">
-      {/* ── Bell Button ── */}
+    <div className="relative" ref={panelRef}>
+      {/* Trigger Bell Button */}
       <button
-        id="btn-notifications"
-        aria-label="Open notifications"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        className={`relative rounded-lg p-2 transition-colors ${
-          open ? "bg-navy-100 text-navy-700" : "text-slate-500 hover:bg-slate-100"
-        }`}
+        onClick={() => setOpen((p) => !p)}
+        className="relative flex h-9 w-9 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100 transition-colors focus:outline-none"
+        aria-label="Notifications"
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-            {unreadCount > 9 ? "9+" : unreadCount}
+          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-xs">
+            {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
       </button>
 
-      {/* ── Dropdown Panel ── */}
+      {/* Popover Card */}
       {open && (
-        <div
-          role="dialog"
-          aria-label="Notifications"
-          className="absolute right-0 top-12 z-50 w-[22rem] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl animate-in fade-in slide-in-from-top-2 duration-150"
-        >
+        <div className="absolute right-0 top-11 z-50 w-80 sm:w-96 rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 bg-white">
             <div className="flex items-center gap-2">
               <Bell className="h-4 w-4 text-navy-700" />
-              <span className="text-sm font-semibold text-slate-800">Notifications</span>
-              {total > 0 && (
-                <span className="rounded-full bg-navy-100 px-2 py-0.5 text-[10px] font-bold text-navy-700">
-                  {total}
+              <span className="text-sm font-extrabold text-slate-900">Notifications</span>
+              {unreadCount > 0 && (
+                <span className="rounded-full bg-navy-50 px-2 py-0.5 text-xs font-bold text-navy-700 border border-navy-100">
+                  {unreadCount}
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1">
-              {notifications.length > 0 && (
+            <div className="flex items-center gap-2">
+              {unreadCount > 0 && (
                 <button
                   onClick={handleMarkAllRead}
-                  className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-navy-700 hover:bg-navy-50 transition-colors cursor-pointer"
-                  title="Mark all as read"
+                  className="flex items-center gap-1 text-xs font-extrabold text-navy-700 hover:text-navy-900 transition-colors"
                 >
                   <CheckCheck className="h-3.5 w-3.5 text-navy-700" />
                   Mark All Read
@@ -478,8 +555,8 @@ export function NotificationPanel() {
             </div>
           </div>
 
-          {/* Body */}
-          <div className="max-h-[28rem] overflow-y-auto divide-y divide-slate-100">
+          {/* Body with Pinned List Layout Group Animation */}
+          <div className="max-h-[28rem] overflow-y-auto">
             {isLoading ? (
               <>
                 <NotificationSkeleton />
@@ -497,15 +574,102 @@ export function NotificationPanel() {
                 </div>
               </div>
             ) : (
-              sorted.map((n) => (
-                <NotificationItem
-                  key={n.id}
-                  notification={n}
-                  isRead={readIds.has(n.id)}
-                  onNavigate={handleNavigate}
-                  onDelete={handleDeleteNotification}
-                />
-              ))
+              <LayoutGroup>
+                <motion.div layout className="flex w-full flex-col divide-y divide-slate-100">
+                  {/* Pinned Notifications Section */}
+                  <AnimatePresence onExitComplete={() => setShowPinnedSection(false)}>
+                    {showPinnedSection && (
+                      <motion.div
+                        key="pinned-section"
+                        layout
+                        variants={headingVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="exit"
+                        className="flex flex-col"
+                      >
+                        <motion.p
+                          layout="position"
+                          className="px-4 py-2 text-[11px] font-extrabold uppercase tracking-wider text-white bg-indigo-600 border-b border-indigo-700 flex items-center justify-between shadow-xs"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Pin className="h-3.5 w-3.5 -rotate-45" /> Pinned Notifications
+                          </span>
+                          <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full text-white font-black">
+                            {pinnedItems.length}
+                          </span>
+                        </motion.p>
+                        <AnimatePresence
+                          mode="popLayout"
+                          onExitComplete={() => {
+                            if (pinnedLengthRef.current === 0)
+                              setShowPinnedSection(false);
+                          }}
+                        >
+                          {pinnedItems.map((n) => (
+                            <NotificationItem
+                              key={n.id}
+                              notification={n}
+                              isRead={readIds.has(n.id)}
+                              pinned
+                              onNavigate={handleNavigate}
+                              onDelete={handleDeleteNotification}
+                              onMarkRead={(id) => setReadIds((prev) => new Set([...prev, id]))}
+                              onTogglePin={togglePin}
+                            />
+                          ))}
+                        </AnimatePresence>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* All Notifications Section */}
+                  <AnimatePresence onExitComplete={() => setShowAllSection(false)}>
+                    {showAllSection && (
+                      <motion.div
+                        key="all-section"
+                        layout
+                        variants={headingVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="exit"
+                        className="flex flex-col"
+                      >
+                        {pinnedItems.length > 0 && (
+                          <motion.p
+                            layout="position"
+                            className="px-4 py-2 text-[11px] font-extrabold uppercase tracking-wider text-slate-700 bg-slate-100 border-b border-slate-200 flex items-center justify-between"
+                          >
+                            <span>All Notifications</span>
+                            <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full font-bold">
+                              {unpinnedItems.length}
+                            </span>
+                          </motion.p>
+                        )}
+                        <AnimatePresence
+                          mode="popLayout"
+                          onExitComplete={() => {
+                            if (unpinnedLengthRef.current === 0) setShowAllSection(false);
+                          }}
+                        >
+                          {unpinnedItems.map((n) => (
+                            <NotificationItem
+                              key={n.id}
+                              notification={n}
+                              isRead={readIds.has(n.id)}
+                              pinned={false}
+                              onNavigate={handleNavigate}
+                              onDelete={handleDeleteNotification}
+                              onMarkRead={(id) => setReadIds((prev) => new Set([...prev, id]))}
+                              onTogglePin={togglePin}
+                            />
+                          ))}
+                        </AnimatePresence>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              </LayoutGroup>
             )}
           </div>
 

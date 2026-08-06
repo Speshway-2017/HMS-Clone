@@ -1,73 +1,289 @@
-import React, { useRef, useState } from "react";
+import React, {
+  type CSSProperties,
+  cloneElement,
+  type ReactElement,
+  type Ref,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
-interface GlowHoverCardProps {
-  children: React.ReactNode;
-  className?: string;
-  glowColor?: string;
-  borderColor?: string;
+function cn(...classes: (string | undefined | null | false)[]) {
+  return classes.filter(Boolean).join(" ");
 }
 
-export const GlowHoverCard: React.FC<GlowHoverCardProps> = ({
-  children,
-  className = "",
-  glowColor = "rgba(59, 130, 246, 0.08)",
-  borderColor = "rgba(37, 99, 235, 0.4)",
-}) => {
-  const cardRef = useRef<HTMLDivElement>(null);
-  const [mousePos, setMousePos] = useState({ x: -1000, y: -1000 });
-  const [isHovered, setIsHovered] = useState(false);
+export interface GlowHoverTheme {
+  hue: number;
+  lightness: number;
+  saturation: number;
+}
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
-    setMousePos({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    });
+export interface GlowHoverItem {
+  element: ReactElement;
+  id: string;
+  theme?: GlowHoverTheme;
+}
+
+export interface GlowHoverProps {
+  className?: string;
+  glowIntensity?: number;
+  items: GlowHoverItem[];
+  maskSize?: number;
+}
+
+// Legacy types for backward compatibility
+export type GlowHoverCardTheme = GlowHoverTheme;
+export type GlowHoverCardItem = GlowHoverItem;
+export type GlowHoverCardsProps = GlowHoverProps;
+
+export default function GlowHover({
+  items,
+  className = "",
+  maskSize = 400,
+  glowIntensity = 0.15,
+}: GlowHoverProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLElement | null)[]>([]);
+  const overlayItemRefs = useRef<(HTMLElement | null)[]>([]);
+  const [mousePosition, setMousePosition] = useState<{
+    x: number;
+    y: number;
+    opacity: number;
+  }>({ opacity: 0, x: 0, y: 0 });
+  
+  const [shouldReduceMotion, setShouldReduceMotion] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia) {
+      const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+      setShouldReduceMotion(mediaQuery.matches);
+    }
+  }, []);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || shouldReduceMotion) {
+      return;
+    }
+
+    const handlePointerMove = (e: PointerEvent) => {
+      const rect = container.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      setMousePosition({
+        opacity: 1,
+        x,
+        y,
+      });
+    };
+
+    const handlePointerLeave = () => {
+      setMousePosition((prev) => ({ ...prev, opacity: 0 }));
+    };
+
+    container.addEventListener("pointermove", handlePointerMove);
+    container.addEventListener("pointerleave", handlePointerLeave);
+
+    return () => {
+      container.removeEventListener("pointermove", handlePointerMove);
+      container.removeEventListener("pointerleave", handlePointerLeave);
+    };
+  }, [shouldReduceMotion]);
+
+  // Sync overlay card sizes and positions with original cards
+  useEffect(() => {
+    if (shouldReduceMotion || !overlayRef.current || !containerRef.current) {
+      return;
+    }
+
+    const syncCards = () => {
+      const container = containerRef.current;
+      const overlay = overlayRef.current;
+      if (!(container && overlay)) {
+        return;
+      }
+
+      itemRefs.current.forEach((itemEl, index) => {
+        const overlayItemEl = overlayItemRefs.current[index];
+        if (!(itemEl && overlayItemEl)) {
+          return;
+        }
+
+        const itemRect = itemEl.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+
+        const left = itemRect.left - containerRect.left;
+        const top = itemRect.top - containerRect.top;
+
+        overlayItemEl.style.position = "absolute";
+        overlayItemEl.style.left = `${left}px`;
+        overlayItemEl.style.top = `${top}px`;
+        overlayItemEl.style.width = `${itemRect.width}px`;
+        overlayItemEl.style.height = `${itemRect.height}px`;
+      });
+    };
+
+    const observers: ResizeObserver[] = [];
+    const mutationObserver = new MutationObserver(syncCards);
+
+    for (const itemEl of itemRefs.current) {
+      if (!itemEl) continue;
+
+      const observer = new ResizeObserver(() => {
+        syncCards();
+      });
+
+      observer.observe(itemEl);
+      observers.push(observer);
+    }
+
+    if (containerRef.current) {
+      mutationObserver.observe(containerRef.current, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+      });
+    }
+
+    syncCards();
+
+    window.addEventListener("scroll", syncCards, { passive: true });
+    window.addEventListener("resize", syncCards);
+
+    return () => {
+      for (const observer of observers) {
+        observer.disconnect();
+      }
+      mutationObserver.disconnect();
+      window.removeEventListener("scroll", syncCards);
+      window.removeEventListener("resize", syncCards);
+    };
+  }, [shouldReduceMotion]);
+
+  const applyGlowStyles = (
+    element: ReactElement,
+    theme?: GlowHoverTheme,
+    isOverlay = false
+  ): ReactElement => {
+    if (!isOverlay) {
+      return element;
+    }
+
+    const props = element.props as {
+      style?: CSSProperties;
+      className?: string;
+    };
+    const existingStyle = props.style || {};
+    const existingClassName = props.className || "";
+
+    let glowStyles: CSSProperties;
+
+    if (theme) {
+      const hsl = `${theme.hue}, ${theme.saturation}%, ${theme.lightness}%`;
+      glowStyles = {
+        backgroundColor: `hsla(${hsl}, ${glowIntensity})`,
+        borderColor: `hsla(${hsl}, 1)`,
+        boxShadow: `0 0 0 1px inset hsl(${hsl}), 0 0 20px hsla(${hsl}, ${glowIntensity})`,
+      };
+    } else {
+      const brandColor = "#0505a9";
+      glowStyles = {
+        backgroundColor: `rgba(5, 5, 169, ${glowIntensity})`,
+        borderColor: "#2563eb",
+        boxShadow: `0 0 0 1px inset #2563eb, 0 0 20px rgba(37, 99, 235, ${glowIntensity})`,
+      };
+    }
+
+    const mergedStyle = {
+      ...existingStyle,
+      ...glowStyles,
+    };
+
+    return cloneElement(element, {
+      ...props,
+      className: cn(existingClassName, "glow-overlay-item"),
+      style: mergedStyle,
+    } as any);
   };
 
   return (
     <div
-      ref={cardRef}
-      onMouseMove={handleMouseMove}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className={`glow-hover-card relative w-full h-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md hover:border-blue-400/50 ${className}`}
-      style={
-        {
-          "--mouse-x": `${mousePos.x}px`,
-          "--mouse-y": `${mousePos.y}px`,
-        } as React.CSSProperties
-      }
+      className={cn("relative", className)}
+      ref={containerRef}
+      style={shouldReduceMotion ? undefined : { willChange: "contents" }}
     >
-      {/* Light Blue Ambient Radial Glow (Full 100% Card Coverage) */}
-      <div
-        className="pointer-events-none absolute inset-0 rounded-2xl transition-opacity duration-300"
-        style={{
-          opacity: isHovered ? 1 : 0,
-          background: `radial-gradient(450px circle at var(--mouse-x) var(--mouse-y), ${glowColor}, transparent 80%)`,
-        }}
-      />
-
-      {/* Blue Border Spotlight Mask (Full Edge Coverage) */}
-      <div
-        className="pointer-events-none absolute inset-0 rounded-2xl transition-opacity duration-300"
-        style={{
-          opacity: isHovered ? 1 : 0,
-          background: `radial-gradient(300px circle at var(--mouse-x) var(--mouse-y), ${borderColor}, transparent 75%)`,
-          maskImage: "linear-gradient(black, black) content-box, linear-gradient(black, black)",
-          maskComposite: "exclude",
-          WebkitMaskComposite: "xor",
-          padding: "1.5px",
-        }}
-      />
-
-      {/* Inner Card Content */}
-      <div className="relative z-10 w-full h-full flex flex-col space-y-4">
-        {children}
+      {/* Original Items */}
+      <div className="contents">
+        {items.map((item, index) =>
+          cloneElement(item.element, {
+            key: item.id,
+            ref: (el: HTMLElement | null) => {
+              itemRefs.current[index] = el;
+              const elementProps = item.element.props as {
+                ref?: Ref<HTMLElement>;
+              };
+              const existingRef = elementProps?.ref;
+              if (typeof existingRef === "function") {
+                existingRef(el);
+              } else if (existingRef && typeof existingRef === "object") {
+                (existingRef as { current: HTMLElement | null }).current = el;
+              }
+            },
+          } as any)
+        )}
       </div>
+
+      {/* Overlay with Glow Effect */}
+      {!shouldReduceMotion && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 select-none"
+          ref={overlayRef}
+          style={{
+            maskImage: `radial-gradient(${maskSize}px ${maskSize}px at ${mousePosition.x}px ${mousePosition.y}px, #000 1%, transparent 50%)`,
+            opacity: mousePosition.opacity,
+            transition:
+              "opacity 200ms ease, mask-image 200ms ease, -webkit-mask-image 200ms ease",
+            WebkitMaskImage: `radial-gradient(${maskSize}px ${maskSize}px at ${mousePosition.x}px ${mousePosition.y}px, #000 1%, transparent 50%)`,
+            willChange: "mask-image, opacity",
+          }}
+        >
+          {items.map((item, index) => {
+            const glowElement = applyGlowStyles(item.element, item.theme, true);
+            return cloneElement(glowElement, {
+              key: item.id,
+              ref: (el: HTMLElement | null) => {
+                overlayItemRefs.current[index] = el;
+              },
+            } as any);
+          })}
+        </div>
+      )}
     </div>
   );
-};
+}
 
-export default GlowHoverCard;
+// Single Card Wrapper export for backward compatibility
+export const GlowHoverCard: React.FC<{
+  children: React.ReactNode;
+  className?: string;
+  glowColor?: string;
+  borderColor?: string;
+}> = ({ children, className = "" }) => {
+  return (
+    <GlowHover
+      items={[
+        {
+          id: "single-card",
+          element: (
+            <div className={cn("rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-all flex flex-col space-y-4", className)}>
+              {children}
+            </div>
+          ),
+        },
+      ]}
+    />
+  );
+};
