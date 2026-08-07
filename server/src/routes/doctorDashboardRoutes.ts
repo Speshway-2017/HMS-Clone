@@ -36,6 +36,7 @@ import {
   updateConsultationDraft,
   completeConsultationSession,
   cancelConsultationSession,
+  getConsultationHistory,
   // Doctor-scoped laboratory endpoints
   getMyLabOrders,
   getMyLabOrderById,
@@ -110,6 +111,7 @@ router.get("/consultations/:appointmentId/draft", getConsultationDraft);
 router.put("/consultations/:consultationId/draft", updateConsultationDraft);
 router.post("/consultations/:consultationId/complete", completeConsultationSession);
 router.post("/consultations/:consultationId/cancel", cancelConsultationSession);
+router.get("/consultations/:id/history", getConsultationHistory);
 
 // ── Doctor-scoped lab order records (security-enforced, audit-logged) ─────────
 router.get("/my-lab-orders", getMyLabOrders);

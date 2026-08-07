@@ -72,6 +72,18 @@ const consultationSessionSchema = new Schema(
       specialInstructions: { type: String, default: "" },
       recommended: { type: Boolean, default: false },
     },
+
+    followUpDate: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
+    completedBy: { type: Schema.Types.ObjectId, ref: "Doctor", default: null },
+
+    history: [
+      {
+        action: { type: String, required: true },
+        timestamp: { type: Date, default: Date.now },
+        details: { type: String, default: "" },
+      },
+    ],
   },
   { timestamps: true }
 );

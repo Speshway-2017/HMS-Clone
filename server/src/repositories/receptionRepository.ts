@@ -11,6 +11,7 @@ import { Queue } from "../models/Queue";
 import { AuditLog } from "../models/AuditLog";
 import { DbNotification } from "../models/DbNotification";
 import { Types } from "mongoose";
+import { AppointmentSlotService } from "../services/appointmentSlotService";
 
 function toFilter(filterOrId: any): any {
   if (!filterOrId) return {};
@@ -99,18 +100,7 @@ export class ReceptionRepository {
   static readonly SLOT_RELEASED_STATUSES = ["cancelled", "no_show"] as const;
 
   static async checkDoctorSlotOverlap(hospitalId: any, doctorId: string, date: Date, time: string) {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    return await Appointment.findOne({
-      ...toFilter(hospitalId),
-      doctor: doctorId,
-      date: { $gte: startOfDay, $lte: endOfDay },
-      timeSlot: time.trim(),
-      status: { $nin: [...ReceptionRepository.SLOT_RELEASED_STATUSES] }
-    });
+    return await AppointmentSlotService.checkSlotConflict(doctorId, date, time, toFilter(hospitalId));
   }
 
   static async createAppointment(data: any) {
@@ -137,7 +127,7 @@ export class ReceptionRepository {
       .populate("patient", "name uhid age gender phone email")
       .populate("doctor", "name specialization")
       .populate("department", "name")
-      .sort({ timeSlot: 1 });
+      .sort({ time: 1 });
   }
 
   // ── OP Visit Operations ──

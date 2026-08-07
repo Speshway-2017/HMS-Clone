@@ -858,7 +858,7 @@ export interface DoctorPatientListResponse {
  * Fetch only the patients assigned to the authenticated doctor.
  * Filtering is enforced at the MongoDB level — no frontend filtering.
  */
-export function useDoctorPatients(params?: { search?: string }) {
+export function useDoctorPatients(params?: { search?: string; patientId?: string }) {
   return useQuery({
     queryKey: ["doctorDashboard", "myPatients", params],
     queryFn: async () => {
@@ -971,6 +971,19 @@ export function useUpdatePrescriptionStatus() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["prescriptions"] });
       queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
+    },
+  });
+}
+
+export function useConsultationHistory(consultationId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["doctorDashboard", "consultationHistory", consultationId],
+    enabled: !!consultationId,
+    queryFn: async () => {
+      const res = await api.get<{ status: string; data: { history: any[]; completedAt?: string; completedBy?: any; status: string } }>(
+        `/doctors/dashboard/consultations/${consultationId}/history`
+      );
+      return res.data.data;
     },
   });
 }

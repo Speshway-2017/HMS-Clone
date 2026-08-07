@@ -1,10 +1,16 @@
 import { Request, Response } from "express";
+import { Types } from "mongoose";
 import { z } from "zod";
 import { Invoice, INVOICE_STATUSES } from "../models/Invoice";
 import { Payment } from "../models/Payment";
 import { IPBill } from "../models/IPBill";
 import { IPBillPayment } from "../models/IPBillPayment";
 import { Patient } from "../models/Patient";
+import { Admission } from "../models/Admission";
+import { Doctor } from "../models/Doctor";
+import { Department } from "../models/Department";
+import { Appointment } from "../models/Appointment";
+import { BillingService } from "../services/billingService";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
@@ -469,189 +475,26 @@ export const deleteInvoice = catchAsync(async (req: Request, res: Response) => {
 /**
  * GET /invoices/pending-overdue
  * Returns all pending/partially_paid/overdue invoices with full patient, doctor, department details.
- * Supports filters: dateFrom, dateTo, department, doctor, billingType, status, branch, search, uhid.
- * Returns summary KPIs: pendingPatients, totalPendingAmount, overdueAmount, todayCollection, monthCollection.
+ * Delegates to BillingService.getPendingInvoices (Single Source of Truth).
  */
 export const getPendingOverdue = catchAsync(async (req: Request, res: Response) => {
-  const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
-  const now = new Date();
-
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const {
     dateFrom, dateTo, department, doctor, billingType, status,
-    branch, search, uhid, page: pageQ, limit: limitQ
+    branch, search, uhid, page, limit
   } = req.query as Record<string, string | undefined>;
 
-  const pageNum = Math.max(1, parseInt(pageQ || "1"));
-  const pageLimit = Math.min(100, Math.max(10, parseInt(limitQ || "20")));
-  const skip = (pageNum - 1) * pageLimit;
-
-  // Base filter - always hospital scoped
-  const baseFilter: Record<string, any> = { ...req.hospitalFilter };
-
-  // Only pending, partially_paid, overdue statuses
-  const targetStatuses = status && ["pending", "partially_paid", "overdue"].includes(status)
-    ? [status]
-    : ["pending", "partially_paid", "overdue"];
-  baseFilter.status = { $in: targetStatuses };
-
-  if (branch) baseFilter.branch = branch;
-  if (billingType) baseFilter.billingType = billingType.toUpperCase();
-  if (dateFrom || dateTo) {
-    baseFilter.issuedAt = {};
-    if (dateFrom) baseFilter.issuedAt.$gte = new Date(dateFrom);
-    if (dateTo) {
-      const to = new Date(dateTo);
-      to.setHours(23, 59, 59, 999);
-      baseFilter.issuedAt.$lte = to;
-    }
-  }
-
-  // Fetch all matching invoices with populations
-  let query = Invoice.find(baseFilter)
-    .populate("patient", "name uhid phone age gender email bloodGroup")
-    .populate({ path: "provisionalData.doctorId", select: "name specialization" })
-    .populate({ path: "provisionalData.departmentId", select: "name" })
-    .populate({ path: "appointment", select: "doctor department", populate: [
-      { path: "doctor", select: "name specialization" },
-      { path: "department", select: "name" }
-    ]})
-    .sort({ issuedAt: -1 });
-
-  const allInvoices: any[] = await query;
-
-  // Fetch all payments at once for patient-balance computation
-  const invoiceIds = allInvoices.map((i: any) => i._id);
-  const paymentsAll = await Payment.find({ invoice: { $in: invoiceIds } });
-  const paidMap: Record<string, number> = {};
-  paymentsAll.forEach((p: any) => {
-    const key = p.invoice.toString();
-    paidMap[key] = (paidMap[key] || 0) + (p.amount || 0);
+  const result = await BillingService.getPendingInvoices(hospitalId, {
+    dateFrom, dateTo, department, doctor, billingType, status,
+    branch, search, uhid,
+    page: page ? parseInt(page) : 1,
+    limit: limit ? parseInt(limit) : 20
   });
-
-  // Enrich invoices with computed totals & derived fields
-  const enriched = allInvoices
-    .map((inv: any) => {
-      const totalPaid = paidMap[inv._id.toString()] || 0;
-      const totals = computeTotals(inv, totalPaid);
-
-      // Determine real-time status
-      let derivedStatus: string = inv.status;
-      if (totals.patientBalance === 0) {
-        derivedStatus = "paid";
-      } else if (inv.dueDate && new Date(inv.dueDate) < now && totals.patientBalance > 0) {
-        derivedStatus = "overdue";
-      } else if (totalPaid > 0 && totals.patientBalance > 0) {
-        derivedStatus = "partially_paid";
-      }
-
-      // Only include if actually still unpaid
-      if (derivedStatus === "paid") return null;
-
-      // Days overdue calculation
-      let daysOverdue = 0;
-      if (inv.dueDate) {
-        const msOverdue = now.getTime() - new Date(inv.dueDate).getTime();
-        if (msOverdue > 0) daysOverdue = Math.floor(msOverdue / (1000 * 60 * 60 * 24));
-      }
-
-      // Derive doctor/department from populated appointment or provisionalData
-      const docFromAppt = inv.appointment?.doctor;
-      const deptFromAppt = inv.appointment?.department;
-      const docFromProv = inv.provisionalData?.doctorId;
-      const deptFromProv = inv.provisionalData?.departmentId;
-
-      const resolvedDoctor = docFromAppt || docFromProv || null;
-      const resolvedDepartment = deptFromAppt || deptFromProv || null;
-
-      return {
-        _id: inv._id,
-        invoiceNo: inv._id.toString().slice(-8).toUpperCase(),
-        patient: inv.patient,
-        doctor: resolvedDoctor,
-        department: resolvedDepartment,
-        billingType: inv.billingType,
-        issuedAt: inv.issuedAt,
-        dueDate: inv.dueDate,
-        daysOverdue,
-        status: derivedStatus,
-        totals,
-        amountPaid: totalPaid,
-        pendingAmount: totals.patientBalance,
-        paymentMode: inv.paymentMode,
-        branch: inv.branch,
-      };
-    })
-    .filter(Boolean) as any[];
-
-  // Apply patient name/UHID search filter post-population
-  let filtered = enriched;
-  if (search) {
-    const re = new RegExp(search, "i");
-    filtered = filtered.filter(inv =>
-      re.test(inv.patient?.name || "") || re.test(inv.patient?.phone || "")
-    );
-  }
-  if (uhid) {
-    const re = new RegExp(uhid, "i");
-    filtered = filtered.filter(inv => re.test(inv.patient?.uhid || ""));
-  }
-  if (doctor) {
-    filtered = filtered.filter(inv => inv.doctor?._id?.toString() === doctor);
-  }
-  if (department) {
-    filtered = filtered.filter(inv => inv.department?._id?.toString() === department);
-  }
-
-  // Summary KPIs
-  const uniquePatients = new Set(filtered.map(inv => inv.patient?._id?.toString()).filter(Boolean));
-  const totalPendingAmount = r2(filtered.reduce((sum, inv) => sum + inv.pendingAmount, 0));
-  const overdueAmount = r2(
-    filtered.filter(inv => inv.status === "overdue").reduce((sum, inv) => sum + inv.pendingAmount, 0)
-  );
-
-  // Today's collection
-  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
-  const endOfToday = new Date(); endOfToday.setHours(23, 59, 59, 999);
-  const allTodayPayments = await Payment.find({
-    ...req.hospitalFilter,
-    $or: [
-      { paidAt: { $gte: startOfToday, $lte: endOfToday } },
-      { createdAt: { $gte: startOfToday, $lte: endOfToday } }
-    ]
-  });
-  const todayCollection = r2(allTodayPayments.reduce((sum, p) => sum + (p.amount || 0), 0));
-
-  // This month's collection
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-  const allMonthPayments = await Payment.find({
-    ...req.hospitalFilter,
-    $or: [
-      { paidAt: { $gte: startOfMonth, $lte: endOfMonth } },
-      { createdAt: { $gte: startOfMonth, $lte: endOfMonth } }
-    ]
-  });
-  const monthCollection = r2(allMonthPayments.reduce((sum, p) => sum + (p.amount || 0), 0));
-
-  // Paginate
-  const total = filtered.length;
-  const pageData = filtered.slice(skip, skip + pageLimit);
 
   res.json({
     status: "success",
-    data: pageData,
-    pagination: {
-      total,
-      page: pageNum,
-      limit: pageLimit,
-      totalPages: Math.ceil(total / pageLimit),
-    },
-    summary: {
-      pendingPatients: uniquePatients.size,
-      totalPendingAmount,
-      overdueAmount,
-      todayCollection,
-      monthCollection,
-    },
+    data: result.invoices,
+    pagination: result.pagination,
+    summary: result.summary,
   });
 });

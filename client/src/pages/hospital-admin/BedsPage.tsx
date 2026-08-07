@@ -117,9 +117,9 @@ export function BedsPage() {
   const totalWardsCount = allWardsOption?.wards.length ?? 0;
   const totalRoomsCount = allRoomsOption?.rooms.length ?? 0;
   const statsTotalBeds = allBedsForStats?.beds.length ?? 0;
-  const statsOccupiedBeds = allBedsForStats?.beds.filter((b) => b.isOccupied || b.status === "Occupied").length ?? 0;
-  const statsAvailableBeds = allBedsForStats?.beds.filter((b) => b.status === "Available" && !b.isOccupied).length ?? (statsTotalBeds - statsOccupiedBeds);
-  const statsMaintenanceBeds = allBedsForStats?.beds.filter((b) => b.status === "Maintenance" || b.status === "Cleaning").length ?? 0;
+  const statsOccupiedBeds = allBedsForStats?.beds.filter((b) => b.status === "Occupied" || (b.isOccupied && b.patient)).length ?? 0;
+  const statsAvailableBeds = allBedsForStats?.beds.filter((b) => b.status === "Available" && !b.patient).length ?? (statsTotalBeds - statsOccupiedBeds);
+  const statsMaintenanceBeds = allBedsForStats?.beds.filter((b) => b.status === "Maintenance" || b.status === "Cleaning" || b.status === "Blocked").length ?? 0;
   const occupancyPercentage = statsTotalBeds > 0 ? ((statsOccupiedBeds / statsTotalBeds) * 100).toFixed(1) : "0.0";
 
   // Mutations
@@ -185,7 +185,7 @@ export function BedsPage() {
 
   // ── Bed Status Handlers ─────────────────────────────────────
   const handleToggleBedBlock = async (bed: BedInfo) => {
-    if (bed.status === "Occupied" || bed.isOccupied) {
+    if (bed.status === "Occupied" || (bed.patient && bed.isOccupied)) {
       toast.error("Occupied bed cannot be blocked.");
       return;
     }
@@ -199,7 +199,7 @@ export function BedsPage() {
   };
 
   const handleMarkCleaning = async (bed: BedInfo) => {
-    if (bed.status === "Occupied" || bed.isOccupied) {
+    if (bed.status === "Occupied" || (bed.patient && bed.isOccupied)) {
       toast.error("Cannot mark occupied bed as cleaning.");
       return;
     }

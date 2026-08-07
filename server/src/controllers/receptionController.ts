@@ -1,3 +1,4 @@
+import { BillingService } from "../services/billingService";
 import { Request, Response } from "express";
 import { z } from "zod";
 import { catchAsync } from "../utils/catchAsync";
@@ -441,66 +442,22 @@ export const getAuditLogs = catchAsync(async (req: Request, res: Response) => {
 
 /**
  * GET /reception/billing/pending-invoices
- * Returns pending invoices using the SAME query as getStats pendingPayments count.
+ * Returns pending invoices using BillingService (Single Source of Truth).
  * Dashboard card count == table row count.
  */
 export const getPendingInvoices = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as any;
 
-  // 1. Fetch pending OP invoices
-  const rawInvoices = await Invoice.find({ hospital: hospitalId, status: { $in: ["pending", "partially_paid"] } })
-    .populate("patient", "name uhid phone")
-    .sort({ createdAt: -1 });
+  const result = await BillingService.getPendingInvoices(hospitalId, { limit: 1000 });
 
-  const invoices: any[] = [];
-  for (const inv of rawInvoices) {
-    const payments = await Payment.find({ invoice: inv._id, hospital: hospitalId });
-    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-    const remainingBalance = Math.max(0, inv.totals.total - totalPaid);
-
-    if (inv.totals.patientBalance !== remainingBalance || (remainingBalance === 0 && inv.status !== "paid") || (remainingBalance > 0 && inv.status === "pending" && totalPaid > 0)) {
-      inv.totals.patientBalance = remainingBalance;
-      if (remainingBalance === 0) {
-        inv.status = "paid";
-      } else if (totalPaid > 0) {
-        inv.status = "partially_paid";
-      }
-      await inv.save();
+  res.json({
+    status: "success",
+    data: {
+      invoices: result.invoices,
+      total: result.pagination.total,
+      summary: result.summary,
     }
-
-    if (remainingBalance > 0) {
-      invoices.push(inv);
-    }
-  }
-
-  // 2. Fetch pending IP bills
-  const ipBills = await IPBill.find({ hospital: hospitalId, status: "Generated", outstanding: { $gt: 0 } })
-    .populate("patient", "name uhid phone")
-    .populate("admission")
-    .sort({ createdAt: -1 });
-
-  // Map IP bills to conformed invoice structure
-  const mappedIpBills = ipBills.map(bill => {
-    return {
-      _id: bill._id,
-      patient: bill.patient,
-      issuedAt: bill.billingDate || (bill as any).createdAt,
-      billingType: "IP",
-      totals: {
-        subtotal: bill.grandTotal,
-        taxAmount: bill.taxRate,
-        total: bill.grandTotal,
-        patientBalance: bill.outstanding
-      },
-      status: "partially_paid",
-      outstanding: bill.outstanding,
-      admission: bill.admission
-    };
   });
-
-  const combined = [...invoices, ...mappedIpBills];
-
-  res.json({ status: "success", data: { invoices: combined, total: combined.length } });
 });
 
 /**

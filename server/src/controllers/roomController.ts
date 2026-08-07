@@ -57,7 +57,7 @@ export const listRooms = catchAsync(async (req: Request, res: Response) => {
       bedsMap[rId] = { totalBeds: 0, occupiedBeds: 0, availableBeds: 0 };
     }
     bedsMap[rId].totalBeds += 1;
-    if (b.isOccupied || b.status === "Occupied") {
+    if (b.status === "Occupied") {
       bedsMap[rId].occupiedBeds += 1;
     } else if (b.status === "Available") {
       bedsMap[rId].availableBeds += 1;
@@ -98,7 +98,7 @@ export const getRoom = catchAsync(async (req: Request, res: Response) => {
   }
 
   const beds = await Bed.find({ ...req.hospitalFilter, room: id }).select("status isOccupied").lean();
-  const occupiedCount = beds.filter((b) => b.isOccupied || b.status === "Occupied").length;
+  const occupiedCount = beds.filter((b) => b.status === "Occupied").length;
   const actualCapacity = room.capacity || beds.length || 1;
 
   res.json({
@@ -330,7 +330,7 @@ export const updateRoom = catchAsync(async (req: Request, res: Response) => {
     }
 
     const existingBeds = await Bed.find({ ...req.hospitalFilter, room: id });
-    const occupiedCount = existingBeds.filter((b) => b.isOccupied || b.status === "Occupied").length;
+    const occupiedCount = existingBeds.filter((b) => b.status === "Occupied").length;
 
     if (newCap < occupiedCount) {
       throw new AppError(

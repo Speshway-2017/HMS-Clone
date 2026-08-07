@@ -154,7 +154,7 @@ export const getDoctor = catchAsync(async (req: Request, res: Response) => {
   // Fetch all appointments for this doctor populated with patient details
   const appointments = await Appointment.find({ doctor: doctor._id })
     .populate("patient", "name uhid age gender phone email")
-    .sort({ date: -1, timeSlot: -1 });
+    .sort({ date: -1, time: -1 });
 
   const appointmentIds = appointments.map(app => app._id);
 
