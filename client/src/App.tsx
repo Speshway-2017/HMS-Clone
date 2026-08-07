@@ -4,6 +4,7 @@ import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "./context/AuthContext";
 import { BranchProvider } from "./context/BranchContext";
 import { router } from "./router";
+import { useSocketSync } from "./hooks/useSocketSync";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -21,16 +22,24 @@ const queryClient = new QueryClient({
   },
 });
 
+function SocketSyncWrapper({ children }: { children: React.ReactNode }) {
+  useSocketSync();
+  return <>{children}</>;
+}
+
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BranchProvider>
-          <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
-          <RouterProvider router={router} />
+          <SocketSyncWrapper>
+            <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
+            <RouterProvider router={router} />
+          </SocketSyncWrapper>
         </BranchProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
 }
+
 

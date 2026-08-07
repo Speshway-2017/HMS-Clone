@@ -252,7 +252,7 @@ export function PendingOverduePage() {
     return () => clearTimeout(searchTimer.current);
   }, [search, uhid]);
 
-  const { data, isLoading, refetch } = usePendingOverdue({
+  const { data, isLoading, isError, refetch } = usePendingOverdue({
     page, limit: 20,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
@@ -492,6 +492,18 @@ export function PendingOverduePage() {
           <div className="flex items-center justify-center py-20 text-slate-400">
             <RefreshCw className="h-6 w-6 animate-spin mr-2" />
             <span className="text-sm font-semibold">Loading pending invoices...</span>
+          </div>
+        ) : isError ? (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+            <AlertCircle className="h-10 w-10 text-red-500 mb-2" />
+            <p className="text-sm font-bold text-slate-700">Failed to load pending invoices</p>
+            <p className="text-xs text-slate-400 mt-1 mb-4">An error occurred while fetching invoice records.</p>
+            <button
+              onClick={() => refetch()}
+              className="px-4 py-2 text-xs font-bold text-white bg-navy-700 hover:bg-navy-800 rounded-xl transition"
+            >
+              Try Again
+            </button>
           </div>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-400">

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { cloudinary } from "../config/cloudinary";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
+import { emitToHospital, broadcastGlobal } from "../config/socket";
 
 const ALLOWED_FOLDERS = new Set(["hospital-logos", "hospital-licenses", "admin-avatars", "doctor-photos", "staff-photos", "blog-covers"]);
 
@@ -26,8 +27,25 @@ export const uploadFile = catchAsync(async (req: Request, res: Response) => {
     stream.end(req.file!.buffer);
   });
 
+  const uploadPayload = {
+    url: result.secure_url,
+    publicId: result.public_id,
+    resourceType: result.resource_type,
+    folder,
+    uploadedBy: req.user?._id || null,
+    uploadedAt: new Date().toISOString()
+  };
+
+  const hospitalId = (req as any).hospitalFilter?.hospital || req.user?.hospital;
+  if (hospitalId) {
+    emitToHospital(hospitalId, "file_uploaded", uploadPayload);
+  } else {
+    broadcastGlobal("file_uploaded", uploadPayload);
+  }
+
   res.status(201).json({
     status: "success",
-    data: { url: result.secure_url, publicId: result.public_id, resourceType: result.resource_type },
+    data: uploadPayload,
   });
 });
+
