@@ -1,3 +1,4 @@
+import toast from "react-hot-toast";
 import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -127,7 +128,10 @@ export function OPManagementPage() {
   };
 
   const handleRedirectToWorkspace = async (targetTab: "overview" | "prescription", forceStatusUpdate = false) => {
-    if (!selectedAppt) return;
+    if (!selectedAppt) {
+      toast.error("Please select a patient from the OP Queue first.");
+      return;
+    }
     
     let activeTab: "overview" | "prescription" | "history" = targetTab;
     if (selectedAppt.status === "completed") {
@@ -154,32 +158,9 @@ export function OPManagementPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">OP Management</h1>
-          <p className="text-sm text-slate-500">Outpatient queue, consultations, prescriptions and follow-ups.</p>
-        </div>
-        <div className="flex gap-2 bg-white p-1 rounded-lg border border-slate-200">
-          {(["queue", "consultation", "prescription"] as View[]).map((v) => (
-            <button
-              key={v}
-              onClick={() => {
-                if (v === "queue") {
-                  setActiveView("queue");
-                } else if (v === "consultation") {
-                  handleRedirectToWorkspace("overview");
-                } else if (v === "prescription") {
-                  handleRedirectToWorkspace("prescription");
-                }
-              }}
-              className={`rounded-lg px-4 py-2 text-sm font-medium capitalize transition-colors ${
-                activeView === v ? "bg-navy-700 text-white" : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              {v === "queue" ? "OP Queue" : v === "consultation" ? "Consultation" : "Prescription"}
-            </button>
-          ))}
-        </div>
+      <div>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">OP Management</h1>
+        <p className="text-xs sm:text-sm text-slate-500">Outpatient queue, consultations, prescriptions and follow-ups.</p>
       </div>
 
       {appointments.length === 0 ? (
@@ -207,12 +188,12 @@ export function OPManagementPage() {
                         className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
                       />
                     </div>
-                    <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
+                    <div className="flex gap-1 bg-slate-100 p-1 rounded-lg overflow-x-auto max-w-full scrollbar-none flex-nowrap shrink-0">
                       {["today", "waiting", "in_progress", "scheduled", "completed", "cancelled", "missed"].map((s) => (
                         <button
                           key={s}
                           onClick={() => setStatusFilter(s)}
-                          className={`rounded-md px-3 py-1.5 text-xs font-semibold capitalize transition-all ${
+                          className={`rounded-md px-2.5 sm:px-3 py-1.5 text-xs font-semibold capitalize transition-all whitespace-nowrap ${
                             statusFilter === s ? "bg-white text-navy-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
                           }`}
                         >

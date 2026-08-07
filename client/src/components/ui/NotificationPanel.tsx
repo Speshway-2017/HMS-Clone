@@ -442,7 +442,9 @@ export function NotificationPanel() {
         toast.custom((t) => (
           <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-slate-900 text-white shadow-2xl rounded-2xl pointer-events-auto p-4 border border-slate-700 flex flex-col gap-2`}>
             <div className="flex items-start gap-3">
-              <div className="h-8 w-8 rounded-xl bg-navy-600 flex items-center justify-center font-bold shrink-0">🔔</div>
+              <div className="h-8 w-8 rounded-xl bg-navy-600 flex items-center justify-center font-bold shrink-0">
+                <Bell className="h-4 w-4 text-white" />
+              </div>
               <div>
                 <p className="text-xs font-extrabold uppercase text-navy-200">{notif.title}</p>
                 <p className="text-xs text-slate-300 mt-0.5">{notif.message}</p>
@@ -562,7 +564,7 @@ export function NotificationPanel() {
 
       {/* Popover Card */}
       {open && (
-        <div className="absolute right-0 top-11 z-50 w-80 sm:w-96 rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="fixed top-14 left-3 right-3 sm:absolute sm:top-11 sm:left-auto sm:right-0 sm:w-96 z-[100] w-auto rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 bg-white">
             <div className="flex items-center gap-2">

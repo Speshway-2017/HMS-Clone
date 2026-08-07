@@ -47,75 +47,8 @@ export function RadiologyPage() {
     return "X-Ray";
   };
 
-  const DEFAULT_SAMPLE_RADIOLOGY = [
-    {
-      id: "RAD-XR-101",
-      type: "X-Ray",
-      patient: "Rajesh Kumar Sharma",
-      age: 45,
-      date: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
-      region: "Chest PA View — Digital Radiograph",
-      status: "completed",
-      priority: "urgent",
-      finding: "Clear lung fields bilaterally. Normal cardiac silhouette. No pleural effusion or pneumothorax identified.",
-      impression: "Normal digital chest radiograph.",
-      radiologist: "Dr. K. Nair (Radiology Specialist)",
-      approved: true,
-      files: [],
-      reportId: "REP-XR-8801",
-    },
-    {
-      id: "RAD-XR-102",
-      type: "X-Ray",
-      patient: "Priya Venkatesh",
-      age: 32,
-      date: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
-      region: "Lumbar Spine AP & Lateral View",
-      status: "completed",
-      priority: "routine",
-      finding: "Mild lumbar lordosis present. L4-L5 intervertebral disc space narrowing observed without acute bone fracture.",
-      impression: "L4-L5 early degenerative spondylosis.",
-      radiologist: "Dr. K. Nair (Radiology Specialist)",
-      approved: true,
-      files: [],
-      reportId: "REP-XR-8802",
-    },
-    {
-      id: "RAD-CT-103",
-      type: "CT Scan",
-      patient: "Mohammed Farooq",
-      age: 50,
-      date: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
-      region: "High-Resolution CT Brain (NCCT)",
-      status: "completed",
-      priority: "emergency",
-      finding: "No acute intracranial hemorrhage or midline shift. Ventricles and sulci normal for age.",
-      impression: "Unremarkable CT brain non-contrast study.",
-      radiologist: "Dr. S. Mehta (Chief Radiologist)",
-      approved: true,
-      files: [],
-      reportId: "REP-CT-9901",
-    },
-    {
-      id: "RAD-US-104",
-      type: "Ultrasound",
-      patient: "Kavita Reddy",
-      age: 36,
-      date: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
-      region: "USG Whole Abdomen & Pelvis",
-      status: "completed",
-      priority: "routine",
-      finding: "Liver normal size with mild fatty infiltration (Grade 1). Gallbladder, pancreas, spleen, and both kidneys normal.",
-      impression: "Grade 1 Fatty Liver. Other abdominal organs normal.",
-      radiologist: "Dr. K. Nair (Radiology Specialist)",
-      approved: true,
-      files: [],
-      reportId: "REP-US-4401",
-    }
-  ];
-
   // Construct dynamic radiology reports from database patient orders
-  const dbReports = orders.map((o: any) => {
+  const radiologyReports = orders.map((o: any) => {
     const isCompleted = o.status === "completed";
     const reportUploaded = o.status === "report_uploaded" || o.status === "verified" || o.status === "completed";
     const type = normalizeModality(o.type);
@@ -131,14 +64,12 @@ export function RadiologyPage() {
       priority: o.priority?.toLowerCase() || "routine",
       finding: o.report?.observations || (reportUploaded ? "Report uploaded. Review documents below." : "Pending review by radiologist."),
       impression: o.report?.remarks || (reportUploaded ? "Report uploaded. Review remarks." : "Pending."),
-      radiologist: o.report?.uploadedBy?.name || "Dr. K. Nair",
+      radiologist: o.report?.uploadedBy?.name || (o.doctor?.name ? `Dr. ${o.doctor.name}` : "Radiologist"),
       approved: isCompleted || o.status === "verified",
       files: o.report?.files || [],
       reportId: o.report?._id || "",
     };
   });
-
-  const radiologyReports = dbReports.length > 0 ? dbReports : DEFAULT_SAMPLE_RADIOLOGY;
 
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const selectedReport = radiologyReports.find((r) => r.id === selectedReportId) || null;
@@ -179,7 +110,7 @@ export function RadiologyPage() {
       ) : (
         <>
           {/* KPIs */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard label="Total Studies"  value={counts.total}    icon={<ScanLine className="h-5 w-5" />} emphasis />
             <KpiCard label="Abnormal"       value={counts.abnormal} icon={<AlertTriangle className="h-5 w-5" />} />
             <KpiCard label="Pending Review" value={counts.pending}  icon={<Clock className="h-5 w-5" />} />
@@ -187,12 +118,12 @@ export function RadiologyPage() {
           </div>
 
           {/* Modality Filter */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2 overflow-x-auto max-w-full scrollbar-none flex-nowrap shrink-0">
             {MODALITIES.map((m) => (
               <button
                 key={m}
                 onClick={() => setActiveModality(m)}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap ${
                   activeModality === m ? "bg-navy-700 text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
               >

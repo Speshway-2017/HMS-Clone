@@ -906,10 +906,10 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
 
       {/* Consultation Header */}
       {!isEmbedded && (
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm">
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold text-slate-900">Consultation Workspace</h1>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <h1 className="text-lg sm:text-xl font-bold text-slate-900">Consultation Workspace</h1>
               <Badge tone={isCompleted ? "success" : appointment.status === "in_consultation" ? "warning" : "info"}>
                 {isCompleted ? "Completed" : appointment.status === "in_consultation" ? "In Progress" : (appointment.status || "").toUpperCase()}
               </Badge>
@@ -920,12 +920,12 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                 </span>
               )}
             </div>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">
               Attending Patient: <span className="font-semibold text-slate-700">{patient.name}</span> (UHID: {patient.uhid})
             </p>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 w-full md:w-auto">
             {!isCompleted && appointment.status === "checked_in" && (
               <Button variant="primary" onClick={handleStartConsultation} disabled={startConsultationMutation.isPending}>
                 Start Consultation
@@ -1011,7 +1011,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
         {/* Right column: Workspace Tabs & Details */}
         <div className="xl:col-span-3 space-y-6">
           {/* Tabs navigation */}
-          <div className="flex bg-slate-100 p-1 rounded-lg w-full overflow-x-auto gap-1">
+          <div className="flex bg-slate-100 p-1 rounded-lg w-full overflow-x-auto gap-1 scrollbar-none flex-nowrap shrink-0">
             {([
               { key: "overview", label: "Overview", icon: <User className="h-3.5 w-3.5" /> },
               { key: "history", label: "History", icon: <History className="h-3.5 w-3.5" /> },
