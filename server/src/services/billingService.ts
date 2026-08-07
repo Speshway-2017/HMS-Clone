@@ -70,7 +70,6 @@ export class BillingService {
     // 1. FETCH OP INVOICES
     // ─────────────────────────────────────────────────────────────
     const opFilter: Record<string, any> = { hospital: hospitalId };
-    opFilter.status = { $in: ["pending", "partially_paid", "overdue"] };
     if (branch) opFilter.branch = branch;
     if (billingType && billingType.toUpperCase() !== "IP") {
       opFilter.billingType = billingType.toUpperCase();
@@ -94,6 +93,14 @@ export class BillingService {
         select: "doctor department",
         populate: [
           { path: "doctor", select: "name specialization" },
+          { path: "department", select: "name" }
+        ]
+      })
+      .populate({
+        path: "admission",
+        select: "admittingDoctor department",
+        populate: [
+          { path: "admittingDoctor", select: "name specialization" },
           { path: "department", select: "name" }
         ]
       })
@@ -142,6 +149,8 @@ export class BillingService {
 
       const docFromAppt = (inv.appointment as any)?.doctor;
       const deptFromAppt = (inv.appointment as any)?.department;
+      const docFromAdm = (inv.admission as any)?.admittingDoctor;
+      const deptFromAdm = (inv.admission as any)?.department;
       const docFromProv = inv.provisionalData?.doctorId;
       const deptFromProv = inv.provisionalData?.departmentId;
 
@@ -149,8 +158,8 @@ export class BillingService {
         _id: inv._id,
         invoiceNo: inv._id.toString().slice(-8).toUpperCase(),
         patient: inv.patient,
-        doctor: docFromAppt || docFromProv || null,
-        department: deptFromAppt || deptFromProv || null,
+        doctor: docFromAppt || docFromAdm || docFromProv || null,
+        department: deptFromAppt || deptFromAdm || deptFromProv || null,
         billingType: inv.billingType || "OP",
         issuedAt: inv.issuedAt || (inv as any).createdAt,
         dueDate: inv.dueDate || null,
@@ -180,8 +189,7 @@ export class BillingService {
     if (includeIP) {
       const ipFilter: Record<string, any> = {
         hospital: hospitalId,
-        status: { $in: ["Generated", "Draft", "Partially Paid", "pending"] },
-        outstanding: { $gt: 0 }
+        status: { $ne: "Cancelled" }
       };
       if (branch) ipFilter.branch = branch;
       if (dateFrom || dateTo) {
@@ -198,9 +206,9 @@ export class BillingService {
         .populate("patient", "name uhid phone age gender email bloodGroup")
         .populate({
           path: "admission",
-          select: "doctor department ward room bed",
+          select: "admittingDoctor department ward room bed",
           populate: [
-            { path: "doctor", select: "name specialization" },
+            { path: "admittingDoctor", select: "name specialization" },
             { path: "department", select: "name" }
           ]
         })
@@ -222,7 +230,7 @@ export class BillingService {
         if (outstanding === 0) continue;
 
         const admission = bill.admission as any;
-        const docFromAdm = admission?.doctor;
+        const docFromAdm = admission?.admittingDoctor;
         const deptFromAdm = admission?.department;
 
         let derivedStatus: "pending" | "partially_paid" | "overdue" | "paid" = "pending";

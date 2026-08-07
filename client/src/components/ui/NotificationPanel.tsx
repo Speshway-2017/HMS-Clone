@@ -121,7 +121,7 @@ function NotificationItem({
   notification: AppNotification;
   isRead: boolean;
   pinned: boolean;
-  onNavigate: (link: string) => void;
+  onNavigate: (link: string, id?: string) => void;
   onDelete: (id: string) => Promise<void>;
   onMarkRead?: (id: string) => void;
   onTogglePin: (id: string) => void;
@@ -203,7 +203,7 @@ function NotificationItem({
       ) : (
         /* Regular Notification Card Row */
         <div
-          onClick={() => onNavigate(notification.link)}
+          onClick={() => onNavigate(notification.link, notification.id)}
           className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-slate-100/60 cursor-pointer group transition-colors"
         >
           {/* Icon */}
@@ -273,18 +273,36 @@ function NotificationItem({
 
 export function NotificationPanel() {
   const [open, setOpen] = useState(false);
-  const [readIds, setReadIds] = useState<Set<string>>(new Set());
-  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  const panelRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const userId = user?.id || (user as any)?._id || "user";
+
+  const [readIds, setReadIds] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem(`hms_read_notifs_${userId}`);
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem(`hms_deleted_notifs_${userId}`);
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
   const [showPinnedSection, setShowPinnedSection] = useState(false);
   const [showAllSection, setShowAllSection] = useState(true);
 
   const pinnedLengthRef = useRef(0);
   const unpinnedLengthRef = useRef(0);
-
-  const panelRef = useRef<HTMLDivElement>(null);
-  const navigate = useNavigate();
-  const { user } = useAuth();
 
   // Conditionally load nurse notifications count
   const isNurse = user?.role === "nurse";
@@ -470,13 +488,31 @@ export function NotificationPanel() {
   }, [user, navigate]);
 
   function handleMarkAllRead() {
-    setReadIds(new Set(notifications.map((n) => n.id)));
+    const allIds = notifications.map((n) => n.id);
+    setReadIds((prev) => {
+      const next = new Set([...prev, ...allIds]);
+      try {
+        localStorage.setItem(`hms_read_notifs_${userId}`, JSON.stringify(Array.from(next)));
+      } catch (_) {}
+      return next;
+    });
     if (isNurse) {
       nurseMarkAllReadMutation.mutate();
     }
   }
 
-  function handleNavigate(link: string) {
+  function handleNavigate(link: string, id?: string) {
+    if (id) {
+      setReadIds((prev) => {
+        const next = new Set(prev);
+        next.add(id);
+        try {
+          localStorage.setItem(`hms_read_notifs_${userId}`, JSON.stringify(Array.from(next)));
+        } catch (_) {}
+        return next;
+      });
+    }
+
     let targetLink = link;
 
     if (user?.role === "nurse" && link.includes("/doctor/ip-management")) {
@@ -490,17 +526,20 @@ export function NotificationPanel() {
   }
 
   const handleDeleteNotification = async (id: string) => {
-    setDeletedIds((prev) => new Set([...prev, id]));
+    setDeletedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      try {
+        localStorage.setItem(`hms_deleted_notifs_${userId}`, JSON.stringify(Array.from(next)));
+      } catch (_) {}
+      return next;
+    });
+
     if (!isNurse) {
       try {
         await deleteNotifMutation.mutateAsync(id);
       } catch (e) {
-        setDeletedIds((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-        throw e;
+        console.error("Failed to delete notification on server:", e);
       }
     }
   };
