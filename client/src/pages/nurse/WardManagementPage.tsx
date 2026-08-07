@@ -12,18 +12,29 @@ export function WardManagementPage() {
 
   const metrics = useMemo(() => {
     const totalBeds = beds.length;
-    const occupied = beds.filter((b: any) => b.status === "occupied").length;
-    const available = beds.filter((b: any) => b.status === "available").length;
-    const maintenance = beds.filter((b: any) => b.status === "maintenance" || b.status === "cleaning").length;
+    const occupied = beds.filter((b: any) => {
+      const st = (b.status || "").toLowerCase();
+      return st === "occupied" || b.isOccupied === true;
+    }).length;
+    const available = beds.filter((b: any) => {
+      const st = (b.status || "").toLowerCase();
+      return (st === "available" || st === "active") && !b.isOccupied;
+    }).length;
+    const maintenance = beds.filter((b: any) => {
+      const st = (b.status || "").toLowerCase();
+      return st === "maintenance" || st === "cleaning" || st === "blocked";
+    }).length;
 
     return { totalBeds, occupied, available, maintenance };
   }, [beds]);
 
   const filteredBeds = useMemo(() => {
     return beds.filter((b: any) => {
-      const bNum = b.bedNumber || "";
+      const bNum = b.bedCode || b.bedNumber || "";
       const wardName = b.ward?.name || b.wardName || "";
-      const matchesSearch = bNum.toLowerCase().includes(searchTerm.toLowerCase()) || wardName.toLowerCase().includes(searchTerm.toLowerCase());
+      const roomNum = b.room?.roomNumber || b.roomNumber || "";
+      const query = searchTerm.toLowerCase();
+      const matchesSearch = bNum.toLowerCase().includes(query) || wardName.toLowerCase().includes(query) || roomNum.toLowerCase().includes(query);
       const matchesWard = selectedWard === "all" || wardName.toLowerCase() === selectedWard.toLowerCase();
       return matchesSearch && matchesWard;
     });
@@ -32,7 +43,7 @@ export function WardManagementPage() {
   const columns: Column<any>[] = [
     {
       header: "Bed ID",
-      render: (row) => <span className="font-bold text-navy-900">{row.bedNumber || "Bed ID"}</span>,
+      render: (row) => <span className="font-bold text-navy-900">{row.bedCode || row.bedNumber || "Bed ID"}</span>,
     },
     {
       header: "Ward Name",
@@ -40,19 +51,49 @@ export function WardManagementPage() {
     },
     {
       header: "Room Number",
-      render: (row) => <span className="text-xs font-mono text-slate-600">Room {row.room?.roomNumber || row.roomNumber || "101"}</span>,
+      render: (row) => <span className="text-xs font-mono text-slate-600">Room {row.room?.roomNumber || row.roomNumber || "N/A"}</span>,
     },
     {
       header: "Occupancy Status",
-      render: (row) => (
-        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${row.status === 'occupied' ? 'bg-purple-50 text-purple-700' : row.status === 'available' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-          {row.status === 'occupied' ? 'Occupied' : row.status === 'available' ? 'Available' : 'Maintenance'}
-        </span>
-      ),
+      render: (row) => {
+        const rawStatus = (row.status || "").toLowerCase();
+        const isOccupied = rawStatus === "occupied" || row.isOccupied === true;
+        const isCleaning = rawStatus === "cleaning";
+        const isMaintenance = rawStatus === "maintenance" || rawStatus === "blocked";
+        const isAvailable = (rawStatus === "available" || rawStatus === "active") && !row.isOccupied;
+
+        let label = "Available";
+        let colorClass = "bg-emerald-50 text-emerald-700 border border-emerald-200";
+
+        if (isOccupied) {
+          label = "Occupied";
+          colorClass = "bg-purple-50 text-purple-700 border border-purple-200";
+        } else if (isCleaning) {
+          label = "Cleaning";
+          colorClass = "bg-blue-50 text-blue-700 border border-blue-200";
+        } else if (isMaintenance) {
+          label = "Maintenance";
+          colorClass = "bg-amber-50 text-amber-700 border border-amber-200";
+        } else if (isAvailable) {
+          label = "Available";
+          colorClass = "bg-emerald-50 text-emerald-700 border border-emerald-200";
+        } else {
+          label = row.status || "Available";
+        }
+
+        return (
+          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-extrabold uppercase tracking-wider ${colorClass}`}>
+            {label}
+          </span>
+        );
+      },
     },
     {
       header: "Daily Bed Tariff",
-      render: (row) => <span className="text-xs font-bold text-slate-700">₹{row.dailyRate || row.pricePerDay || 1500}/day</span>,
+      render: (row) => {
+        const tariff = row.room?.tariff?.roomChargePerDay || row.dailyRate || row.pricePerDay || 1500;
+        return <span className="text-xs font-bold text-slate-700">₹{tariff}/day</span>;
+      },
     },
   ];
 

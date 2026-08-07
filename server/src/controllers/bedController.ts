@@ -35,7 +35,7 @@ export const listBeds = catchAsync(async (req: Request, res: Response) => {
   const [beds, total] = await Promise.all([
     Bed.find(query)
       .populate("ward", "name code")
-      .populate("room", "roomNumber roomName")
+      .populate("room", "roomNumber roomName roomType tariff capacity")
       .populate("patient", "name uhid patientCode phone")
       .populate("admission", "admissionNumber admissionDate status")
       .sort({ bedNumber: 1 })
