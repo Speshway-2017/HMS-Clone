@@ -77,7 +77,7 @@ export function PerformancePage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard label="Completed Consults" value={totalCompleted} icon={<Users className="h-5 w-5" />} emphasis />
         <KpiCard label="Avg. Rating" value={`${ratingValue} ★`} icon={<Star className="h-5 w-5" />} />
         <KpiCard label="Upcoming Consults" value={totalUpcoming} icon={<Clock className="h-5 w-5" />} />

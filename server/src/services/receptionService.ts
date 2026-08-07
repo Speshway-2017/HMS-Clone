@@ -625,6 +625,26 @@ export class ReceptionService {
     const patientRecord = await Patient.findById(patientId);
     const patientName = patientRecord ? patientRecord.name : "Patient";
 
+    // Notify assigned doctor of new appointment booking
+    try {
+      await createDoctorNotification({
+        hospital: hospitalId,
+        title: "New Patient Assigned",
+        message: `Patient ${patientName} (${referenceId}) booked an appointment with you for ${bookingDateStr} at ${time}.`,
+        type: "appointment",
+        severity: "info",
+        recipientDoctor: doctorId,
+        link: "/doctor/op-management",
+        data: {
+          appointmentId: newAppointment._id.toString(),
+          referenceId,
+          patientName,
+        }
+      });
+    } catch (err) {
+      console.error("Failed to notify doctor of new appointment booking:", err);
+    }
+
     let tokenNumber = "N/A";
     let queueNumber = "N/A";
     let queueRecord = null;
@@ -1029,6 +1049,28 @@ export class ReceptionService {
           } else {
             appointment.status = "scheduled";
             await appointment.save({ session });
+          }
+        }
+
+        if (appointment) {
+          try {
+            const docId = provisionalData?.doctorId || (appointment.doctor as any)?._id || appointment.doctor;
+            const patName = (invoice.patient as any)?.name || "Patient";
+            await createDoctorNotification({
+              hospital: hospitalId,
+              title: "OP Patient Checked In",
+              message: `OP patient ${patName} checked in and is waiting in your queue (Token: ${tokenNumber || "N/A"}).`,
+              type: "appointment",
+              severity: "info",
+              recipientDoctor: docId,
+              link: "/doctor/op-management",
+              data: {
+                appointmentId: appointment._id.toString(),
+                tokenNumber,
+              }
+            });
+          } catch (err) {
+            console.error("Failed to send doctor notification on payment check-in:", err);
           }
         }
       }

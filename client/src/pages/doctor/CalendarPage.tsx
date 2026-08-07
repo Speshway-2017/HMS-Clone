@@ -88,11 +88,11 @@ export function CalendarPage() {
 
       {/* Navigation & Header */}
       <Card className="flex items-center justify-between p-4 bg-white border border-slate-200 shadow-sm rounded-xl">
-        <button onClick={handlePrev} className="p-2 hover:bg-slate-50 rounded-lg transition-colors border border-slate-200">
+        <button onClick={handlePrev} className="p-2 hover:bg-slate-50 rounded-lg transition-colors border border-slate-200 shrink-0">
           <ChevronLeft className="h-4 w-4 text-slate-600" />
         </button>
-        <h2 className="text-base font-bold text-slate-800">{formatHeader()}</h2>
-        <button onClick={handleNext} className="p-2 hover:bg-slate-50 rounded-lg transition-colors border border-slate-200">
+        <h2 className="text-xs sm:text-base font-bold text-slate-800 text-center mx-2">{formatHeader()}</h2>
+        <button onClick={handleNext} className="p-2 hover:bg-slate-50 rounded-lg transition-colors border border-slate-200 shrink-0">
           <ChevronRight className="h-4 w-4 text-slate-600" />
         </button>
       </Card>

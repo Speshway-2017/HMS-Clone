@@ -208,7 +208,7 @@ export function TelemedicinePage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard label="Total Sessions" value={allTeleConsultations.length} icon={<Video className="h-5 w-5 text-indigo-600" />} emphasis />
         <KpiCard label="In Call" value={activeQueue.filter((t) => t.status === "in_call").length} icon={<Phone className="h-5 w-5 text-emerald-600" />} />
         <KpiCard label="Waiting" value={activeQueue.filter((t) => t.status === "waiting").length} icon={<Clock className="h-5 w-5 text-amber-600" />} />
@@ -219,10 +219,10 @@ export function TelemedicinePage() {
       <Card className="p-5 border border-slate-200 bg-white shadow-sm rounded-2xl space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
           {/* Sub Tabs: Active Queue vs Completed */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto max-w-full scrollbar-none flex-nowrap shrink-0">
             <button
               onClick={() => setQueueTab("active")}
-              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
                 queueTab === "active"
                   ? "bg-navy-700 text-white shadow"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"

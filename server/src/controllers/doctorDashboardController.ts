@@ -1295,11 +1295,22 @@ export const getMyLabOrderById = catchAsync(async (req: Request, res: Response) 
     throw new AppError("You do not have access to this laboratory order.", 403);
   }
 
-  // Find the associated DiagnosticReport if one exists
-  const report = await DiagnosticReport.findOne({
-    requestId: order._id,
-    hospital: hospitalId
-  }).populate("uploadedBy", "name");
+  // Find all associated DiagnosticReport documents for this order / appointment
+  const reportFilter: any = { hospital: hospitalId };
+  if (order.appointment) {
+    reportFilter.$or = [
+      { requestId: order._id },
+      { appointment: order.appointment }
+    ];
+  } else {
+    reportFilter.requestId = order._id;
+  }
+
+  const reports = await DiagnosticReport.find(reportFilter)
+    .populate("uploadedBy", "name")
+    .sort({ uploadedAt: -1, createdAt: -1 });
+
+  const primaryReport = reports[0] || null;
 
   // Audit log — authorised access to individual lab report
   if (req.user) {
@@ -1317,11 +1328,12 @@ export const getMyLabOrderById = catchAsync(async (req: Request, res: Response) 
         doctorId: doctorObjId.toString(),
         patientId: patient?._id?.toString() ?? null,
         labOrderStatus: order.status,
+        reportsCount: reports.length,
       },
     });
   }
 
-  res.json({ status: "success", data: { order, report } });
+  res.json({ status: "success", data: { order, reports, report: primaryReport } });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

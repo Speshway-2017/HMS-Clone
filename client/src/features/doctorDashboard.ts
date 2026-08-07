@@ -942,7 +942,7 @@ export function useDoctorLabOrderById(labOrderId: string | null | undefined) {
     queryKey: ["doctorDashboard", "myLabOrders", labOrderId],
     enabled: !!labOrderId,
     queryFn: async () => {
-      const res = await api.get<{ status: string; data: { order: LabOrder; report?: any } }>(
+      const res = await api.get<{ status: string; data: { order: LabOrder; report?: any; reports?: any[] } }>(
         `/doctors/dashboard/my-lab-orders/${labOrderId}`,
       );
       return res.data.data;

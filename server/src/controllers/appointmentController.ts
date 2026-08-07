@@ -13,6 +13,7 @@ import { emitToHospital } from "../config/socket";
 import { logAudit } from "../utils/auditLogger";
 import { validateAppointmentTimeRestriction } from "../utils/appointmentTimeValidation";
 import { AppointmentSlotService } from "../services/appointmentSlotService";
+import { createDoctorNotification } from "../utils/notificationHelper";
 
 async function generateReferenceId(hospitalId: string, bookingDate: Date): Promise<string> {
   const dateStr = bookingDate.toISOString().split("T")[0].replace(/-/g, "");
@@ -288,6 +289,23 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
   }
 
   emitToHospital(hospitalId.toString(), "appointment_created", { appointmentId: appointment._id, referenceId });
+
+  try {
+    const patDoc = await Patient.findById(body.patient);
+    const patName = patDoc ? patDoc.name : "Patient";
+    await createDoctorNotification({
+      hospital: hospitalId,
+      title: "New Patient Appointment",
+      message: `New appointment booked for ${patName} (${referenceId}) on ${new Date(body.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} at ${body.time}.`,
+      type: "appointment",
+      severity: "info",
+      recipientDoctor: body.doctor,
+      link: "/doctor/op-management",
+      data: { appointmentId: appointment._id.toString(), referenceId }
+    });
+  } catch (err) {
+    console.error("Failed to create doctor notification for appointment:", err);
+  }
 
   await logAudit({
     req,

@@ -47,9 +47,8 @@ export function RadiologyPage() {
     return "X-Ray";
   };
 
-
-  // Construct dynamic radiology reports from database patient orders only — no dummy data
-  const dbReports = orders.map((o: any) => {
+  // Construct dynamic radiology reports from database patient orders
+  const radiologyReports = orders.map((o: any) => {
     const isCompleted = o.status === "completed";
     const reportUploaded = o.status === "report_uploaded" || o.status === "verified" || o.status === "completed";
     const type = normalizeModality(o.type);
@@ -66,7 +65,7 @@ export function RadiologyPage() {
       priority: o.priority?.toLowerCase() || "routine",
       finding: o.report?.observations || (reportUploaded ? "Report uploaded. Review documents below." : "Report Pending — Awaiting radiologist upload."),
       impression: o.report?.remarks || (reportUploaded ? "Report uploaded. Review remarks." : "Pending."),
-      radiologist: o.report?.uploadedBy?.name || (reportUploaded ? "Lab Staff" : "Pending"),
+      radiologist: o.report?.uploadedBy?.name || (o.doctor?.name ? `Dr. ${o.doctor.name}` : "Radiologist"),
       approved: isCompleted || o.status === "verified",
       files: o.report?.files || [],
       reportId: o.report?._id || "",
@@ -74,8 +73,6 @@ export function RadiologyPage() {
       reportReady: isCompleted && hasAttachment,
     };
   });
-
-  const radiologyReports = dbReports;
 
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const selectedReport = radiologyReports.find((r) => r.id === selectedReportId) || null;
@@ -116,7 +113,7 @@ export function RadiologyPage() {
       ) : (
         <>
           {/* KPIs */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard label="Total Studies"  value={counts.total}    icon={<ScanLine className="h-5 w-5" />} emphasis />
             <KpiCard label="Abnormal"       value={counts.abnormal} icon={<AlertTriangle className="h-5 w-5" />} />
             <KpiCard label="Pending Review" value={counts.pending}  icon={<Clock className="h-5 w-5" />} />
@@ -124,12 +121,12 @@ export function RadiologyPage() {
           </div>
 
           {/* Modality Filter */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2 overflow-x-auto max-w-full scrollbar-none flex-nowrap shrink-0">
             {MODALITIES.map((m) => (
               <button
                 key={m}
                 onClick={() => setActiveModality(m)}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap ${
                   activeModality === m ? "bg-navy-700 text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
               >

@@ -52,7 +52,7 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
   // Filters
   const apptFilter: Record<string, any> = {
     ...hospitalFilter,
-    status: "scheduled",
+    status: { $in: ["scheduled", "checked_in", "in_consultation", "pending_payment"] },
     date: { $gte: startOfToday, $lt: endOfTomorrow },
   };
 
@@ -152,9 +152,15 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
     DbNotification.find({
       hospital: hospitalFilter.hospital,
       $or: [
-        ...(doctorId ? [{ recipientDoctor: doctorId }] : []),
-        ...(patientRefId ? [{ recipientPatient: patientRefId }] : []),
-        { recipientRole: req.user!.role, recipientDoctor: null },
+        ...(doctorId ? [
+          { recipientDoctor: doctorId },
+          { recipientDoctor: new Types.ObjectId(doctorId) }
+        ] : []),
+        ...(patientRefId ? [
+          { recipientPatient: patientRefId },
+          { recipientPatient: new Types.ObjectId(patientRefId) }
+        ] : []),
+        { recipientRole: req.user!.role },
       ],
     })
       .sort({ createdAt: -1 })
