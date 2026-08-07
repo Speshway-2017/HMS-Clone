@@ -134,6 +134,7 @@ import { NewLabBillPage } from "./pages/laboratory/NewLabBill";
 import { UploadReportPage } from "./pages/laboratory/UploadReportPage";
 import { TestRequestDetailsPage } from "./pages/laboratory/TestRequestDetailsPage";
 import { LaboratoryQualityControl } from "./pages/laboratory/QualityControl";
+import { LaboratoryCompletedReports } from "./pages/laboratory/CompletedReports";
 
 // Nurse & Patient modules
 import { NurseDashboardPage } from "./pages/nurse/DashboardPage";
@@ -397,6 +398,7 @@ export const router = createBrowserRouter([
           { path: "reports", element: <LaboratoryReportDelivery /> },
           { path: "billing", element: <LaboratoryBilling /> },
           { path: "billing/new", element: <NewLabBillPage /> },
+          { path: "completed-reports", element: <LaboratoryCompletedReports /> },
           { path: "settings", element: <LaboratorySettings /> },
         ],
       },

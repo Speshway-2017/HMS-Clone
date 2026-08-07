@@ -47,78 +47,13 @@ export function RadiologyPage() {
     return "X-Ray";
   };
 
-  const DEFAULT_SAMPLE_RADIOLOGY = [
-    {
-      id: "RAD-XR-101",
-      type: "X-Ray",
-      patient: "Rajesh Kumar Sharma",
-      age: 45,
-      date: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
-      region: "Chest PA View — Digital Radiograph",
-      status: "completed",
-      priority: "urgent",
-      finding: "Clear lung fields bilaterally. Normal cardiac silhouette. No pleural effusion or pneumothorax identified.",
-      impression: "Normal digital chest radiograph.",
-      radiologist: "Dr. K. Nair (Radiology Specialist)",
-      approved: true,
-      files: [],
-      reportId: "REP-XR-8801",
-    },
-    {
-      id: "RAD-XR-102",
-      type: "X-Ray",
-      patient: "Priya Venkatesh",
-      age: 32,
-      date: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
-      region: "Lumbar Spine AP & Lateral View",
-      status: "completed",
-      priority: "routine",
-      finding: "Mild lumbar lordosis present. L4-L5 intervertebral disc space narrowing observed without acute bone fracture.",
-      impression: "L4-L5 early degenerative spondylosis.",
-      radiologist: "Dr. K. Nair (Radiology Specialist)",
-      approved: true,
-      files: [],
-      reportId: "REP-XR-8802",
-    },
-    {
-      id: "RAD-CT-103",
-      type: "CT Scan",
-      patient: "Mohammed Farooq",
-      age: 50,
-      date: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
-      region: "High-Resolution CT Brain (NCCT)",
-      status: "completed",
-      priority: "emergency",
-      finding: "No acute intracranial hemorrhage or midline shift. Ventricles and sulci normal for age.",
-      impression: "Unremarkable CT brain non-contrast study.",
-      radiologist: "Dr. S. Mehta (Chief Radiologist)",
-      approved: true,
-      files: [],
-      reportId: "REP-CT-9901",
-    },
-    {
-      id: "RAD-US-104",
-      type: "Ultrasound",
-      patient: "Kavita Reddy",
-      age: 36,
-      date: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
-      region: "USG Whole Abdomen & Pelvis",
-      status: "completed",
-      priority: "routine",
-      finding: "Liver normal size with mild fatty infiltration (Grade 1). Gallbladder, pancreas, spleen, and both kidneys normal.",
-      impression: "Grade 1 Fatty Liver. Other abdominal organs normal.",
-      radiologist: "Dr. K. Nair (Radiology Specialist)",
-      approved: true,
-      files: [],
-      reportId: "REP-US-4401",
-    }
-  ];
 
-  // Construct dynamic radiology reports from database patient orders
+  // Construct dynamic radiology reports from database patient orders only — no dummy data
   const dbReports = orders.map((o: any) => {
     const isCompleted = o.status === "completed";
     const reportUploaded = o.status === "report_uploaded" || o.status === "verified" || o.status === "completed";
     const type = normalizeModality(o.type);
+    const hasAttachment = o.report?.files && o.report.files.length > 0;
 
     return {
       id: o._id,
@@ -129,16 +64,18 @@ export function RadiologyPage() {
       region: o.notes || "Standard view",
       status: o.status,
       priority: o.priority?.toLowerCase() || "routine",
-      finding: o.report?.observations || (reportUploaded ? "Report uploaded. Review documents below." : "Pending review by radiologist."),
+      finding: o.report?.observations || (reportUploaded ? "Report uploaded. Review documents below." : "Report Pending — Awaiting radiologist upload."),
       impression: o.report?.remarks || (reportUploaded ? "Report uploaded. Review remarks." : "Pending."),
-      radiologist: o.report?.uploadedBy?.name || "Dr. K. Nair",
+      radiologist: o.report?.uploadedBy?.name || (reportUploaded ? "Lab Staff" : "Pending"),
       approved: isCompleted || o.status === "verified",
       files: o.report?.files || [],
       reportId: o.report?._id || "",
+      hasAttachment,
+      reportReady: isCompleted && hasAttachment,
     };
   });
 
-  const radiologyReports = dbReports.length > 0 ? dbReports : DEFAULT_SAMPLE_RADIOLOGY;
+  const radiologyReports = dbReports;
 
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const selectedReport = radiologyReports.find((r) => r.id === selectedReportId) || null;
