@@ -1250,7 +1250,10 @@ export class ReceptionService {
 
   // ── Inpatient (IP) Admissions ──
   static async getAdmissionRequests(hospitalId: Types.ObjectId) {
-    return await AdmissionRequest.find({ hospital: hospitalId, status: "Admission Requested" })
+    return await AdmissionRequest.find({
+      hospital: hospitalId,
+      status: { $in: ["Pending", "pending", "Admission Requested", "AdmissionRequested"] }
+    })
       .populate("patient")
       .populate("doctor")
       .populate("department")

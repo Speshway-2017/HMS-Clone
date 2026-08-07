@@ -297,7 +297,7 @@ export function DoctorProfilePage() {
                                     </div>
                                     <div className="flex items-center gap-1">
                                       <Clock className="h-4 w-4 text-slate-400" />
-                                      <span>{appointment.timeSlot}</span>
+                                      <span>{appointment.time || appointment.timeSlot}</span>
                                     </div>
                                     <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 uppercase">
                                       {appointment.type || "OPD Consultation"}

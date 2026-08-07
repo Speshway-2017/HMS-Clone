@@ -175,7 +175,7 @@ export const updateBed = catchAsync(async (req: Request, res: Response) => {
 
   if (bedType) bed.bedType = bedType;
   if (status) {
-    if (bed.status === "Occupied" && status !== "Occupied") {
+    if (bed.status === "Occupied" && status !== "Occupied" && bed.patient) {
       throw new AppError("Occupied beds can only be made available via inpatient transfer or discharge.", 400);
     }
     bed.status = status;
@@ -194,7 +194,7 @@ export const deleteBed = catchAsync(async (req: Request, res: Response) => {
     throw new AppError("Bed not found.", 404);
   }
 
-  if (bed.status === "Occupied" || bed.isOccupied) {
+  if (bed.status === "Occupied" || (bed.patient && bed.isOccupied)) {
     throw new AppError("Cannot delete bed because it is currently occupied by a patient.", 400);
   }
 

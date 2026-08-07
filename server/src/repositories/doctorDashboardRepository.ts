@@ -18,11 +18,12 @@ export class DoctorDashboardRepository {
   }
 
   // 1. Today's Appointments
-  static async getTodayAppointments(hospitalId: Types.ObjectId, doctorId: string) {
+  static async getTodayAppointments(hospitalId: Types.ObjectId, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
     const { start, end } = this.getTodayRange();
+    const docIds = Array.isArray(doctorId) ? doctorId : [doctorId];
     return await Appointment.find({
       hospital: hospitalId,
-      doctor: doctorId,
+      doctor: { $in: docIds },
       date: { $gte: start, $lte: end },
       status: { $nin: ["cancelled", "no_show"] },
     })
@@ -32,11 +33,12 @@ export class DoctorDashboardRepository {
       .sort({ time: 1 });
   }
 
-  static async getWaitingPatients(hospitalId: Types.ObjectId, doctorId: string) {
+  static async getWaitingPatients(hospitalId: Types.ObjectId, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
     const { start, end } = this.getTodayRange();
+    const docIds = Array.isArray(doctorId) ? doctorId : [doctorId];
     return await Queue.find({
       hospital: hospitalId,
-      doctor: doctorId,
+      doctor: { $in: docIds },
       status: { $in: ["waiting", "called"] },
       createdAt: { $gte: start, $lte: end },
     })

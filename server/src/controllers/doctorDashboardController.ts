@@ -23,14 +23,22 @@ import { createOrUpdatePrescriptionCore, formatAndSanitizeMedications } from "./
 
 
 async function getLoggedDoctor(req: Request) {
-  if (!req.user?.email) {
-    throw new AppError("User profile email not found.", 401);
+  if (!req.user) {
+    throw new AppError("User is not authenticated.", 401);
   }
-  const emailRegex = new RegExp(`^${req.user.email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
-  let doctor = await Doctor.findOne({ email: emailRegex, isActive: { $ne: false } });
-  if (!doctor && req.user.hospital) {
-    doctor = await Doctor.findOne({ hospital: req.user.hospital, email: emailRegex, isActive: { $ne: false } });
+
+  // 1. Match by user ObjectId linked to Doctor document
+  let doctor = await Doctor.findOne({ user: req.user._id, isActive: { $ne: false } });
+
+  // 2. Fall back to email lookup if user link not directly set
+  if (!doctor && req.user.email) {
+    const emailRegex = new RegExp(`^${req.user.email.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+    doctor = await Doctor.findOne({ email: emailRegex, isActive: { $ne: false } });
+    if (!doctor && req.user.hospital) {
+      doctor = await Doctor.findOne({ hospital: req.user.hospital, email: emailRegex, isActive: { $ne: false } });
+    }
   }
+
   if (!doctor) {
     throw new AppError("Doctor profile not found for the logged-in user.", 404);
   }
@@ -718,8 +726,9 @@ export const getWorkspace = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const appointmentId = req.params.id;
   const doctor = await getLoggedDoctor(req);
+  const doctorObjIds = [doctor._id, (doctor as any).user, req.user?._id].filter(Boolean);
 
-  const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: doctor._id })
+  const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: { $in: doctorObjIds } })
     .populate("patient")
     .populate("doctor")
     .populate("department");
@@ -729,19 +738,19 @@ export const getWorkspace = catchAsync(async (req: Request, res: Response) => {
   }
 
   const patientId = appointment.patient._id;
-  const doctorId = appointment.doctor._id;
 
   const [queueItem, prescriptions, labOrders, radiologyOrders, admissions, admissionRequests] = await Promise.all([
-    Queue.findOne({ appointment: appointmentId, hospital: hospitalId, doctor: doctorId }),
-    Prescription.find({ patient: patientId, doctor: doctorId, hospital: hospitalId }).sort({ createdAt: -1 }),
-    LabOrder.find({ patient: patientId, doctor: doctorId, hospital: hospitalId }),
-    RadiologyOrder.find({ patient: patientId, doctor: doctorId, hospital: hospitalId }),
+    Queue.findOne({ appointment: appointmentId, hospital: hospitalId }),
+    Prescription.find({ $or: [{ appointment: appointmentId }, { patient: patientId, hospital: hospitalId }] }).sort({ createdAt: -1 }),
+    LabOrder.find({ $or: [{ appointment: appointmentId }, { patient: patientId, hospital: hospitalId }] }).sort({ createdAt: -1 }),
+    RadiologyOrder.find({ $or: [{ appointment: appointmentId }, { patient: patientId, hospital: hospitalId }] }).sort({ createdAt: -1 }),
     Admission.find({ patient: patientId, hospital: hospitalId }),
     AdmissionRequest.find({ patient: patientId, hospital: hospitalId }).sort({ createdAt: -1 }),
   ]);
 
-  let draftSession = await ConsultationSession.findOne({ appointment: appointmentId, hospital: hospitalId, status: "IN_PROGRESS" });
-  if (!draftSession && appointment.status === "in_consultation") {
+  let draftSession = await ConsultationSession.findOne({ appointment: appointmentId, hospital: hospitalId }).sort({ createdAt: -1 });
+
+  if (!draftSession && ["in_consultation", "scheduled", "checked_in"].includes(appointment.status)) {
     draftSession = await ConsultationSession.create({
       hospital: hospitalId,
       patient: appointment.patient._id,
@@ -755,6 +764,13 @@ export const getWorkspace = catchAsync(async (req: Request, res: Response) => {
       clinicalNotes: appointment.clinicalNotes || "",
       treatmentPlan: appointment.treatmentPlan || "",
       advice: appointment.advice || "",
+      history: [
+        {
+          action: "Consultation Session Initialized",
+          timestamp: new Date(),
+          details: `Doctor ${doctor.name} opened workspace.`,
+        },
+      ],
     });
   }
 
@@ -1340,17 +1356,18 @@ export const getMyPatients = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
   const doctorObjId = doctor._id;
+  const doctorObjIds = [doctor._id, (doctor as any).user, req.user?._id].filter(Boolean);
 
-  const { search } = req.query as Record<string, string | undefined>;
+  const { search, patientId } = req.query as Record<string, string | undefined>;
 
   // Step 1: collect all patient ObjectIds linked to this doctor across all
   // relevant collections — entirely at the database level.
   const [apptPatients, admissionPatients, labPatients, radioPatients, assignedPatients] = await Promise.all([
-    Appointment.distinct("patient", { hospital: hospitalId, doctor: doctorObjId }),
-    Admission.distinct("patient", { hospital: hospitalId, admittingDoctor: doctorObjId }),
-    LabOrder.distinct("patient", { hospital: hospitalId, doctor: doctorObjId }),
-    RadiologyOrder.distinct("patient", { hospital: hospitalId, doctor: doctorObjId }),
-    Patient.distinct("_id", { hospital: hospitalId, assignedDoctor: doctorObjId }),
+    Appointment.distinct("patient", { hospital: hospitalId, doctor: { $in: doctorObjIds } }),
+    Admission.distinct("patient", { hospital: hospitalId, admittingDoctor: { $in: doctorObjIds } }),
+    LabOrder.distinct("patient", { hospital: hospitalId, doctor: { $in: doctorObjIds } }),
+    RadiologyOrder.distinct("patient", { hospital: hospitalId, doctor: { $in: doctorObjIds } }),
+    Patient.distinct("_id", { hospital: hospitalId, assignedDoctor: { $in: doctorObjIds } }),
   ]);
 
   // Filter out falsy/invalid values before calling toString()
@@ -1361,6 +1378,10 @@ export const getMyPatients = catchAsync(async (req: Request, res: Response) => {
     ...radioPatients,
     ...assignedPatients,
   ].filter((id) => id != null && Types.ObjectId.isValid(id.toString()));
+
+  if (patientId && Types.ObjectId.isValid(patientId)) {
+    rawIds.push(new Types.ObjectId(patientId));
+  }
 
   const patientIdSet = new Set<string>(rawIds.map((id: any) => id.toString()));
   const patientIds = Array.from(patientIdSet).map((id) => new Types.ObjectId(id));
@@ -1573,8 +1594,9 @@ export const startConsultationSession = catchAsync(async (req: Request, res: Res
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const { appointmentId } = req.body;
   const doctor = await getLoggedDoctor(req);
+  const doctorObjIds = [doctor._id, (doctor as any).user, req.user?._id].filter(Boolean);
 
-  const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: doctor._id })
+  const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: { $in: doctorObjIds } })
     .populate("patient");
   if (!appointment) {
     throw new AppError("Appointment not found.", 404);
@@ -1583,9 +1605,7 @@ export const startConsultationSession = catchAsync(async (req: Request, res: Res
   let session = await ConsultationSession.findOne({
     appointment: appointmentId,
     hospital: hospitalId,
-    doctor: doctor._id,
-    status: "IN_PROGRESS"
-  });
+  }).sort({ createdAt: -1 });
 
   if (!session) {
     session = await ConsultationSession.create({
@@ -1601,20 +1621,35 @@ export const startConsultationSession = catchAsync(async (req: Request, res: Res
       clinicalNotes: appointment.clinicalNotes || "",
       treatmentPlan: appointment.treatmentPlan || "",
       advice: appointment.advice || "",
+      history: [
+        {
+          action: "Consultation Started",
+          timestamp: new Date(),
+          details: `Started by Dr. ${doctor.name}`,
+        },
+      ],
     });
+  } else if (session.status !== "COMPLETED") {
+    session.status = "IN_PROGRESS";
+    if (!session.history || session.history.length === 0) {
+      session.history.push({ action: "Consultation Started", timestamp: new Date(), details: `Started by Dr. ${doctor.name}` });
+    }
+    await session.save();
   }
 
-  // Update appointment status to 'in_consultation'
-  appointment.status = "in_consultation";
-  await appointment.save();
+  // Update appointment status to 'in_consultation' if not completed
+  if (appointment.status !== "completed") {
+    appointment.status = "in_consultation";
+    await appointment.save();
+  }
 
   // Update queue item
   await Queue.findOneAndUpdate(
-    { appointment: appointmentId, hospital: hospitalId, doctor: doctor._id },
+    { appointment: appointmentId, hospital: hospitalId },
     { status: "called" }
   );
 
-  emitToHospital(hospitalId.toString(), "appointment_updated", { appointmentId, status: "in_consultation" });
+  emitToHospital(hospitalId.toString(), "appointment_updated", { appointmentId, status: appointment.status });
   emitToHospital(hospitalId.toString(), "queue_updated", { appointmentId, status: "called" });
   emitToHospital(hospitalId.toString(), "dashboard_update", { action: "start_consultation", appointmentId });
 
@@ -1625,23 +1660,22 @@ export const getConsultationDraft = catchAsync(async (req: Request, res: Respons
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const { appointmentId } = req.params;
   const doctor = await getLoggedDoctor(req);
+  const doctorObjIds = [doctor._id, (doctor as any).user, req.user?._id].filter(Boolean);
 
   let session = await ConsultationSession.findOne({
     appointment: appointmentId,
     hospital: hospitalId,
-    doctor: doctor._id,
-    status: "IN_PROGRESS"
-  });
+  }).sort({ createdAt: -1 });
 
   if (!session) {
-    const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: doctor._id });
-    if (appointment && appointment.status === "in_consultation") {
+    const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: { $in: doctorObjIds } });
+    if (appointment) {
       session = await ConsultationSession.create({
         hospital: hospitalId,
         patient: appointment.patient,
         appointment: appointmentId,
         doctor: doctor._id,
-        status: "IN_PROGRESS",
+        status: appointment.status === "completed" ? "COMPLETED" : "IN_PROGRESS",
         vitals: appointment.vitals || {},
         chiefComplaint: appointment.chiefComplaint || "",
         diagnosis: appointment.diagnosis || "",
@@ -1649,6 +1683,7 @@ export const getConsultationDraft = catchAsync(async (req: Request, res: Respons
         clinicalNotes: appointment.clinicalNotes || "",
         treatmentPlan: appointment.treatmentPlan || "",
         advice: appointment.advice || "",
+        history: [{ action: "Session Initialized", timestamp: new Date(), details: `Loaded for appointment` }],
       });
     }
   }
@@ -1666,14 +1701,39 @@ export const updateConsultationDraft = catchAsync(async (req: Request, res: Resp
     updateData.prescriptions = formatAndSanitizeMedications(updateData.prescriptions);
   }
 
-  const session = await ConsultationSession.findOneAndUpdate(
-    { _id: consultationId, hospital: hospitalId, doctor: doctor._id, status: "IN_PROGRESS" },
-    { $set: updateData },
-    { new: true, runValidators: true }
-  );
+  const session = await ConsultationSession.findOne({
+    _id: consultationId,
+    hospital: hospitalId,
+  });
 
   if (!session) {
-    throw new AppError("Draft consultation session not found or not in progress.", 404);
+    throw new AppError("Consultation session not found.", 404);
+  }
+
+  if (session.status === "COMPLETED") {
+    return res.json({ status: "success", data: session, message: "Consultation is completed and read-only." });
+  }
+
+  Object.assign(session, updateData);
+  session.history.push({
+    action: "Draft Updated",
+    timestamp: new Date(),
+    details: "Auto-saved clinical draft data.",
+  });
+  await session.save();
+
+  // Keep Appointment clinical summary in sync
+  if (session.appointment) {
+    await Appointment.findByIdAndUpdate(session.appointment, {
+      vitals: session.vitals,
+      chiefComplaint: session.chiefComplaint,
+      diagnosis: session.diagnosis,
+      symptoms: session.symptoms,
+      clinicalNotes: session.clinicalNotes,
+      treatmentPlan: session.treatmentPlan,
+      advice: session.advice,
+      followUpDate: session.followUpDate,
+    });
   }
 
   res.json({ status: "success", data: session });
@@ -1689,7 +1749,7 @@ export const cancelConsultationSession = catchAsync(async (req: Request, res: Re
 
   try {
     const session = await ConsultationSession.findOneAndUpdate(
-      { _id: consultationId, hospital: hospitalId, doctor: doctor._id, status: "IN_PROGRESS" },
+      { _id: consultationId, hospital: hospitalId, status: "IN_PROGRESS" },
       { status: "CANCELLED" },
       { new: true, session: dbSession }
     );
@@ -1707,7 +1767,7 @@ export const cancelConsultationSession = catchAsync(async (req: Request, res: Re
 
     // Revert queue status
     await Queue.findOneAndUpdate(
-      { appointment: session.appointment, hospital: hospitalId, doctor: doctor._id },
+      { appointment: session.appointment, hospital: hospitalId },
       { status: "waiting" },
       { session: dbSession }
     );
@@ -1734,12 +1794,14 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
   const draft = await ConsultationSession.findOne({
     _id: consultationId,
     hospital: hospitalId,
-    doctor: doctor._id,
-    status: "IN_PROGRESS"
   });
 
   if (!draft) {
-    throw new AppError("Draft consultation session not found or not in progress.", 404);
+    throw new AppError("Consultation session not found.", 404);
+  }
+
+  if (draft.status === "COMPLETED") {
+    return res.json({ status: "success", data: draft, message: "Consultation is already completed." });
   }
 
   if (!draft.diagnosis || !draft.diagnosis.trim()) {
@@ -1761,6 +1823,13 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
   try {
     // 1. Mark consultation draft as COMPLETED
     draft.status = "COMPLETED";
+    draft.completedAt = new Date();
+    draft.completedBy = doctor._id;
+    draft.history.push({
+      action: "Consultation Completed",
+      timestamp: new Date(),
+      details: `Consultation finalized by Dr. ${doctor.name}`,
+    });
     await draft.save({ session: dbSession });
 
     // 2. Update appointment status and clinical notes
@@ -1772,14 +1841,14 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
     appointment.clinicalNotes = draft.clinicalNotes;
     appointment.treatmentPlan = draft.treatmentPlan;
     appointment.advice = draft.advice;
-    if (followUpDate) {
-      appointment.followUpDate = new Date(followUpDate);
+    if (followUpDate || draft.followUpDate) {
+      appointment.followUpDate = new Date(followUpDate || draft.followUpDate);
     }
     await appointment.save({ session: dbSession });
 
     // 3. Update queue status
     await Queue.findOneAndUpdate(
-      { appointment: appointment._id, hospital: hospitalId, doctor: doctor._id },
+      { appointment: appointment._id, hospital: hospitalId },
       { status: "completed" },
       { session: dbSession }
     );
@@ -1859,6 +1928,8 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
 
     // 6. Create final RadiologyOrders if present
     if (draft.radiologyOrders && draft.radiologyOrders.length > 0) {
+      const radItems: { type: string; priority: string; notes: string }[] = [];
+
       for (const rad of draft.radiologyOrders) {
         await RadiologyOrder.create(
           [
@@ -1877,29 +1948,38 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
           { session: dbSession }
         );
 
-        // Add to Patient medical history as radiology requested
-        await Patient.findOneAndUpdate(
-          { _id: appointment.patient._id, hospital: hospitalId },
-          {
-            $push: {
-              medicalHistory: {
-                $each: [
-                  {
-                    date: new Date(),
-                    visitType: "Radiology Ordered",
-                    doctorName: doctor.name,
-                    diagnosis: `${rad.type} Request`,
-                    notes: `Priority: ${rad.priority || "Routine"}. Notes: ${rad.notes || "None"}`,
-                    status: "Pending",
-                  },
-                ],
-                $position: 0,
-              },
+        radItems.push({
+          type: rad.type || "Radiology",
+          priority: rad.priority || "Routine",
+          notes: rad.notes || "None",
+        });
+      }
+
+      // Add ONE consolidated entry to Patient medical history for all radiology orders requested in this session
+      const combinedDiagnosis = radItems.map((item) => `${item.type} Request`).join(", ");
+      const combinedNotes = radItems.map((item) => `• ${item.type} (Priority: ${item.priority}). Notes: ${item.notes}`).join("\n");
+
+      await Patient.findOneAndUpdate(
+        { _id: appointment.patient._id, hospital: hospitalId },
+        {
+          $push: {
+            medicalHistory: {
+              $each: [
+                {
+                  date: new Date(),
+                  visitType: "Radiology Ordered",
+                  doctorName: doctor.name,
+                  diagnosis: combinedDiagnosis,
+                  notes: combinedNotes,
+                  status: "Pending",
+                },
+              ],
+              $position: 0,
             },
           },
-          { session: dbSession }
-        );
-      }
+        },
+        { session: dbSession }
+      );
     }
 
     // 7. Create final AdmissionRequest if recommended
@@ -1926,7 +2006,7 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
         const existingRequest = await AdmissionRequest.findOne({
           hospital: hospitalId,
           patient: patient._id,
-          status: "Admission Requested"
+          status: { $in: ["Pending", "pending", "Admission Requested", "AdmissionRequested"] }
         }).session(dbSession);
 
         if (!existingRequest) {
@@ -1951,7 +2031,7 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
           const diagVal = rec.primaryDiagnosis || draft.diagnosis || "Admission Required";
           const notesVal = rec.clinicalNotes || draft.clinicalNotes || "";
 
-          await AdmissionRequest.create(
+          const [newAdmissionReq] = await AdmissionRequest.create(
             [
               {
                 hospital: hospitalId,
@@ -1971,7 +2051,7 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
                 notes: notesVal,
                 admissionReason: rec.admissionReason || diagVal,
                 specialInstructions: rec.specialInstructions || "",
-                status: "Admission Requested"
+                status: "Pending"
               }
             ],
             { session: dbSession }
@@ -2902,6 +2982,30 @@ export const getAnalytics = catchAsync(async (req: Request, res: Response) => {
       },
       timeline: sortedTimeline
     }
+  });
+});
+
+export const getConsultationHistory = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const { id } = req.params;
+
+  const session = await ConsultationSession.findOne({
+    _id: id,
+    hospital: hospitalId,
+  }).populate("doctor", "name");
+
+  if (!session) {
+    throw new AppError("Consultation history not found.", 404);
+  }
+
+  res.json({
+    status: "success",
+    data: {
+      history: session.history || [],
+      completedAt: session.completedAt,
+      completedBy: session.completedBy,
+      status: session.status,
+    },
   });
 });
 

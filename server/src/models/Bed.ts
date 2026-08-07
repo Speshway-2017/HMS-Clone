@@ -30,9 +30,13 @@ bedSchema.index({ hospital: 1, branch: 1, bedCode: 1 }, { unique: true });
 // Sync status and isOccupied fields
 bedSchema.pre("save", function (next) {
   if (this.isModified("status")) {
-    this.isOccupied = this.status !== "Available";
+    this.isOccupied = this.status === "Occupied";
   } else if (this.isModified("isOccupied")) {
-    this.status = this.isOccupied ? "Occupied" : "Available";
+    if (this.isOccupied && this.status !== "Occupied") {
+      this.status = "Occupied";
+    } else if (!this.isOccupied && this.status === "Occupied") {
+      this.status = "Available";
+    }
   }
   next();
 });
