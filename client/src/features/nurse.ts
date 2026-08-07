@@ -66,22 +66,32 @@ export function useAddNurseNotes(patientId: string) {
   });
 }
 
-export function useAdministerNurseMed(patientId: string) {
+export function useAdministerNurseMed(patientId?: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (payload: {
+      patientId?: string;
       medOrderId: string;
       action: "Administered" | "Skipped" | "Rescheduled";
+      medicineName?: string;
+      dosage?: string;
       scheduledTime?: string;
       administrationTime?: string;
       remarks?: string;
     }) => {
-      const res = await api.post(`/nurse/inpatients/${patientId}/medications/administer`, payload);
+      const targetPatientId = payload.patientId || patientId;
+      if (!targetPatientId) {
+        throw new Error("Patient ID is missing.");
+      }
+      const res = await api.post(`/nurse/inpatients/${targetPatientId}/medications/administer`, payload);
       return res.data.data;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["nurse", "inpatients"] });
-      queryClient.invalidateQueries({ queryKey: ["nurse", "inpatients", patientId] });
+      const targetPt = variables.patientId || patientId;
+      if (targetPt) {
+        queryClient.invalidateQueries({ queryKey: ["nurse", "inpatients", targetPt] });
+      }
     },
   });
 }
@@ -90,7 +100,7 @@ export function useNurseBeds() {
   return useQuery({
     queryKey: ["beds"],
     queryFn: async () => {
-      const res = await api.get<{ data: { beds: BedInfo[] } }>("/beds");
+      const res = await api.get<{ data: { beds: BedInfo[] } }>("/beds?limit=1000");
       return res.data.data.beds;
     },
   });

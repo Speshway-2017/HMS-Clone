@@ -3,7 +3,8 @@
 @tailwind utilities;
 
 body {
-  @apply bg-slate-50 text-slate-900;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  @apply bg-slate-50 text-slate-900 antialiased;
 }
 
 /* Hide scrollbars everywhere while keeping content scrollable. */

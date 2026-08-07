@@ -456,17 +456,15 @@ export default function NotificationsPage() {
                         </button>
                       )}
 
-                      {/* Dismissal (Only non-critical / non-emergency) */}
-                      {notif.severity !== "critical" && actualType !== "critical_alert" && actualType !== "emergency" && (
-                        <button
-                          type="button"
-                          onClick={() => handleDismiss(notif._id)}
-                          className="p-1 rounded-lg border border-slate-200 hover:bg-red-50 text-slate-400 hover:text-red-650 transition-colors cursor-pointer bg-white"
-                          title="Dismiss"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
+                      {/* Dismissal */}
+                      <button
+                        type="button"
+                        onClick={() => handleDismiss(notif._id)}
+                        className="p-1 rounded-lg border border-slate-200 hover:bg-red-50 text-slate-400 hover:text-red-650 transition-colors cursor-pointer bg-white"
+                        title="Dismiss"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
 
                     </div>
 
