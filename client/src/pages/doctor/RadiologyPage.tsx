@@ -52,6 +52,7 @@ export function RadiologyPage() {
     const isCompleted = o.status === "completed";
     const reportUploaded = o.status === "report_uploaded" || o.status === "verified" || o.status === "completed";
     const type = normalizeModality(o.type);
+    const hasAttachment = o.report?.files && o.report.files.length > 0;
 
     return {
       id: o._id,
@@ -62,12 +63,14 @@ export function RadiologyPage() {
       region: o.notes || "Standard view",
       status: o.status,
       priority: o.priority?.toLowerCase() || "routine",
-      finding: o.report?.observations || (reportUploaded ? "Report uploaded. Review documents below." : "Pending review by radiologist."),
+      finding: o.report?.observations || (reportUploaded ? "Report uploaded. Review documents below." : "Report Pending — Awaiting radiologist upload."),
       impression: o.report?.remarks || (reportUploaded ? "Report uploaded. Review remarks." : "Pending."),
       radiologist: o.report?.uploadedBy?.name || (o.doctor?.name ? `Dr. ${o.doctor.name}` : "Radiologist"),
       approved: isCompleted || o.status === "verified",
       files: o.report?.files || [],
       reportId: o.report?._id || "",
+      hasAttachment,
+      reportReady: isCompleted && hasAttachment,
     };
   });
 

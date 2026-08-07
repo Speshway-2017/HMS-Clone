@@ -86,10 +86,20 @@ export interface LabOrder {
     referenceRange: string;
     status: "normal" | "elevated" | "high" | "low" | "borderline" | "pending";
   }[];
-  status: "pending" | "completed" | "rejected";
+  status: "pending" | "completed" | "rejected" | "accepted" | "processing" | "report_uploaded" | "verified" | "cancelled" | "Sample Collection" | "Quality Check" | "Completed";
   rejectionReason?: string;
   date: string;
   createdAt: string;
+  report?: {
+    _id: string;
+    observations?: string;
+    remarks?: string;
+    files?: { secure_url: string; original_filename: string; public_id: string; mime_type: string; file_size: number }[];
+    uploadedBy?: { name: string };
+    uploadedAt?: string;
+    status?: string;
+    version?: number;
+  } | null;
 }
 
 export interface Certificate {

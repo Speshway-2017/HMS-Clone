@@ -211,6 +211,10 @@ export function LaboratoryPage() {
                   year: "numeric",
                 });
 
+                const isCompleted = order.status === "completed" || order.status === "Completed";
+                const hasReport = order.report && order.report.files && order.report.files.length > 0;
+                const reportReady = isCompleted && hasReport;
+
                 return (
                   <Card key={order._id}>
                     <div className="flex items-start justify-between mb-3">
@@ -241,6 +245,25 @@ export function LaboratoryPage() {
                       </div>
                     </div>
 
+                    {/* Report Status Banner */}
+                    <div className={`mt-3 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold ${
+                      reportReady
+                        ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                        : "bg-amber-50 border border-amber-200 text-amber-700"
+                    }`}>
+                      {reportReady ? (
+                        <>
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                          Report Ready — Attachment available for download
+                        </>
+                      ) : (
+                        <>
+                          <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse inline-block" />
+                          Report Pending — Awaiting lab technician upload
+                        </>
+                      )}
+                    </div>
+
                     <div className="mt-4 flex gap-2">
                       <Button
                         variant="secondary"
@@ -249,7 +272,7 @@ export function LaboratoryPage() {
                       >
                         View Detailed Report
                       </Button>
-                      {order.status === "completed" && (
+                      {isCompleted && (
                         <Button
                           variant="primary"
                           size="sm"
