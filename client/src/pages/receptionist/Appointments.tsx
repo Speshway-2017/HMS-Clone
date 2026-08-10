@@ -344,7 +344,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
 
   const { data: hospital } = useMyHospital();
   const { data: patientDetail, isLoading: patientLoading, isError: patientError } = usePatientDetail(selectedPatientId);
-  const { data: bookedSlots } = useBookedSlots(selectedDoctorId, selectedDate);
+  const { data: bookedSlots } = useBookedSlots(selectedDoctorId, selectedDate, selectedPatientId);
 
   const isWithinRevisitWindow = () => {
     if (!selectedDoc || !selectedDate) return false;

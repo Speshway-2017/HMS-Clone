@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ClipboardList, Search, Eye } from "lucide-react";
+import { ClipboardList, Search, Eye, Check, IndianRupee } from "lucide-react";
+import toast from "react-hot-toast";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { useLaboratoryRequests } from "../../features/laboratory";
+import { useLaboratoryRequests, useAcceptRequest } from "../../features/laboratory";
 
 export function LaboratoryTestRequestManagement() {
   const { data: requests = [], isLoading, isError } = useLaboratoryRequests();
+  const acceptRequest = useAcceptRequest();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<"Pending" | "Accepted" | "Rejected">("Pending");
@@ -20,6 +22,15 @@ export function LaboratoryTestRequestManagement() {
     if (s === "pending" || s === "pending request" || s === "pending approval") return "Pending";
     if (s === "rejected") return "Rejected";
     return "Accepted"; // accepted, processing, report_uploaded, verified, completed
+  };
+
+  const handleDirectAccept = async (id: string) => {
+    try {
+      await acceptRequest.mutateAsync(id);
+      toast.success("Request accepted! Moved to Test Processing queue.");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to accept request.");
+    }
   };
 
   const filtered = requests.filter(r => {
@@ -171,20 +182,32 @@ export function LaboratoryTestRequestManagement() {
             },
             {
               header: "Actions",
-              render: (r) => (
-                <div className="flex gap-2">
-                  <Button 
-                    variant="ghost" 
-                    onClick={() => {
-                      navigate(`/laboratory/requests/${r._id}`, { state: { request: r } });
-                    }}
-                    className="p-1 hover:text-blue-700 hover:bg-slate-100"
-                    title="View Details"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                </div>
-              )
+              render: (r) => {
+                const isPending = mapStatusTab(r.status) === "Pending";
+                return (
+                  <div className="flex items-center gap-1.5">
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => {
+                        navigate(`/laboratory/requests/${r._id}`, { state: { request: r } });
+                      }}
+                      className="p-1 hover:text-blue-700 hover:bg-slate-100"
+                      title="View Details"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    {isPending && (
+                      <Button
+                        onClick={() => handleDirectAccept(r._id)}
+                        className="py-1 px-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1"
+                        title="Accept Request and move to Test Processing"
+                      >
+                        <Check className="h-3.5 w-3.5" /> Accept
+                      </Button>
+                    )}
+                  </div>
+                );
+              }
             }
           ]}
         />

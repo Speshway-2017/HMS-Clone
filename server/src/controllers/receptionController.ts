@@ -640,7 +640,7 @@ export const rescheduleAppointment = catchAsync(async (req: Request, res: Respon
 });
 
 export const getBookedSlots = catchAsync(async (req: Request, res: Response) => {
-  const { doctorId, date } = req.query as Record<string, string>;
+  const { doctorId, date, patientId } = req.query as Record<string, string>;
   if (!doctorId || !date) {
     throw new AppError("doctorId and date are required query parameters.", 400);
   }
@@ -649,6 +649,23 @@ export const getBookedSlots = catchAsync(async (req: Request, res: Response) => 
   const bookedSlots = await AppointmentSlotService.getBookedSlots(
     doctorId,
     date,
+
+    req.hospitalFilter!.hospital,
+    patientId
+  );
+
+  const parsedDate = new Date(date);
+  const startOfDay = new Date(parsedDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(parsedDate);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const appointments = await Appointment.find({
+    hospital: req.hospitalFilter!.hospital,
+    doctor: doctorQuery,
+    date: { $gte: startOfDay, $lte: endOfDay },
+    status: { $nin: ["cancelled", "no_show"] }
+  }).select("time");
     req.hospitalFilter!.hospital
   );
 

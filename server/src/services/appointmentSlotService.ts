@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { Appointment } from "../models/Appointment";
 import { Doctor } from "../models/Doctor";
+import { Patient } from "../models/Patient";
 
 /**
  * AppointmentSlotService — Single source of truth for slot availability.
@@ -101,13 +102,14 @@ export class AppointmentSlotService {
    *
    * @param doctorId   - Doctor._id (ObjectId) or any resolvable string.
    * @param date       - ISO date string (YYYY-MM-DD) or Date object.
-   * @param hospitalId - Optional; scopes the query to a specific hospital.
+   * @param patientId  - Optional; patient ID to block slots where patient already has an active appointment.
    * @returns          - Array of booked time strings, e.g. ["09:00", "10:30"]
    */
   static async getBookedSlots(
     doctorId: string | Types.ObjectId,
     date: string | Date,
-    hospitalId?: Types.ObjectId | string | Record<string, any>
+    hospitalId?: Types.ObjectId | string | Record<string, any>,
+    patientId?: string | Types.ObjectId
   ): Promise<string[]> {
     const parsedDate = new Date(date);
     const startOfDay = new Date(parsedDate);
@@ -142,9 +144,35 @@ export class AppointmentSlotService {
     }
 
     const appointments = await Appointment.find(filter).select("time");
-    return appointments
-      .map((appt) => appt.time?.trim())
-      .filter(Boolean) as string[];
+    const bookedTimes = new Set(
+      appointments.map((appt) => appt.time?.trim()).filter(Boolean) as string[]
+    );
+
+    // If patientId is provided, also block time slots where this patient already has an active appointment with ANY doctor
+    if (patientId) {
+      let patientIds: any[] = [patientId];
+      const patientDoc = await Patient.findById(patientId);
+      if (patientDoc?.user) {
+        const relatedDocs = await Patient.find({ user: patientDoc.user }).select("_id");
+        if (relatedDocs.length > 0) {
+          patientIds = relatedDocs.map((p) => p._id);
+        }
+      }
+
+      const patientAppts = await Appointment.find({
+        patient: { $in: patientIds },
+        date: { $gte: startOfDay, $lte: endOfDay },
+        status: { $nin: ["cancelled", "no_show", "completed", "missed"] },
+      }).select("time");
+
+      patientAppts.forEach((appt) => {
+        if (appt.time) {
+          bookedTimes.add(appt.time.trim());
+        }
+      });
+    }
+
+    return Array.from(bookedTimes);
   }
 
   /**
@@ -191,5 +219,51 @@ export class AppointmentSlotService {
     }
 
     return await Appointment.findOne(filter);
+  }
+
+  /**
+   * Check if a patient already has an active appointment at the exact same date and time slot (with ANY doctor).
+   *
+   * @returns The conflicting Appointment document, or null if patient has no conflict.
+   */
+  static async checkPatientSlotConflict(
+    patientId: string | Types.ObjectId,
+    date: string | Date,
+    time: string,
+    hospitalId?: Types.ObjectId | string | Record<string, any>,
+    excludeAppointmentId?: string
+  ) {
+    const parsedDate = new Date(date);
+    const startOfDay = new Date(parsedDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(parsedDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const trimmed = time ? time.trim() : "";
+    const timeVariations = Array.from(
+      new Set([trimmed, normalizeSlotTime(trimmed), formatSlot12Hour(trimmed)].filter(Boolean))
+    );
+
+    let allPatientIds: any[] = [patientId];
+    const currentPatientDoc = await Patient.findById(patientId);
+    if (currentPatientDoc?.user) {
+      const relatedDocs = await Patient.find({ user: currentPatientDoc.user }).select("_id");
+      if (relatedDocs.length > 0) {
+        allPatientIds = relatedDocs.map((p) => p._id);
+      }
+    }
+
+    const filter: Record<string, any> = {
+      patient: { $in: allPatientIds },
+      date: { $gte: startOfDay, $lte: endOfDay },
+      time: { $in: timeVariations },
+      status: { $nin: ["cancelled", "no_show", "completed", "missed"] },
+    };
+
+    if (excludeAppointmentId) {
+      filter._id = { $ne: excludeAppointmentId };
+    }
+
+    return await Appointment.findOne(filter).populate("doctor", "name");
   }
 }

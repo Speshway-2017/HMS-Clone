@@ -620,6 +620,9 @@ export function useCompleteConsultationSession() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["reception"] });
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
     },
   });
 }
@@ -728,6 +731,9 @@ export function useCompleteConsultation() {
     onSuccess: (data) => {
       const apptId = data.data?._id;
       queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["reception"] });
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
       if (apptId) {
         queryClient.invalidateQueries({ queryKey: ["doctorDashboard", "workspace", apptId] });
       }

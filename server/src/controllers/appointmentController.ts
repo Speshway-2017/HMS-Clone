@@ -216,6 +216,23 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
     );
   }
 
+  // 3. Prevent patient from booking multiple appointments at the exact same date and time slot (with ANY doctor)
+  if (body.patient && body.date && body.time) {
+    const patientSlotClash = await AppointmentSlotService.checkPatientSlotConflict(
+      body.patient,
+      body.date as unknown as Date,
+      body.time,
+      hospitalId
+    );
+    if (patientSlotClash) {
+      const otherDocName = (patientSlotClash.doctor as any)?.name || "another doctor";
+      throw new AppError(
+        `Patient already has an active appointment scheduled at ${body.time} with Dr. ${otherDocName}. A patient cannot book appointments with multiple doctors at the exact same time slot.`,
+        409
+      );
+    }
+  }
+
   const referenceId = await generateReferenceId(hospitalId.toString(), new Date(body.date));
   const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
   const appointment = await Appointment.create({
@@ -357,6 +374,27 @@ export const updateAppointment = catchAsync(async (req: Request, res: Response) 
     validateAppointmentTimeRestriction(existingAppt);
   }
 
+  if (isRescheduling) {
+    const targetDate = body.date ? (body.date as unknown as Date) : existingAppt.date;
+    const targetTime = body.time || existingAppt.time;
+    const targetPatient = existingAppt.patient;
+
+    const patientSlotClash = await AppointmentSlotService.checkPatientSlotConflict(
+      targetPatient,
+      targetDate,
+      targetTime,
+      existingAppt.hospital,
+      existingAppt._id.toString()
+    );
+    if (patientSlotClash) {
+      const otherDocName = (patientSlotClash.doctor as any)?.name || "another doctor";
+      throw new AppError(
+        `Patient already has an active appointment scheduled at ${targetTime} with Dr. ${otherDocName}. A patient cannot book appointments with multiple doctors at the exact same time slot.`,
+        409
+      );
+    }
+  }
+
   const appointment = await Appointment.findOneAndUpdate(filter, body, {
     new: true,
     runValidators: true,
@@ -471,4 +509,3 @@ export const getAvailableSlots = catchAsync(async (req: Request, res: Response) 
 
   res.json({ status: "success", data: { bookedSlots } });
 });
-

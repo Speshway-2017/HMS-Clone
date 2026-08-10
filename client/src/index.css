@@ -49,6 +49,18 @@ body {
   #patient-registry-print *,
   #consolidated-patient-statement-print,
   #consolidated-patient-statement-print *,
+  #consultation-print-area,
+  #consultation-print-area *,
+  .printable-area,
+  .printable-area * {
+    visibility: visible !important;
+  }
+
+  /* Force patient card & registry print to display block */
+  #patient-card-print,
+  #patient-registry-print,
+  #consultation-print-area {
+  #consolidated-patient-statement-print *,
   .printable-area,
   .printable-area * {
     visibility: visible !important;
@@ -78,6 +90,10 @@ body {
   #admission-slip-print,
   #opd-receipt-print,
   #patient-card-print,
+  #patient-registry-print,
+  #consolidated-patient-statement-print,
+  #consultation-print-area,
+  .printable-area {
   #patient-registry-print,
   #consolidated-patient-statement-print,
   .printable-area {
