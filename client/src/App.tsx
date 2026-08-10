@@ -34,7 +34,7 @@ export function App() {
         <BranchProvider>
           <SocketSyncWrapper>
             <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
-            <RouterProvider router={router} />
+            <RouterProvider router={router} future={{ v7_startTransition: true }} />
           </SocketSyncWrapper>
         </BranchProvider>
       </AuthProvider>

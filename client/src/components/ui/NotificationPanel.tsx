@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   motion,
@@ -109,23 +109,29 @@ function NotificationSkeleton() {
 
 // ─── Notification Item ────────────────────────────────────────────────────────
 
-function NotificationItem({
-  notification,
-  isRead,
-  pinned,
-  onNavigate,
-  onDelete,
-  onMarkRead,
-  onTogglePin,
-}: {
-  notification: AppNotification;
-  isRead: boolean;
-  pinned: boolean;
-  onNavigate: (link: string, id?: string) => void;
-  onDelete: (id: string) => Promise<void>;
-  onMarkRead?: (id: string) => void;
-  onTogglePin: (id: string) => void;
-}) {
+const NotificationItem = forwardRef<
+  HTMLDivElement,
+  {
+    notification: AppNotification;
+    isRead: boolean;
+    pinned: boolean;
+    onNavigate: (link: string, id?: string) => void;
+    onDelete: (id: string) => Promise<void>;
+    onMarkRead?: (id: string) => void;
+    onTogglePin: (id: string) => void;
+  }
+>(function NotificationItem(
+  {
+    notification,
+    isRead,
+    pinned,
+    onNavigate,
+    onDelete,
+    onMarkRead,
+    onTogglePin,
+  },
+  ref
+) {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -159,6 +165,7 @@ function NotificationItem({
 
   return (
     <motion.div
+      ref={ref}
       layoutId={notification.id}
       layout
       variants={itemVariants}
@@ -267,7 +274,7 @@ function NotificationItem({
       )}
     </motion.div>
   );
-}
+});
 
 // ─── Main Panel ───────────────────────────────────────────────────────────────
 
