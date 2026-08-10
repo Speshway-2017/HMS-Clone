@@ -976,13 +976,6 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
               </Button>
             )}
 
-            <Button variant="secondary" onClick={() => navigate(-1)}>
-            {isCompleted && (
-              <Button variant="secondary" onClick={() => window.print()} className="flex items-center gap-1">
-                <Printer className="h-4 w-4" /> Print Record
-              </Button>
-            )}
-
             <Button variant="secondary" onClick={() => navigate(-1)} className="flex items-center gap-1.5">
               <ArrowLeft className="h-4 w-4" /> Back
             </Button>
@@ -1856,52 +1849,6 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                           value={admitWard}
                           onChange={(e) => setAdmitWard(e.target.value)}
                         >
-                          <option value="General">General</option>
-                          <option value="Semi Private">Semi Private</option>
-                          <option value="Private">Private</option>
-                          <option value="ICU">ICU</option>
-                        </SelectField>
-                      </div>
-
-                    {/* Form Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="md:col-span-2">
-                        <InputField
-                          label="Primary Diagnosis (Mandatory)"
-                          value={admitDiagnosis}
-                          onChange={(e) => setAdmitDiagnosis(e.target.value)}
-                          placeholder="Enter diagnostic confirmation..."
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <SelectField
-                          label="Admission Priority"
-                          value={admitPriority}
-                          onChange={(e) => setAdmitPriority(e.target.value)}
-                        >
-                          <option value="Routine">Routine</option>
-                          <option value="Urgent">Urgent</option>
-                          <option value="Emergency">Emergency</option>
-                        </SelectField>
-                      </div>
-
-                      <div>
-                        <InputField
-                          label="Expected Stay Duration"
-                          value={admitExpectedStay}
-                          onChange={(e) => setAdmitExpectedStay(e.target.value)}
-                          placeholder="e.g. 3 Days, 1 Week"
-                        />
-                      </div>
-
-                      <div>
-                        <SelectField
-                          label="Preferred Ward"
-                          value={admitWard}
-                          onChange={(e) => setAdmitWard(e.target.value)}
-                        >
                           {wardOptions.length > 0 ? (
                             wardOptions.map((wName) => (
                               <option key={wName} value={wName}>
@@ -1925,10 +1872,20 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                           value={admitBedType}
                           onChange={(e) => setAdmitBedType(e.target.value)}
                         >
-                          <option value="General">General</option>
-                          <option value="Semi-Private">Semi-Private</option>
-                          <option value="Private">Private</option>
-                          <option value="ICU">ICU</option>
+                          {bedTypeOptions.length > 0 ? (
+                            bedTypeOptions.map((bType) => (
+                              <option key={bType} value={bType}>
+                                {bType}
+                              </option>
+                            ))
+                          ) : (
+                            <>
+                              <option value="General">General</option>
+                              <option value="Semi-Private">Semi-Private</option>
+                              <option value="Private">Private</option>
+                              <option value="ICU">ICU</option>
+                            </>
+                          )}
                         </SelectField>
                       </div>
 

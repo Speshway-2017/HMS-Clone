@@ -32,19 +32,6 @@ export function LaboratoryTestProcessing() {
 
     return isActiveStatus;
   });
-  // Requirement 3: Show only requests where Payment Status = PAID AND Lab Status != COMPLETED
-  // Hide: Completed requests, Cancelled requests, Archived requests, Already processed/completed requests.
-  const processingQueue = requests.filter(r => {
-    const s = (r.status || "").toLowerCase();
-    const p = (r.paymentStatus || "PAID").toUpperCase();
-
-    if (s === "completed" || s === "rejected" || s === "cancelled") return false;
-
-    const isPaid = p === "PAID";
-    const isActiveStatus = s === "accepted" || s === "processing" || s === "sample collection" || s === "quality check" || s === "pending" || s === "report_uploaded" || s === "verified";
-
-    return isPaid && isActiveStatus;
-  });
 
   if (isLoading) {
     return (
@@ -62,9 +49,6 @@ export function LaboratoryTestProcessing() {
         <p className="text-sm text-slate-500">
           Track active diagnostic orders, start processing, and upload report documents. (Completed orders automatically move to Completed Reports).
         </p>
-        <p className="text-sm text-slate-500">
-          Track paid diagnostic orders, start processing, and upload report documents. (Completed orders automatically move to Completed Reports).
-        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -75,13 +59,6 @@ export function LaboratoryTestProcessing() {
             <div className="flex h-48 flex-col items-center justify-center text-center text-slate-400 bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
               <Check className="h-8 w-8 text-emerald-500 mb-1" />
               <p className="text-sm font-medium">All queue requests processed!</p>
-              <p className="text-xs text-slate-400">No active diagnostic orders pending processing.</p>
-          <h3 className="mb-4 text-base font-semibold text-slate-800">Test Processing Queue (Paid & Active Only)</h3>
-          {processingQueue.length === 0 ? (
-            <div className="flex h-48 flex-col items-center justify-center text-center text-slate-400 bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
-              <Check className="h-8 w-8 text-emerald-500 mb-1" />
-              <p className="text-sm font-medium">All paid queue requests processed!</p>
-              <p className="text-xs text-slate-400">No active paid diagnostic orders pending processing.</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
