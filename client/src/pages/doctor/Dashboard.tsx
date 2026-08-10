@@ -61,6 +61,7 @@ import {
   useDoctorTodayAppointments
 } from "../../features/doctorDashboard";
 import { mapAppointmentTypeForDisplay } from "../../features/appointments";
+import { useSocketSync } from "../../hooks/useSocketSync";
 
 const STATUS_BADGE: Record<string, { tone: "success" | "warning" | "info" | "neutral" | "danger"; label: string }> = {
   pending_payment: { tone: "danger",   label: "Pending Payment" },
@@ -124,6 +125,7 @@ const Sparkline = React.memo(({ data, color = "#1e3a8a" }: { data: number[]; col
 Sparkline.displayName = "Sparkline";
 
 export function DoctorDashboard() {
+  useSocketSync();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [dateRange, setDateRange] = useState<string>("7days");

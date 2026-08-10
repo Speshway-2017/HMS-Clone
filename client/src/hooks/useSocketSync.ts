@@ -64,6 +64,7 @@ export function useSocketSync() {
       }
 
       queryClient.invalidateQueries({ queryKey: ["appointments"], refetchType: "none" });
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
       queryClient.invalidateQueries({ queryKey: ["doctor", "dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["reception"] });
     };

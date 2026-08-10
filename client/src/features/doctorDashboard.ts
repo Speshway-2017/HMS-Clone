@@ -146,6 +146,8 @@ export function useDoctorDashboardAnalytics(filters?: { range?: string; startDat
       const res = await api.get<{ status: string; data: any }>("/doctors/dashboard/analytics", { params: filters });
       return res.data.data;
     },
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 }
 
@@ -157,6 +159,8 @@ export function useDoctorTodayAppointments() {
       const res = await api.get<{ status: string; data: Appointment[] }>("/doctors/dashboard/appointments/today");
       return res.data.data;
     },
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 }
 
