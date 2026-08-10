@@ -14,6 +14,7 @@ import { getDoctorDynamicStatus, getBusyDoctorIds } from "../utils/doctorStatus"
 import { syncDoctorStaffRecords } from "./staffController";
 
 import { Department } from "../models/Department";
+import { Feedback } from "../models/Feedback";
 import { emitToHospital } from "../config/socket";
 
 const doctorSchema = z.object({
@@ -48,20 +49,22 @@ export const listDoctors = catchAsync(async (req: Request, res: Response) => {
   if (search) filter.name = new RegExp(search, "i");
 
   const hospitalId = req.hospitalFilter?.hospital;
-  const busyDoctorIds = await getBusyDoctorIds(hospitalId as any);
+  const busyDoctorIds = await getBusyDoctorIds(hospitalId);
 
   const [doctors, allHospitalDoctors] = await Promise.all([
     Doctor.find(filter).populate("department", "name").sort({ createdAt: -1 }).skip(skip).limit(limit),
-    Doctor.find(filter),
+    Doctor.find({ ...req.hospitalFilter, isActive: { $ne: false } }),
   ]);
 
-  const resolvedPaginated = doctors.map(d => {
-    return { ...d.toObject(), status: getDoctorDynamicStatus(d, busyDoctorIds) };
-  });
+  const resolvedPaginated = doctors.map(d => ({
+    ...d.toObject(),
+    status: getDoctorDynamicStatus(d, busyDoctorIds)
+  }));
 
-  const allResolvedDoctors = allHospitalDoctors.map(d => {
-    return { ...d.toObject(), status: getDoctorDynamicStatus(d, busyDoctorIds) };
-  });
+  const allResolvedDoctors = allHospitalDoctors.map(d => ({
+    ...d.toObject(),
+    status: getDoctorDynamicStatus(d, busyDoctorIds)
+  }));
 
   const totalFiltered = await Doctor.countDocuments(filter);
   const total = allResolvedDoctors.length;
@@ -69,7 +72,6 @@ export const listDoctors = catchAsync(async (req: Request, res: Response) => {
   const onLeaveCount = allResolvedDoctors.filter(d => d.status === "on_leave").length;
 
   res.json({
-    status: "success",
     ...paginatedResponse(resolvedPaginated, totalFiltered, { page, limit, skip }),
     counts: {
       total,
@@ -264,19 +266,78 @@ export const getDoctorPerformance = catchAsync(async (req: Request, res: Respons
     throw new AppError("Doctor not found.", 404);
   }
 
-  const [monthlyVolume, completedTotal] = await Promise.all([
-    Appointment.countDocuments({
-      doctor: doctor._id,
-      createdAt: { $gte: new Date(new Date().setDate(1)) },
-    }),
-    Appointment.countDocuments({ doctor: doctor._id, status: "completed" }),
+  const hospitalId = doctor.hospital;
+
+  // 1. Appointments counters
+  const [completedTotal, upcomingTotal, totalBookings] = await Promise.all([
+    Appointment.countDocuments({ hospital: hospitalId, doctor: doctor._id, status: "completed" }),
+    Appointment.countDocuments({ hospital: hospitalId, doctor: doctor._id, status: { $in: ["scheduled", "checked_in", "waiting", "in_consultation"] } }),
+    Appointment.countDocuments({ hospital: hospitalId, doctor: doctor._id, status: { $nin: ["cancelled", "no_show"] } })
   ]);
+
+  // 2. Real patient feedback records
+  const feedbackList = await Feedback.find({ hospital: hospitalId, doctor: doctor._id })
+    .populate("patient", "name uhid photoUrl")
+    .sort({ createdAt: -1 })
+    .limit(20);
+
+  // 3. Dynamic Rating Calculation
+  const allRatings = await Feedback.find({ hospital: hospitalId, doctor: doctor._id }).select("rating");
+  const totalReviews = allRatings.length;
+  let avgRating = 0;
+  const ratingDistribution: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+
+  if (totalReviews > 0) {
+    const sum = allRatings.reduce((acc, curr) => {
+      const r = Math.min(5, Math.max(1, curr.rating));
+      ratingDistribution[r] = (ratingDistribution[r] || 0) + 1;
+      return acc + r;
+    }, 0);
+    avgRating = parseFloat((sum / totalReviews).toFixed(1));
+  }
+
+  // 4. Monthly Consultations Trends (last 3 months)
+  const now = new Date();
+  const monthlyTrends: { month: string; consultations: number }[] = [];
+  for (let i = 2; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const startOfMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+    const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+    const monthName = d.toLocaleString("en-US", { month: "short" });
+
+    const count = await Appointment.countDocuments({
+      hospital: hospitalId,
+      doctor: doctor._id,
+      status: "completed",
+      date: { $gte: startOfMonth, $lte: endOfMonth }
+    });
+
+    monthlyTrends.push({ month: monthName, consultations: count });
+  }
 
   res.json({
     status: "success",
     data: {
       doctor,
-      metrics: { monthlyVolume, completedTotal, patientSatisfaction: doctor.rating },
+      metrics: {
+        completedTotal,
+        upcomingTotal,
+        totalBookings,
+        monthlyVolume: totalBookings,
+        patientSatisfaction: avgRating ? Math.round(avgRating * 20) : (doctor.rating || 95),
+        avgRating,
+        totalReviews,
+        ratingDistribution,
+        monthlyTrends,
+      },
+      feedback: feedbackList.map(fb => ({
+        _id: fb._id,
+        patientName: (fb.patient as any)?.name || "Patient",
+        patientUhid: (fb.patient as any)?.uhid || "",
+        rating: fb.rating,
+        comment: fb.comment,
+        createdAt: fb.createdAt
+      }))
     },
   });
 });
