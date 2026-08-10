@@ -3,6 +3,7 @@ import { catchAsync } from "../utils/catchAsync";
 import { AppError } from "../utils/AppError";
 import { Bed } from "../models/Bed";
 import { Room } from "../models/Room";
+import { Admission } from "../models/Admission";
 
 export const listBeds = catchAsync(async (req: Request, res: Response) => {
   const { search, ward, room, status, page = 1, limit = 10 } = req.query;
@@ -45,10 +46,38 @@ export const listBeds = catchAsync(async (req: Request, res: Response) => {
     Bed.countDocuments(query)
   ]);
 
+  // Enrich occupied beds with patient details if missing from direct reference
+  const enrichedBeds = await Promise.all(
+    beds.map(async (b: any) => {
+      if (!b.patient && (b.isOccupied || b.status === "Occupied")) {
+        const activeAdm = await Admission.findOne({
+          hospital: req.hospitalFilter?.hospital,
+          bed: b._id,
+          status: { $nin: ["discharged", "Discharged", "Cancelled", "Expired", "Transferred Out (Final)"] }
+        })
+          .populate("patient", "name uhid patientCode phone")
+          .lean();
+
+        if (activeAdm && activeAdm.patient) {
+          return {
+            ...b,
+            patient: activeAdm.patient,
+            admission: {
+              _id: activeAdm._id,
+              admissionNumber: activeAdm.admissionNumber,
+              status: activeAdm.status
+            }
+          };
+        }
+      }
+      return b;
+    })
+  );
+
   res.json({
     status: "success",
     data: {
-      beds,
+      beds: enrichedBeds,
       pagination: {
         total,
         page: pageNum,

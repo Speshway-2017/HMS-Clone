@@ -231,9 +231,15 @@ export class ReceptionRepository {
     });
   }
 
-  static async updateBedOccupancy(hospitalId: any, bedId: string, isOccupied: boolean) {
+  static async updateBedOccupancy(hospitalId: any, bedId: string, isOccupied: boolean, patientId: any = null, admissionId: any = null) {
     const status = isOccupied ? "Occupied" : "Available";
-    return await Bed.findOneAndUpdate({ _id: bedId, ...toFilter(hospitalId) }, { isOccupied, status }, { new: true });
+    const updateData: any = {
+      isOccupied,
+      status,
+      patient: isOccupied ? patientId : null,
+      admission: isOccupied ? admissionId : null
+    };
+    return await Bed.findOneAndUpdate({ _id: bedId, ...toFilter(hospitalId) }, updateData, { new: true });
   }
 
   static async getQueueByDate(hospitalId: any, targetDate: Date) {

@@ -45,6 +45,8 @@ body {
   #opd-receipt-print *,
   #patient-card-print,
   #patient-card-print *,
+  #patient-registry-print,
+  #patient-registry-print *,
   #consolidated-patient-statement-print,
   #consolidated-patient-statement-print *,
   .printable-area,
@@ -52,8 +54,9 @@ body {
     visibility: visible !important;
   }
 
-  /* Force patient card print to display block */
-  #patient-card-print {
+  /* Force patient card & registry print to display block */
+  #patient-card-print,
+  #patient-registry-print {
     display: block !important;
   }
 
@@ -75,6 +78,7 @@ body {
   #admission-slip-print,
   #opd-receipt-print,
   #patient-card-print,
+  #patient-registry-print,
   #consolidated-patient-statement-print,
   .printable-area {
     position: absolute !important;

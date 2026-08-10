@@ -1519,6 +1519,8 @@ export class ReceptionService {
 
       // Allocate Bed / Mark as Occupied
       bed.isOccupied = true;
+      bed.status = "Occupied";
+      bed.patient = patientId as any;
       await bed.save({ session });
 
       // Fetch daily tariff and nursing rate for this room/ward
@@ -1587,6 +1589,10 @@ export class ReceptionService {
           }
         ]
       }], { session });
+
+      // Link created admission to bed
+      bed.admission = createdAdmission._id as any;
+      await bed.save({ session });
 
       let createdInvoice: any = null;
       let createdPayment: any = null;
