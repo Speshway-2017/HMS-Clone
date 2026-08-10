@@ -9,6 +9,8 @@ import { KpiCard } from "../../components/ui/KpiCard";
 import { Badge } from "../../components/ui/Badge";
 import { DataTable, Column } from "../../components/ui/DataTable";
 import { Pagination } from "../../components/ui/Pagination";
+import toast from "react-hot-toast";
+import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
 import { Branch } from "../../types/domain";
 
 const STATUS_TONE: Record<Branch["status"], "success" | "warning" | "danger" | "neutral"> = {
@@ -25,18 +27,31 @@ export function BranchesPage() {
   const { data, isLoading } = useBranches({ page, hospitalId });
   const deleteBranch = useDeleteBranch();
   const exportReport = useExportReport();
+  const [deleteTargetBranch, setDeleteTargetBranch] = useState<{ id: string; name: string } | null>(null);
+
+  const confirmDeleteBranch = async () => {
+    if (!deleteTargetBranch) return;
+    try {
+      await deleteBranch.mutateAsync(deleteTargetBranch.id);
+      toast.success(`Branch ${deleteTargetBranch.name} deleted successfully!`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to delete branch");
+    } finally {
+      setDeleteTargetBranch(null);
+    }
+  };
 
   const columns: Column<Branch>[] = [
     {
       header: "Branch Name",
       render: (b) => (
         <div>
-          <div className="font-semibold text-slate-800">{b.name}</div>
-          <div className="text-xs text-slate-400">ID: {b.branchId}</div>
+          <span className="font-semibold text-slate-800">{b.name}</span>
+          {b.branchId && <div className="text-xs text-slate-400 font-mono">ID: {b.branchId}</div>}
         </div>
       ),
     },
-    { header: "Parent Hospital", render: (b) => <span className="text-slate-600">{typeof b.hospital === "object" ? b.hospital.name : ""}</span> },
+    { header: "Hospital", render: (b) => <span className="text-slate-600">{typeof b.hospital === "object" && b.hospital ? b.hospital.name : "Unassigned"}</span> },
     { header: "Branch Head", render: (b) => <span className="text-slate-600">{b.headName || "—"}</span> },
     { header: "Total Staff", render: (b) => <span className="font-semibold text-slate-700">{b.totalStaff}</span> },
     { header: "Location", render: (b) => <span className="text-slate-600">{[b.city, b.state].filter(Boolean).join(", ") || "—"}</span> },
@@ -52,10 +67,9 @@ export function BranchesPage() {
             <Pencil className="h-4 w-4" />
           </Link>
           <button
-            onClick={() => {
-              if (confirm(`Delete ${b.name}?`)) deleteBranch.mutate(b._id);
-            }}
-            className="hover:text-red-600"
+            onClick={() => setDeleteTargetBranch({ id: b._id, name: b.name })}
+            className="hover:text-red-600 cursor-pointer"
+            title="Delete Branch"
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -99,6 +113,15 @@ export function BranchesPage() {
           <Pagination page={page} totalPages={data?.pagination.totalPages ?? 1} onPageChange={setPage} />
         </div>
       </Card>
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(deleteTargetBranch)}
+        title="Confirm Deletion"
+        message={`Are you sure you want to delete branch ${deleteTargetBranch?.name || ""}? This action cannot be undone.`}
+        isLoading={deleteBranch.isPending}
+        onClose={() => setDeleteTargetBranch(null)}
+        onConfirm={confirmDeleteBranch}
+      />
     </div>
   );
 }

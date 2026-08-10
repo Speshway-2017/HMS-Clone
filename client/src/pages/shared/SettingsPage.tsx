@@ -19,6 +19,8 @@ import { useChangePassword, useUpdateProfile } from "../../features/auth";
 import { useAuth } from "../../context/AuthContext";
 import { useMyHospital, useUpdateMyHospital } from "../../features/hospitals";
 import { FileUpload } from "../../components/ui/FileUpload";
+import { Card } from "../../components/ui/Card";
+import { Badge } from "../../components/ui/Badge";
 import toast from "react-hot-toast";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -42,7 +44,7 @@ function PasswordInput({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-xs font-bold uppercase tracking-wider text-slate-600">
+      <label htmlFor={id} className="text-xs font-semibold uppercase text-slate-400">
         {label}
       </label>
       <div className="relative">
@@ -53,7 +55,7 @@ function PasswordInput({
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           autoComplete={autoComplete}
-          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 pr-11 text-xs font-bold text-slate-800 placeholder:text-slate-400 shadow-sm outline-none transition focus:border-navy-600 focus:ring-2 focus:ring-navy-200"
+          className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 pr-11 text-sm text-slate-800 placeholder:text-slate-400 shadow-sm outline-none transition focus:border-navy-500 focus:ring-2 focus:ring-navy-200"
         />
         <button
           type="button"
@@ -64,6 +66,48 @@ function PasswordInput({
           {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>
       </div>
+    </div>
+  );
+}
+
+function Section({ title, subtitle, icon, children }: {
+  title: string; subtitle: string; icon: React.ReactNode; children: React.ReactNode;
+}) {
+  return (
+    <Card>
+      <div className="mb-5 flex items-center gap-3 pb-4 border-b border-slate-100">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy-100 text-navy-700">
+          {icon}
+        </div>
+        <div>
+          <h2 className="text-base font-semibold text-slate-800">{title}</h2>
+          <p className="text-xs text-slate-500">{subtitle}</p>
+        </div>
+      </div>
+      {children}
+    </Card>
+  );
+}
+
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm text-slate-700">{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-navy-500 focus:ring-offset-2 ${
+          checked ? "bg-navy-700" : "bg-slate-200"
+        }`}
+      >
+        <span
+          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform ${
+            checked ? "translate-x-5" : "translate-x-0"
+          }`}
+        />
+      </button>
     </div>
   );
 }
@@ -162,291 +206,212 @@ export function SettingsPage() {
     toast.success("Notification preferences saved successfully!");
   };
 
+  const TABS = [
+    { id: "profile", label: "Profile", icon: <User className="h-4 w-4" /> },
+    { id: "security", label: "Security", icon: <KeyRound className="h-4 w-4" /> },
+    { id: "notifications", label: "Notifications", icon: <Bell className="h-4 w-4" /> },
+    ...(user?.role === "hospital_admin"
+      ? [{ id: "hospital", label: "Hospital Rules", icon: <Building className="h-4 w-4" /> }]
+      : [])
+  ];
+
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      {/* Page Header Banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-navy-900 via-navy-800 to-indigo-950 p-6 text-white shadow-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-6">
+      {/* ── Page Header ── */}
+      <div className="flex items-start justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-emerald-500/20 px-3 py-0.5 text-xs font-extrabold text-emerald-300 border border-emerald-400/30">
-              Account Control Center
-            </span>
-            <span className="rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-xs font-semibold text-indigo-200 border border-indigo-400/30">
-              Role: {user?.role?.replace("_", " ").toUpperCase()}
-            </span>
-          </div>
-          <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">System & Account Settings</h1>
-          <p className="mt-1 text-xs text-indigo-200/80">
-            Manage your personal credentials, profile picture, security controls, and notification preferences.
-          </p>
+          <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
+          <p className="text-sm text-slate-500">Manage your profile, security, and system preferences.</p>
         </div>
+        <Badge tone="info">{user?.role ? user.role.replace("_", " ").toUpperCase() + " PORTAL" : "SYSTEM PORTAL"}</Badge>
       </div>
 
-      {/* Main Grid Layout: Left Nav + Right Section Panel */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4 items-start">
-        {/* Navigation Sidebar Cards */}
-        <div className="lg:col-span-1 space-y-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-          {[
-            { id: "profile", label: "Profile & Identity", icon: User, desc: "Personal info & photo" },
-            { id: "security", label: "Security & Credentials", icon: ShieldCheck, desc: "Password & authentication" },
-            { id: "notifications", label: "Notifications & Alerts", icon: Bell, desc: "Email, SMS & WhatsApp" },
-            ...(user?.role === "hospital_admin"
-              ? [{ id: "hospital", label: "Hospital System Rules", icon: Building, desc: "Global clinic settings" }]
-              : [])
-          ].map((item) => {
-            const Icon = item.icon;
-            const isActive = activeSection === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setActiveSection(item.id as any)}
-                className={`w-full flex items-center gap-3 rounded-xl p-3 text-left transition-all cursor-pointer ${
-                  isActive
-                    ? "bg-navy-800 text-white shadow-md font-extrabold"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                }`}
-              >
-                <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${isActive ? "bg-white/15 text-white" : "bg-slate-100 text-navy-700"}`}>
-                  <Icon className="h-4 w-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold">{item.label}</div>
-                  <div className={`text-[10px] ${isActive ? "text-indigo-200" : "text-slate-400"}`}>{item.desc}</div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Right Content Panel */}
-        <div className="lg:col-span-3 space-y-6">
-          {/* SECTION 1: PROFILE & IDENTITY */}
-          {activeSection === "profile" && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
-              <div className="flex items-center gap-3 border-b pb-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700">
-                  <User className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-800">Profile & Identity</h3>
-                  <p className="text-xs text-slate-500">Update your account avatar, display name, and personal information.</p>
-                </div>
+      {/* ── Profile Summary Banner ── */}
+      <Card className="p-0 overflow-hidden">
+        <div className="bg-gradient-to-r from-navy-700 to-navy-800 px-6 py-5">
+          <div className="flex items-center gap-5">
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.name}
+                className="h-16 w-16 rounded-full object-cover ring-4 ring-white/30"
+              />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/20 ring-4 ring-white/30">
+                <span className="text-2xl font-bold text-white">
+                  {user?.name?.charAt(0).toUpperCase() ?? "U"}
+                </span>
               </div>
+            )}
+            <div>
+              <p className="text-xl font-bold text-white">{user?.name ?? "User"}</p>
+              <p className="text-sm text-navy-200">{user?.email}</p>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-medium text-white capitalize">
+                  Role: {user?.role?.replace("_", " ") ?? "Staff"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
 
-              {/* Photo Upload Card */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 rounded-2xl bg-slate-50/80 p-5 border border-slate-200">
-                <div className="flex items-center gap-4">
-                  {user?.avatarUrl ? (
-                    <img
-                      src={user.avatarUrl}
-                      alt={user.name}
-                      className="h-16 w-16 rounded-2xl object-cover ring-4 ring-navy-100 shadow-md"
-                    />
-                  ) : (
-                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-navy-800 text-white text-2xl font-black ring-4 ring-navy-100 shadow-md">
-                      {user?.name?.charAt(0).toUpperCase() ?? "?"}
-                    </div>
-                  )}
-                  <div>
-                    <h4 className="text-base font-extrabold text-slate-900">{user?.name}</h4>
-                    <p className="text-xs text-slate-500">{user?.email}</p>
-                    <span className="mt-1.5 inline-block rounded-full bg-emerald-100 px-3 py-0.5 text-[10px] font-black uppercase text-emerald-800 border border-emerald-300">
-                      {user?.role?.replace("_", " ")}
-                    </span>
-                  </div>
+      {/* ── Tab Navigation ── */}
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-200 pb-px">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveSection(tab.id as any)}
+            className={`flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 ${
+              activeSection === tab.id
+                ? "border-navy-700 text-navy-700 font-semibold"
+                : "border-transparent text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            {tab.icon} {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ══════════════════ PROFILE TAB ══════════════════ */}
+      {activeSection === "profile" && (
+        <div className="space-y-5">
+          <Section title="Personal Information" subtitle="Your basic personal and account identity details." icon={<User className="h-5 w-5 text-navy-700" />}>
+            <form onSubmit={handleSaveProfile} className="space-y-5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold uppercase text-slate-400">Full Display Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                  />
                 </div>
 
-                <div className="w-full sm:w-64">
-                  <FileUpload
-                    label="Upload New Photo"
-                    folder={user?.role === "doctor" ? "doctor-photos" : "staff-photos"}
-                    value={user?.avatarUrl || ""}
-                    onChange={handleAvatarChange}
-                    hint="PNG, JPG or WEBP (Max 2MB)"
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold uppercase text-slate-400">Email Address (ReadOnly)</label>
+                  <input
+                    type="email"
+                    disabled
+                    value={email}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-500 cursor-not-allowed"
                   />
                 </div>
               </div>
 
-              {/* Account Form */}
-              <form onSubmit={handleSaveProfile} className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                      Full Display Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-xs font-bold text-slate-800 focus:border-navy-600 focus:ring-2 focus:ring-navy-200"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                      Email Address (Account Username)
-                    </label>
-                    <input
-                      type="email"
-                      disabled
-                      value={email}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-500 cursor-not-allowed"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end pt-3">
-                  <button
-                    type="submit"
-                    disabled={updateProfileMutation.isPending}
-                    className="flex items-center gap-2 rounded-xl bg-navy-800 px-5 py-2.5 text-xs font-extrabold text-white shadow-md hover:bg-navy-900 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-                  >
-                    <Save className="h-4 w-4" />
-                    {updateProfileMutation.isPending ? "Saving Profile..." : "Save Profile Details"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* SECTION 2: SECURITY & CREDENTIALS */}
-          {activeSection === "security" && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
-              <div className="flex items-center gap-3 border-b pb-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700">
-                  <KeyRound className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-800">Security & Credentials</h3>
-                  <p className="text-xs text-slate-500">Update your account password and manage system authentication security.</p>
-                </div>
+              <div className="mt-4 border-t border-slate-100 pt-4">
+                <FileUpload
+                  label="Upload Profile Avatar"
+                  folder={user?.role === "doctor" ? "doctor-photos" : "staff-photos"}
+                  value={user?.avatarUrl || ""}
+                  onChange={handleAvatarChange}
+                  hint="PNG, JPG or WEBP (Max 2MB)"
+                />
               </div>
 
-              <form onSubmit={handleChangePassword} className="space-y-4 max-w-lg">
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  disabled={updateProfileMutation.isPending}
+                  className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Save className="h-4 w-4" />
+                  {updateProfileMutation.isPending ? "Saving..." : "Save Profile"}
+                </button>
+              </div>
+            </form>
+          </Section>
+        </div>
+      )}
+
+      {/* ══════════════════ SECURITY TAB ══════════════════ */}
+      {activeSection === "security" && (
+        <div className="space-y-5">
+          <Section title="Change Password" subtitle="Set a strong new password for your account." icon={<KeyRound className="h-5 w-5 text-navy-700" />}>
+            <form onSubmit={handleChangePassword} className="space-y-5" noValidate>
+              <PasswordInput
+                id="newPassword"
+                label="New Password *"
+                value={newPassword}
+                onChange={setNewPassword}
+                placeholder="Enter your new strong password"
+                autoComplete="new-password"
+              />
+
+              <div>
                 <PasswordInput
-                  id="newPassword"
-                  label="New Password *"
-                  value={newPassword}
-                  onChange={setNewPassword}
-                  placeholder="Enter your new strong password"
+                  id="confirmPassword"
+                  label="Confirm New Password *"
+                  value={confirmPassword}
+                  onChange={setConfirmPassword}
+                  placeholder="Re-enter your new password"
                   autoComplete="new-password"
                 />
-
-                <div>
-                  <PasswordInput
-                    id="confirmPassword"
-                    label="Confirm New Password *"
-                    value={confirmPassword}
-                    onChange={setConfirmPassword}
-                    placeholder="Re-enter your new password"
-                    autoComplete="new-password"
-                  />
-                  {confirmPassword && (
-                    <p className={`mt-2 flex items-center gap-1.5 text-xs font-bold ${passwordsMatch ? "text-emerald-600" : "text-rose-600"}`}>
-                      {passwordsMatch ? (
-                        <>
-                          <CheckCircle2 className="h-4 w-4" /> Passwords match perfectly
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="h-4 w-4" /> Passwords do not match
-                        </>
-                      )}
-                    </p>
-                  )}
-                </div>
-
-                <div className="rounded-xl bg-slate-50 p-4 border border-slate-200 text-xs font-medium text-slate-600 space-y-1">
-                  <p className="font-extrabold text-slate-800 flex items-center gap-1.5">
-                    <Lock className="h-4 w-4 text-emerald-600" /> End-to-End Encryption
+                {confirmPassword && (
+                  <p className={`mt-1.5 flex items-center gap-1.5 text-xs font-semibold ${passwordsMatch ? "text-emerald-600" : "text-red-500"}`}>
+                    {passwordsMatch ? (
+                      <>
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Passwords match
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-3.5 w-3.5" /> Passwords do not match
+                      </>
+                    )}
                   </p>
-                  <p className="text-slate-500 text-[11px]">
-                    Your password is hashed using bcrypt prior to database storage. Keep your login credentials confidential.
-                  </p>
-                </div>
-
-                <div className="flex justify-end pt-2">
-                  <button
-                    type="submit"
-                    disabled={isChangingPassword || !newPassword || !confirmPassword || passwordsMismatch}
-                    className="flex items-center gap-2 rounded-xl bg-navy-800 px-5 py-2.5 text-xs font-extrabold text-white shadow-md hover:bg-navy-900 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-                  >
-                    <ShieldCheck className="h-4 w-4" />
-                    {isChangingPassword ? "Updating Password..." : "Update Password"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* SECTION 3: NOTIFICATIONS & PREFERENCES */}
-          {activeSection === "notifications" && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
-              <div className="flex items-center gap-3 border-b pb-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
-                  <Bell className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-800">Notifications & Alert Preferences</h3>
-                  <p className="text-xs text-slate-500">Customize how and when you receive appointment, billing, and clinical notifications.</p>
-                </div>
+                )}
               </div>
 
-              <form onSubmit={handleSavePreferences} className="space-y-4">
-                <div className="space-y-3">
-                  {[
-                    { title: "Email Notifications & Reminders", desc: "Receive instant email receipts for appointment confirmations & billing invoices.", state: emailAlerts, setState: setEmailAlerts, icon: Mail },
-                    { title: "SMS Phone Text Alerts", desc: "Get SMS alerts for upcoming doctor consultations and hospital queues.", state: smsAlerts, setState: setSmsAlerts, icon: Smartphone },
-                    { title: "WhatsApp Appointment Reminders", desc: "Receive automated Google Meet video links and RX slips via WhatsApp.", state: whatsappAlerts, setState: setWhatsappAlerts, icon: Globe },
-                    { title: "Dashboard Sound Notifications", desc: "Play audio alert chimes when new live notifications or messages arrive.", state: soundEnabled, setState: setSoundEnabled, icon: Bell }
-                  ].map((item, idx) => {
-                    const Icon = item.icon;
-                    return (
-                      <div key={idx} className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white transition-all">
-                        <div className="flex items-start gap-3">
-                          <div className="p-2 rounded-lg bg-navy-100 text-navy-700 shrink-0 mt-0.5">
-                            <Icon className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <h4 className="text-xs font-extrabold text-slate-900">{item.title}</h4>
-                            <p className="text-[11px] text-slate-500 mt-0.5">{item.desc}</p>
-                          </div>
-                        </div>
-
-                        <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-4">
-                          <input
-                            type="checkbox"
-                            checked={item.state}
-                            onChange={(e) => item.setState(e.target.checked)}
-                            className="sr-only peer"
-                          />
-                          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                        </label>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="flex justify-end pt-3">
-                  <button
-                    type="submit"
-                    className="flex items-center gap-2 rounded-xl bg-navy-800 px-5 py-2.5 text-xs font-extrabold text-white shadow-md hover:bg-navy-900 transition-all cursor-pointer active:scale-95"
-                  >
-                    <Save className="h-4 w-4" /> Save Preferences
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* SECTION 4: HOSPITAL SYSTEM RULES (HOSPITAL ADMIN ONLY) */}
-          {activeSection === "hospital" && user?.role === "hospital_admin" && (
-            <HospitalSettingsCard />
-          )}
+              <div className="flex items-center justify-between pt-2">
+                <p className="flex items-center gap-1.5 text-xs text-slate-400">
+                  <Lock className="h-3.5 w-3.5" /> Encrypted end-to-end with bcrypt
+                </p>
+                <button
+                  type="submit"
+                  disabled={isChangingPassword || !newPassword || !confirmPassword || passwordsMismatch}
+                  className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  {isChangingPassword ? "Updating..." : "Update Password"}
+                </button>
+              </div>
+            </form>
+          </Section>
         </div>
-      </div>
+      )}
+
+      {/* ══════════════════ NOTIFICATIONS TAB ══════════════════ */}
+      {activeSection === "notifications" && (
+        <div className="space-y-5">
+          <Section title="Notification Preferences" subtitle="Customize your alert delivery channels." icon={<Bell className="h-5 w-5 text-navy-700" />}>
+            <form onSubmit={handleSavePreferences} className="space-y-4">
+              <div className="space-y-3 rounded-lg border border-slate-100 p-4">
+                <Toggle checked={emailAlerts} onChange={setEmailAlerts} label="Email Notifications & Receipts" />
+                <Toggle checked={smsAlerts} onChange={setSmsAlerts} label="SMS Phone Text Alerts" />
+                <Toggle checked={whatsappAlerts} onChange={setWhatsappAlerts} label="WhatsApp Appointment Reminders" />
+                <Toggle checked={soundEnabled} onChange={setSoundEnabled} label="Dashboard Sound Alerts & Chimes" />
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors"
+                >
+                  <Save className="h-4 w-4" /> Save Preferences
+                </button>
+              </div>
+            </form>
+          </Section>
+        </div>
+      )}
+
+      {/* ══════════════════ HOSPITAL RULES TAB (HOSPITAL ADMIN ONLY) ══════════════════ */}
+      {activeSection === "hospital" && user?.role === "hospital_admin" && (
+        <HospitalSettingsCard />
+      )}
     </div>
   );
 }
@@ -498,80 +463,73 @@ function HospitalSettingsCard() {
 
   if (isLoading) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex items-center justify-center">
-        <span className="text-slate-500 text-xs font-bold">Loading hospital settings...</span>
-      </div>
+      <Card>
+        <div className="py-8 text-center text-xs font-semibold text-slate-400">Loading hospital settings...</div>
+      </Card>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
-      <div className="flex items-center gap-3 border-b pb-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700">
-          <Building className="h-5 w-5" />
-        </div>
-        <div>
-          <h3 className="text-base font-extrabold text-slate-800">Hospital Settings & Rules</h3>
-          <p className="text-xs text-slate-500">Configure global hospital details, logo, and OP consultation validity policies.</p>
-        </div>
-      </div>
-
+    <Section title="Hospital Settings & System Rules" subtitle="Configure global hospital information, branding, and consultation validity." icon={<Building className="h-5 w-5 text-navy-700" />}>
       <form onSubmit={handleSave} className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Hospital Name *</label>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase text-slate-400">Hospital Name *</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-xs font-bold text-slate-800 focus:border-navy-600 focus:ring-2 focus:ring-navy-200"
+              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
               required
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Hospital Code (ReadOnly)</label>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase text-slate-400">Hospital Code (ReadOnly)</label>
             <input
               type="text"
               value={hospital?.code || ""}
               disabled
-              className="w-full rounded-xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-500 cursor-not-allowed"
+              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-500 cursor-not-allowed"
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Contact Email</label>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase text-slate-400">Contact Email</label>
             <input
               type="email"
               value={contactEmail}
               onChange={(e) => setContactEmail(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-xs font-bold text-slate-800 focus:border-navy-600 focus:ring-2 focus:ring-navy-200"
+              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Contact Phone</label>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase text-slate-400">Contact Phone</label>
             <input
-              type="text"
+              type="tel"
               value={contactPhone}
-              onChange={(e) => setContactPhone(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-xs font-bold text-slate-800 focus:border-navy-600 focus:ring-2 focus:ring-navy-200"
-            />
-          </div>
-
-          <div className="sm:col-span-2 border-t pt-4">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Hospital Logo</label>
-            <FileUpload
-              label="Hospital Logo"
-              folder="hospital-logos"
-              value={logoUrl}
-              onChange={setLogoUrl}
+              onKeyDown={(e) => {
+                const allowed = ["Backspace", "Delete", "Tab", "Escape", "Enter", "ArrowLeft", "ArrowRight", "+"];
+                if (!allowed.includes(e.key) && !e.ctrlKey && !e.metaKey && !/^[0-9]$/.test(e.key)) e.preventDefault();
+              }}
+              onChange={(e) => setContactPhone(e.target.value.replace(/(?!^\+)[^\d]/g, ""))}
+              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
             />
           </div>
         </div>
 
-        <div className="border-t pt-4 space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-800">OP Consultation Expiry Limit (Days)</label>
+        <div className="border-t border-slate-100 pt-4">
+          <FileUpload
+            label="Hospital Branding Logo"
+            folder="hospital-logos"
+            value={logoUrl}
+            onChange={setLogoUrl}
+          />
+        </div>
+
+        <div className="border-t border-slate-100 pt-4 space-y-1.5">
+          <label className="text-xs font-semibold uppercase text-slate-400">OP Consultation Expiry Limit (Days)</label>
           <p className="text-xs text-slate-500">Number of days a completed OP consultation remains valid for free revisits.</p>
           <input
             type="number"
@@ -579,7 +537,7 @@ function HospitalSettingsCard() {
             max="180"
             value={opExpiryLimit}
             onChange={(e) => setOpExpiryLimit(Number(e.target.value))}
-            className="w-full sm:w-1/3 rounded-xl border border-slate-300 px-4 py-2.5 text-xs font-bold text-slate-800 focus:border-navy-600 focus:ring-2 focus:ring-navy-200"
+            className="w-full sm:w-1/3 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
             required
           />
         </div>
@@ -588,13 +546,13 @@ function HospitalSettingsCard() {
           <button
             type="submit"
             disabled={updateMutation.isPending}
-            className="flex items-center gap-2 rounded-xl bg-navy-800 px-5 py-2.5 text-xs font-extrabold text-white shadow-md hover:bg-navy-900 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="h-4 w-4" />
-            {updateMutation.isPending ? "Saving Hospital Settings..." : "Save Hospital Settings"}
+            {updateMutation.isPending ? "Saving..." : "Save Hospital Settings"}
           </button>
         </div>
       </form>
-    </div>
+    </Section>
   );
 }

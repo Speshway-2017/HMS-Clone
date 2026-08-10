@@ -4,8 +4,7 @@ import { AppError } from "../utils/AppError";
 import { RoomTariff } from "../models/RoomTariff";
 
 export const listRoomTariffs = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
-  const tariffs = await RoomTariff.find({ hospital: hospitalId }).sort({ ward: 1, roomType: 1 });
+  const tariffs = await RoomTariff.find({ ...req.hospitalFilter }).sort({ ward: 1, roomType: 1 });
   
   res.json({
     status: "success",
@@ -15,6 +14,7 @@ export const listRoomTariffs = catchAsync(async (req: Request, res: Response) =>
 
 export const createRoomTariff = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital;
+  const branchId = req.hospitalFilter?.branch ?? null;
   const { ward, roomType, tariff, nursingTariff, status, effectiveDate, description } = req.body;
 
   if (!ward || !roomType || tariff === undefined) {
@@ -22,13 +22,14 @@ export const createRoomTariff = catchAsync(async (req: Request, res: Response) =
   }
 
   // Check if tariff already exists for this combo
-  const existing = await RoomTariff.findOne({ hospital: hospitalId, ward, roomType });
+  const existing = await RoomTariff.findOne({ ...req.hospitalFilter, ward, roomType });
   if (existing) {
     throw new AppError(`A tariff configuration already exists for ward "${ward}" and room type "${roomType}".`, 400);
   }
 
   const roomTariff = await RoomTariff.create({
     hospital: hospitalId,
+    branch: branchId,
     ward,
     roomType,
     tariff: Number(tariff),
@@ -45,11 +46,10 @@ export const createRoomTariff = catchAsync(async (req: Request, res: Response) =
 });
 
 export const updateRoomTariff = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
   const { id } = req.params;
   const { ward, roomType, tariff, nursingTariff, status, effectiveDate, description } = req.body;
 
-  const roomTariff = await RoomTariff.findOne({ _id: id, hospital: hospitalId });
+  const roomTariff = await RoomTariff.findOne({ _id: id, ...req.hospitalFilter });
   if (!roomTariff) {
     throw new AppError("Room tariff configuration not found.", 404);
   }
@@ -58,7 +58,7 @@ export const updateRoomTariff = catchAsync(async (req: Request, res: Response) =
   if ((ward && ward !== roomTariff.ward) || (roomType && roomType !== roomTariff.roomType)) {
     const targetWard = ward || roomTariff.ward;
     const targetRoomType = roomType || roomTariff.roomType;
-    const existing = await RoomTariff.findOne({ hospital: hospitalId, ward: targetWard, roomType: targetRoomType });
+    const existing = await RoomTariff.findOne({ ...req.hospitalFilter, ward: targetWard, roomType: targetRoomType });
     if (existing && String(existing._id) !== id) {
       throw new AppError(`A tariff configuration already exists for ward "${targetWard}" and room type "${targetRoomType}".`, 400);
     }
@@ -81,10 +81,9 @@ export const updateRoomTariff = catchAsync(async (req: Request, res: Response) =
 });
 
 export const deleteRoomTariff = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
   const { id } = req.params;
 
-  const roomTariff = await RoomTariff.findOneAndDelete({ _id: id, hospital: hospitalId });
+  const roomTariff = await RoomTariff.findOneAndDelete({ _id: id, ...req.hospitalFilter });
   if (!roomTariff) {
     throw new AppError("Room tariff configuration not found.", 404);
   }
@@ -96,7 +95,6 @@ export const deleteRoomTariff = catchAsync(async (req: Request, res: Response) =
 });
 
 export const getRoomTariffByWardAndType = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
   const ward = req.query.ward as string;
   const roomType = req.query.roomType as string;
 
@@ -105,7 +103,7 @@ export const getRoomTariffByWardAndType = catchAsync(async (req: Request, res: R
   }
 
   const tariff = await RoomTariff.findOne({
-    hospital: hospitalId,
+    ...req.hospitalFilter,
     ward,
     roomType,
     status: "Active"

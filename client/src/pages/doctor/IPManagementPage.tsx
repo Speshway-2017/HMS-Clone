@@ -579,12 +579,12 @@ export function IPManagementPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-200 pb-px">
+      <div className="flex gap-2 border-b border-slate-200 pb-px overflow-x-auto max-w-full scrollbar-none flex-nowrap shrink-0">
         {TABS.map((tab, idx) => (
           <button
             key={tab}
             onClick={() => setActiveTab(idx)}
-            className={`border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
+            className={`border-b-2 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap ${
               activeTab === idx
                 ? "border-navy-700 text-navy-700"
                 : "border-transparent text-slate-500 hover:text-slate-700"

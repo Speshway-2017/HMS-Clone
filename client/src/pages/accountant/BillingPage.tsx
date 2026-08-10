@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
+// @ts-ignore
+import html2pdf from "html2pdf.js";
 import { 
   Receipt, 
   Plus, 
@@ -35,6 +38,7 @@ import { socket } from "../../lib/socket";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { Modal } from "../../components/ui/Modal";
+import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
 import { InputField, SelectField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 import { formatINR } from "../../lib/currency";
@@ -286,7 +290,6 @@ export function AccountantBillingPage() {
   // Socket sync bindings
   useEffect(() => {
     const handleIPUpdate = (data: any) => {
-      console.log("IP Billing real-time update:", data);
       if (selectedAdmissionId && (data.admissionId === selectedAdmissionId || data.type === "IP_DISCHARGE_BILL")) {
         refetchIPDetails();
       }
@@ -337,6 +340,34 @@ export function AccountantBillingPage() {
 
 
 
+  const handleDownloadPDF = async (elementId: string, filename: string) => {
+    const element = document.getElementById(elementId);
+    if (!element) {
+      toast.error("Document element not found for PDF export.");
+      return;
+    }
+
+    const toastId = toast.loading("Generating PDF document...");
+
+    try {
+      const opt = {
+        margin: [8, 8, 8, 8],
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      // @ts-ignore
+      await html2pdf().set(opt).from(element).save();
+
+      toast.success("PDF document downloaded successfully!", { id: toastId });
+    } catch (error: any) {
+      console.error("PDF generation error:", error);
+      toast.error(error?.message || "Failed to generate PDF document.", { id: toastId });
+    }
+  };
+
   const handleAddCustomCharge = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customServiceName || customPrice <= 0) return;
@@ -357,16 +388,25 @@ export function AccountantBillingPage() {
       setCustomTax(0);
       setCustomRemarks("");
     } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || "Failed to add charge");
+      toast.error(err?.response?.data?.message || err?.message || "Failed to add charge");
     }
   };
 
-  const handleDeleteCharge = async (chargeId: string) => {
-    if (!window.confirm("Are you sure you want to remove this charge item?")) return;
+  const [deleteTargetChargeId, setDeleteTargetChargeId] = useState<string | null>(null);
+
+  const handleDeleteCharge = (chargeId: string) => {
+    setDeleteTargetChargeId(chargeId);
+  };
+
+  const confirmDeleteCharge = async () => {
+    if (!deleteTargetChargeId) return;
     try {
-      await deleteChargeMutation.mutateAsync(chargeId);
+      await deleteChargeMutation.mutateAsync(deleteTargetChargeId);
+      toast.success("Charge item removed successfully!");
     } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || "Failed to remove charge");
+      toast.error(err?.response?.data?.message || err?.message || "Failed to remove charge");
+    } finally {
+      setDeleteTargetChargeId(null);
     }
   };
 
@@ -384,13 +424,13 @@ export function AccountantBillingPage() {
       setAdvanceAmount(0);
       setAdvanceTxId("");
     } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || "Failed to post payment");
+      toast.error(err?.response?.data?.message || err?.message || "Failed to post payment");
     }
   };
 
   const handleGenerateFinalBill = async () => {
     if (allBlockages.length > 0) {
-      alert("Cannot generate final invoice. Please resolve all blocking requirements.");
+      toast.error("Cannot generate final invoice. Please resolve all blocking requirements.");
       return;
     }
     if (!window.confirm("Confirm generating Final IP Invoice? This will discharge the patient.")) return;
@@ -408,7 +448,7 @@ export function AccountantBillingPage() {
         taxRate: taxRateVal
       });
       if (res.success) {
-        alert("Final Inpatient Invoice generated successfully. Patient discharged.");
+        toast.success("Final Inpatient Invoice generated successfully. Patient discharged.");
         setSelectedInvoice(res.data.invoice);
         setIsInvoiceDetailsOpen(true);
         setSelectedAdmissionId(null);
@@ -416,7 +456,7 @@ export function AccountantBillingPage() {
         refetch();
       }
     } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || "Failed to generate final invoice");
+      toast.error(err?.response?.data?.message || err?.message || "Failed to generate final invoice");
     }
   };
 
@@ -1662,7 +1702,13 @@ export function AccountantBillingPage() {
                 <Button variant="secondary" onClick={handlePrint}>
                   <Printer className="h-4 w-4" /> Print Bill
                 </Button>
-                <Button variant="primary" onClick={() => alert("Invoice downloaded as PDF successfully.")}>
+                <Button 
+                  variant="primary" 
+                  onClick={() => handleDownloadPDF(
+                    "invoice-print-area", 
+                    `Invoice_${selectedInvoice._id.slice(-8).toUpperCase()}.pdf`
+                  )}
+                >
                   <Download className="h-4 w-4" /> Download PDF
                 </Button>
               </div>
@@ -1823,11 +1869,30 @@ export function AccountantBillingPage() {
                 <Button variant="primary" onClick={handlePrint} className="bg-navy-700 hover:bg-navy-800 text-white font-bold">
                   <Printer className="h-4 w-4" /> Print {selectedVisitKey === "all" ? "Consolidated Statement" : "Visit Bill"}
                 </Button>
+                <Button 
+                  variant="primary" 
+                  onClick={() => handleDownloadPDF(
+                    "consolidated-patient-statement-print", 
+                    `Statement_${selectedPatient?.name ? selectedPatient.name.replace(/\s+/g, "_") : "Patient"}.pdf`
+                  )} 
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1"
+                >
+                  <Download className="h-4 w-4" /> Download PDF
+                </Button>
               </div>
             </div>
           </div>
         )}
       </Modal>
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(deleteTargetChargeId)}
+        title="Confirm Deletion"
+        message="Are you sure you want to delete this charge item? This action cannot be undone."
+        isLoading={deleteChargeMutation.isPending}
+        onClose={() => setDeleteTargetChargeId(null)}
+        onConfirm={confirmDeleteCharge}
+      />
     </div>
   );
 }

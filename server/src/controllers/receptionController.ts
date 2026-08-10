@@ -1,3 +1,4 @@
+import { BillingService } from "../services/billingService";
 import { Request, Response } from "express";
 import { z } from "zod";
 import { catchAsync } from "../utils/catchAsync";
@@ -16,6 +17,7 @@ import { IPBill } from "../models/IPBill";
 import { IPBillPayment } from "../models/IPBillPayment";
 import { Appointment } from "../models/Appointment";
 import { getIPBillItemsSummary } from "./ipBillController";
+import { AppointmentSlotService } from "../services/appointmentSlotService";
 
 
 // Validation Schemas
@@ -23,7 +25,7 @@ const patientRegistrationSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().min(5, "Phone is required"),
-  age: z.coerce.number().min(0, "Age must be positive"),
+  age: z.coerce.number().min(0, "Age must be at least 0").max(150, "Age cannot exceed 150 years"),
   gender: z.string().min(1, "Gender is required"),
   bloodGroup: z.string().default(""),
   address: z.string().default(""),
@@ -440,66 +442,22 @@ export const getAuditLogs = catchAsync(async (req: Request, res: Response) => {
 
 /**
  * GET /reception/billing/pending-invoices
- * Returns pending invoices using the SAME query as getStats pendingPayments count.
+ * Returns pending invoices using BillingService (Single Source of Truth).
  * Dashboard card count == table row count.
  */
 export const getPendingInvoices = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as any;
 
-  // 1. Fetch pending OP invoices
-  const rawInvoices = await Invoice.find({ hospital: hospitalId, status: { $in: ["pending", "partially_paid"] } })
-    .populate("patient", "name uhid phone")
-    .sort({ createdAt: -1 });
+  const result = await BillingService.getPendingInvoices(hospitalId, { limit: 1000 });
 
-  const invoices: any[] = [];
-  for (const inv of rawInvoices) {
-    const payments = await Payment.find({ invoice: inv._id, hospital: hospitalId });
-    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-    const remainingBalance = Math.max(0, inv.totals.total - totalPaid);
-
-    if (inv.totals.patientBalance !== remainingBalance || (remainingBalance === 0 && inv.status !== "paid") || (remainingBalance > 0 && inv.status === "pending" && totalPaid > 0)) {
-      inv.totals.patientBalance = remainingBalance;
-      if (remainingBalance === 0) {
-        inv.status = "paid";
-      } else if (totalPaid > 0) {
-        inv.status = "partially_paid";
-      }
-      await inv.save();
+  res.json({
+    status: "success",
+    data: {
+      invoices: result.invoices,
+      total: result.pagination.total,
+      summary: result.summary,
     }
-
-    if (remainingBalance > 0) {
-      invoices.push(inv);
-    }
-  }
-
-  // 2. Fetch pending IP bills
-  const ipBills = await IPBill.find({ hospital: hospitalId, status: "Generated", outstanding: { $gt: 0 } })
-    .populate("patient", "name uhid phone")
-    .populate("admission")
-    .sort({ createdAt: -1 });
-
-  // Map IP bills to conformed invoice structure
-  const mappedIpBills = ipBills.map(bill => {
-    return {
-      _id: bill._id,
-      patient: bill.patient,
-      issuedAt: bill.billingDate || (bill as any).createdAt,
-      billingType: "IP",
-      totals: {
-        subtotal: bill.grandTotal,
-        taxAmount: bill.taxRate,
-        total: bill.grandTotal,
-        patientBalance: bill.outstanding
-      },
-      status: "partially_paid",
-      outstanding: bill.outstanding,
-      admission: bill.admission
-    };
   });
-
-  const combined = [...invoices, ...mappedIpBills];
-
-  res.json({ status: "success", data: { invoices: combined, total: combined.length } });
 });
 
 /**
@@ -687,34 +645,14 @@ export const getBookedSlots = catchAsync(async (req: Request, res: Response) => 
     throw new AppError("doctorId and date are required query parameters.", 400);
   }
 
-<<<<<<< Updated upstream
-  let doctorQuery: any = doctorId;
-  if (Types.ObjectId.isValid(doctorId)) {
-    const docDoc = await Doctor.findOne({
-      $or: [{ _id: doctorId }, { user: doctorId }],
-      hospital: req.hospitalFilter!.hospital
-    });
-    if (docDoc) {
-      doctorQuery = docDoc._id;
-    }
-  } else {
-    const docDoc = await Doctor.findOne({
-      name: new RegExp(doctorId.replace(/^dr\.\s*/i, ""), "i"),
-      hospital: req.hospitalFilter!.hospital
-    });
-    if (docDoc) {
-      doctorQuery = docDoc._id;
-    }
-  }
-=======
   // Delegate entirely to the shared AppointmentSlotService — single source of truth.
   const bookedSlots = await AppointmentSlotService.getBookedSlots(
     doctorId,
     date,
+
     req.hospitalFilter!.hospital,
     patientId
   );
->>>>>>> Stashed changes
 
   const parsedDate = new Date(date);
   const startOfDay = new Date(parsedDate);
@@ -728,8 +666,9 @@ export const getBookedSlots = catchAsync(async (req: Request, res: Response) => 
     date: { $gte: startOfDay, $lte: endOfDay },
     status: { $nin: ["cancelled", "no_show"] }
   }).select("time");
+    req.hospitalFilter!.hospital
+  );
 
-  const bookedSlots = appointments.map(appt => appt.time?.trim()).filter(Boolean);
   res.json({ status: "success", data: { bookedSlots } });
 });
 

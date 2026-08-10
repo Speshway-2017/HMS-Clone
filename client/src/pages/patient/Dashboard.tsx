@@ -73,10 +73,10 @@ import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { useAuth } from "../../context/AuthContext";
 import { usePatientProfileMe, usePatientInvoices, usePatientReports, useUpdatePatient, useUpdatePatientProfileMe, usePatientPrescriptions } from "../../features/patients";
-import { useAppointments, useCreateAppointment, useUpdateAppointment } from "../../features/appointments";
+import { useAppointments, useCreateAppointment, useUpdateAppointment, useAvailableSlots } from "../../features/appointments";
 import { useDoctors } from "../../features/doctors";
 import { useNotifications } from "../../features/notifications";
-import { useBookedSlots } from "../../features/receptionist";
+import { generateTimeSlots, isSlotBooked } from "../../lib/slotUtils";
 import { api } from "../../lib/api";
 
 const CustomPatientTooltip = ({ active, payload, label }: any) => {
@@ -605,7 +605,10 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
 
   const targetDoc = getSelectedDoctor();
   const docObjId = targetDoc?._id || targetDoc?.id || selectedDoctorId;
-  const { data: bookedSlotsRaw } = useBookedSlots(docObjId, bookingDate);
+  // Use the shared useAvailableSlots hook (hits /appointments/available-slots)
+  // which is accessible to the patient role and uses the same backend service
+  // as the Receptionist Dashboard — single source of truth.
+  const { data: bookedSlotsRaw } = useAvailableSlots(docObjId, bookingDate);
   const bookedSlots = bookedSlotsRaw || [];
 
   const isCancellationAllowed = (dateVal: string | Date, timeStr?: string): boolean => {
@@ -673,76 +676,12 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
   const [selectedBank, setSelectedBank] = useState("HDFC Bank");
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
-  // Dynamic 15-min slot generator & past-slot filter for TODAY ("before slots should not be visible")
-  const generate15MinSlots = (from: string, to: string, duration: number = 15, breakTime?: string) => {
-    const slots: string[] = [];
-    const [startH, startM] = from.split(":").map(Number);
-    const [endH, endM] = to.split(":").map(Number);
-
-    let current = startH * 60 + startM;
-    const end = endH * 60 + endM;
-
-    let breakStart = -1;
-    let breakEnd = -1;
-    if (breakTime) {
-      const [breakH, breakM] = breakTime.split(":").map(Number);
-      breakStart = breakH * 60 + breakM;
-      breakEnd = breakStart + 60;
-    }
-
-    while (current + duration <= end) {
-      if (breakStart !== -1 && current >= breakStart && current < breakEnd) {
-        current += duration;
-        continue;
-      }
-      const h = Math.floor(current / 60);
-      const m = current % 60;
-      const timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-      slots.push(timeStr);
-      current += duration;
-    }
-    return slots;
-  };
-
+  // Slot generation is now handled by the shared generateTimeSlots utility from slotUtils.ts.
+  // This is the SAME function used by the Receptionist Appointments page to ensure
+  // identical slot lists are generated on both dashboards.
   const getAvailableTimeSlots = (dateStr: string, doctorId?: string) => {
     const selectedDoc = doctors?.find((d: any) => d._id === doctorId);
-    let from = "09:00";
-    let to = "17:00";
-    let duration = 15;
-    let breakTime = "13:00";
-
-    if (selectedDoc) {
-      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      const dateObj = new Date(dateStr || new Date());
-      const dayName = days[dateObj.getDay()];
-      const daySchedule = selectedDoc.workingHours?.find((wh: any) => wh.day === dayName);
-
-      if (daySchedule && !daySchedule.active) {
-        return [];
-      }
-      if (daySchedule?.from && daySchedule.from !== "—") from = daySchedule.from;
-      if (daySchedule?.to && daySchedule.to !== "—") to = daySchedule.to;
-      if (selectedDoc.consultationSettings?.slotDuration) duration = selectedDoc.consultationSettings.slotDuration;
-      if (selectedDoc.consultationSettings?.breakTime) breakTime = selectedDoc.consultationSettings.breakTime;
-    }
-
-    let generated = generate15MinSlots(from, to, duration, breakTime);
-
-    // CRITICAL REQUIREMENT: "before slots should not be visible"
-    // For TODAY, filter out all time slots before current time!
-    const todayStr = new Date().toISOString().split("T")[0];
-    const targetDateStr = dateStr || todayStr;
-    if (targetDateStr === todayStr) {
-      const now = new Date();
-      const currentH = now.getHours();
-      const currentM = now.getMinutes();
-      generated = generated.filter((slot) => {
-        const [h, m] = slot.split(":").map(Number);
-        return h > currentH || (h === currentH && m > currentM);
-      });
-    }
-
-    return generated;
+    return generateTimeSlots(selectedDoc, dateStr);
   };
 
   // Helper to check if patient booking is within OP limit (7 days from previous visit)

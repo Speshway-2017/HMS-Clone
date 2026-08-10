@@ -12,6 +12,8 @@ import { getPagination, paginatedResponse } from "../utils/pagination";
 import { emitToHospital } from "../config/socket";
 import { logAudit } from "../utils/auditLogger";
 import { validateAppointmentTimeRestriction } from "../utils/appointmentTimeValidation";
+import { AppointmentSlotService } from "../services/appointmentSlotService";
+import { createDoctorNotification } from "../utils/notificationHelper";
 
 async function generateReferenceId(hospitalId: string, bookingDate: Date): Promise<string> {
   const dateStr = bookingDate.toISOString().split("T")[0].replace(/-/g, "");
@@ -105,13 +107,22 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
     }
   }
 
-  if (dateMode === "other_days") {
-    const today = new Date();
-    const startOfToday = new Date(today);
+  if (dateMode === "today") {
+    const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
-
-    filter.date = { $gte: startOfToday };
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+    filter.date = { $gte: startOfToday, $lte: endOfToday };
+  } else if (dateMode === "other_days" || dateMode === "scheduled") {
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+    filter.date = { $gt: endOfToday };
     filter.status = { $nin: ["completed", "cancelled", "no_show"] };
+  } else if (dateMode === "past" || dateMode === "missed") {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    filter.date = { $lt: startOfToday };
+    filter.status = { $nin: ["completed", "cancelled"] };
   } else if (dateMode === "completed") {
     filter.status = { $in: ["completed", "cancelled", "no_show"] };
   } else if (from || to) {
@@ -190,16 +201,19 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
     }
   }
 
-  // 2. Prevent two active appointments for the same doctor and same time slot
-  const slotClash = await Appointment.findOne({
-    hospital: hospitalId,
-    doctor: body.doctor,
-    date: body.date,
-    time: body.time,
-    status: { $nin: ["cancelled", "no_show", "completed", "missed"] }
-  });
+  // 2. Prevent two active appointments for the same doctor and same time slot.
+  //    Uses AppointmentSlotService.checkSlotConflict — the SAME logic as the display layer.
+  const slotClash = await AppointmentSlotService.checkSlotConflict(
+    body.doctor,
+    body.date as unknown as Date,
+    body.time,
+    hospitalId
+  );
   if (slotClash) {
-    throw new AppError("This time slot is already booked for this doctor. Please choose a different slot.", 409);
+    throw new AppError(
+      "This appointment slot has already been booked. Please choose another available slot.",
+      409
+    );
   }
 
   // 3. Prevent patient from booking multiple appointments at the exact same date and time slot (with ANY doctor)
@@ -292,6 +306,23 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
   }
 
   emitToHospital(hospitalId.toString(), "appointment_created", { appointmentId: appointment._id, referenceId });
+
+  try {
+    const patDoc = await Patient.findById(body.patient);
+    const patName = patDoc ? patDoc.name : "Patient";
+    await createDoctorNotification({
+      hospital: hospitalId,
+      title: "New Patient Appointment",
+      message: `New appointment booked for ${patName} (${referenceId}) on ${new Date(body.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} at ${body.time}.`,
+      type: "appointment",
+      severity: "info",
+      recipientDoctor: body.doctor,
+      link: "/doctor/op-management",
+      data: { appointmentId: appointment._id.toString(), referenceId }
+    });
+  } catch (err) {
+    console.error("Failed to create doctor notification for appointment:", err);
+  }
 
   await logAudit({
     req,
@@ -454,8 +485,6 @@ export const getInvoiceByAppointmentId = catchAsync(async (req: Request, res: Re
   }
   res.json({ status: "success", data: { invoice } });
 });
-<<<<<<< Updated upstream
-=======
 
 /**
  * GET /appointments/available-slots?doctorId=&date=
@@ -467,26 +496,16 @@ export const getInvoiceByAppointmentId = catchAsync(async (req: Request, res: Re
  * Frontend must NEVER cache these results between doctor/date changes.
  */
 export const getAvailableSlots = catchAsync(async (req: Request, res: Response) => {
-  const { doctorId, date, patientId } = req.query as Record<string, string>;
+  const { doctorId, date } = req.query as Record<string, string>;
   if (!doctorId || !date) {
     throw new AppError("doctorId and date are required query parameters.", 400);
-  }
-
-  let resolvedPatientId = patientId;
-  if (!resolvedPatientId && req.user!.role === "patient") {
-    const patientDoc = await Patient.findOne({ email: req.user!.email });
-    if (patientDoc) {
-      resolvedPatientId = patientDoc._id.toString();
-    }
   }
 
   const bookedSlots = await AppointmentSlotService.getBookedSlots(
     doctorId,
     date,
-    req.hospitalFilter?.hospital,
-    resolvedPatientId
+    req.hospitalFilter?.hospital
   );
 
   res.json({ status: "success", data: { bookedSlots } });
 });
->>>>>>> Stashed changes

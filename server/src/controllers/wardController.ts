@@ -5,10 +5,9 @@ import { Ward } from "../models/Ward";
 import { Room } from "../models/Room";
 
 export const listWards = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
   const { search, wardType, status, page = 1, limit = 10 } = req.query;
 
-  const query: any = { hospital: hospitalId };
+  const query: any = { ...req.hospitalFilter };
 
   if (search) {
     query.$or = [
@@ -48,30 +47,41 @@ export const listWards = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+export const getWard = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const ward = await Ward.findOne({ _id: id, ...req.hospitalFilter });
+  if (!ward) {
+    throw new AppError("Ward not found.", 404);
+  }
+  res.json({ status: "success", data: { ward } });
+});
+
 export const createWard = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital;
+  const branchId = req.hospitalFilter?.branch ?? null;
   const { name, code, wardType, floorNumber, description, status } = req.body;
 
   if (!name || !code || !wardType || floorNumber === undefined) {
     throw new AppError("Name, Code, Ward Type, and Floor Number are required.", 400);
   }
 
-  // Check unique name and code
+  // Check unique name and code within scope
   const [existingName, existingCode] = await Promise.all([
-    Ward.findOne({ hospital: hospitalId, name: name.trim() }),
-    Ward.findOne({ hospital: hospitalId, code: code.trim().toUpperCase() })
+    Ward.findOne({ ...req.hospitalFilter, name: name.trim() }),
+    Ward.findOne({ ...req.hospitalFilter, code: code.trim().toUpperCase() })
   ]);
 
   if (existingName) {
-    throw new AppError(`Ward name "${name}" already exists.`, 400);
+    throw new AppError(`Ward name "${name}" already exists in this branch.`, 400);
   }
 
   if (existingCode) {
-    throw new AppError(`Ward code "${code}" already exists.`, 400);
+    throw new AppError(`Ward code "${code}" already exists in this branch.`, 400);
   }
 
   const ward = await Ward.create({
     hospital: hospitalId,
+    branch: branchId,
     name: name.trim(),
     code: code.trim().toUpperCase(),
     wardType,
@@ -84,30 +94,29 @@ export const createWard = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const updateWard = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
   const { id } = req.params;
   const { name, code, wardType, floorNumber, description, status } = req.body;
 
-  const ward = await Ward.findOne({ _id: id, hospital: hospitalId });
+  const ward = await Ward.findOne({ _id: id, ...req.hospitalFilter });
   if (!ward) {
     throw new AppError("Ward not found.", 404);
   }
 
   if (name && name.trim() !== ward.name) {
-    const existing = await Ward.findOne({ hospital: hospitalId, name: name.trim() });
+    const existing = await Ward.findOne({ ...req.hospitalFilter, name: name.trim(), _id: { $ne: id } });
     if (existing) {
-      throw new AppError(`Ward name "${name}" already exists.`, 400);
+      throw new AppError(`Ward name "${name}" already exists in this branch.`, 400);
     }
     ward.name = name.trim();
     
     // Update linked rooms' wardName field for compatibility
-    await Room.updateMany({ hospital: hospitalId, ward: id }, { wardName: name.trim() });
+    await Room.updateMany({ ...req.hospitalFilter, ward: id }, { wardName: name.trim() });
   }
 
   if (code && code.trim().toUpperCase() !== ward.code) {
-    const existing = await Ward.findOne({ hospital: hospitalId, code: code.trim().toUpperCase() });
+    const existing = await Ward.findOne({ ...req.hospitalFilter, code: code.trim().toUpperCase(), _id: { $ne: id } });
     if (existing) {
-      throw new AppError(`Ward code "${code}" already exists.`, 400);
+      throw new AppError(`Ward code "${code}" already exists in this branch.`, 400);
     }
     ward.code = code.trim().toUpperCase();
   }
@@ -123,16 +132,15 @@ export const updateWard = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const deleteWard = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
   const { id } = req.params;
 
   // Check if ward contains rooms
-  const roomsCount = await Room.countDocuments({ hospital: hospitalId, ward: id });
+  const roomsCount = await Room.countDocuments({ ...req.hospitalFilter, ward: id });
   if (roomsCount > 0) {
     throw new AppError("Cannot delete ward because it contains active room assignments.", 400);
   }
 
-  const ward = await Ward.findOneAndDelete({ _id: id, hospital: hospitalId });
+  const ward = await Ward.findOneAndDelete({ _id: id, ...req.hospitalFilter });
   if (!ward) {
     throw new AppError("Ward not found.", 404);
   }

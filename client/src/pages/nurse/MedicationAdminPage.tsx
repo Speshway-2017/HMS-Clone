@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import toast from "react-hot-toast";
 import { Pill, Search, Clock, CheckCircle2, AlertCircle, RefreshCw, AlertTriangle } from "lucide-react";
 import { useNurseInpatients, useAdministerNurseMed } from "../../features/nurse";
 import { DataTable, Column } from "../../components/ui/DataTable";
@@ -14,7 +15,7 @@ export function MedicationAdminPage() {
   const { data: staffMe } = useStaffProfileMe();
   const isReadOnly = localStorage.getItem("nurse_shift_completed") === "true" || staffMe?.dutyStatus === "off_duty";
 
-  const administerMutation = useAdministerNurseMed(administerModal?.patient?.patient?._id || (typeof administerModal?.patient?.patient === 'string' ? administerModal.patient.patient : '') || administerModal?.patient?._id || "");
+  const administerMutation = useAdministerNurseMed();
 
   const medOrders = useMemo(() => {
     const orders: any[] = [];
@@ -65,16 +66,34 @@ export function MedicationAdminPage() {
   const handleAdministerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!administerModal) return;
+
+    const targetPatientId = 
+      administerModal.patient?.patient?._id || 
+      (typeof administerModal.patient?.patient === 'string' ? administerModal.patient.patient : '') || 
+      administerModal.patient?._id || "";
+
+    if (!targetPatientId) {
+      toast.error("Unable to identify patient for this record.");
+      return;
+    }
+
+    const toastId = toast.loading("Saving administration record...");
+
     try {
       await administerMutation.mutateAsync({
+        patientId: targetPatientId,
         medOrderId: administerModal.med._id || "med-1",
+        medicineName: administerModal.med.medicineName || "Paracetamol 500mg",
+        dosage: administerModal.med.dosage || "1 Tab",
         action: adminForm.action,
         remarks: adminForm.remarks,
       });
+      toast.success("Medication administration and Nursing Note saved successfully!", { id: toastId });
       setAdministerModal(null);
+      setAdminForm({ action: "Administered", remarks: "" });
       refetch();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to save record.", { id: toastId });
     }
   };
 
@@ -198,8 +217,8 @@ export function MedicationAdminPage() {
 
       {/* Modal: Administer Medication */}
       {administerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-transparent">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="text-base font-bold text-slate-900">Log Administration</h3>
               <button onClick={() => setAdministerModal(null)} className="text-slate-400 hover:text-slate-600">✕</button>

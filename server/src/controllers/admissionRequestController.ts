@@ -13,7 +13,10 @@ import { emitToHospital } from "../config/socket";
 
 // Helper to resolve the logged-in doctor profile
 async function getLoggedDoctor(req: Request) {
-  const doctor = await Doctor.findOne({ email: req.user!.email, isActive: { $ne: false } });
+  let doctor = await Doctor.findOne({ user: req.user!._id, isActive: { $ne: false } });
+  if (!doctor) {
+    doctor = await Doctor.findOne({ email: req.user!.email, isActive: { $ne: false } });
+  }
   if (!doctor) {
     throw new AppError("Doctor profile not found for the logged-in user.", 404);
   }
@@ -40,9 +43,10 @@ export const createAdmissionRequest = catchAsync(async (req: Request, res: Respo
     throw new AppError("Diagnosis is mandatory for admission recommendation.", 400);
   }
 
-    const doctor = await getLoggedDoctor(req);
+  const doctor = await getLoggedDoctor(req);
+  const doctorObjIds = [doctor._id, (doctor as any).user, req.user?._id].filter(Boolean);
 
-  const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: doctor._id })
+  const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: { $in: doctorObjIds } })
     .populate("patient")
     .populate("doctor")
     .populate("department");
@@ -56,7 +60,7 @@ export const createAdmissionRequest = catchAsync(async (req: Request, res: Respo
   const department = appointment.department as any;
 
   // Find if there is an active OPVisit consultation
-  const opVisit = await OPVisit.findOne({ patient: patient._id, doctor: doctor._id, hospital: hospitalId }).sort({ createdAt: -1 });
+  const opVisit = await OPVisit.findOne({ patient: patient._id, doctor: { $in: doctorObjIds }, hospital: hospitalId }).sort({ createdAt: -1 });
 
   // 1. Validation: If patient already admitted
   const activeAdm = await Admission.findOne({
@@ -85,10 +89,10 @@ export const createAdmissionRequest = catchAsync(async (req: Request, res: Respo
   const existingPending = await AdmissionRequest.findOne({
     hospital: hospitalId,
     patient: patient._id,
-    status: "Pending"
+    status: { $in: ["Pending", "pending", "Admission Requested", "AdmissionRequested"] }
   });
   if (existingPending) {
-    throw new AppError("Admission request already pending.", 400);
+    return res.json({ status: "success", data: existingPending, message: "Admission request already pending." });
   }
 
   // 3. Validation: If OP already converted to IP
@@ -126,13 +130,15 @@ export const createAdmissionRequest = catchAsync(async (req: Request, res: Respo
       doctor: doctor._id,
       appointment: appointment._id,
       consultation: opVisit ? opVisit._id : null,
-      department: department._id,
+      department: department ? department._id : null,
       priority,
       preferredWard,
       preferredBedType,
       expectedStay,
       diagnosis: primaryDiagnosis,
+      primaryDiagnosis,
       notes: clinicalNotes,
+      clinicalNotes,
       specialInstructions,
       requestedAt: new Date(),
       requestedBy: doctor._id,
@@ -143,11 +149,11 @@ export const createAdmissionRequest = catchAsync(async (req: Request, res: Respo
     await DbNotification.create([{
       hospital: hospitalId,
       title: "New Admission Request",
-      message: `Dr. ${docProfile.name} requested IP admission for ${patient.name} (${patient.uhid}) due to: ${primaryDiagnosis}`,
+      message: `Dr. ${docProfile?.name || doctor.name} requested IP admission for ${patient.name} (${patient.uhid}) due to: ${primaryDiagnosis}`,
       type: "admission_request",
       recipientRole: "receptionist",
       severity: priority === "Emergency" ? "critical" : "warning",
-      link: `/receptionist/ip/new`,
+      link: `/receptionist/ip`,
       data: {
         patientId: patient._id.toString(),
         opVisitId: appointment._id.toString(),
@@ -160,54 +166,34 @@ export const createAdmissionRequest = catchAsync(async (req: Request, res: Respo
     }], { session });
 
     await session.commitTransaction();
-    session.endSession();
 
-    // Emit real-time Socket.IO notification to receptionist dashboard
-    emitToHospital(hospitalId.toString(), "admission:request:created", {
-      _id: admissionReq._id,
-      requestNumber,
-      patient: {
-        _id: patient._id,
-        name: patient.name,
-        uhid: patient.uhid,
-        phone: patient.phone,
-        age: patient.age,
-        gender: patient.gender,
-        bloodGroup: patient.bloodGroup,
-        address: patient.address,
-        emergencyContact: patient.emergencyContact
-      },
-      doctor: {
-        _id: doctor._id,
-        name: docProfile.name
-      },
-      department: {
-        _id: department._id,
-        name: department.name
-      },
-      priority,
-      diagnosis: primaryDiagnosis,
-      notes: clinicalNotes,
-      requestedAt: admissionReq.requestedAt,
-      status: "Pending"
-    });
+    emitToHospital(hospitalId.toString(), "admission_request_created", admissionReq);
+    emitToHospital(hospitalId.toString(), "dashboard_update", { action: "admission_request" });
 
     res.status(201).json({ status: "success", data: admissionReq });
-  } catch (error) {
+  } catch (err) {
     await session.abortTransaction();
+    throw err;
+  } finally {
     session.endSession();
-    throw error;
   }
 });
 
 export const getAdmissionRequests = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
-  const status = req.query.status || "Pending";
+  const statusParam = req.query.status as string;
 
-  const filter: any = { hospital: hospitalId, status };
+  const filter: any = { hospital: hospitalId };
+  if (!statusParam || ["Pending", "pending", "Admission Requested"].includes(statusParam)) {
+    filter.status = { $in: ["Pending", "pending", "Admission Requested", "AdmissionRequested"] };
+  } else {
+    filter.status = statusParam;
+  }
+
   if (req.user!.role === "doctor") {
     const doctor = await getLoggedDoctor(req);
-    filter.requestedBy = doctor._id;
+    const docIds = [doctor._id, (doctor as any).user, req.user?._id].filter(Boolean);
+    filter.$or = [{ doctor: { $in: docIds } }, { requestedBy: { $in: docIds } }];
   }
 
   const requests = await AdmissionRequest.find(filter)

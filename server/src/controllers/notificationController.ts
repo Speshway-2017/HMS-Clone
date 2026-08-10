@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { Types } from "mongoose";
 import { catchAsync } from "../utils/catchAsync";
 import { Appointment } from "../models/Appointment";
 import { InventoryItem } from "../models/InventoryItem";
@@ -9,6 +10,7 @@ import { LabOrder } from "../models/LabOrder";
 import { RadiologyOrder } from "../models/RadiologyOrder";
 import { DbNotification } from "../models/DbNotification";
 import { PayrollRecord } from "../models/PayrollRecord";
+import { NotificationDismissal } from "../models/NotificationDismissal";
 
 export const getNotifications = catchAsync(async (req: Request, res: Response) => {
   const hospitalFilter = req.hospitalFilter as Record<string, unknown>;
@@ -51,7 +53,7 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
   // Filters
   const apptFilter: Record<string, any> = {
     ...hospitalFilter,
-    status: "scheduled",
+    status: { $in: ["scheduled", "checked_in", "in_consultation", "pending_payment"] },
     date: { $gte: startOfToday, $lt: endOfTomorrow },
   };
 
@@ -76,6 +78,7 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
     pendingRadiologyOrders,
     payrollRecalcRecords,
     dbNotifications,
+    userDismissals,
   ] = await Promise.all([
     // Appointments: Doctor (own), Patient (own), Receptionist (hospital), Admin (hospital)
     (isDoctor || isPatientUser || isReceptionist || isAdmin)
@@ -124,7 +127,7 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
           .populate("patient", "name")
           .populate("doctor", "name")
           .sort({ createdAt: -1 })
-          .limit(10)
+          .limit(20)
           .lean()
       : Promise.resolve([]),
 
@@ -134,7 +137,7 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
           .populate("patient", "name")
           .populate("doctor", "name")
           .sort({ createdAt: -1 })
-          .limit(10)
+          .limit(20)
           .lean()
       : Promise.resolve([]),
 
@@ -150,15 +153,30 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
     DbNotification.find({
       hospital: hospitalFilter.hospital,
       $or: [
-        ...(doctorId ? [{ recipientDoctor: doctorId }] : []),
-        ...(patientRefId ? [{ recipientPatient: patientRefId }] : []),
-        { recipientRole: req.user!.role, recipientDoctor: null },
+        ...(doctorId ? [
+          { recipientDoctor: doctorId },
+          { recipientDoctor: new Types.ObjectId(doctorId) }
+        ] : []),
+        ...(patientRefId ? [
+          { recipientPatient: patientRefId },
+          { recipientPatient: new Types.ObjectId(patientRefId) }
+        ] : []),
+        { recipientRole: req.user!.role },
       ],
     })
       .sort({ createdAt: -1 })
       .limit(20)
       .lean(),
+
+    // Permanently dismissed notifications for this user
+    NotificationDismissal.find({
+      user: req.user!._id,
+      hospital: hospitalFilter.hospital,
+    }).lean(),
   ]);
+
+  const dismissedSet = new Set(userDismissals.map(d => d.notificationId));
+
 
   type Notification = {
     id: string;
@@ -260,34 +278,84 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
     });
   }
 
-  // ── 5. Pending Lab Orders ──
+  // ── 5. Consolidated Pending Lab Orders (Single Notification per Patient) ──
+  const labOrdersByPatient = new Map<string, { patientName: string; doctorName: string; tests: Set<string>; priority: string; latestDate: Date }>();
   for (const order of pendingLabOrders) {
+    const pId = (order.patient as any)?._id?.toString() || order.patient?.toString() || "unknown";
     const patientName = (order.patient as { name?: string })?.name ?? "Unknown patient";
     const doctorName = (order.doctor as { name?: string })?.name ?? "Unknown doctor";
-    const testsList = (order.tests || []).join(", ");
+
+    if (!labOrdersByPatient.has(pId)) {
+      labOrdersByPatient.set(pId, {
+        patientName,
+        doctorName,
+        tests: new Set(order.tests || []),
+        priority: order.priority || "Routine",
+        latestDate: order.createdAt as Date
+      });
+    } else {
+      const existing = labOrdersByPatient.get(pId)!;
+      (order.tests || []).forEach(t => existing.tests.add(t));
+      if (order.priority === "STAT" || (order.priority === "Urgent" && existing.priority !== "STAT")) {
+        existing.priority = order.priority;
+      }
+      if (new Date(order.createdAt).getTime() > new Date(existing.latestDate).getTime()) {
+        existing.latestDate = order.createdAt as Date;
+      }
+    }
+  }
+
+  for (const [pId, info] of labOrdersByPatient.entries()) {
+    const testsList = Array.from(info.tests).join(", ");
     notifications.push({
-      id: `lab-${order._id}`,
+      id: `lab-${pId}`,
       type: "general",
       title: "New Lab Request",
-      message: `Dr. ${doctorName} ordered [${testsList}] for ${patientName} (${order.priority || "Routine"})`,
+      message: `Dr. ${info.doctorName} ordered [${testsList}] for ${info.patientName} (${info.priority})`,
       link: `/laboratory/requests`,
-      severity: order.priority === "STAT" ? "critical" : order.priority === "Urgent" ? "warning" : "info",
-      createdAt: order.createdAt as Date,
+      severity: info.priority === "STAT" ? "critical" : info.priority === "Urgent" ? "warning" : "info",
+      createdAt: info.latestDate,
     });
   }
 
-  // ── 6. Pending Radiology Orders ──
+  // ── 6. Consolidated Pending Radiology Orders (Single Notification per Patient) ──
+  const radOrdersByPatient = new Map<string, { patientName: string; doctorName: string; types: Set<string>; priority: string; latestDate: Date }>();
   for (const order of pendingRadiologyOrders) {
+    const pId = (order.patient as any)?._id?.toString() || order.patient?.toString() || "unknown";
     const patientName = (order.patient as { name?: string })?.name ?? "Unknown patient";
     const doctorName = (order.doctor as { name?: string })?.name ?? "Unknown doctor";
+    const scanType = order.type || "Radiology Scan";
+
+    if (!radOrdersByPatient.has(pId)) {
+      radOrdersByPatient.set(pId, {
+        patientName,
+        doctorName,
+        types: new Set([scanType]),
+        priority: order.priority || "Routine",
+        latestDate: order.createdAt as Date
+      });
+    } else {
+      const existing = radOrdersByPatient.get(pId)!;
+      existing.types.add(scanType);
+      if (order.priority === "STAT" || (order.priority === "Urgent" && existing.priority !== "STAT")) {
+        existing.priority = order.priority;
+      }
+      if (new Date(order.createdAt).getTime() > new Date(existing.latestDate).getTime()) {
+        existing.latestDate = order.createdAt as Date;
+      }
+    }
+  }
+
+  for (const [pId, info] of radOrdersByPatient.entries()) {
+    const typesList = Array.from(info.types).join(", ");
     notifications.push({
-      id: `rad-${order._id}`,
+      id: `rad-${pId}`,
       type: "general",
       title: "New Radiology Request",
-      message: `Dr. ${doctorName} requested ${order.type} for ${patientName} (${order.priority || "Routine"})`,
+      message: `Dr. ${info.doctorName} requested [${typesList}] for ${info.patientName} (${info.priority})`,
       link: `/laboratory/requests`,
-      severity: order.priority === "STAT" ? "critical" : order.priority === "Urgent" ? "warning" : "info",
-      createdAt: order.createdAt as Date,
+      severity: info.priority === "STAT" ? "critical" : info.priority === "Urgent" ? "warning" : "info",
+      createdAt: info.latestDate,
     });
   }
 
@@ -317,14 +385,20 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
     });
   }
 
+  // Filter out any notifications that were permanently dismissed by this user
+  const activeNotifications = notifications.filter(n => {
+    const rawId = n.id.replace(/^(db-|pay-|appt-|patient-|lab-|rad-)/, "");
+    return !dismissedSet.has(n.id) && !dismissedSet.has(rawId);
+  });
+
   // Sort newest-first
-  notifications.sort(
+  activeNotifications.sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 
   res.json({
     status: "success",
-    data: { notifications, total: notifications.length },
+    data: { notifications: activeNotifications, total: activeNotifications.length },
   });
 });
 
@@ -332,12 +406,19 @@ export const deleteNotification = catchAsync(async (req: Request, res: Response)
   const { id } = req.params;
   const hospitalFilter = req.hospitalFilter as Record<string, unknown>;
 
-  const rawId = id.replace(/^(db-|pay-|appt-|patient-|lab-|rad-)/, "");
+  // 1. Permanently record dismissal for this user so it never reappears across any dashboard
+  await NotificationDismissal.findOneAndUpdate(
+    { user: req.user!._id, notificationId: id, hospital: hospitalFilter.hospital as any },
+    { user: req.user!._id, notificationId: id, hospital: hospitalFilter.hospital as any },
+    { upsert: true, new: true }
+  );
 
+  // 2. If it corresponds to a DbNotification document, delete it from MongoDB
+  const rawId = id.replace(/^(db-|pay-|appt-|patient-|lab-|rad-)/, "");
   await DbNotification.deleteOne({
     _id: rawId,
     hospital: hospitalFilter.hospital
-  });
+  }).catch(() => {});
 
   res.json({
     status: "success",

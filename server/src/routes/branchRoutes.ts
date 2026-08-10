@@ -7,11 +7,11 @@ const router = Router();
 router.use(protect);
 
 router.route("/")
-  .get(restrictTo("super_admin", "hospital_admin"), listBranches)
+  .get(listBranches)
   .post(restrictTo("super_admin", "hospital_admin"), createBranch);
 
 router.route("/:id")
-  .get(restrictTo("super_admin", "hospital_admin"), getBranch)
+  .get(getBranch)
   .patch(restrictTo("super_admin", "hospital_admin"), updateBranch)
   .delete(restrictTo("super_admin"), deleteBranch);
 

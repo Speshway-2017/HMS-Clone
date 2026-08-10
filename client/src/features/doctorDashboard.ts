@@ -27,22 +27,48 @@ export interface DbNotification {
   createdAt: string;
 }
 
-// Additional TypeScript definitions
 export interface Prescription {
   _id: string;
   hospital: string;
   patient: Patient | string;
-  doctor: string;
+  doctor: any;
+  department?: any;
+  prescriptionNumber?: string;
   diagnosis: string;
-  medicines: {
+  chiefComplaint?: string;
+  clinicalNotes?: string;
+  advice?: string;
+  followUpDate?: string;
+  medicines?: {
     name: string;
-    dosage: string;
-    frequency: string;
-    duration: string;
+    strength?: string;
+    dosage?: string;
+    frequency?: string;
+    duration?: string;
+    quantity?: number;
+    instructions?: string;
+    status?: string;
+    prescribedAt?: string;
   }[];
-  status: "pending" | "completed";
-  notes: string;
-  date: string;
+  medications?: {
+    name: string;
+    strength?: string;
+    dosage?: string;
+    frequency?: string;
+    duration?: string;
+    quantity?: number;
+    instructions?: string;
+    status?: string;
+    prescribedAt?: string;
+  }[];
+  status: string;
+  dispensedBy?: any;
+  dispensedByName?: string;
+  dispensedAt?: string;
+  notes?: string;
+  pdfUrl?: string;
+  downloadUrl?: string;
+  date?: string;
   createdAt: string;
 }
 
@@ -60,10 +86,20 @@ export interface LabOrder {
     referenceRange: string;
     status: "normal" | "elevated" | "high" | "low" | "borderline" | "pending";
   }[];
-  status: "pending" | "completed" | "rejected";
+  status: "pending" | "completed" | "rejected" | "accepted" | "processing" | "report_uploaded" | "verified" | "cancelled" | "Sample Collection" | "Quality Check" | "Completed";
   rejectionReason?: string;
   date: string;
   createdAt: string;
+  report?: {
+    _id: string;
+    observations?: string;
+    remarks?: string;
+    files?: { secure_url: string; original_filename: string; public_id: string; mime_type: string; file_size: number }[];
+    uploadedBy?: { name: string };
+    uploadedAt?: string;
+    status?: string;
+    version?: number;
+  } | null;
 }
 
 export interface Certificate {
@@ -110,6 +146,8 @@ export function useDoctorDashboardAnalytics(filters?: { range?: string; startDat
       const res = await api.get<{ status: string; data: any }>("/doctors/dashboard/analytics", { params: filters });
       return res.data.data;
     },
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 }
 
@@ -121,6 +159,8 @@ export function useDoctorTodayAppointments() {
       const res = await api.get<{ status: string; data: Appointment[] }>("/doctors/dashboard/appointments/today");
       return res.data.data;
     },
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 }
 
@@ -300,7 +340,8 @@ export function useCreatePrescription() {
       appointmentId?: string;
       patientId: string;
       diagnosis: string;
-      medicines: any[];
+      medicines?: any[];
+      medications?: any[];
       notes?: string;
       advice?: string;
       followUpDate?: Date | null;
@@ -837,7 +878,7 @@ export interface DoctorPatientListResponse {
  * Fetch only the patients assigned to the authenticated doctor.
  * Filtering is enforced at the MongoDB level — no frontend filtering.
  */
-export function useDoctorPatients(params?: { search?: string }) {
+export function useDoctorPatients(params?: { search?: string; patientId?: string }) {
   return useQuery({
     queryKey: ["doctorDashboard", "myPatients", params],
     queryFn: async () => {
@@ -911,7 +952,7 @@ export function useDoctorLabOrderById(labOrderId: string | null | undefined) {
     queryKey: ["doctorDashboard", "myLabOrders", labOrderId],
     enabled: !!labOrderId,
     queryFn: async () => {
-      const res = await api.get<{ status: string; data: { order: LabOrder; report?: any } }>(
+      const res = await api.get<{ status: string; data: { order: LabOrder; report?: any; reports?: any[] } }>(
         `/doctors/dashboard/my-lab-orders/${labOrderId}`,
       );
       return res.data.data;
@@ -933,6 +974,36 @@ export function useMarkDoctorNotificationRead() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["doctorDashboard", "notifications"] });
+    },
+  });
+}
+
+export function useUpdatePrescriptionStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const res = await api.patch<{ status: string; data: { prescription: any } }>(
+        `/prescriptions/${id}/status`,
+        { status }
+      );
+      return res.data.data.prescription;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["prescriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
+    },
+  });
+}
+
+export function useConsultationHistory(consultationId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["doctorDashboard", "consultationHistory", consultationId],
+    enabled: !!consultationId,
+    queryFn: async () => {
+      const res = await api.get<{ status: string; data: { history: any[]; completedAt?: string; completedBy?: any; status: string } }>(
+        `/doctors/dashboard/consultations/${consultationId}/history`
+      );
+      return res.data.data;
     },
   });
 }

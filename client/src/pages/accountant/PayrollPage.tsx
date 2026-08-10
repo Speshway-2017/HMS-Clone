@@ -926,97 +926,99 @@ export function AccountantPayrollPage() {
         }}
       >
         {selectedSummary && (
-          <div className="space-y-5 text-xs p-1">
-            {/* Hospital Header */}
-            <div className="flex justify-between items-start border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-base font-bold text-[#1e2b4f]">HMS Enterprise</h3>
-                <p className="text-[11px] text-slate-400">Employee Payslip Receipt</p>
+          <div className="space-y-4">
+            <div id="payslip-print-area" className="space-y-5 text-xs p-1 bg-white">
+              {/* Hospital Header */}
+              <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-base font-bold text-[#1e2b4f]">HMS Enterprise</h3>
+                  <p className="text-[11px] text-slate-400">Employee Payslip Receipt</p>
+                </div>
+                <div className="text-right">
+                  <h4 className="font-bold text-slate-800 tracking-wider text-[11px] uppercase">
+                    SALARY STATEMENT
+                  </h4>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {selectedSummary.month}
+                  </p>
+                </div>
               </div>
-              <div className="text-right">
-                <h4 className="font-bold text-slate-800 tracking-wider text-[11px] uppercase">
-                  SALARY STATEMENT
-                </h4>
-                <p className="text-xs text-slate-500 font-medium">
-                  {selectedSummary.month}
-                </p>
-              </div>
-            </div>
 
-            {/* Employee Info Block */}
-            <div className="bg-slate-50/80 p-4 rounded-xl flex justify-between items-start border border-slate-100/80">
-              <div className="space-y-0.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                  EMPLOYEE INFO:
+              {/* Employee Info Block */}
+              <div className="bg-slate-50/80 p-4 rounded-xl flex justify-between items-start border border-slate-100/80">
+                <div className="space-y-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                    EMPLOYEE INFO:
+                  </span>
+                  <p className="font-bold text-slate-900 text-sm">{selectedSummary.employeeName}</p>
+                  <p className="text-slate-500 font-mono text-xs">ID: {selectedSummary.employeeId}</p>
+                  <p className="text-slate-500 text-xs">Role: {selectedSummary.designation}</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                    STATUS:
+                  </span>
+                  <span className="font-bold text-emerald-600 uppercase tracking-wider text-xs block">
+                    {selectedSummary.status === "Draft" ? "UNPROCESSED" : selectedSummary.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Salary Component Table */}
+              <div className="border border-slate-100 rounded-xl overflow-hidden">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50/60 border-b border-slate-100 text-slate-500 font-semibold text-xs">
+                    <tr>
+                      <th className="py-2.5 px-4 font-semibold">Salary Component</th>
+                      <th className="py-2.5 px-4 font-semibold text-center">Inflow (₹)</th>
+                      <th className="py-2.5 px-4 font-semibold text-right">Deduction (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    <tr>
+                      <td className="py-3 px-4 font-medium text-slate-800">Basic Salary</td>
+                      <td className="py-3 px-4 text-center font-medium text-slate-800">
+                        ₹{selectedSummary.salaryBreakdown.basicSalary.toLocaleString("en-IN")}
+                      </td>
+                      <td className="py-3 px-4 text-right text-slate-400 font-normal">—</td>
+                    </tr>
+                    <tr>
+                      <td className="py-3 px-4 font-medium text-slate-800">Allowance & Bonuses</td>
+                      <td className="py-3 px-4 text-center font-medium text-slate-800">
+                        ₹{(
+                          selectedSummary.salaryBreakdown.allowances +
+                          (selectedSummary.salaryBreakdown.specialAllowance || 0) +
+                          (selectedSummary.salaryBreakdown.bonus || 0) +
+                          (selectedSummary.salaryBreakdown.incentives || 0) +
+                          (selectedSummary.salaryBreakdown.overtimePayment || 0)
+                        ).toLocaleString("en-IN")}
+                      </td>
+                      <td className="py-3 px-4 text-right text-slate-400 font-normal">—</td>
+                    </tr>
+                    <tr>
+                      <td className="py-3 px-4 font-medium text-slate-800">
+                        Professional Tax, PF, Deductions
+                      </td>
+                      <td className="py-3 px-4 text-center text-slate-400 font-normal">—</td>
+                      <td className="py-3 px-4 text-right font-semibold text-rose-600">
+                        ₹{selectedSummary.salaryBreakdown.totalDeductions.toLocaleString("en-IN")}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Net Salary Disbursed */}
+              <div className="flex justify-between items-center py-2 px-1">
+                <span className="font-bold text-slate-900 text-sm">Net Salary Disbursed:</span>
+                <span className="font-bold text-[#1e2b4f] text-base font-sans">
+                  ₹{selectedSummary.salaryBreakdown.netSalary.toLocaleString("en-IN")}
                 </span>
-                <p className="font-bold text-slate-900 text-sm">{selectedSummary.employeeName}</p>
-                <p className="text-slate-500 font-mono text-xs">ID: {selectedSummary.employeeId}</p>
-                <p className="text-slate-500 text-xs">Role: {selectedSummary.designation}</p>
-              </div>
-              <div className="text-right">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                  STATUS:
-                </span>
-                <span className="font-bold text-emerald-600 uppercase tracking-wider text-xs block">
-                  {selectedSummary.status === "Draft" ? "UNPROCESSED" : selectedSummary.status}
-                </span>
               </div>
             </div>
 
-            {/* Salary Component Table */}
-            <div className="border border-slate-100 rounded-xl overflow-hidden">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50/60 border-b border-slate-100 text-slate-500 font-semibold text-xs">
-                  <tr>
-                    <th className="py-2.5 px-4 font-semibold">Salary Component</th>
-                    <th className="py-2.5 px-4 font-semibold text-center">Inflow (₹)</th>
-                    <th className="py-2.5 px-4 font-semibold text-right">Deduction (₹)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-xs">
-                  <tr>
-                    <td className="py-3 px-4 font-medium text-slate-800">Basic Salary</td>
-                    <td className="py-3 px-4 text-center font-medium text-slate-800">
-                      ₹{selectedSummary.salaryBreakdown.basicSalary.toLocaleString("en-IN")}
-                    </td>
-                    <td className="py-3 px-4 text-right text-slate-400 font-normal">—</td>
-                  </tr>
-                  <tr>
-                    <td className="py-3 px-4 font-medium text-slate-800">Allowance & Bonuses</td>
-                    <td className="py-3 px-4 text-center font-medium text-slate-800">
-                      ₹{(
-                        selectedSummary.salaryBreakdown.allowances +
-                        (selectedSummary.salaryBreakdown.specialAllowance || 0) +
-                        (selectedSummary.salaryBreakdown.bonus || 0) +
-                        (selectedSummary.salaryBreakdown.incentives || 0) +
-                        (selectedSummary.salaryBreakdown.overtimePayment || 0)
-                      ).toLocaleString("en-IN")}
-                    </td>
-                    <td className="py-3 px-4 text-right text-slate-400 font-normal">—</td>
-                  </tr>
-                  <tr>
-                    <td className="py-3 px-4 font-medium text-slate-800">
-                      Professional Tax, PF, Deductions
-                    </td>
-                    <td className="py-3 px-4 text-center text-slate-400 font-normal">—</td>
-                    <td className="py-3 px-4 text-right font-semibold text-rose-600">
-                      ₹{selectedSummary.salaryBreakdown.totalDeductions.toLocaleString("en-IN")}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            {/* Net Salary Disbursed */}
-            <div className="flex justify-between items-center py-2 px-1">
-              <span className="font-bold text-slate-900 text-sm">Net Salary Disbursed:</span>
-              <span className="font-bold text-[#1e2b4f] text-base font-sans">
-                ₹{selectedSummary.salaryBreakdown.netSalary.toLocaleString("en-IN")}
-              </span>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex justify-between items-center pt-3 border-t border-slate-100">
+            {/* Modal Footer Actions (Hidden on Printed Page) */}
+            <div className="flex justify-between items-center pt-3 border-t border-slate-100 print:hidden">
               <button
                 type="button"
                 onClick={() => window.print()}

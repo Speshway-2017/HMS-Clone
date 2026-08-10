@@ -12,6 +12,7 @@ import { getPagination, paginatedResponse } from "../utils/pagination";
 const staffSchema = z.object({
   department: z.string().optional().nullable(),
   name: z.string().min(1),
+  gender: z.string().min(1, "Gender is required").default("Male"),
   email: z.string().optional().default(""),
   phone: z.string().optional().default(""),
   photoUrl: z.string().optional().default(""),
@@ -155,6 +156,8 @@ export const getNextEmployeeId = catchAsync(async (req: Request, res: Response) 
   res.json({ status: "success", data: { employeeId } });
 });
 
+import { emitToHospital } from "../config/socket";
+
 export const createStaff = catchAsync(async (req: Request, res: Response) => {
   const body = staffSchema.parse(req.body);
   const hospitalId = req.hospitalFilter!.hospital;
@@ -236,6 +239,9 @@ export const createStaff = catchAsync(async (req: Request, res: Response) => {
     }
   }
 
+  emitToHospital(hospitalId, "staff:created", createdRecord);
+  emitToHospital(hospitalId, "staff:updated", createdRecord);
+
   res.status(201).json({
     status: "success",
     data: { staff: createdRecord, tempPassword: tempPassword ?? null },
@@ -256,19 +262,15 @@ export const getStaffMember = catchAsync(async (req: Request, res: Response) => 
     })
       .populate("patient", "name uhid age gender phone bloodGroup photoUrl")
       .populate("room", "roomNumber type")
-      .populate("bed", "bedNumber")
-      .populate("admittingDoctor", "name specialization")
-      .sort({ createdAt: -1 });
+      .populate("bed", "bedNumber");
   }
 
   res.json({
     status: "success",
     data: {
-      staff: {
-        ...staff.toObject(),
-        assignedPatients
-      }
-    }
+      staff,
+      assignedPatients,
+    },
   });
 });
 
@@ -281,6 +283,7 @@ export const updateStaff = catchAsync(async (req: Request, res: Response) => {
   if (!staff) {
     throw new AppError("Staff member not found.", 404);
   }
+  emitToHospital(staff.hospital, "staff:updated", staff);
   res.json({ status: "success", data: { staff } });
 });
 
@@ -289,6 +292,7 @@ export const deleteStaff = catchAsync(async (req: Request, res: Response) => {
   if (!staff) {
     throw new AppError("Staff member not found.", 404);
   }
+  emitToHospital(staff.hospital, "staff:deleted", { id: staff._id });
   res.status(204).send();
 });
 

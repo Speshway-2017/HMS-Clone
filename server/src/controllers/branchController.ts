@@ -6,6 +6,9 @@ import { catchAsync } from "../utils/catchAsync";
 import { generateBranchId } from "../utils/idGenerator";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 
+import { syncBranchDepartmentsForBranch } from "../utils/branchDepartmentSync";
+import { emitToHospital } from "../config/socket";
+
 const branchSchema = z.object({
   hospital: z.string().min(1),
   name: z.string().min(1),
@@ -23,7 +26,7 @@ export const listBranches = catchAsync(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req);
   let hospitalId = req.query.hospitalId as string | undefined;
 
-  if (!hospitalId && req.user?.hospital && req.user?.role !== "super_admin") {
+  if (req.user?.role !== "super_admin" && req.user?.hospital) {
     const rawHosp: any = req.user.hospital;
     hospitalId = typeof rawHosp === "object" && rawHosp ? rawHosp._id?.toString() : String(rawHosp);
   }
@@ -49,6 +52,12 @@ export const listBranches = catchAsync(async (req: Request, res: Response) => {
 export const createBranch = catchAsync(async (req: Request, res: Response) => {
   const body = branchSchema.parse(req.body);
   const branch = await Branch.create({ ...body, branchId: generateBranchId() });
+
+  // Automatically inherit active departments from Parent Hospital
+  await syncBranchDepartmentsForBranch(branch._id, branch.hospital);
+
+  emitToHospital(branch.hospital, "branch:created", branch);
+
   res.status(201).json({ status: "success", data: { branch } });
 });
 
@@ -56,6 +65,13 @@ export const getBranch = catchAsync(async (req: Request, res: Response) => {
   const branch = await Branch.findById(req.params.id).populate("hospital", "name");
   if (!branch) {
     throw new AppError("Branch not found.", 404);
+  }
+  if (req.user?.role !== "super_admin" && req.user?.hospital) {
+    const userHospId = typeof req.user.hospital === "object" ? (req.user.hospital as any)._id?.toString() : String(req.user.hospital);
+    const branchHospId = typeof branch.hospital === "object" ? (branch.hospital as any)._id?.toString() : String(branch.hospital);
+    if (userHospId !== branchHospId) {
+      throw new AppError("You do not have permission to view this branch.", 403);
+    }
   }
   res.json({ status: "success", data: { branch } });
 });
@@ -66,6 +82,7 @@ export const updateBranch = catchAsync(async (req: Request, res: Response) => {
   if (!branch) {
     throw new AppError("Branch not found.", 404);
   }
+  emitToHospital(branch.hospital, "branch:updated", branch);
   res.json({ status: "success", data: { branch } });
 });
 
@@ -74,5 +91,6 @@ export const deleteBranch = catchAsync(async (req: Request, res: Response) => {
   if (!branch) {
     throw new AppError("Branch not found.", 404);
   }
+  emitToHospital(branch.hospital, "branch:deleted", { id: branch._id });
   res.status(204).send();
 });

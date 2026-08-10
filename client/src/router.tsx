@@ -43,6 +43,9 @@ import { InventoryPage } from "./pages/hospital-admin/InventoryPage";
 import { InventoryFormPage } from "./pages/hospital-admin/InventoryFormPage";
 import { InventoryItemDetailsPage } from "./pages/hospital-admin/InventoryItemDetailsPage";
 import { BedsPage } from "./pages/hospital-admin/BedsPage";
+import { WardFormPage } from "./pages/hospital-admin/WardFormPage";
+import { RoomFormPage } from "./pages/hospital-admin/RoomFormPage";
+import { BedFormPage } from "./pages/hospital-admin/BedFormPage";
 import { HospitalInfoPage } from "./pages/hospital-admin/HospitalInfoPage";
 import { EnquiriesPage } from "./pages/hospital-admin/EnquiriesPage";
 import { BlogsPage } from "./pages/hospital-admin/BlogsPage";
@@ -131,6 +134,7 @@ import { NewLabBillPage } from "./pages/laboratory/NewLabBill";
 import { UploadReportPage } from "./pages/laboratory/UploadReportPage";
 import { TestRequestDetailsPage } from "./pages/laboratory/TestRequestDetailsPage";
 import { LaboratoryQualityControl } from "./pages/laboratory/QualityControl";
+import { LaboratoryCompletedReports } from "./pages/laboratory/CompletedReports";
 
 // Nurse & Patient modules
 import { NurseDashboardPage } from "./pages/nurse/DashboardPage";
@@ -229,6 +233,12 @@ export const router = createBrowserRouter([
           { path: "roles/new", element: <RoleFormPage /> },
           { path: "roles/:id/edit", element: <RoleFormPage /> },
           { path: "beds", element: <BedsPage /> },
+          { path: "beds/create-ward", element: <WardFormPage /> },
+          { path: "beds/edit-ward/:id", element: <WardFormPage /> },
+          { path: "beds/create-room", element: <RoomFormPage /> },
+          { path: "beds/edit-room/:id", element: <RoomFormPage /> },
+          { path: "beds/create-beds", element: <BedFormPage /> },
+          { path: "beds/edit-bed/:id", element: <BedFormPage /> },
           { path: "hospital-info", element: <HospitalInfoPage /> },
           { path: "enquiries", element: <EnquiriesPage /> },
           { path: "blogs", element: <BlogsPage /> },
@@ -388,6 +398,7 @@ export const router = createBrowserRouter([
           { path: "reports", element: <LaboratoryReportDelivery /> },
           { path: "billing", element: <LaboratoryBilling /> },
           { path: "billing/new", element: <NewLabBillPage /> },
+          { path: "completed-reports", element: <LaboratoryCompletedReports /> },
           { path: "settings", element: <LaboratorySettings /> },
         ],
       },

@@ -41,8 +41,7 @@ export function EnquiriesPage() {
 
   // --- SOCKET.IO REAL-TIME LISTENER ---
   useEffect(() => {
-    const handleNewEnquiry = (data: any) => {
-      console.log("Socket: New enquiry received!", data);
+    const handleNewEnquiry = () => {
       queryClient.invalidateQueries({ queryKey: ["enquiries"] });
     };
 

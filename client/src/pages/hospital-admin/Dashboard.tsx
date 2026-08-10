@@ -176,12 +176,6 @@ export function HospitalAdminDashboard() {
         {/* Header Action Shortcuts */}
         <div className="flex items-center gap-2">
           <Link
-            to="/admin/patients"
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-          >
-            <UserPlus className="h-3.5 w-3.5 text-navy-700" /> New Patient
-          </Link>
-          <Link
             to="/admin/doctors/new"
             className="flex items-center gap-1.5 rounded-lg bg-navy-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-navy-800"
           >

@@ -9,12 +9,21 @@ export interface DiagnosticReportFile {
   file_size: number;
 }
 
+export interface ReportVersion {
+  version: number;
+  observations: string;
+  remarks: string;
+  files: DiagnosticReportFile[];
+  editedBy: any;
+  editedAt: string;
+}
+
 export interface DiagnosticReport {
   _id: string;
   hospital: string;
   patient: any;
   doctor: any;
-  appointment: string;
+  appointment: any;
   requestType: "Laboratory" | "Radiology" | "Combined";
   requestId: string;
   testName: string;
@@ -24,6 +33,8 @@ export interface DiagnosticReport {
   uploadedBy: { _id: string; name: string };
   uploadedAt: string;
   status: "report_uploaded" | "verified" | "completed";
+  version?: number;
+  versions?: ReportVersion[];
 }
 
 export interface UnifiedRequest {
@@ -38,10 +49,14 @@ export interface UnifiedRequest {
   tests: string[];
   priority: "Routine" | "Urgent" | "STAT";
   date: string;
-  status: "pending" | "accepted" | "processing" | "report_uploaded" | "verified" | "completed" | "rejected" | "cancelled";
+  status: "pending" | "accepted" | "processing" | "report_uploaded" | "verified" | "completed" | "rejected" | "cancelled" | "Pending" | "Sample Collection" | "Processing" | "Quality Check" | "Completed" | "Cancelled";
+  paymentStatus?: "PAID" | "PAYMENT_PENDING";
   requestType: "Laboratory" | "Radiology" | "Combined";
   rejectionReason?: string;
   sampleStatus?: string;
+  sampleId?: string;
+  sampleType?: string;
+  collectionTime?: string;
   appointment?: any;
   notes?: string;
 }
@@ -51,6 +66,16 @@ export function useLaboratoryRequests() {
     queryKey: ["laboratory", "requests"],
     queryFn: async () => {
       const res = await api.get<{ status: string; data: UnifiedRequest[] }>("/laboratory/requests");
+      return res.data.data;
+    },
+  });
+}
+
+export function useCompletedReports() {
+  return useQuery({
+    queryKey: ["laboratory", "completed-reports"],
+    queryFn: async () => {
+      const res = await api.get<{ status: string; data: DiagnosticReport[] }>("/laboratory/completed-reports");
       return res.data.data;
     },
   });
@@ -106,6 +131,23 @@ export function useUploadReport() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["laboratory", "requests"] });
+      queryClient.invalidateQueries({ queryKey: ["laboratory", "completed-reports"] });
+    },
+  });
+}
+
+export function useEditReport() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ reportId, formData }: { reportId: string; formData: FormData }) => {
+      const res = await api.post(`/laboratory/reports/${reportId}/edit`, formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["laboratory", "completed-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["laboratory", "requests"] });
     },
   });
 }
@@ -119,6 +161,7 @@ export function useVerifyReport() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["laboratory", "requests"] });
+      queryClient.invalidateQueries({ queryKey: ["laboratory", "completed-reports"] });
     },
   });
 }
@@ -132,6 +175,7 @@ export function usePublishReport() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["laboratory", "requests"] });
+      queryClient.invalidateQueries({ queryKey: ["laboratory", "completed-reports"] });
     },
   });
 }
@@ -156,6 +200,32 @@ export function usePatientReports(patientId: string | undefined) {
         params: { patientId }
       });
       return res.data.data;
+    },
+  });
+}
+
+export function useCollectSample() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ requestId, sampleId, sampleType, collectedBy }: { requestId: string; sampleId?: string; sampleType?: string; collectedBy?: string }) => {
+      const res = await api.post(`/laboratory/${requestId}/collect-sample`, { sampleId, sampleType, collectedBy });
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["laboratory", "requests"] });
+    },
+  });
+}
+
+export function useSubmitResults() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ requestId, results }: { requestId: string; results: any[] }) => {
+      const res = await api.post(`/laboratory/${requestId}/results`, { results });
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["laboratory", "requests"] });
     },
   });
 }

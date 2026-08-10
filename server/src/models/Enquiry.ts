@@ -14,3 +14,9 @@ const enquirySchema = new Schema(
 
 export type Enquiry = InferSchemaType<typeof enquirySchema> & { _id: Types.ObjectId };
 export const Enquiry = model("Enquiry", enquirySchema);
+
+// Ensure legacy unique referenceId_1 index is cleaned up if present in MongoDB
+Enquiry.collection.dropIndex("referenceId_1").catch(() => {
+  // Ignore if index doesn't exist
+});
+

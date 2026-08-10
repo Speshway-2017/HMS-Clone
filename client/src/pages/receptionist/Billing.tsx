@@ -22,6 +22,8 @@ import {
   ChevronDown,
   ChevronRight
 } from "lucide-react";
+import toast from "react-hot-toast";
+import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
 import {
   usePayBilling,
   usePendingInvoices,
@@ -270,7 +272,6 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
   // Socket sync integrations
   useEffect(() => {
     const handleUpdateEvent = (data: any) => {
-      console.log("Socket billing sync received:", data);
       if (selectedAdmissionId && (data.admissionId === selectedAdmissionId || data.type === "BILL_PAYMENT_PROCESSED" || data.type === "BILL_INVOICE_GENERATED")) {
         refetchBillDetails();
       }
@@ -322,14 +323,14 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
       const res = await api.get<any>(`/invoices/${id}`);
       const inv = res.data?.data?.invoice || res.data;
       if (inv && inv.billingType === "PHARMACY") {
-        alert("Pharmacy invoices must be paid at the pharmacy counter only.");
+        toast.error("Pharmacy invoices must be paid at the pharmacy counter only.");
         setInvoice(null);
         return;
       }
       setInvoice(inv);
       setReceiptData(null);
     } catch {
-      alert("Failed to fetch invoice details");
+      toast.error("Failed to fetch invoice details");
     } finally {
       setInvoiceLoading(false);
     }
@@ -349,7 +350,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
     }
 
     if (isNaN(amt) || amt <= 0) {
-      alert("Please enter a valid payment amount.");
+      toast.error("Please enter a valid payment amount.");
       return;
     }
 
@@ -358,9 +359,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
     const remainingPaise = toPaise(rawBalance);
 
     if (enteredPaise > remainingPaise) {
-      alert(
-        `Entered Amount:\n₹${(enteredPaise / 100).toFixed(2)}\n\nRemaining Balance:\n₹${(remainingPaise / 100).toFixed(2)}\n\nPlease enter an amount less than or equal to the remaining balance.`
-      );
+      toast.error(`Entered Amount ₹${(enteredPaise / 100).toFixed(2)} exceeds remaining balance ₹${(remainingPaise / 100).toFixed(2)}.`);
       return;
     }
 
@@ -381,8 +380,9 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
       setReceiptData(result);
       setInvoice(null);
       refetchPending();
+      toast.success("Payment processed successfully!");
     } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || "Failed to process payment");
+      toast.error(err?.response?.data?.message || err?.message || "Failed to process payment");
     }
   };
 
@@ -403,15 +403,15 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
     if (!selectedAdmissionId) return;
     try {
       await createBillMutation.mutateAsync({ admissionId: selectedAdmissionId });
-      alert("Inpatient Draft Bill created successfully.");
+      toast.success("Inpatient Draft Bill created successfully.");
     } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || "Failed to create inpatient bill");
+      toast.error(err?.response?.data?.message || err?.message || "Failed to create inpatient bill");
     }
   };
 
   const handleAddBillItem = async (category: string) => {
     if (!itemDesc || itemPrice <= 0) {
-      alert("Please provide Description and Unit Price.");
+      toast.error("Please provide Description and Unit Price.");
       return;
     }
     try {
@@ -431,8 +431,9 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
       setItemDiscount(0);
       setItemTax(0);
       setAddItemCategory(null);
+      toast.success("Bill item added successfully.");
     } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || "Failed to add charge item");
+      toast.error(err?.response?.data?.message || err?.message || "Failed to add charge item");
     }
   };
 
@@ -456,23 +457,33 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
         tax: editTax
       });
       setEditingItemId(null);
+      toast.success("Charge item updated successfully.");
     } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || "Failed to update charge item");
+      toast.error(err?.response?.data?.message || err?.message || "Failed to update charge item");
     }
   };
 
-  const handleDeleteBillItem = async (itemId: string) => {
-    if (!window.confirm("Are you sure you want to delete this custom charge?")) return;
+  const [deleteTargetItemId, setDeleteTargetItemId] = useState<string | null>(null);
+
+  const handleDeleteBillItem = (itemId: string) => {
+    setDeleteTargetItemId(itemId);
+  };
+
+  const confirmDeleteBillItem = async () => {
+    if (!deleteTargetItemId) return;
     try {
-      await deleteBillItemMutation.mutateAsync(itemId);
+      await deleteBillItemMutation.mutateAsync(deleteTargetItemId);
+      toast.success("Charge item deleted successfully!");
     } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || "Failed to delete charge item");
+      toast.error(err?.response?.data?.message || err?.message || "Failed to delete charge item");
+    } finally {
+      setDeleteTargetItemId(null);
     }
   };
 
   const handleGenerateInvoice = async () => {
     if (gross === 0) {
-      alert("Cannot generate invoice for a bill with zero items.");
+      toast.error("Cannot generate invoice for a bill with zero items.");
       return;
     }
     if (!window.confirm("Are you sure you want to lock the bill and generate the invoice? This is permanent.")) return;
@@ -488,9 +499,9 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
         paymentMode,
         taxRate: taxRateVal
       });
-      alert("GST Invoice generated successfully.");
+      toast.success("GST Invoice generated successfully.");
     } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || "Failed to generate invoice");
+      toast.error(err?.response?.data?.message || err?.message || "Failed to generate invoice");
     }
   };
 
@@ -516,7 +527,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
         mixedDetails: mixed,
         transactionId: ipPayTxId || `TXN-IP-${Date.now().toString().slice(-6)}`
       });
-      alert("Payment processed successfully.");
+      toast.success("Payment processed successfully.");
       setSelectedReceiptPaymentId(res.payment._id);
       setShowIPPaymentModal(false);
       setShowIPReceiptModal(true);
@@ -528,7 +539,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
       setIpChequeAmt(0);
       setIpInsAmt(0);
     } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || "Failed to process transaction");
+      toast.error(err?.response?.data?.message || err?.message || "Failed to process transaction");
     }
   };
 
@@ -930,40 +941,63 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
             )}
 
             {receiptData && (
-              <Card id="opd-receipt-print" className="space-y-4 border-t-4 border-t-green-600 bg-green-50/10 print:border-none print:shadow-none print:p-0">
-                <div className="flex justify-between items-center border-b pb-2">
-                  <div className="flex items-center gap-2">
+              <Card id="opd-receipt-print" className="space-y-4 border border-emerald-200 bg-emerald-50/20 p-5 rounded-2xl shadow-md print:border-none print:shadow-none print:p-0">
+                <div className="flex justify-between items-center border-b border-emerald-100 pb-3">
+                  <div className="flex items-center gap-2.5">
                     {hospitalData?.logoUrl ? (
-                      <img src={hospitalData.logoUrl} alt={hospitalData.name} className="h-8 w-8 object-contain rounded bg-slate-50 p-0.5 border" />
+                      <img src={hospitalData.logoUrl} alt={hospitalData.name} className="h-9 w-9 object-contain rounded-lg bg-white p-1 border border-slate-200" />
                     ) : (
-                      <div className="flex h-8 w-8 items-center justify-center rounded bg-navy-100 text-navy-700 font-bold text-xs">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy-700 text-white font-bold text-sm">
                         {hospitalData?.name ? hospitalData.name.charAt(0).toUpperCase() : "H"}
                       </div>
                     )}
                     <div>
-                      <h4 className="text-xs font-bold text-slate-800">{hospitalData?.name || "HMS Hospital Network"}</h4>
-                      <p className="text-[9px] text-slate-400">Payment Receipt</p>
+                      <h4 className="text-sm font-extrabold text-slate-900">{hospitalData?.name || "HMS Hospital Network"}</h4>
+                      <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Official Payment Receipt</p>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-200">
+                    <CheckCircle className="h-4 w-4 text-emerald-600" /> Paid
+                  </span>
+                </div>
+
+                <div className="rounded-xl bg-white p-4 border border-emerald-100/80 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Receipt Reference</span>
+                    <span className="text-sm font-mono font-extrabold text-slate-900">{receiptData.receiptNumber || "RCP-3342"}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-xs border-t border-slate-100 pt-3">
+                    <div>
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase">Transaction ID</span>
+                      <p className="font-mono font-bold text-slate-800 mt-0.5 truncate">{receiptData.payment?.transactionId || "N/A"}</p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase">Total Amount Paid</span>
+                      <p className="font-mono font-extrabold text-emerald-700 mt-0.5 text-base">
+                        {formatINR(receiptData.receipt?.amount || receiptData.payment?.amount)}
+                      </p>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-green-700 font-bold text-sm">
-                  <CheckCircle className="h-5 w-5 text-green-600" /> Payment Processed Successfully
+
+                <div className="flex items-center gap-2 pt-1">
+                  <Button
+                    onClick={() => {
+                      toast.success("Opening print dialog...");
+                      window.print();
+                    }}
+                    variant="secondary"
+                    className="flex-1 flex items-center justify-center gap-2 text-xs py-2.5 font-bold bg-white border-slate-200 hover:bg-slate-50 text-slate-800 shadow-sm"
+                  >
+                    <Printer className="h-4 w-4 text-navy-700" /> Print Payment Receipt
+                  </Button>
+                  <Button
+                    onClick={() => setReceiptData(null)}
+                    className="px-4 py-2.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                  >
+                    Done
+                  </Button>
                 </div>
-                <div className="text-xs space-y-1 text-slate-650">
-                  <p><strong>Receipt Number:</strong> {receiptData.receiptNumber || "RCP-3342"}</p>
-                  <p><strong>Transaction ID:</strong> {receiptData.payment?.transactionId || "N/A"}</p>
-                  <p><strong>Paid Amount:</strong> {formatINR(receiptData.receipt?.amount || receiptData.payment?.amount)}</p>
-                </div>
-                <Button
-                  onClick={() => {
-                    alert("Printing receipt details...");
-                    window.print();
-                  }}
-                  variant="secondary"
-                  className="w-full flex items-center justify-center gap-1.5 text-xs py-2"
-                >
-                  <Printer className="h-4 w-4" /> Print Payment Receipt
-                </Button>
               </Card>
             )}
           </div>
@@ -1772,6 +1806,15 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
           </div>
         )}
       </Modal>
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(deleteTargetItemId)}
+        title="Confirm Deletion"
+        message="Are you sure you want to delete this custom charge? This action cannot be undone."
+        isLoading={deleteBillItemMutation.isPending}
+        onClose={() => setDeleteTargetItemId(null)}
+        onConfirm={confirmDeleteBillItem}
+      />
     </div>
   );
 }

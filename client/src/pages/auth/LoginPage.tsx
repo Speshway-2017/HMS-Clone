@@ -1,12 +1,12 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { Button } from "../../components/ui/Button";
+import AnimatedInput from "../../components/ui/AnimatedInput";
+import AnimatedSubmitButton from "../../components/ui/AnimatedSubmitButton";
+import SpringScaleIn from "../../components/ui/SpringScaleIn";
 import { ROLE_HOME_PATH } from "../../types/auth";
 import { usePublicHospital } from "../../features/hospitals";
-import { ShieldCheck, Lock, Activity, ArrowLeft, CheckCircle2, ChevronRight, Eye, EyeOff } from "lucide-react";
-import toast from "react-hot-toast";
-import { api } from "../../lib/api";
+import { ShieldCheck, Lock, Mail, Activity, ArrowLeft, CheckCircle2, Eye, EyeOff } from "lucide-react";
 
 export function LoginPage() {
   const { user, login } = useAuth();
@@ -34,6 +34,7 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   // Rotate features or stats on the left panel
   const [activePromoIdx, setActivePromoIdx] = useState(0);
@@ -62,7 +63,7 @@ export function LoginPage() {
   const searchParams = new URLSearchParams(location.search);
   const redirectParam = searchParams.get("redirect");
 
-  if (user) {
+  if (user && !isSubmitting && !isSuccess) {
     const redirectTo = redirectParam || (location.state as { from?: string })?.from || ROLE_HOME_PATH[user.role] || "/";
     return <Navigate to={redirectTo} replace />;
   }
@@ -71,8 +72,16 @@ export function LoginPage() {
     event.preventDefault();
     setError(null);
     setIsSubmitting(true);
+    setIsSuccess(false);
+
     try {
       const loggedInUser = await login(identifier.trim(), password);
+
+      // Trigger green tick mark animation
+      setIsSuccess(true);
+
+      // Wait 2.2 seconds for full spin and green tick mark animation to show
+      await new Promise((resolve) => setTimeout(resolve, 2200));
 
       if (sessionStorage.getItem("pendingAppointmentDraft") && loggedInUser.role === "patient") {
         navigate("/patient?tab=appointments", { replace: true });
@@ -83,167 +92,176 @@ export function LoginPage() {
       navigate(targetPath, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed.");
-    } finally {
       setIsSubmitting(false);
+      setIsSuccess(false);
     }
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <div className="flex w-full grid-cols-12 lg:grid">
-        {/* --- LEFT PANEL: SaaS Info (Hidden on mobile) --- */}
-        <div className="relative hidden flex-col justify-between bg-gradient-to-br from-slate-900 via-slate-950 to-indigo-950 p-12 text-white lg:col-span-5 lg:flex xl:col-span-4 overflow-hidden">
-          {/* Background overlay shapes */}
-          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
-          <div className="absolute -left-10 bottom-10 h-48 w-48 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none" />
+    <div className="h-screen w-full flex overflow-hidden bg-slate-50 font-sans">
+      {/* --- LEFT PANEL: SaaS Info (Hidden on mobile) --- */}
+      <div className="relative hidden lg:flex flex-col justify-between bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 p-8 lg:w-[360px] xl:w-[420px] shrink-0 h-full overflow-hidden text-white">
+        {/* Background overlay shapes */}
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl pointer-events-none" />
+        <div className="absolute -left-10 bottom-10 h-48 w-48 rounded-full bg-blue-400/15 blur-2xl pointer-events-none" />
 
-          {/* Logo Branding */}
-          <Link to="/" className="flex items-center gap-3 text-lg font-extrabold tracking-tight relative z-10">
-            {logoUrl ? (
-              <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover shadow-sm" />
-            ) : (
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-white font-bold text-sm shadow-md border border-white/10">
-                <Activity className="h-4 w-4 text-emerald-400" />
-              </div>
-            )}
-            <span className="bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">
-              {hospitalName}
+        {/* Logo Branding */}
+        <Link to="/" className="flex items-center gap-3 text-lg font-extrabold tracking-tight relative z-10">
+          {logoUrl ? (
+            <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover shadow-sm" />
+          ) : (
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-sm shadow-md border border-blue-400/20">
+              <Activity className="h-4 w-4 text-blue-200" />
+            </div>
+          )}
+          <span className="bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
+            {hospitalName}
+          </span>
+        </Link>
+
+        {/* Marketing rotating text */}
+        <div className="my-auto space-y-6 relative z-10 py-4">
+          <div className="space-y-3">
+            <span className="inline-block rounded-full bg-blue-500/10 border border-blue-400/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-300">
+              Enterprise Health Architecture
             </span>
-          </Link>
-
-          {/* Marketing rotating text */}
-          <div className="my-auto space-y-10 relative z-10">
-            <div className="space-y-4">
-              <span className="inline-block rounded-full bg-white/5 border border-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-300">
-                Enterprise Health Architecture
-              </span>
-              <h2 className="text-3xl font-extrabold leading-tight tracking-tight text-white">
+            <h2 className="text-2xl xl:text-3xl font-extrabold leading-tight tracking-tight text-white block">
+              <SpringScaleIn delay={200} stagger={70}>
                 One Platform. Seamless Compliance.
-              </h2>
-              <p className="text-sm leading-relaxed text-slate-300">
+              </SpringScaleIn>
+            </h2>
+            <p className="text-xs leading-relaxed text-slate-300 block">
+              <SpringScaleIn delay={500} stagger={30}>
                 HMS Enterprise integrates outpatient reception desks, clinician workspaces, and accountant audit ledgers into a unified clinical software matrix.
-              </p>
-            </div>
-
-            {/* Carousel Promo */}
-            <div className="rounded-xl border border-white/10 bg-white/5 p-5 backdrop-blur-md min-h-[120px] transition-all duration-300">
-              <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest block mb-1">
-                SYSTEM BENEFIT
-              </span>
-              <h4 className="text-sm font-bold flex items-center gap-1.5 text-white">
-                <ShieldCheck className="h-4.5 w-4.5 text-emerald-400" />
-                {promos[activePromoIdx].title}
-              </h4>
-              <p className="mt-2 text-xs text-slate-300 leading-relaxed">
-                {promos[activePromoIdx].desc}
-              </p>
-            </div>
-
-            {/* Quick trust metrics */}
-            <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-6 text-xs text-slate-300">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" /> 100% HIPAA Isolated
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" /> AES-256 Encrypted
-              </div>
-            </div>
+              </SpringScaleIn>
+            </p>
           </div>
 
-          {/* Footer of Left Panel */}
-          <div className="text-[10px] text-slate-400 relative z-10">
-            © {new Date().getFullYear()} {hospitalName}. Managed Clinical Network.
+          {/* Carousel Promo */}
+          <div className="rounded-xl border border-blue-500/20 bg-blue-900/20 p-4 backdrop-blur-md min-h-[110px] transition-all duration-300">
+            <span className="text-[9px] font-bold text-blue-400 uppercase tracking-widest block mb-1">
+              SYSTEM BENEFIT
+            </span>
+            <h4 className="text-xs font-bold flex items-center gap-1.5 text-white">
+              <ShieldCheck className="h-4 w-4 text-blue-400" />
+              {promos[activePromoIdx].title}
+            </h4>
+            <p className="mt-1.5 text-xs text-slate-300 leading-relaxed">
+              {promos[activePromoIdx].desc}
+            </p>
+          </div>
+
+          {/* Quick trust metrics */}
+          <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-4 text-xs text-slate-300">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-blue-400" /> 100% HIPAA Isolated
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-blue-400" /> AES-256 Encrypted
+            </div>
           </div>
         </div>
 
-        {/* --- RIGHT PANEL: Login Form --- */}
-        <div className="flex flex-1 flex-col justify-center px-6 py-12 lg:col-span-7 xl:col-span-8 bg-slate-50">
+        {/* Footer of Left Panel */}
+        <div className="text-[10px] text-slate-400 relative z-10">
+          © {new Date().getFullYear()} {hospitalName}. Managed Clinical Network.
+        </div>
+      </div>
+
+      {/* --- RIGHT PANEL: Login Form --- */}
+      <div className="flex-1 h-full overflow-y-auto px-6 py-12 bg-slate-50 flex flex-col justify-center">
           <div className="mx-auto w-full max-w-[420px] space-y-8">
             {/* Header branding for mobile / small screen */}
             <div className="text-center space-y-2 lg:text-left">
-              <Link to="/" className="inline-flex lg:hidden items-center gap-2.5 text-xl font-extrabold text-navy-900 justify-center">
+              <Link to="/" className="inline-flex lg:hidden items-center gap-2.5 text-xl font-extrabold text-blue-900 justify-center">
                 {logoUrl && (
                   <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover" />
                 )}
                 <span>{hospitalName}</span>
               </Link>
-              <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-                Sign In to Dashboard
+              <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight block">
+                <SpringScaleIn delay={100} stagger={80}>
+                  Sign In to Dashboard
+                </SpringScaleIn>
               </h3>
-              <p className="text-xs text-slate-500 font-medium">
-                Enter your credentials or mobile number to access your account.
+              <p className="text-xs text-slate-500 font-medium block">
+                <SpringScaleIn delay={350} stagger={30}>
+                  Enter your credentials or mobile number to access your account.
+                </SpringScaleIn>
               </p>
             </div>
 
             {/* Login Card */}
             <div className="rounded-2xl border border-slate-200/80 bg-white p-8 shadow-xl">
-              <form onSubmit={handleSubmit} className="space-y-5 text-xs font-semibold text-slate-700">
-                {/* Email / Phone input in one single field */}
-                <div>
-                  <label htmlFor="identifier" className="block mb-1 text-xs text-slate-600 font-bold">
-                    Email Address or Phone Number
-                  </label>
-                  <input
+              <form onSubmit={handleSubmit} className="space-y-6 text-xs font-semibold text-slate-700">
+                {/* Email / Phone input with AnimatedInput */}
+                <div className="pt-2">
+                  <AnimatedInput
                     id="identifier"
-                    type="text"
+                    icon={<Mail className="h-4 w-4 text-blue-500" />}
+                    label="Email Address or Phone Number"
+                    value={identifier}
+                    onChange={setIdentifier}
                     required
                     autoComplete="username"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500 font-medium transition-all text-sm"
-                    placeholder="Email address or phone number (e.g. 9876543210)"
                   />
                 </div>
 
-                {/* Password input */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label htmlFor="password" className="text-xs text-slate-600">
-                      Security Password
-                    </label>
-                    <Link to="/forgot-password" className="text-[10px] text-navy-600 hover:text-navy-800 hover:underline">
+                {/* Password input with AnimatedInput */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-end">
+                    <Link to="/forgot-password" className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline">
                       Forgot Password?
                     </Link>
                   </div>
-                  <div className="relative">
-                    <input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      required
-                      autoComplete="current-password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 pl-3.5 pr-10 py-2.5 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500 font-medium transition-all text-sm"
-                      placeholder="••••••••"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 focus:outline-none"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
+                  <AnimatedInput
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    icon={<Lock className="h-4 w-4 text-blue-500" />}
+                    label="Security Password"
+                    value={password}
+                    onChange={setPassword}
+                    required
+                    autoComplete="current-password"
+                    endIcon={
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="svg-button text-slate-400 hover:text-blue-600 focus:outline-none transition-colors"
+                        title={showPassword ? "Hide Password" : "Show Password"}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    }
+                  />
                 </div>
 
                 {/* Error Banner */}
                 {error && (
-                  <div className="rounded-lg bg-red-50 border border-red-100 p-3 text-xs text-red-650 font-bold leading-normal">
+                  <div className="rounded-lg bg-red-50 border border-red-100 p-3 text-xs text-red-600 font-bold leading-normal">
                     {error}
                   </div>
                 )}
 
-                {/* Action button */}
-                <Button type="submit" variant="primary" disabled={isSubmitting} className="w-full py-3.5 text-sm bg-navy-700 shadow-md">
-                  {isSubmitting ? "Authenticating Session..." : "Secure Sign In"}
-                </Button>
+                {/* Animated Submit Button */}
+                <AnimatedSubmitButton
+                  type="submit"
+                  disabled={isSubmitting || isSuccess}
+                  isSubmitting={isSubmitting}
+                  isSuccess={isSuccess}
+                  text="Secure Sign In"
+                />
               </form>
 
               {/* Patient Register link */}
               <div className="mt-6 border-t border-slate-100 pt-4 text-center">
                 <p className="text-xs text-slate-500 font-medium">
                   New Patient?{" "}
-                  <Link to="/register" className="font-bold text-navy-700 hover:text-navy-900 hover:underline">
+                  <Link to="/register" className="font-bold text-blue-600 hover:text-blue-800 hover:underline">
                     Register for Patient Portal & Appointments →
                   </Link>
                 </p>
@@ -254,7 +272,7 @@ export function LoginPage() {
             <div className="text-center">
               <Link
                 to="/"
-                className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-navy-700 transition-colors"
+                className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors"
               >
                 <ArrowLeft className="h-4 w-4" /> Back to Marketing Portal
               </Link>
@@ -262,6 +280,5 @@ export function LoginPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

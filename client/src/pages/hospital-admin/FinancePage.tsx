@@ -23,6 +23,7 @@ import { DataTable, Column } from "../../components/ui/DataTable";
 import { Pagination } from "../../components/ui/Pagination";
 import { Invoice } from "../../types/domain";
 import { formatINR } from "../../lib/currency";
+import { PendingOverduePage } from "./PendingOverduePage";
 
 const STATUS_TONE = { pending: "warning", partially_paid: "info", paid: "success", overdue: "danger" } as const;
 
@@ -40,7 +41,7 @@ interface VisitGroup {
 }
 
 export function FinancePage() {
-  const [activeTab, setActiveTab] = useState<"overview" | "statement">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "pending" | "statement">("overview");
 
   // Invoices & Overview state
   const [page, setPage] = useState(1);
@@ -179,8 +180,9 @@ export function FinancePage() {
     }
   }
 
+  // Standard columns for All Invoices view
   const columns: Column<Invoice>[] = [
-    { header: "Invoice", render: (inv) => <span className="font-mono text-xs text-slate-500">{inv._id.slice(-8).toUpperCase()}</span> },
+    { header: "Invoice", render: (inv) => <span className="font-mono text-xs text-slate-500">#{inv._id.slice(-8).toUpperCase()}</span> },
     { header: "Patient", render: (inv) => <span className="font-medium text-slate-700">{inv.patient && typeof inv.patient === "object" ? inv.patient.name : "Walk-in Patient"}</span> },
     {
       header: "Reason",
@@ -202,6 +204,56 @@ export function FinancePage() {
       ),
     },
   ];
+
+  // Pending-specific columns: show UHID, Billing Reason, Total, Paid, Remaining (red), Due Date, Status
+  const pendingColumns: Column<Invoice>[] = [
+    { header: "Invoice No", render: (inv) => <span className="font-mono text-xs font-bold text-slate-700">#{inv._id.slice(-8).toUpperCase()}</span> },
+    {
+      header: "Patient",
+      render: (inv) => (
+        <div>
+          <p className="font-semibold text-slate-800 text-xs">{inv.patient && typeof inv.patient === "object" ? (inv.patient as any).name : "Walk-in"}</p>
+          <p className="text-[10px] font-mono text-slate-400">{inv.patient && typeof inv.patient === "object" ? (inv.patient as any).uhid : ""}</p>
+        </div>
+      ),
+    },
+    {
+      header: "Billing Reason",
+      render: (inv) => (
+        <span className="text-xs text-slate-600 max-w-[180px] truncate block" title={getInvoiceReason(inv)}>
+          {getInvoiceReason(inv)}
+        </span>
+      ),
+    },
+    { header: "Total Bill", render: (inv) => <span className="font-semibold text-slate-800 font-mono text-xs">₹{(inv.totals?.total ?? 0).toFixed(2)}</span> },
+    { header: "Amount Paid", render: (inv) => <span className="font-semibold text-emerald-600 font-mono text-xs">₹{((inv as any).amountPaid ?? 0).toFixed(2)}</span> },
+    {
+      header: "Remaining",
+      render: (inv) => (
+        <span className="font-black text-red-600 font-mono text-xs bg-red-50 border border-red-200 px-2 py-0.5 rounded-md">
+          ₹{(inv.totals?.patientBalance ?? 0).toFixed(2)}
+        </span>
+      ),
+    },
+    {
+      header: "Due Date",
+      render: (inv) => (
+        <span className="text-xs text-slate-500">
+          {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+        </span>
+      ),
+    },
+    { header: "Status", render: (inv) => <Badge tone={STATUS_TONE[inv.status]}>{inv.status.replace("_", " ")}</Badge> },
+    {
+      header: "View",
+      render: (inv) => (
+        <Link to={`/admin/finance/invoices/${inv._id}`} className="inline-flex items-center gap-1 text-xs font-bold text-navy-700 hover:underline">
+          View Invoice
+        </Link>
+      ),
+    },
+  ];
+
 
   const handlePrint = () => {
     window.print();
@@ -230,6 +282,21 @@ export function FinancePage() {
           All Invoices Overview
         </button>
         <button
+          onClick={() => setActiveTab("pending")}
+          className={`border-b-2 px-4 py-2.5 text-sm font-semibold capitalize transition-all whitespace-nowrap flex items-center gap-1.5 ${
+            activeTab === "pending"
+              ? "border-amber-500 text-amber-700 font-bold"
+              : "border-transparent text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          <AlertCircle className="h-4 w-4" /> Pending &amp; Overdue
+          {data?.counts?.pendingCount != null && data.counts.pendingCount > 0 && (
+            <span className="ml-1 bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
+              {data.counts.pendingCount}
+            </span>
+          )}
+        </button>
+        <button
           onClick={() => setActiveTab("statement")}
           className={`border-b-2 px-4 py-2.5 text-sm font-semibold capitalize transition-all whitespace-nowrap ${
             activeTab === "statement"
@@ -251,22 +318,48 @@ export function FinancePage() {
           </div>
 
           <Card>
+            {/* Status filter tabs */}
             <div className="mb-4 flex flex-wrap gap-2">
-              {["", "pending", "partially_paid", "paid", "overdue"].map((s) => (
+              {(["", "pending", "partially_paid", "paid", "overdue"] as const).map((s) => (
                 <button
                   key={s}
                   onClick={() => {
                     setStatus(s);
                     setPage(1);
                   }}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-medium ${status === s ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:bg-slate-50"}`}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                    status === s
+                      ? s === "pending"
+                        ? "bg-amber-50 text-amber-700 font-bold border border-amber-300"
+                        : "bg-navy-50 text-navy-700 font-bold"
+                      : "text-slate-500 hover:bg-slate-50"
+                  }`}
                 >
-                  {s === "" ? "All Invoices" : s.replace("_", " ")}
+                  {s === "" ? "All Invoices"
+                    : s === "pending" ? "Pending (All Unpaid)"
+                    : s.replace("_", " ").replace(/\b\w/g, c => c.toUpperCase())}
                 </button>
               ))}
             </div>
 
-            <DataTable columns={columns} rows={data?.data ?? []} rowKey={(inv) => inv._id} emptyMessage={isLoading ? "Loading..." : "No invoices yet."} />
+            {/* Pending info banner */}
+            {status === "pending" && (
+              <div className="mb-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-xs text-amber-800">
+                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5 text-amber-500" />
+                <span>
+                  <strong>Pending (All Unpaid)</strong> — shows every invoice where the patient still has an outstanding balance,
+                  including <strong>Pending</strong>, <strong>Partially Paid</strong>, and <strong>Overdue</strong> invoices.
+                  Sorted by remaining balance.
+                </span>
+              </div>
+            )}
+
+            <DataTable
+              columns={status === "pending" ? pendingColumns : columns}
+              rows={data?.data ?? []}
+              rowKey={(inv) => inv._id}
+              emptyMessage={isLoading ? "Loading..." : status === "pending" ? "No outstanding invoices. All balances are cleared! ✓" : "No invoices yet."}
+            />
 
             <div className="mt-4 flex justify-end">
               <Pagination page={page} totalPages={data?.pagination.totalPages ?? 1} onPageChange={setPage} />
@@ -275,7 +368,10 @@ export function FinancePage() {
         </div>
       )}
 
-      {/* Tab 2: Patient Consolidated Statement */}
+      {/* Tab 2: Pending & Overdue */}
+      {activeTab === "pending" && <PendingOverduePage />}
+
+      {/* Tab 3: Patient Consolidated Statement */}
       {activeTab === "statement" && (
         <div className="space-y-6">
           {/* Patient Selection & Search Card */}

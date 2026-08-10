@@ -322,7 +322,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
         if (draft.prescriptions && draft.prescriptions.length > 0) {
           setPrescriptionMeds(draft.prescriptions.map((p: any, idx: number) => ({
             key: p._id || p.key || `draft-med-${idx}`,
-            name: p.name || "",
+            name: p.name || p.medicineName || "",
             strength: p.strength || "",
             dosage: p.dosage || "",
             frequency: p.frequency || "",
@@ -332,6 +332,22 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
             afternoon: !!p.afternoon,
             night: !!p.night,
           })));
+        } else if (workspaceData.prescriptions && workspaceData.prescriptions.length > 0) {
+          const latestRx = workspaceData.prescriptions[0];
+          if (latestRx.medications && latestRx.medications.length > 0) {
+            setPrescriptionMeds(latestRx.medications.map((p: any, idx: number) => ({
+              key: p._id || `rx-med-${idx}`,
+              name: p.name || p.medicineName || "",
+              strength: p.strength || "",
+              dosage: p.dosage || "",
+              frequency: p.frequency || "",
+              duration: p.duration || "",
+              instructions: p.instructions || "",
+              morning: !!p.morning,
+              afternoon: !!p.afternoon,
+              night: !!p.night,
+            })));
+          }
         }
 
         if (draft.labOrders && draft.labOrders.length > 0) {
@@ -377,7 +393,8 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
 
   // Auto-save logic
   useEffect(() => {
-    if (!hasPopulated.current || !workspaceData?.draftSession?._id) return;
+    const isCompleted = workspaceData?.appointment?.status === "completed" || workspaceData?.draftSession?.status === "COMPLETED";
+    if (isCompleted || !workspaceData?.draftSession?._id) return;
 
     const draftId = workspaceData.draftSession._id;
 
@@ -397,17 +414,19 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
       clinicalNotes,
       treatmentPlan,
       advice,
-      prescriptions: prescriptionMeds.map(p => ({
-        name: p.name,
-        strength: p.strength,
-        dosage: p.dosage,
-        frequency: p.frequency,
-        duration: p.duration,
-        instructions: p.instructions,
-        morning: !!p.morning,
-        afternoon: !!p.afternoon,
-        night: !!p.night,
-      })),
+      prescriptions: prescriptionMeds
+        .map(p => ({
+          name: (p.name || p.medicineName || "").trim(),
+          strength: p.strength || "",
+          dosage: p.dosage || "",
+          frequency: p.frequency || "",
+          duration: p.duration || "",
+          instructions: p.instructions || "",
+          morning: !!p.morning,
+          afternoon: !!p.afternoon,
+          night: !!p.night,
+        }))
+        .filter(p => p.name.length > 0),
       labOrders: selectedLabTests,
       radiologyOrders: selectedRadiologyStudies.map((study) => ({
         type: study,
@@ -728,25 +747,58 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
 
   const handleGeneratePrescription = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (prescriptionMeds.some((m) => !m.name.trim())) {
-      toast.error("Please enter medicine names");
+    const validMeds = prescriptionMeds
+      .map((m) => ({
+        name: (m.name || m.medicineName || "").trim(),
+        strength: m.strength || "",
+        dosage: m.dosage || "",
+        frequency: m.frequency || "",
+        duration: m.duration || "",
+        instructions: m.instructions || "",
+        morning: !!m.morning,
+        afternoon: !!m.afternoon,
+        night: !!m.night,
+      }))
+      .filter((m) => m.name.length > 0);
+
+    if (validMeds.length === 0) {
+      toast.error("Please enter at least one valid medicine name");
       return;
     }
-    if (!workspaceData?.draftSession) {
-      toast.error("No active draft session. Please start consultation.");
-      return;
-    }
+
     try {
-      await updateDraftMutation.mutateAsync({
-        consultationId: workspaceData.draftSession._id,
-        updateData: {
-          prescriptions: prescriptionMeds,
-        },
+      if (workspaceData?.draftSession) {
+        await updateDraftMutation.mutateAsync({
+          consultationId: workspaceData.draftSession._id,
+          updateData: {
+            prescriptions: validMeds,
+          },
+          appointmentId: appointment._id,
+        });
+      }
+
+      const res = await prescriptionMutation.mutateAsync({
         appointmentId: appointment._id,
+        patientId: patient._id,
+        medications: validMeds,
+        diagnosis: diagnosis || "Consultation",
+        notes: clinicalNotes || "",
+        advice: advice || "",
       });
-      toast.success("Prescription draft saved successfully!");
+
+      if (res?.pdfUrl || res?.downloadUrl) {
+        setSuccessInfo({
+          show: true,
+          isCompleted: false,
+          pdfUrl: res.pdfUrl || "",
+          downloadUrl: res.downloadUrl || "",
+        });
+      }
+
+      toast.success("Prescription generated and sent to Pharmacy successfully!");
+      refetch();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to save prescription draft");
+      toast.error(err.response?.data?.message || err.message || "Failed to generate prescription");
     }
   };
 
@@ -852,45 +904,79 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
     }
   };
 
+  const isCompleted = appointment.status === "completed" || workspaceData.draftSession?.status === "COMPLETED";
+
   return (
     <div className="space-y-6">
+      {/* Read-Only Completion Banner */}
+      {isCompleted && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+              <CheckCircle className="h-6 w-6" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-emerald-900">Consultation Completed (Read-Only View)</h4>
+              <p className="text-xs text-emerald-700 mt-0.5">
+                Completed on: <span className="font-semibold">{new Date((workspaceData.draftSession as any)?.completedAt || (appointment as any)?.updatedAt || (appointment as any)?.createdAt || Date.now()).toLocaleString("en-IN")}</span>
+                {" · "}
+                Completed by: <span className="font-semibold">Dr. {(appointment.doctor as any)?.name || "Attending Doctor"}</span>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => window.print()}
+              className="flex items-center gap-1.5 text-xs bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100"
+            >
+              <Printer className="h-4 w-4" /> Print Consultation
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Consultation Header */}
       {!isEmbedded && (
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm">
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold text-slate-900">Consultation Workspace</h1>
-              <Badge tone={appointment.status === "completed" ? "success" : appointment.status === "in_consultation" ? "warning" : "info"}>
-                {appointment.status === "in_consultation" ? "In Progress" : appointment.status === "completed" ? "Completed" : appointment.status.toUpperCase()}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <h1 className="text-lg sm:text-xl font-bold text-slate-900">Consultation Workspace</h1>
+              <Badge tone={isCompleted ? "success" : appointment.status === "in_consultation" ? "warning" : "info"}>
+                {isCompleted ? "Completed" : appointment.status === "in_consultation" ? "In Progress" : (appointment.status || "").toUpperCase()}
               </Badge>
-              {appointment.status === "in_consultation" && workspaceData?.draftSession && (
+              {!isCompleted && appointment.status === "in_consultation" && workspaceData?.draftSession && (
                 <span className="text-xs text-emerald-600 font-medium flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                   {isSavingDraft ? "Saving..." : lastSavedTime ? `Draft saved at ${lastSavedTime}` : "Draft saved automatically"}
                 </span>
               )}
             </div>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">
               Attending Patient: <span className="font-semibold text-slate-700">{patient.name}</span> (UHID: {patient.uhid})
             </p>
           </div>
 
-          <div className="flex gap-2">
-            {appointment.status === "checked_in" && (
+          <div className="flex flex-wrap gap-2 w-full md:w-auto">
+            {!isCompleted && appointment.status === "checked_in" && (
               <Button variant="primary" onClick={handleStartConsultation} disabled={startConsultationMutation.isPending}>
                 Start Consultation
               </Button>
             )}
 
-            {appointment.status === "in_consultation" && (
+            {!isCompleted && (appointment.status === "in_consultation" || workspaceData?.draftSession) && (
               <Button variant="primary" onClick={handleCompleteConsultation} disabled={completeDraftMutation.isPending}>
                 Complete Consultation
               </Button>
             )}
 
-<<<<<<< Updated upstream
+            {isCompleted && (
+              <Button variant="secondary" onClick={() => window.print()} className="flex items-center gap-1">
+                <Printer className="h-4 w-4" /> Print Record
+              </Button>
+            )}
+
             <Button variant="secondary" onClick={() => navigate(-1)}>
-=======
             {isCompleted && (
               <Button variant="secondary" onClick={() => window.print()} className="flex items-center gap-1">
                 <Printer className="h-4 w-4" /> Print Record
@@ -901,7 +987,6 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
               <ArrowLeft className="h-4 w-4" /> Back
             </Button>
             <Button variant="secondary" onClick={() => navigate("/doctor")}>
->>>>>>> Stashed changes
               Back to Dashboard
             </Button>
           </div>
@@ -968,7 +1053,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
         {/* Right column: Workspace Tabs & Details */}
         <div className="xl:col-span-3 space-y-6">
           {/* Tabs navigation */}
-          <div className="flex bg-slate-100 p-1 rounded-lg w-full overflow-x-auto gap-1">
+          <div className="flex bg-slate-100 p-1 rounded-lg w-full overflow-x-auto gap-1 scrollbar-none flex-nowrap shrink-0">
             {([
               { key: "overview", label: "Overview", icon: <User className="h-3.5 w-3.5" /> },
               { key: "history", label: "History", icon: <History className="h-3.5 w-3.5" /> },
@@ -995,21 +1080,25 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
           {activeTab === "overview" && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <form onSubmit={handleSaveClinicalNotes} className="md:col-span-2 space-y-4">
-                <Card className="p-6 space-y-4">
-                  <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Clinical Assessment Notes</h3>
-                  <InputField label="Chief Complaint" value={chiefComplaint} onChange={(e) => setChiefComplaint(e.target.value)} placeholder="Why is the patient here?" />
-                  <InputField label="Diagnosis" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} placeholder="e.g. Essential Hypertension" required />
-                  <TextareaField label="Symptoms" value={symptoms} onChange={(e) => setSymptoms(e.target.value)} placeholder="Enter details of symptoms..." rows={2} />
-                  <TextareaField label="Clinical Notes" value={clinicalNotes} onChange={(e) => setClinicalNotes(e.target.value)} placeholder="Attending doctor notes..." rows={3} />
-                  <TextareaField label="Treatment Plan" value={treatmentPlan} onChange={(e) => setTreatmentPlan(e.target.value)} placeholder="Enter next plan..." rows={2} />
-                  <TextareaField label="Advice / Follow-up notes" value={advice} onChange={(e) => setAdvice(e.target.value)} placeholder="Enter instructions for patient..." rows={2} />
+                <fieldset disabled={isCompleted} className="contents">
+                  <Card className="p-6 space-y-4">
+                    <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Clinical Assessment Notes</h3>
+                    <InputField label="Chief Complaint" value={chiefComplaint} onChange={(e) => setChiefComplaint(e.target.value)} placeholder="Why is the patient here?" />
+                    <InputField label="Diagnosis" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} placeholder="e.g. Essential Hypertension" required />
+                    <TextareaField label="Symptoms" value={symptoms} onChange={(e) => setSymptoms(e.target.value)} placeholder="Enter details of symptoms..." rows={2} />
+                    <TextareaField label="Clinical Notes" value={clinicalNotes} onChange={(e) => setClinicalNotes(e.target.value)} placeholder="Attending doctor notes..." rows={3} />
+                    <TextareaField label="Treatment Plan" value={treatmentPlan} onChange={(e) => setTreatmentPlan(e.target.value)} placeholder="Enter next plan..." rows={2} />
+                    <TextareaField label="Advice / Follow-up notes" value={advice} onChange={(e) => setAdvice(e.target.value)} placeholder="Enter instructions for patient..." rows={2} />
 
-                  <div className="flex justify-end">
-                    <Button type="submit" variant="primary" disabled={saveNotesMutation.isPending}>
-                      {saveNotesMutation.isPending ? "Saving..." : "Save Notes"}
-                    </Button>
-                  </div>
-                </Card>
+                    {!isCompleted && (
+                      <div className="flex justify-end">
+                        <Button type="submit" variant="primary" disabled={saveNotesMutation.isPending}>
+                          {saveNotesMutation.isPending ? "Saving..." : "Save Notes"}
+                        </Button>
+                      </div>
+                    )}
+                  </Card>
+                </fieldset>
               </form>
             </div>
           )}
@@ -1177,22 +1266,26 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
           {/* TAB 3: VITALS FORM */}
           {activeTab === "vitals" && (
             <form onSubmit={handleSaveVitals} className="space-y-4">
-              <Card className="p-6 space-y-4">
-                <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Record Patient Vitals</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  <InputField label="Temperature (°F)" value={temperature} onChange={(e) => setTemperature(e.target.value)} placeholder="e.g. 98.6" />
-                  <InputField label="BP (mmHg)" value={bloodPressure} onChange={(e) => setBloodPressure(e.target.value)} placeholder="e.g. 120/80" />
-                  <InputField label="Pulse Rate (bpm)" value={pulseRate} onChange={(e) => setPulseRate(e.target.value)} placeholder="e.g. 72" />
-                  <InputField label="Respiratory Rate (/min)" value={respiratoryRate} onChange={(e) => setRespiratoryRate(e.target.value)} placeholder="e.g. 16" />
-                  <InputField label="Oxygen Saturation (%)" value={oxygenSaturation} onChange={(e) => setOxygenSaturation(e.target.value)} placeholder="e.g. 98" />
-                  <InputField label="Weight (kg)" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="e.g. 68" />
-                </div>
-                <div className="flex justify-end">
-                  <Button type="submit" variant="primary" disabled={saveVitalsMutation.isPending}>
-                    {saveVitalsMutation.isPending ? "Saving..." : "Save Vitals"}
-                  </Button>
-                </div>
-              </Card>
+              <fieldset disabled={isCompleted} className="contents">
+                <Card className="p-6 space-y-4">
+                  <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Record Patient Vitals</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    <InputField label="Temperature (°F)" value={temperature} onChange={(e) => setTemperature(e.target.value)} placeholder="e.g. 98.6" />
+                    <InputField label="BP (mmHg)" value={bloodPressure} onChange={(e) => setBloodPressure(e.target.value)} placeholder="e.g. 120/80" />
+                    <InputField label="Pulse Rate (bpm)" value={pulseRate} onChange={(e) => setPulseRate(e.target.value)} placeholder="e.g. 72" />
+                    <InputField label="Respiratory Rate (/min)" value={respiratoryRate} onChange={(e) => setRespiratoryRate(e.target.value)} placeholder="e.g. 16" />
+                    <InputField label="Oxygen Saturation (%)" value={oxygenSaturation} onChange={(e) => setOxygenSaturation(e.target.value)} placeholder="e.g. 98" />
+                    <InputField label="Weight (kg)" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="e.g. 68" />
+                  </div>
+                  {!isCompleted && (
+                    <div className="flex justify-end">
+                      <Button type="submit" variant="primary" disabled={saveVitalsMutation.isPending}>
+                        {saveVitalsMutation.isPending ? "Saving..." : "Save Vitals"}
+                      </Button>
+                    </div>
+                  )}
+                </Card>
+              </fieldset>
             </form>
           )}
 
@@ -1200,28 +1293,31 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
           {activeTab === "prescription" && (
             <div className="space-y-6">
               <form onSubmit={handleGeneratePrescription} className="space-y-4">
-                <Card className="p-6 space-y-4">
-                  <div className="flex items-center justify-between border-b pb-2">
-                    <h3 className="text-sm font-bold text-slate-800">Issue Medication</h3>
-                    <button type="button" onClick={handleAddMed} className="text-xs font-semibold text-navy-700 hover:text-navy-800 flex items-center gap-0.5">
-                      <Plus className="h-3 w-3" /> Add Med
-                    </button>
-                  </div>
+                <fieldset disabled={isCompleted} className="contents">
+                  <Card className="p-6 space-y-4">
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <h3 className="text-sm font-bold text-slate-800">Issue Medication</h3>
+                      {!isCompleted && (
+                        <button type="button" onClick={handleAddMed} className="text-xs font-semibold text-navy-700 hover:text-navy-800 flex items-center gap-0.5">
+                          <Plus className="h-3 w-3" /> Add Med
+                        </button>
+                      )}
+                    </div>
 
-                  <div className="space-y-4">
-                    {prescriptionMeds.map((med, index) => (
-                      <div key={med.key || index} className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 space-y-3 relative">
-                        {/* Trash/Remove button at top right */}
-                        {prescriptionMeds.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveMed(index)}
-                            className="absolute top-3 right-3 p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition"
-                            title="Remove Medicine"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
+                    <div className="space-y-4">
+                      {prescriptionMeds.map((med, index) => (
+                        <div key={med.key || index} className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 space-y-3 relative">
+                          {/* Trash/Remove button at top right */}
+                          {!isCompleted && prescriptionMeds.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveMed(index)}
+                              className="absolute top-3 right-3 p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition"
+                              title="Remove Medicine"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
 
                         {/* Row 1: Main Fields */}
                         <div className="flex flex-wrap gap-3 items-start pr-8">
@@ -1327,17 +1423,109 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                   </div>
 
                   <div className="flex justify-end gap-2">
-                    {prescriptions?.length > 0 && (
+                    {(isCompleted || prescriptions?.length > 0) && (
                       <button type="button" onClick={handlePrint} className="inline-flex items-center gap-1 px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold">
                         <Printer className="h-4 w-4" /> Print Rx
                       </button>
                     )}
-                    <Button type="submit" variant="primary" disabled={prescriptionMutation.isPending}>
-                      {prescriptionMutation.isPending ? "Generating..." : "Generate Prescription"}
-                    </Button>
+                    {!isCompleted && (
+                      <Button type="submit" variant="primary" disabled={prescriptionMutation.isPending}>
+                        {prescriptionMutation.isPending ? "Generating..." : "Generate Prescription"}
+                      </Button>
+                    )}
                   </div>
                 </Card>
-              </form>
+              </fieldset>
+            </form>
+
+              {/* Issued Prescriptions History List / Display */}
+              <Card className="p-6 space-y-4">
+                <h3 className="text-sm font-bold text-slate-800 border-b pb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Pill className="h-4 w-4 text-indigo-600" /> Prescriptions History ({prescriptions?.length || 0})
+                  </span>
+                  <span className="text-xs text-slate-400 font-normal">Real-time Dispense Status &amp; Medication Records</span>
+                </h3>
+
+                {(!prescriptions || prescriptions.length === 0) ? (
+                  <div className="py-8 text-center text-xs text-slate-400 border border-dashed rounded-xl bg-slate-50/50">
+                    No prescriptions available
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {prescriptions.map((rx: any) => (
+                      <div key={rx._id} className="border border-slate-200 rounded-xl p-4 bg-white shadow-xs space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-bold text-slate-800">
+                              {rx.prescriptionNumber || `#${rx._id.slice(-8).toUpperCase()}`}
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              • {new Date(rx.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {rx.dispensedAt && (
+                              <span className="text-[11px] text-emerald-700 font-medium bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                                Dispensed: {new Date(rx.dispensedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })} {new Date(rx.dispensedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                            <Badge tone={rx.status === "Dispensed" || rx.status === "Completed" ? "success" : rx.status === "Partially Dispensed" ? "info" : "warning"}>
+                              {rx.status || "Pending"}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {/* Medications Table */}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs whitespace-nowrap">
+                            <thead>
+                              <tr className="text-[10px] font-bold uppercase text-slate-400 border-b pb-1">
+                                <th className="py-1">Medicine Name</th>
+                                <th className="py-1">Strength</th>
+                                <th className="py-1">Dosage</th>
+                                <th className="py-1">Frequency</th>
+                                <th className="py-1">Duration</th>
+                                <th className="py-1 text-center">Quantity</th>
+                                <th className="py-1">Instructions</th>
+                                <th className="py-1 text-center">Dispense Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-slate-700">
+                              {(rx.medications || rx.medicines || []).map((m: any, idx: number) => {
+                                const calculatedQty = m.quantity || ((parseFloat(m.dosage) || 1) * (parseFloat(m.frequency) || 1) * (parseFloat(m.duration) || 1));
+                                const itemStatus = m.status || rx.status || "Pending";
+                                return (
+                                  <tr key={idx} className="hover:bg-slate-50/60">
+                                    <td className="py-2 font-bold text-slate-800">{m.name}</td>
+                                    <td className="py-2 text-slate-600">{m.strength || "—"}</td>
+                                    <td className="py-2 text-slate-600">{m.dosage || "—"}</td>
+                                    <td className="py-2 text-slate-600">{m.frequency || "—"}</td>
+                                    <td className="py-2 text-slate-600">{m.duration || "—"}</td>
+                                    <td className="py-2 text-center font-semibold font-mono text-slate-800">{calculatedQty}</td>
+                                    <td className="py-2 text-slate-500 italic max-w-[150px] truncate" title={m.instructions}>{m.instructions || "—"}</td>
+                                    <td className="py-2 text-center">
+                                      <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded ${
+                                        itemStatus === "Dispensed" || itemStatus === "Completed"
+                                          ? "bg-emerald-100 text-emerald-800"
+                                          : itemStatus === "Partially Dispensed"
+                                          ? "bg-blue-100 text-blue-800"
+                                          : "bg-amber-100 text-amber-800"
+                                      }`}>
+                                        {itemStatus}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
 
               {/* Printable Prescription Template (Hidden on screen, shown in ref) */}
               <div className="hidden">
@@ -1399,32 +1587,36 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
           {activeTab === "lab" && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <form onSubmit={handleOrderLabs} className="md:col-span-1">
-                <Card className="p-4 space-y-4">
-                  <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Order Laboratory Tests</h3>
-                  <div className="space-y-2">
-                    {labTests.map((test: string) => (
-                      <label key={test} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedLabTests.includes(test)}
-                          onChange={() => toggleLabTest(test)}
-                          className="rounded border-slate-350 text-navy-700 focus:ring-navy-500"
-                        />
-                        {test}
-                      </label>
-                    ))}
-                  </div>
+                <fieldset disabled={isCompleted} className="contents">
+                  <Card className="p-4 space-y-4">
+                    <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Order Laboratory Tests</h3>
+                    <div className="space-y-2">
+                      {labTests.map((test: string) => (
+                        <label key={test} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedLabTests.includes(test)}
+                            onChange={() => toggleLabTest(test)}
+                            className="rounded border-slate-350 text-navy-700 focus:ring-navy-500"
+                          />
+                          {test}
+                        </label>
+                      ))}
+                    </div>
 
-                  <SelectField label="Priority" value={labPriority} onChange={(e) => setLabPriority(e.target.value)}>
-                    <option value="Routine">Routine</option>
-                    <option value="Urgent">Urgent</option>
-                    <option value="STAT">STAT / Emergency</option>
-                  </SelectField>
+                    <SelectField label="Priority" value={labPriority} onChange={(e) => setLabPriority(e.target.value)}>
+                      <option value="Routine">Routine</option>
+                      <option value="Urgent">Urgent</option>
+                      <option value="STAT">STAT / Emergency</option>
+                    </SelectField>
 
-                  <Button type="submit" variant="primary" disabled={labMutation.isPending}>
-                    Submit Labs Order
-                  </Button>
-                </Card>
+                    {!isCompleted && (
+                      <Button type="submit" variant="primary" disabled={labMutation.isPending}>
+                        Submit Labs Order
+                      </Button>
+                    )}
+                  </Card>
+                </fieldset>
               </form>
 
               <div className="md:col-span-2">
@@ -1480,56 +1672,60 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
           {activeTab === "radiology" && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <form onSubmit={handleOrderRadiology} className="md:col-span-1">
-                <Card className="p-4 space-y-4">
-                  <div className="flex items-center justify-between border-b pb-2">
-                    <h3 className="text-sm font-bold text-slate-800">Order Imaging Studies</h3>
-                    {selectedRadiologyStudies.length > 0 && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold bg-blue-600 text-white rounded-full px-2 py-0.5">
-                          {selectedRadiologyStudies.length} selected
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedRadiologyStudies([])}
-                          className="text-[10px] text-red-500 hover:underline"
-                        >
-                          Clear all
-                        </button>
-                      </div>
+                <fieldset disabled={isCompleted} className="contents">
+                  <Card className="p-4 space-y-4">
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <h3 className="text-sm font-bold text-slate-800">Order Imaging Studies</h3>
+                      {!isCompleted && selectedRadiologyStudies.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold bg-blue-600 text-white rounded-full px-2 py-0.5">
+                            {selectedRadiologyStudies.length} selected
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRadiologyStudies([])}
+                            className="text-[10px] text-red-500 hover:underline"
+                          >
+                            Clear all
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Multi-select checkboxes — mirroring the Labs tab */}
+                    <div className="space-y-2">
+                      {radiologyTests.length === 0 ? (
+                        <p className="text-xs text-slate-400 italic">No radiology studies configured.</p>
+                      ) : (
+                        radiologyTests.map((study: string) => (
+                          <label key={study} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={selectedRadiologyStudies.includes(study)}
+                              onChange={() => toggleRadiologyStudy(study)}
+                              className="rounded border-slate-350 text-navy-700 focus:ring-navy-500"
+                            />
+                            {study}
+                          </label>
+                        ))
+                      )}
+                    </div>
+
+                    <SelectField label="Priority" value={radioPriority} onChange={(e) => setRadioPriority(e.target.value)}>
+                      <option value="Routine">Routine</option>
+                      <option value="Urgent">Urgent</option>
+                      <option value="STAT">STAT / Emergency</option>
+                    </SelectField>
+
+                    <TextareaField label="Clinical Notes / Indications" value={radioNotes} onChange={(e) => setRadioNotes(e.target.value)} placeholder="e.g. Suspected fracture right forearm" rows={2} />
+
+                    {!isCompleted && (
+                      <Button type="submit" variant="primary" disabled={radiologyMutation.isPending || selectedRadiologyStudies.length === 0}>
+                        Submit Request
+                      </Button>
                     )}
-                  </div>
-
-                  {/* Multi-select checkboxes — mirroring the Labs tab */}
-                  <div className="space-y-2">
-                    {radiologyTests.length === 0 ? (
-                      <p className="text-xs text-slate-400 italic">No radiology studies configured.</p>
-                    ) : (
-                      radiologyTests.map((study: string) => (
-                        <label key={study} className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={selectedRadiologyStudies.includes(study)}
-                            onChange={() => toggleRadiologyStudy(study)}
-                            className="rounded border-slate-350 text-navy-700 focus:ring-navy-500"
-                          />
-                          {study}
-                        </label>
-                      ))
-                    )}
-                  </div>
-
-                  <SelectField label="Priority" value={radioPriority} onChange={(e) => setRadioPriority(e.target.value)}>
-                    <option value="Routine">Routine</option>
-                    <option value="Urgent">Urgent</option>
-                    <option value="STAT">STAT / Emergency</option>
-                  </SelectField>
-
-                  <TextareaField label="Clinical Notes / Indications" value={radioNotes} onChange={(e) => setRadioNotes(e.target.value)} placeholder="e.g. Suspected fracture right forearm" rows={2} />
-
-                  <Button type="submit" variant="primary" disabled={radiologyMutation.isPending || selectedRadiologyStudies.length === 0}>
-                    Submit Request
-                  </Button>
-                </Card>
+                  </Card>
+                </fieldset>
               </form>
 
               <div className="md:col-span-2">
@@ -1576,62 +1772,97 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               {/* Form on Left (spans 2 columns on xl screens) */}
               <form onSubmit={handleRecommendAdmission} className="xl:col-span-2">
-                <Card className="p-6 space-y-6">
-                  {/* Title & Accent */}
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy-50 text-navy-700">
-                        <FileText className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h3 className="text-base font-bold text-slate-900">Recommend IP Admission</h3>
-                        <p className="text-xs text-slate-500">Initiate inpatient ward transfer and bed allocation request</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Modern Patient Info Card */}
-                  <div className="bg-gradient-to-r from-navy-50/50 to-blue-50/20 rounded-xl p-4 border border-navy-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-navy-700 font-bold text-white text-sm shadow-sm">
-                        {((appointment.patient as any)?.name || "P").split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-slate-800 text-sm">{(appointment.patient as any)?.name}</h4>
-                        <p className="text-[10px] text-slate-500 mt-0.5">UHID: <span className="font-mono font-semibold text-slate-700">{(appointment.patient as any)?.uhid}</span></p>
+                <fieldset disabled={isCompleted} className="contents">
+                  <Card className="p-6 space-y-6">
+                    {/* Title & Accent */}
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy-50 text-navy-700">
+                          <FileText className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-bold text-slate-900">Recommend IP Admission</h3>
+                          <p className="text-xs text-slate-500">Initiate inpatient ward transfer and bed allocation request</p>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="hidden md:block h-8 w-px bg-slate-200"></div>
+                    {/* Modern Patient Info Card */}
+                    <div className="bg-gradient-to-r from-navy-50/50 to-blue-50/20 rounded-xl p-4 border border-navy-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-navy-700 font-bold text-white text-sm shadow-sm">
+                          {((appointment.patient as any)?.name || "P").split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-slate-800 text-sm">{(appointment.patient as any)?.name}</h4>
+                          <p className="text-[10px] text-slate-500 mt-0.5">UHID: <span className="font-mono font-semibold text-slate-700">{(appointment.patient as any)?.uhid}</span></p>
+                        </div>
+                      </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 text-slate-650 flex-1 md:justify-end md:flex md:flex-row md:gap-x-8">
-                      <div>
-                        <span className="block text-[9px] text-slate-400 font-medium uppercase tracking-wider">Age / Gender</span>
-                        <span className="font-semibold text-slate-700">{(appointment.patient as any)?.age} yrs / {(appointment.patient as any)?.gender}</span>
-                      </div>
-                      <div>
-                        <span className="block text-[9px] text-slate-400 font-medium uppercase tracking-wider">OP Code</span>
-                        <span className="font-semibold text-slate-750 font-mono">{appointment.referenceId}</span>
-                      </div>
-                      <div>
-                        <span className="block text-[9px] text-slate-400 font-medium uppercase tracking-wider">Token Number</span>
-                        <span className="font-semibold text-slate-750 font-mono">{queueItem?.tokenNumber || "N/A"}</span>
+                      <div className="hidden md:block h-8 w-px bg-slate-200"></div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 text-slate-650 flex-1 md:justify-end md:flex md:flex-row md:gap-x-8">
+                        <div>
+                          <span className="block text-[9px] text-slate-400 font-medium uppercase tracking-wider">Age / Gender</span>
+                          <span className="font-semibold text-slate-700">{(appointment.patient as any)?.age} yrs / {(appointment.patient as any)?.gender}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[9px] text-slate-400 font-medium uppercase tracking-wider">OP Code</span>
+                          <span className="font-semibold text-slate-750 font-mono">{appointment.referenceId}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[9px] text-slate-400 font-medium uppercase tracking-wider">Token Number</span>
+                          <span className="font-semibold text-slate-750 font-mono">{queueItem?.tokenNumber || "N/A"}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-<<<<<<< Updated upstream
-                  {/* Form Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="md:col-span-2">
-                      <InputField
-                        label="Primary Diagnosis (Mandatory)"
-                        value={admitDiagnosis}
-                        onChange={(e) => setAdmitDiagnosis(e.target.value)}
-                        placeholder="Enter diagnostic confirmation..."
-                        required
-                      />
-=======
+                    {/* Form Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <InputField
+                          label="Primary Diagnosis (Mandatory)"
+                          value={admitDiagnosis}
+                          onChange={(e) => setAdmitDiagnosis(e.target.value)}
+                          placeholder="Enter diagnostic confirmation..."
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <SelectField
+                          label="Admission Priority"
+                          value={admitPriority}
+                          onChange={(e) => setAdmitPriority(e.target.value)}
+                        >
+                          <option value="Routine">Routine</option>
+                          <option value="Urgent">Urgent</option>
+                          <option value="Emergency">Emergency</option>
+                        </SelectField>
+                      </div>
+
+                      <div>
+                        <InputField
+                          label="Expected Stay Duration"
+                          value={admitExpectedStay}
+                          onChange={(e) => setAdmitExpectedStay(e.target.value)}
+                          placeholder="e.g. 3 Days, 1 Week"
+                        />
+                      </div>
+
+                      <div>
+                        <SelectField
+                          label="Preferred Ward"
+                          value={admitWard}
+                          onChange={(e) => setAdmitWard(e.target.value)}
+                        >
+                          <option value="General">General</option>
+                          <option value="Semi Private">Semi Private</option>
+                          <option value="Private">Private</option>
+                          <option value="ICU">ICU</option>
+                        </SelectField>
+                      </div>
+
                     {/* Form Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="md:col-span-2">
@@ -1694,20 +1925,10 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                           value={admitBedType}
                           onChange={(e) => setAdmitBedType(e.target.value)}
                         >
-                          {bedTypeOptions.length > 0 ? (
-                            bedTypeOptions.map((bType) => (
-                              <option key={bType} value={bType}>
-                                {bType}
-                              </option>
-                            ))
-                          ) : (
-                            <>
-                              <option value="General">General</option>
-                              <option value="Semi-Private">Semi-Private</option>
-                              <option value="Private">Private</option>
-                              <option value="ICU">ICU</option>
-                            </>
-                          )}
+                          <option value="General">General</option>
+                          <option value="Semi-Private">Semi-Private</option>
+                          <option value="Private">Private</option>
+                          <option value="ICU">ICU</option>
                         </SelectField>
                       </div>
 
@@ -1739,92 +1960,17 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                           rows={3}
                         />
                       </div>
->>>>>>> Stashed changes
                     </div>
 
-                    <div>
-                      <SelectField
-                        label="Admission Priority"
-                        value={admitPriority}
-                        onChange={(e) => setAdmitPriority(e.target.value)}
-                      >
-                        <option value="Routine">Routine</option>
-                        <option value="Urgent">Urgent</option>
-                        <option value="Emergency">Emergency</option>
-                      </SelectField>
-                    </div>
-
-                    <div>
-                      <InputField
-                        label="Expected Stay Duration"
-                        value={admitExpectedStay}
-                        onChange={(e) => setAdmitExpectedStay(e.target.value)}
-                        placeholder="e.g. 3 Days, 1 Week"
-                      />
-                    </div>
-
-                    <div>
-                      <SelectField
-                        label="Preferred Ward"
-                        value={admitWard}
-                        onChange={(e) => setAdmitWard(e.target.value)}
-                      >
-                        <option value="General">General</option>
-                        <option value="Semi Private">Semi Private</option>
-                        <option value="Private">Private</option>
-                        <option value="ICU">ICU</option>
-                      </SelectField>
-                    </div>
-
-                    <div>
-                      <SelectField
-                        label="Preferred Bed Type"
-                        value={admitBedType}
-                        onChange={(e) => setAdmitBedType(e.target.value)}
-                      >
-                        <option value="General">General</option>
-                        <option value="Semi-Private">Semi-Private</option>
-                        <option value="Private">Private</option>
-                        <option value="ICU">ICU</option>
-                      </SelectField>
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <InputField
-                        label="Admission Reason"
-                        value={admitReason}
-                        onChange={(e) => setAdmitReason(e.target.value)}
-                        placeholder="Clinical reason for ward admission"
-                      />
-                    </div>
-
-                    <div>
-                      <TextareaField
-                        label="Clinical Notes / Diagnosis Remarks"
-                        value={admitNotes}
-                        onChange={(e) => setAdmitNotes(e.target.value)}
-                        placeholder="Describe clinical symptoms and observations..."
-                        rows={3}
-                      />
-                    </div>
-
-                    <div>
-                      <TextareaField
-                        label="Special Instructions"
-                        value={admitSpecialInstructions}
-                        onChange={(e) => setAdmitSpecialInstructions(e.target.value)}
-                        placeholder="Nursing guidance, diet directives..."
-                        rows={3}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end border-t border-slate-100 pt-4">
-                    <Button type="submit" variant="primary" className="px-6 py-2.5 shadow-md font-semibold" disabled={admitMutation.isPending}>
-                      {admitMutation.isPending ? "Submitting..." : "Send Admission Request"}
-                    </Button>
-                  </div>
-                </Card>
+                    {!isCompleted && (
+                      <div className="flex justify-end border-t border-slate-100 pt-4">
+                        <Button type="submit" variant="primary" className="px-6 py-2.5 shadow-md font-semibold" disabled={admitMutation.isPending}>
+                          {admitMutation.isPending ? "Submitting..." : "Send Admission Request"}
+                        </Button>
+                      </div>
+                    )}
+                  </Card>
+                </fieldset>
               </form>
 
               {/* Status Trackers on Right */}
@@ -1851,49 +1997,52 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                     </div>
                   ) : (
                     <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-                      {admissionRequests.map((req: any) => (
-                        <div key={req._id} className="border border-slate-100 hover:border-slate-200 rounded-xl p-3.5 space-y-3 text-xs bg-slate-50/50 hover:bg-slate-50 transition-colors shadow-sm">
-                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-indigo-700 font-mono tracking-wider">Req: {req.requestNumber}</span>
-                            <Badge tone={
-                              req.status === "Admitted" ? "success" :
-                                req.status === "Approved" ? "success" :
-                                  req.status === "Rejected" ? "danger" :
-                                    "warning"
-                            }>
-                              {req.status}
-                            </Badge>
-                          </div>
+                      {admissionRequests.map((req: any) => {
+                        const s = (req.status || "").toLowerCase();
+                        const tone = s.includes("admit") || s.includes("approve") ? "success" : s.includes("reject") || s.includes("cancel") ? "danger" : "warning";
+                        const label = s.includes("admit") ? "Admitted" : s.includes("approve") ? "Approved" : s.includes("reject") ? "Rejected" : s.includes("cancel") ? "Cancelled" : "Pending";
 
-                          <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-slate-600 border-t border-slate-100 pt-2.5">
-                            <div>
-                              <span className="block text-[9px] text-slate-400 uppercase tracking-wider">Priority</span>
-                              <span className={`font-semibold ${req.priority === "Emergency" ? "text-red-600" : req.priority === "Urgent" ? "text-amber-600" : "text-slate-700"}`}>
-                                {req.priority}
+                        return (
+                          <div key={req._id} className="border border-slate-100 hover:border-slate-200 rounded-xl p-3.5 space-y-3 text-xs bg-slate-50/50 hover:bg-slate-50 transition-colors shadow-sm overflow-hidden">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                              <span className="font-bold text-indigo-700 font-mono tracking-wider truncate max-w-[140px]" title={`Req: ${req.requestNumber}`}>
+                                Req: {req.requestNumber}
                               </span>
+                              <Badge tone={tone} className="whitespace-nowrap shrink-0">
+                                {label}
+                              </Badge>
                             </div>
-                            <div>
-                              <span className="block text-[9px] text-slate-400 uppercase tracking-wider">Preferred Ward</span>
-                              <span className="font-semibold text-slate-750">{req.preferredWard || "General"}</span>
-                            </div>
-                            <div>
-                              <span className="block text-[9px] text-slate-400 uppercase tracking-wider">Stay Estimate</span>
-                              <span className="font-semibold text-slate-750">{req.expectedStay || "N/A"}</span>
-                            </div>
-                            <div>
-                              <span className="block text-[9px] text-slate-400 uppercase tracking-wider">Diagnosis</span>
-                              <span className="font-semibold text-slate-750 truncate max-w-28 block">{req.primaryDiagnosis}</span>
-                            </div>
-                          </div>
 
-                          {req.clinicalNotes && (
-                            <div className="bg-white rounded-lg p-2.5 border border-slate-100 text-slate-600 text-[11px] italic leading-relaxed">
-                              <span className="font-semibold not-italic block text-[9px] text-slate-400 uppercase tracking-wider mb-1">Clinical Remarks</span>
-                              {req.clinicalNotes}
+                            <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-slate-600 pt-1">
+                              <div>
+                                <span className="block text-[9px] text-slate-400 uppercase tracking-wider">Priority</span>
+                                <span className={`font-semibold ${req.priority === "Emergency" ? "text-red-600" : req.priority === "Urgent" ? "text-amber-600" : "text-slate-700"}`}>
+                                  {req.priority}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="block text-[9px] text-slate-400 uppercase tracking-wider">Preferred Ward</span>
+                                <span className="font-semibold text-slate-750">{req.preferredWard || "General"}</span>
+                              </div>
+                              <div>
+                                <span className="block text-[9px] text-slate-400 uppercase tracking-wider">Stay Estimate</span>
+                                <span className="font-semibold text-slate-750">{req.expectedStay || "N/A"}</span>
+                              </div>
+                              <div>
+                                <span className="block text-[9px] text-slate-400 uppercase tracking-wider">Diagnosis</span>
+                                <span className="font-semibold text-slate-750 truncate max-w-[110px] block">{req.primaryDiagnosis}</span>
+                              </div>
                             </div>
-                          )}
-                        </div>
-                      ))}
+
+                            {req.clinicalNotes && (
+                              <div className="bg-white rounded-lg p-2.5 border border-slate-100 text-slate-600 text-[11px] italic leading-relaxed">
+                                <span className="font-semibold not-italic block text-[9px] text-slate-400 uppercase tracking-wider mb-1">Clinical Remarks</span>
+                                {req.clinicalNotes}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </Card>

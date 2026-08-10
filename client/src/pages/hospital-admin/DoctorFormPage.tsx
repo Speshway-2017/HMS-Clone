@@ -15,12 +15,13 @@ export function DoctorFormPage() {
   const isEdit = !!id;
   const navigate = useNavigate();
   const { data } = useDoctor(id);
-  const { data: departments } = useDepartments();
+  const { data: departments } = useDepartments({ activeOnly: true });
   const createDoctor = useCreateDoctor();
   const updateDoctor = useUpdateDoctor(id ?? "");
 
   const [form, setForm] = useState({
     name: "",
+    gender: "Male",
     email: "",
     phone: "",
     photoUrl: "",
@@ -54,6 +55,7 @@ export function DoctorFormPage() {
       const doctor = data.doctor;
       setForm({
         name: doctor.name,
+        gender: (doctor as any).gender || "Male",
         email: doctor.email,
         phone: doctor.phone,
         photoUrl: doctor.photoUrl,
@@ -161,6 +163,11 @@ export function DoctorFormPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         <FormSection icon={UserPlus} title="Personal Information">
           <InputField label="Full Name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Sarah J. Montgomery" />
+          <SelectField label="Gender *" required value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </SelectField>
           <InputField
             label="Email Address (used for login)"
             type="email"

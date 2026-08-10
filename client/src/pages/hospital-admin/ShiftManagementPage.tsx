@@ -27,7 +27,9 @@ import { KpiCard } from "../../components/ui/KpiCard";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { InputField, SelectField } from "../../components/ui/Field";
+import toast from "react-hot-toast";
 import { Modal } from "../../components/ui/Modal";
+import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
 
 export function ShiftManagementPage() {
   // Modals state
@@ -138,9 +140,21 @@ export function ShiftManagementPage() {
     setIsShiftModalOpen(false);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this shift master?")) {
-      await deleteShift.mutateAsync(id);
+  const [deleteTargetShiftId, setDeleteTargetShiftId] = useState<string | null>(null);
+
+  const handleDelete = (id: string) => {
+    setDeleteTargetShiftId(id);
+  };
+
+  const confirmDeleteShift = async () => {
+    if (!deleteTargetShiftId) return;
+    try {
+      await deleteShift.mutateAsync(deleteTargetShiftId);
+      toast.success("Shift master deleted successfully!");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to delete shift master");
+    } finally {
+      setDeleteTargetShiftId(null);
     }
   };
 
@@ -440,6 +454,15 @@ export function ShiftManagementPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(deleteTargetShiftId)}
+        title="Confirm Deletion"
+        message="Are you sure you want to delete this shift master? This action cannot be undone."
+        isLoading={deleteShift.isPending}
+        onClose={() => setDeleteTargetShiftId(null)}
+        onConfirm={confirmDeleteShift}
+      />
     </div>
   );
 }

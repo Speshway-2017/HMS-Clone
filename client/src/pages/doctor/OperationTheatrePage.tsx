@@ -42,11 +42,11 @@ export function OperationTheatrePage() {
       ot: `OT-${(index % 3) + 1}`,
       status: s.status === "completed" ? "completed" : "upcoming",
       priority: isEven ? "elective" : "emergency",
-      surgeon: doctorProfile?.name || "Lead Surgeon",
-      assistants: ["Dr. Mehta (Asst.)"],
-      anaesthetist: "Dr. Nair",
-      scrubNurse: "Sr. Leela",
-      circulatingNurse: "Nurse Priya",
+      surgeon: doctorProfile?.name ? `Dr. ${doctorProfile.name}` : "Lead Surgeon",
+      assistants: [],
+      anaesthetist: "Anaesthetist Staff",
+      scrubNurse: "Scrub Nurse",
+      circulatingNurse: "Circulating Nurse",
       notes: s.notes || "Patient pre-op check complete.",
       checklist: ["Consent Signed", "Pre-op Labs", "NPO confirmed", "IV Access"]
     };
@@ -77,7 +77,7 @@ export function OperationTheatrePage() {
       ) : (
         <>
           {/* KPIs */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard label="Total Surgeries"   value={otSchedule.length}                                              icon={<Scissors className="h-5 w-5" />} emphasis />
             <KpiCard label="Today"             value={otSchedule.length}                                              icon={<CalendarClock className="h-5 w-5" />} />
             <KpiCard label="Emergency"         value={otSchedule.filter(o => o.priority === "emergency").length}       icon={<AlertTriangle className="h-5 w-5" />} />
@@ -89,14 +89,14 @@ export function OperationTheatrePage() {
             {otSchedule.map((surgery) => (
               <Card key={surgery.id}>
                 {/* Card Header */}
-                <div className="flex items-start justify-between mb-5 pb-4 border-b border-slate-100">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-100">
-                      <Scissors className="h-6 w-6 text-red-600" />
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-5 pb-4 border-b border-slate-100">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl bg-red-100">
+                      <Scissors className="h-5 w-5 sm:h-6 sm:w-6 text-red-600" />
                     </div>
                     <div>
-                      <h3 className="text-base font-bold text-slate-800">{surgery.procedure}</h3>
-                      <p className="text-sm text-slate-500">Patient: <span className="font-medium text-slate-700">{surgery.patient}</span> · {surgery.age} yrs · Blood: <span className="text-red-600 font-semibold">{surgery.blood}</span></p>
+                      <h3 className="text-sm sm:text-base font-bold text-slate-800">{surgery.procedure}</h3>
+                      <p className="text-xs sm:text-sm text-slate-500">Patient: <span className="font-medium text-slate-700">{surgery.patient}</span> · {surgery.age} yrs · Blood: <span className="text-red-600 font-semibold">{surgery.blood}</span></p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">

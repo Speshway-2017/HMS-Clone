@@ -208,74 +208,73 @@ export function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans">
-      <div className="flex w-full grid-cols-12 lg:grid">
-        {/* --- LEFT PANEL: Branding & Info (Hidden on mobile) --- */}
-        <div className="relative hidden flex-col justify-between bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 p-12 text-white lg:col-span-5 lg:flex xl:col-span-4 overflow-hidden">
-          <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
-          <div className="absolute -left-10 bottom-10 h-48 w-48 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none" />
+    <div className="h-screen w-full flex overflow-hidden bg-slate-50 font-sans">
+      {/* --- LEFT PANEL: Branding & Info (Hidden on mobile) --- */}
+      <div className="relative hidden lg:flex flex-col justify-between bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 p-8 lg:w-[360px] xl:w-[420px] shrink-0 h-full overflow-hidden text-white">
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute -left-10 bottom-10 h-48 w-48 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none" />
 
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-3 text-lg font-extrabold tracking-tight relative z-10">
-            {logoUrl ? (
-              <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover shadow-sm" />
-            ) : (
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white font-bold text-sm shadow-md">
-                <Activity className="h-4 w-4" />
-              </div>
-            )}
-            <span className="bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">
-              {hospitalName}
+        {/* Logo */}
+        <Link to="/" className="flex items-center gap-3 text-lg font-extrabold tracking-tight relative z-10">
+          {logoUrl ? (
+            <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover shadow-sm" />
+          ) : (
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white font-bold text-sm shadow-md">
+              <Activity className="h-4 w-4" />
+            </div>
+          )}
+          <span className="bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">
+            {hospitalName}
+          </span>
+        </Link>
+
+        {/* Info */}
+        <div className="my-auto space-y-6 relative z-10 py-4">
+          <div className="space-y-2.5">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+              <UserPlus className="h-3 w-3 text-emerald-400" /> Fast-Track Patient Registration
             </span>
-          </Link>
-
-          {/* Info */}
-          <div className="my-auto space-y-8 relative z-10">
-            <div className="space-y-3">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
-                <UserPlus className="h-3 w-3 text-emerald-400" /> Fast-Track Patient Registration
-              </span>
-              <h2 className="text-3xl font-extrabold leading-tight tracking-tight text-white">
-                Join Our Digital Healthcare Network
-              </h2>
-              <p className="text-xs leading-relaxed text-slate-300">
-                Create your verified patient profile to schedule OPD appointments, track medical histories, view diagnostic laboratory test reports, and connect with clinical specialists.
-              </p>
-            </div>
-
-            <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md text-xs">
-              <div className="flex items-start gap-2.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="font-bold text-white">Instant UHID Generation</h4>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Automated unique health identification code linked directly to our reception desk matrix.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="font-bold text-white">Real-Time Reception Sync</h4>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Your registration is fetched in real-time by receptionists for instant check-in & OPD token issuance.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="font-bold text-white">Encrypted & HIPAA Compliant</h4>
-                  <p className="text-[11px] text-slate-300 mt-0.5">Your personal information and medical records are isolated and protected using AES-256 encryption.</p>
-                </div>
-              </div>
-            </div>
+            <h2 className="text-2xl xl:text-3xl font-extrabold leading-tight tracking-tight text-white">
+              Join Our Digital Healthcare Network
+            </h2>
+            <p className="text-xs leading-relaxed text-slate-300">
+              Create your verified patient profile to schedule OPD appointments, track medical histories, view diagnostic laboratory test reports, and connect with clinical specialists.
+            </p>
           </div>
 
-          <div className="text-[10px] text-slate-400 relative z-10">
-            © {new Date().getFullYear()} {hospitalName}. Managed Healthcare Platform.
+          <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-md text-xs">
+            <div className="flex items-start gap-2.5">
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-bold text-white">Instant UHID Generation</h4>
+                <p className="text-[11px] text-slate-300 mt-0.5">Automated unique health identification code linked directly to our reception desk matrix.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-bold text-white">Real-Time Reception Sync</h4>
+                <p className="text-[11px] text-slate-300 mt-0.5">Your registration is fetched in real-time by receptionists for instant check-in & OPD token issuance.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-bold text-white">Encrypted & HIPAA Compliant</h4>
+                <p className="text-[11px] text-slate-300 mt-0.5">Your personal information and medical records are isolated and protected using AES-256 encryption.</p>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* --- RIGHT PANEL: Patient Registration Form --- */}
-        <div className="flex flex-1 flex-col justify-center px-4 py-8 sm:px-8 lg:col-span-7 xl:col-span-8 bg-slate-50 overflow-y-auto">
-          <div className="mx-auto w-full max-w-2xl space-y-6">
+        <div className="text-[10px] text-slate-400 relative z-10">
+          © {new Date().getFullYear()} {hospitalName}. Managed Healthcare Platform.
+        </div>
+      </div>
+
+      {/* --- RIGHT PANEL: Patient Registration Form --- */}
+      <div className="flex-1 h-full overflow-y-auto px-4 py-8 sm:px-10 lg:px-12 bg-slate-50">
+        <div className="mx-auto w-full max-w-3xl space-y-6 pb-12">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
@@ -283,7 +282,7 @@ export function RegisterPage() {
                   Patient Self-Registration
                 </h2>
                 <p className="text-xs text-slate-500 font-medium mt-1">
-                  Sections 1, 2, and 3 fields are mandatory. Section 4 is optional.
+                  Fill in your details below to create your patient account.
                 </p>
               </div>
               <Link
@@ -306,7 +305,7 @@ export function RegisterPage() {
               <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-card space-y-4">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-950 flex items-center gap-2 border-b border-slate-100 pb-2">
                   <User className="h-4 w-4 text-indigo-650" />
-                  1. Account & Security Details <span className="text-rose-600 font-bold">(Mandatory)</span>
+                  1. Account & Security Details
                 </h3>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -394,7 +393,7 @@ export function RegisterPage() {
               <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-card space-y-4">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-950 flex items-center gap-2 border-b border-slate-100 pb-2">
                   <Activity className="h-4 w-4 text-emerald-600" />
-                  2. Patient Demographics & Contact <span className="text-rose-600 font-bold">(Mandatory)</span>
+                  2. Patient Demographics & Contact
                 </h3>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -488,7 +487,7 @@ export function RegisterPage() {
               <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-card space-y-4">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-950 flex items-center gap-2 border-b border-slate-100 pb-2">
                   <ShieldAlert className="h-4 w-4 text-amber-600" />
-                  3. Emergency Contact Person <span className="text-rose-600 font-bold">(Mandatory)</span>
+                  3. Emergency Contact Person
                 </h3>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -600,6 +599,5 @@ export function RegisterPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

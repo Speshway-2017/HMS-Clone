@@ -3,6 +3,7 @@ import { protect, restrictTo } from "../middleware/auth";
 import { scopeToHospital } from "../middleware/scopeToHospital";
 import {
   listBeds,
+  getBed,
   createBed,
   updateBed,
   deleteBed
@@ -18,6 +19,7 @@ router.route("/")
   .post(restrictTo("hospital_admin"), createBed);
 
 router.route("/:id")
+  .get(getBed)
   .patch(restrictTo("hospital_admin"), updateBed)
   .delete(restrictTo("hospital_admin"), deleteBed);
 
