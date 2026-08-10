@@ -33,8 +33,13 @@ export function WardManagementPage() {
       const bNum = b.bedCode || b.bedNumber || "";
       const wardName = b.ward?.name || b.wardName || "";
       const roomNum = b.room?.roomNumber || b.roomNumber || "";
+      const patientName = b.patient?.name || b.patientName || b.admission?.patient?.name || "";
       const query = searchTerm.toLowerCase();
-      const matchesSearch = bNum.toLowerCase().includes(query) || wardName.toLowerCase().includes(query) || roomNum.toLowerCase().includes(query);
+      const matchesSearch =
+        bNum.toLowerCase().includes(query) ||
+        wardName.toLowerCase().includes(query) ||
+        roomNum.toLowerCase().includes(query) ||
+        patientName.toLowerCase().includes(query);
       const matchesWard = selectedWard === "all" || wardName.toLowerCase() === selectedWard.toLowerCase();
       return matchesSearch && matchesWard;
     });
@@ -52,6 +57,24 @@ export function WardManagementPage() {
     {
       header: "Room Number",
       render: (row) => <span className="text-xs font-mono text-slate-600">Room {row.room?.roomNumber || row.roomNumber || "N/A"}</span>,
+    },
+    {
+      header: "Patient Name",
+      render: (row) => {
+        const pName = row.patient?.name || row.patientName || row.admission?.patient?.name;
+        const isOccupied = row.isOccupied === true || (row.status || "").toLowerCase() === "occupied";
+        if (isOccupied && pName) {
+          return (
+            <div className="flex flex-col">
+              <span className="font-bold text-slate-900 text-xs">{pName}</span>
+              {row.patient?.uhid && (
+                <span className="text-[10px] text-slate-400 font-mono">UHID: {row.patient.uhid}</span>
+              )}
+            </div>
+          );
+        }
+        return <span className="font-bold text-slate-400 text-xs font-mono">-</span>;
+      },
     },
     {
       header: "Occupancy Status",

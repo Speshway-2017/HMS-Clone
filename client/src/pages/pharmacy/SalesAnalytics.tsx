@@ -31,6 +31,7 @@ export function PharmacySalesAnalytics() {
   const [monthlySales, setMonthlySales] = useState<any[]>([]);
   const [topMeds, setTopMeds] = useState<MedicineSales[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   useEffect(() => {
     // Generate analytics data dynamically based on invoices, dispensing records, and POs
@@ -157,8 +158,6 @@ export function PharmacySalesAnalytics() {
       </div>
     );
   }
-
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const handleExportExcel = () => {
     const headers = ["Medicine Name", "Category", "Quantity Sold", "Revenue (INR)"];

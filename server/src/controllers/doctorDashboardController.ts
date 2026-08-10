@@ -241,23 +241,58 @@ export const getInpatients = catchAsync(async (req: Request, res: Response) => {
   res.json({ status: "success", data });
 });
 
+/**
+ * Helper to look up an active inpatient admission by Admission ID, Patient ID, or Admission Number.
+ */
+async function findActiveAdmission(hospitalId: Types.ObjectId, targetId: string) {
+  if (!targetId || !hospitalId) return null;
+
+  const inactiveStatuses = [
+    "discharged",
+    "Discharged",
+    "Cancelled",
+    "Expired",
+    "Transferred Out (Final)"
+  ];
+
+  const isObjectId = Types.ObjectId.isValid(targetId);
+  const query: any = {
+    hospital: hospitalId,
+    status: { $nin: inactiveStatuses }
+  };
+
+  if (isObjectId) {
+    query.$or = [{ _id: targetId }, { patient: targetId }];
+  } else {
+    query.admissionNumber = targetId;
+  }
+
+  let admission = await Admission.findOne(query);
+
+  if (!admission && isObjectId) {
+    admission = await Admission.findOne({
+      $or: [{ _id: targetId }, { patient: targetId }],
+      status: { $nin: inactiveStatuses }
+    });
+  }
+
+  return admission;
+}
+
 export const addInpatientNotes = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
-  const patientId = req.params.id;
+  const targetId = req.params.id;
   const { notes, diagnosis, plan } = req.body;
   const doctor = await getLoggedDoctor(req);
 
-  // Hardened validation: Verify patient has active admission under this doctor
-  const activeAdmission = await Admission.findOne({
-    hospital: hospitalId,
-    patient: patientId,
-    admittingDoctor: doctor._id,
-    status: "admitted",
-  });
+  // Hardened validation: Verify active admission exists for this inpatient
+  const activeAdmission = await findActiveAdmission(hospitalId, targetId);
 
   if (!activeAdmission) {
-    throw new AppError("You do not have authorization to add inpatient notes for this patient.", 403);
+    throw new AppError("No active inpatient admission found for this patient.", 403);
   }
+
+  const patientId = activeAdmission.patient;
 
   // Calculate admission day
   const admissionDate = new Date(activeAdmission.admissionDate);
@@ -2138,25 +2173,25 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
 
 export const getInpatientDetails = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
-  const { id } = req.params; // patientId
+  const { id } = req.params; // patientId or admissionId
   const doctor = await getLoggedDoctor(req);
 
-  const admission = await Admission.findOne({
-    hospital: hospitalId,
-    patient: id,
-    status: "admitted"
-  })
-    .populate("patient", "name uhid age gender phone bloodGroup allergies")
-    .populate("room")
-    .populate("bed")
-    .populate("admittingDoctor", "name");
+  const admission = await findActiveAdmission(hospitalId, id);
 
   if (!admission) {
     throw new AppError("No active inpatient admission found for this patient.", 404);
   }
 
-  const labOrders = await LabOrder.find({ hospital: hospitalId, patient: id }).sort({ createdAt: -1 });
-  const radiologyOrders = await RadiologyOrder.find({ hospital: hospitalId, patient: id }).sort({ createdAt: -1 });
+  await admission.populate([
+    { path: "patient", select: "name uhid age gender phone bloodGroup allergies" },
+    { path: "room" },
+    { path: "bed" },
+    { path: "admittingDoctor", select: "name" }
+  ]);
+
+  const patientObjId = (admission.patient as any)?._id || admission.patient;
+  const labOrders = await LabOrder.find({ hospital: hospitalId, patient: patientObjId }).sort({ createdAt: -1 });
+  const radiologyOrders = await RadiologyOrder.find({ hospital: hospitalId, patient: patientObjId }).sort({ createdAt: -1 });
 
   res.json({
     status: "success",
@@ -2170,16 +2205,11 @@ export const getInpatientDetails = catchAsync(async (req: Request, res: Response
 
 export const addInpatientMedication = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
-  const patientId = req.params.id;
+  const targetId = req.params.id;
   const { drugName, dosage, frequency, duration, route, notes } = req.body;
   const doctor = await getLoggedDoctor(req);
 
-  const activeAdmission = await Admission.findOne({
-    hospital: hospitalId,
-    patient: patientId,
-    admittingDoctor: doctor._id,
-    status: "admitted",
-  });
+  const activeAdmission = await findActiveAdmission(hospitalId, targetId);
 
   if (!activeAdmission) {
     throw new AppError("No active inpatient admission found or unauthorized.", 403);
@@ -2228,16 +2258,11 @@ export const addInpatientMedication = catchAsync(async (req: Request, res: Respo
 
 export const updateInpatientMedication = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
-  const patientId = req.params.id;
+  const targetId = req.params.id;
   const { medicationId, action, drugName, dosage, frequency, duration, route, notes } = req.body;
   const doctor = await getLoggedDoctor(req);
 
-  const activeAdmission = await Admission.findOne({
-    hospital: hospitalId,
-    patient: patientId,
-    admittingDoctor: doctor._id,
-    status: "admitted",
-  });
+  const activeAdmission = await findActiveAdmission(hospitalId, targetId);
 
   if (!activeAdmission) {
     throw new AppError("No active inpatient admission found or unauthorized.", 403);
@@ -2320,16 +2345,11 @@ export const updateInpatientMedication = catchAsync(async (req: Request, res: Re
 
 export const saveInpatientVitals = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
-  const patientId = req.params.id;
+  const targetId = req.params.id;
   const { temperature, bloodPressure, pulseRate, respiratoryRate, oxygenSaturation, weight } = req.body;
   const doctor = await getLoggedDoctor(req);
 
-  const activeAdmission = await Admission.findOne({
-    hospital: hospitalId,
-    patient: patientId,
-    admittingDoctor: doctor._id,
-    status: "admitted",
-  });
+  const activeAdmission = await findActiveAdmission(hospitalId, targetId);
 
   if (!activeAdmission) {
     throw new AppError("No active inpatient admission found or unauthorized.", 403);
