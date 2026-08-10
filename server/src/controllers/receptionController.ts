@@ -682,11 +682,12 @@ export const rescheduleAppointment = catchAsync(async (req: Request, res: Respon
 });
 
 export const getBookedSlots = catchAsync(async (req: Request, res: Response) => {
-  const { doctorId, date } = req.query as Record<string, string>;
+  const { doctorId, date, patientId } = req.query as Record<string, string>;
   if (!doctorId || !date) {
     throw new AppError("doctorId and date are required query parameters.", 400);
   }
 
+<<<<<<< Updated upstream
   let doctorQuery: any = doctorId;
   if (Types.ObjectId.isValid(doctorId)) {
     const docDoc = await Doctor.findOne({
@@ -705,6 +706,15 @@ export const getBookedSlots = catchAsync(async (req: Request, res: Response) => 
       doctorQuery = docDoc._id;
     }
   }
+=======
+  // Delegate entirely to the shared AppointmentSlotService — single source of truth.
+  const bookedSlots = await AppointmentSlotService.getBookedSlots(
+    doctorId,
+    date,
+    req.hospitalFilter!.hospital,
+    patientId
+  );
+>>>>>>> Stashed changes
 
   const parsedDate = new Date(date);
   const startOfDay = new Date(parsedDate);

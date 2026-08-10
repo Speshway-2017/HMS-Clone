@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { socket } from "../../lib/socket";
 import {
   Search, Filter, Clock, User, ChevronRight, Stethoscope,
   FileText, Pill, CalendarClock, CheckCircle2, XCircle, RotateCcw, Plus,
@@ -29,6 +31,27 @@ export function OPManagementPage() {
   const [activeView, setActiveView] = useState<View>("queue");
   const [notes, setNotes] = useState("");
   const [diagnosis, setDiagnosis] = useState("");
+
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const handleLiveUpdate = () => {
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
+    };
+
+    socket.on("appointment_updated", handleLiveUpdate);
+    socket.on("dashboard_update", handleLiveUpdate);
+    socket.on("queue_updated", handleLiveUpdate);
+    socket.on("notification:new", handleLiveUpdate);
+
+    return () => {
+      socket.off("appointment_updated", handleLiveUpdate);
+      socket.off("dashboard_update", handleLiveUpdate);
+      socket.off("queue_updated", handleLiveUpdate);
+      socket.off("notification:new", handleLiveUpdate);
+    };
+  }, [queryClient]);
 
   const { data: doctorProfile } = useDoctorProfileMe();
   const { data: appointmentsData, isLoading } = useAppointments(
@@ -300,8 +323,17 @@ export function OPManagementPage() {
                           onClick={() => handleRedirectToWorkspace("overview", true)}
                           className="flex items-center justify-center gap-2 w-full rounded-lg bg-navy-700 px-3 py-2 text-sm font-medium text-white hover:bg-navy-800 transition-colors"
                         >
-                          <Stethoscope className="h-4 w-4" /> Start Consultation
+                          <Stethoscope className="h-4 w-4" /> {selectedAppt.status === "in_consultation" ? "Resume Consultation" : "Start Consultation"}
                         </button>
+                        {selectedAppt.status === "in_consultation" && (
+                          <button
+                            onClick={handleMarkComplete}
+                            disabled={updateAppointment.isPending}
+                            className="flex items-center justify-center gap-2 w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors shadow-sm"
+                          >
+                            <CheckCircle2 className="h-4 w-4" /> Mark Consultation Completed
+                          </button>
+                        )}
                         <button
                           onClick={() => handleRedirectToWorkspace("prescription")}
                           className="flex items-center justify-center gap-2 w-full rounded-lg border border-navy-200 px-3 py-2 text-sm font-medium text-navy-700 hover:bg-navy-50 transition-colors"

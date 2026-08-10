@@ -202,6 +202,23 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
     throw new AppError("This time slot is already booked for this doctor. Please choose a different slot.", 409);
   }
 
+  // 3. Prevent patient from booking multiple appointments at the exact same date and time slot (with ANY doctor)
+  if (body.patient && body.date && body.time) {
+    const patientSlotClash = await AppointmentSlotService.checkPatientSlotConflict(
+      body.patient,
+      body.date as unknown as Date,
+      body.time,
+      hospitalId
+    );
+    if (patientSlotClash) {
+      const otherDocName = (patientSlotClash.doctor as any)?.name || "another doctor";
+      throw new AppError(
+        `Patient already has an active appointment scheduled at ${body.time} with Dr. ${otherDocName}. A patient cannot book appointments with multiple doctors at the exact same time slot.`,
+        409
+      );
+    }
+  }
+
   const referenceId = await generateReferenceId(hospitalId.toString(), new Date(body.date));
   const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
   const appointment = await Appointment.create({
@@ -326,6 +343,27 @@ export const updateAppointment = catchAsync(async (req: Request, res: Response) 
     validateAppointmentTimeRestriction(existingAppt);
   }
 
+  if (isRescheduling) {
+    const targetDate = body.date ? (body.date as unknown as Date) : existingAppt.date;
+    const targetTime = body.time || existingAppt.time;
+    const targetPatient = existingAppt.patient;
+
+    const patientSlotClash = await AppointmentSlotService.checkPatientSlotConflict(
+      targetPatient,
+      targetDate,
+      targetTime,
+      existingAppt.hospital,
+      existingAppt._id.toString()
+    );
+    if (patientSlotClash) {
+      const otherDocName = (patientSlotClash.doctor as any)?.name || "another doctor";
+      throw new AppError(
+        `Patient already has an active appointment scheduled at ${targetTime} with Dr. ${otherDocName}. A patient cannot book appointments with multiple doctors at the exact same time slot.`,
+        409
+      );
+    }
+  }
+
   const appointment = await Appointment.findOneAndUpdate(filter, body, {
     new: true,
     runValidators: true,
@@ -416,3 +454,39 @@ export const getInvoiceByAppointmentId = catchAsync(async (req: Request, res: Re
   }
   res.json({ status: "success", data: { invoice } });
 });
+<<<<<<< Updated upstream
+=======
+
+/**
+ * GET /appointments/available-slots?doctorId=&date=
+ *
+ * Unified booked-slots endpoint accessible by BOTH patient and receptionist roles.
+ * Returns the list of already-booked time strings for a doctor on a given date,
+ * using the canonical AppointmentSlotService — the single source of truth.
+ *
+ * Frontend must NEVER cache these results between doctor/date changes.
+ */
+export const getAvailableSlots = catchAsync(async (req: Request, res: Response) => {
+  const { doctorId, date, patientId } = req.query as Record<string, string>;
+  if (!doctorId || !date) {
+    throw new AppError("doctorId and date are required query parameters.", 400);
+  }
+
+  let resolvedPatientId = patientId;
+  if (!resolvedPatientId && req.user!.role === "patient") {
+    const patientDoc = await Patient.findOne({ email: req.user!.email });
+    if (patientDoc) {
+      resolvedPatientId = patientDoc._id.toString();
+    }
+  }
+
+  const bookedSlots = await AppointmentSlotService.getBookedSlots(
+    doctorId,
+    date,
+    req.hospitalFilter?.hospital,
+    resolvedPatientId
+  );
+
+  res.json({ status: "success", data: { bookedSlots } });
+});
+>>>>>>> Stashed changes

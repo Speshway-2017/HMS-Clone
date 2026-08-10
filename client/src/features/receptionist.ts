@@ -273,13 +273,21 @@ export function useDoctorsAvailability() {
   });
 }
 
-export function useBookedSlots(doctorId?: string, date?: string) {
+export function useBookedSlots(doctorId?: string, date?: string, patientId?: string) {
   return useQuery({
+<<<<<<< Updated upstream
     queryKey: ["reception", "appointments", "booked-slots", doctorId, date],
+=======
+    queryKey: ["reception", "appointments", "booked-slots", doctorId, date, patientId],
+    // Slot availability data is booking-critical: never serve from cache.
+    staleTime: 0,           // Always re-fetch from server
+    gcTime: 0,              // Evict immediately when component unmounts
+    refetchInterval: 30_000, // Auto-refresh every 30s while booking panel is open
+>>>>>>> Stashed changes
     queryFn: async () => {
       if (!doctorId || !date) return [];
       const res = await api.get<{ data: { bookedSlots: string[] } }>("/reception/appointments/booked-slots", {
-        params: { doctorId, date }
+        params: { doctorId, date, patientId }
       });
       return res.data.data.bookedSlots;
     },

@@ -18,6 +18,7 @@ import { Hospital } from "../models/Hospital";
 import { DbNotification } from "../models/DbNotification";
 import { Ward } from "../models/Ward";
 import { Staff } from "../models/Staff";
+import { AppointmentSlotService } from "./appointmentSlotService";
 import { emitToHospital, emitToDoctor } from "../config/socket";
 import { createDoctorNotification } from "../utils/notificationHelper";
 import { IPBill } from "../models/IPBill";
@@ -447,6 +448,21 @@ export class ReceptionService {
     const overlap = await ReceptionRepository.checkDoctorSlotOverlap(hospitalId, doctorId, bookingDate, time);
     if (overlap) {
       throw new AppError("Doctor is already booked for this time slot. Please choose a different slot.", 400);
+    }
+
+    // 5b. Patient slot conflict check (patient already has an active appointment at exact same date & time slot with another doctor)
+    const patientSlotClash = await AppointmentSlotService.checkPatientSlotConflict(
+      patientId,
+      bookingDate,
+      time,
+      hospitalId
+    );
+    if (patientSlotClash) {
+      const otherDocName = (patientSlotClash.doctor as any)?.name || "another doctor";
+      throw new AppError(
+        `Patient already has an active appointment scheduled at ${time} with Dr. ${otherDocName}. A patient cannot book appointments with multiple doctors at the exact same time slot.`,
+        409
+      );
     }
 
     // 6. Generate unique auto-incremented appointment reference ID: APT-YYYYMMDD-XXXXXX (we'll reserve this for later)

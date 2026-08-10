@@ -37,12 +37,27 @@ body {
   #patient-card-print,
   #patient-card-print *,
   #consolidated-patient-statement-print,
+<<<<<<< Updated upstream
   #consolidated-patient-statement-print * {
     visibility: visible !important;
   }
 
   /* Force patient card print to display block (bypassing tailwind hidden print:block conflict) */
   #patient-card-print {
+=======
+  #consolidated-patient-statement-print *,
+  #consultation-print-area,
+  #consultation-print-area *,
+  .printable-area,
+  .printable-area * {
+    visibility: visible !important;
+  }
+
+  /* Force patient card & registry print to display block */
+  #patient-card-print,
+  #patient-registry-print,
+  #consultation-print-area {
+>>>>>>> Stashed changes
     display: block !important;
   }
 
@@ -53,7 +68,14 @@ body {
   #admission-slip-print,
   #opd-receipt-print,
   #patient-card-print,
+<<<<<<< Updated upstream
   #consolidated-patient-statement-print {
+=======
+  #patient-registry-print,
+  #consolidated-patient-statement-print,
+  #consultation-print-area,
+  .printable-area {
+>>>>>>> Stashed changes
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;

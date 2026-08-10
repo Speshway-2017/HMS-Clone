@@ -103,8 +103,6 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "OP Management", path: "/doctor/op-management", icon: Activity },
     { label: "IP Management", path: "/doctor/ip-management", icon: BedDouble },
     { label: "Patient Records", path: "/doctor/patient-records", icon: Users },
-    { label: "Laboratory", path: "/doctor/laboratory", icon: FlaskConical },
-    { label: "Radiology", path: "/doctor/radiology", icon: ScanLine },
     { label: "Operation Theatre", path: "/doctor/ot", icon: Scissors },
     { label: "Telemedicine", path: "/doctor/telemedicine", icon: Video },
     { label: "Performance", path: "/doctor/performance", icon: BarChart3 },

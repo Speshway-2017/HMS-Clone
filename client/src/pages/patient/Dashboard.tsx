@@ -160,15 +160,25 @@ function findDoctorMatch(list: any[], draftObj: any) {
   }) || null;
 }
 
-export function PatientDashboard() {
+interface PatientDashboardProps {
+  activeTab?: "overview" | "profile" | "appointments" | "history" | "prescriptions" | "reports" | "imaging" | "billing" | "insurance" | "telehealth" | "notifications" | "settings";
+}
+
+export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardProps = {}) {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get("tab");
-  const normalizedTab = (!rawTab || rawTab === "dashboard") ? "overview" : rawTab;
+  const initialTab = propActiveTab || ((!rawTab || rawTab === "dashboard") ? "overview" : rawTab);
 
   const [activeTab, setActiveTab] = useState<
     "overview" | "profile" | "appointments" | "history" | "prescriptions" | "reports" | "imaging" | "billing" | "insurance" | "telehealth" | "notifications" | "settings"
-  >((normalizedTab as any) || "overview");
+  >((initialTab as any) || "overview");
+
+  useEffect(() => {
+    if (propActiveTab) {
+      setActiveTab(propActiveTab);
+    }
+  }, [propActiveTab]);
 
   const changeTab = (tab: typeof activeTab) => {
     setActiveTab(tab);

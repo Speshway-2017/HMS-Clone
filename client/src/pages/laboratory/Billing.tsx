@@ -14,6 +14,7 @@ import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
+import { InputField, SelectField } from "../../components/ui/Field";
 import toast from "react-hot-toast";
 
 interface LabBillItem {
@@ -46,9 +47,50 @@ export function LaboratoryBilling() {
   const [activeTab, setActiveTab] = useState<"pending" | "paid" | "today">("pending");
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [receiptInfo, setReceiptInfo] = useState<ReceiptInfo | null>(null);
+
+  // Payment collection modal state
+  const [selectedInvoiceForPay, setSelectedInvoiceForPay] = useState<any | null>(null);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [payAmount, setPayAmount] = useState("");
+  const [payMethod, setPayMethod] = useState("Cash");
+
   const printRef = useRef<HTMLDivElement>(null);
 
   const prices: Record<string, number> = (hospitalData as any)?.investigationPrices || {};
+
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedInvoiceForPay) return;
+
+    const amt = parseFloat(payAmount);
+    if (isNaN(amt) || amt <= 0) {
+      toast.error("Payment amount must be greater than zero.");
+      return;
+    }
+
+    if (amt > selectedInvoiceForPay.patientBalance + 0.01) {
+      toast.error(`Entered amount (₹${amt.toFixed(2)}) exceeds remaining balance (₹${selectedInvoiceForPay.patientBalance.toFixed(2)})`);
+      return;
+    }
+
+    try {
+      await api.post("/reception/billing/pay", {
+        invoiceId: selectedInvoiceForPay._id,
+        amount: amt,
+        paymentMethod: payMethod,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["reception", "billing", "payment-history"] });
+      queryClient.invalidateQueries({ queryKey: ["laboratory", "requests"] });
+
+      toast.success("Payment Processed Successfully!");
+      setIsPaymentModalOpen(false);
+      setSelectedInvoiceForPay(null);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to process payment.");
+    }
+  };
 
   const rawInvoices: any[] = invoiceData?.data || [];
   const invoices = rawInvoices.map((inv: any) => ({
@@ -390,30 +432,18 @@ export function LaboratoryBilling() {
                             <Eye className="h-4 w-4" />
                           </button>
                           {inv.status !== "paid" && (
-                            <button
-                              onClick={async () => {
-                                try {
-                                  if (inv.patientBalance > 0) {
-                                    await api.post("/reception/billing/pay", {
-                                      invoiceId: inv._id,
-                                      amount: inv.patientBalance,
-                                      paymentMethod: "Cash",
-                                    });
-                                  } else {
-                                    await api.patch(`/invoices/${inv._id}`, { status: "paid" });
-                                  }
-                                  queryClient.invalidateQueries({ queryKey: ["invoices"] });
-                                  queryClient.invalidateQueries({ queryKey: ["reception", "billing", "payment-history"] });
-                                  toast.success("Bill marked as paid!");
-                                } catch {
-                                  toast.error("Failed to update status.");
-                                }
+                            <Button
+                              onClick={() => {
+                                setSelectedInvoiceForPay(inv);
+                                setPayAmount(inv.patientBalance.toFixed(2));
+                                setPayMethod("Cash");
+                                setIsPaymentModalOpen(true);
                               }}
-                              className="p-1.5 rounded-lg text-slate-500 hover:text-green-600 hover:bg-green-50 transition-colors"
-                              title="Mark as Paid"
+                              className="py-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-xs flex items-center gap-1 font-bold whitespace-nowrap text-white"
+                              title="Collect Payment"
                             >
-                              <Check className="h-4 w-4" />
-                            </button>
+                              <IndianRupee className="h-3.5 w-3.5" /> Pay Balance
+                            </Button>
                           )}
                         </div>
                       ) : (
@@ -448,6 +478,71 @@ export function LaboratoryBilling() {
           )}
         </div>
       </Card>
+
+      {/* ── Collect Payment Modal ── */}
+      {selectedInvoiceForPay && (
+        <Modal
+          title="Collect Balance Payment"
+          isOpen={isPaymentModalOpen}
+          onClose={() => setIsPaymentModalOpen(false)}
+        >
+          <form onSubmit={handlePaymentSubmit} className="space-y-4 text-xs">
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Patient:</span>
+                <span className="font-bold text-slate-800">
+                  {selectedInvoiceForPay.patientName} {selectedInvoiceForPay.patientUhid ? `(${selectedInvoiceForPay.patientUhid})` : ""}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Invoice Total:</span>
+                <span className="font-bold text-slate-800">₹{selectedInvoiceForPay.total.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Total Paid So Far:</span>
+                <span className="font-bold text-slate-800">₹{(selectedInvoiceForPay.total - selectedInvoiceForPay.patientBalance).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold border-t border-dashed border-slate-200 pt-1.5 text-blue-900">
+                <span>Remaining Balance Due:</span>
+                <span>₹{selectedInvoiceForPay.patientBalance.toLocaleString()}</span>
+              </div>
+            </div>
+
+            <InputField
+              label="Amount to Pay (₹)"
+              type="number"
+              required
+              min={0.01}
+              step={0.01}
+              max={selectedInvoiceForPay.patientBalance}
+              value={payAmount}
+              onChange={(e) => setPayAmount(e.target.value)}
+            />
+
+            <SelectField
+              label="Payment Option"
+              required
+              value={payMethod}
+              onChange={(e) => setPayMethod(e.target.value)}
+            >
+              <option value="Cash">Cash</option>
+              <option value="UPI">UPI</option>
+              <option value="Card">Card</option>
+              <option value="Net Banking">Net Banking</option>
+              <option value="Cheque">Cheque</option>
+            </SelectField>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button type="button" variant="secondary" onClick={() => setIsPaymentModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1">
+                <IndianRupee className="h-3.5 w-3.5" /> Process Payment
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
 
 

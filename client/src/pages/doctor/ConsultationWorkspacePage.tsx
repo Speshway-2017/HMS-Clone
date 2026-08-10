@@ -17,6 +17,9 @@ import {
 } from "../../features/doctorDashboard";
 import { useInventory } from "../../features/inventory";
 import { useMyHospital } from "../../features/hospitals";
+import { useWards } from "../../features/wards";
+import { useRooms } from "../../features/rooms";
+import { useBeds } from "../../features/beds";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -38,6 +41,7 @@ import {
   FileCheck,
   AlertTriangle,
   FolderOpen,
+  ArrowLeft,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -252,6 +256,21 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
   };
 
   // Admission form state
+  const { data: wardsData } = useWards({ limit: 100 });
+  const { data: roomsData } = useRooms({ limit: 200 });
+  const { data: bedsData } = useBeds({ limit: 200 });
+
+  const activeWards = (wardsData?.wards || []).filter((w) => w.status !== "Inactive");
+  const wardOptions = activeWards.map((w) => w.name);
+
+  const activeRooms = (roomsData?.rooms || []).filter((r) => r.status !== "Inactive");
+  const bedTypeOptions = Array.from(
+    new Set([
+      ...activeRooms.map((r) => r.roomType).filter(Boolean),
+      ...(bedsData?.beds || []).map((b) => b.bedType).filter(Boolean)
+    ])
+  );
+
   const [admitWard, setAdmitWard] = useState("General");
   const [admitDiagnosis, setAdmitDiagnosis] = useState("");
   const [admitNotes, setAdmitNotes] = useState("");
@@ -260,6 +279,19 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
   const [admitExpectedStay, setAdmitExpectedStay] = useState("");
   const [admitReason, setAdmitReason] = useState("");
   const [admitSpecialInstructions, setAdmitSpecialInstructions] = useState("");
+
+  // Sync ward & room/bed type with Admin DB when fetched
+  useEffect(() => {
+    if (wardOptions.length > 0 && (!admitWard || admitWard === "General" || !wardOptions.includes(admitWard))) {
+      setAdmitWard(wardOptions[0]);
+    }
+  }, [wardOptions]);
+
+  useEffect(() => {
+    if (bedTypeOptions.length > 0 && (!admitBedType || admitBedType === "General" || !bedTypeOptions.includes(admitBedType))) {
+      setAdmitBedType(bedTypeOptions[0]);
+    }
+  }, [bedTypeOptions]);
 
   // Auto-save states
   const [isSavingDraft, setIsSavingDraft] = useState(false);
@@ -856,7 +888,20 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
               </Button>
             )}
 
+<<<<<<< Updated upstream
             <Button variant="secondary" onClick={() => navigate(-1)}>
+=======
+            {isCompleted && (
+              <Button variant="secondary" onClick={() => window.print()} className="flex items-center gap-1">
+                <Printer className="h-4 w-4" /> Print Record
+              </Button>
+            )}
+
+            <Button variant="secondary" onClick={() => navigate(-1)} className="flex items-center gap-1.5">
+              <ArrowLeft className="h-4 w-4" /> Back
+            </Button>
+            <Button variant="secondary" onClick={() => navigate("/doctor")}>
+>>>>>>> Stashed changes
               Back to Dashboard
             </Button>
           </div>
@@ -1575,6 +1620,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                     </div>
                   </div>
 
+<<<<<<< Updated upstream
                   {/* Form Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
@@ -1585,6 +1631,115 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                         placeholder="Enter diagnostic confirmation..."
                         required
                       />
+=======
+                    {/* Form Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <InputField
+                          label="Primary Diagnosis (Mandatory)"
+                          value={admitDiagnosis}
+                          onChange={(e) => setAdmitDiagnosis(e.target.value)}
+                          placeholder="Enter diagnostic confirmation..."
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <SelectField
+                          label="Admission Priority"
+                          value={admitPriority}
+                          onChange={(e) => setAdmitPriority(e.target.value)}
+                        >
+                          <option value="Routine">Routine</option>
+                          <option value="Urgent">Urgent</option>
+                          <option value="Emergency">Emergency</option>
+                        </SelectField>
+                      </div>
+
+                      <div>
+                        <InputField
+                          label="Expected Stay Duration"
+                          value={admitExpectedStay}
+                          onChange={(e) => setAdmitExpectedStay(e.target.value)}
+                          placeholder="e.g. 3 Days, 1 Week"
+                        />
+                      </div>
+
+                      <div>
+                        <SelectField
+                          label="Preferred Ward"
+                          value={admitWard}
+                          onChange={(e) => setAdmitWard(e.target.value)}
+                        >
+                          {wardOptions.length > 0 ? (
+                            wardOptions.map((wName) => (
+                              <option key={wName} value={wName}>
+                                {wName}
+                              </option>
+                            ))
+                          ) : (
+                            <>
+                              <option value="General">General</option>
+                              <option value="Semi Private">Semi Private</option>
+                              <option value="Private">Private</option>
+                              <option value="ICU">ICU</option>
+                            </>
+                          )}
+                        </SelectField>
+                      </div>
+
+                      <div>
+                        <SelectField
+                          label="Preferred Bed Type"
+                          value={admitBedType}
+                          onChange={(e) => setAdmitBedType(e.target.value)}
+                        >
+                          {bedTypeOptions.length > 0 ? (
+                            bedTypeOptions.map((bType) => (
+                              <option key={bType} value={bType}>
+                                {bType}
+                              </option>
+                            ))
+                          ) : (
+                            <>
+                              <option value="General">General</option>
+                              <option value="Semi-Private">Semi-Private</option>
+                              <option value="Private">Private</option>
+                              <option value="ICU">ICU</option>
+                            </>
+                          )}
+                        </SelectField>
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <InputField
+                          label="Admission Reason"
+                          value={admitReason}
+                          onChange={(e) => setAdmitReason(e.target.value)}
+                          placeholder="Clinical reason for ward admission"
+                        />
+                      </div>
+
+                      <div>
+                        <TextareaField
+                          label="Clinical Notes / Diagnosis Remarks"
+                          value={admitNotes}
+                          onChange={(e) => setAdmitNotes(e.target.value)}
+                          placeholder="Describe clinical symptoms and observations..."
+                          rows={3}
+                        />
+                      </div>
+
+                      <div>
+                        <TextareaField
+                          label="Special Instructions"
+                          value={admitSpecialInstructions}
+                          onChange={(e) => setAdmitSpecialInstructions(e.target.value)}
+                          placeholder="Nursing guidance, diet directives..."
+                          rows={3}
+                        />
+                      </div>
+>>>>>>> Stashed changes
                     </div>
 
                     <div>
@@ -1925,6 +2080,154 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
           </div>
         </Modal>
       )}
+
+      {/* Hidden Printable Consultation Record Container (Triggers on window.print() via @media print) */}
+      <div id="consultation-print-area" className="hidden print:block p-8 bg-white text-slate-900 font-sans leading-relaxed">
+        {/* Hospital Letterhead */}
+        <div className="flex items-center justify-between border-b-2 border-navy-800 pb-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-navy-900 tracking-tight">SPESHWAY HOSPITALS</h1>
+            <p className="text-xs text-slate-600 font-medium mt-0.5">Multispecialty Healthcare & Research Institute</p>
+            <p className="text-[11px] text-slate-500">123 Health City Avenue, Medical District · Phone: +91 800-123-4567 · www.speshwayhospitals.com</p>
+          </div>
+          <div className="text-right">
+            <div className="inline-block bg-navy-50 border border-navy-200 px-3 py-1 rounded text-xs font-bold text-navy-800 uppercase tracking-wider mb-1">
+              OPD Consultation Record
+            </div>
+            <p className="text-xs text-slate-600 font-mono">Date: {new Date((workspaceData?.draftSession as any)?.completedAt || (appointment as any)?.updatedAt || Date.now()).toLocaleDateString("en-IN")}</p>
+            <p className="text-xs text-slate-600 font-mono">OP Code: {appointment.referenceId || appointment._id.slice(-6)}</p>
+          </div>
+        </div>
+
+        {/* Patient & Doctor Header Grid */}
+        <div className="grid grid-cols-2 gap-4 rounded-xl border border-slate-200 p-4 bg-slate-50/50 mb-6 text-xs">
+          <div>
+            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">PATIENT INFORMATION</p>
+            <p className="text-sm font-bold text-slate-800">{patient.name}</p>
+            <p className="text-slate-600 mt-0.5"><span className="font-semibold">UHID:</span> {patient.uhid}</p>
+            <p className="text-slate-600"><span className="font-semibold">Age / Gender:</span> {patient.age || "—"} yrs / {patient.gender || "—"}</p>
+            <p className="text-slate-600"><span className="font-semibold">Contact:</span> {patient.phone || "—"}</p>
+            <p className="text-slate-600"><span className="font-semibold">Blood Group:</span> {patient.bloodGroup || "—"} {patient.allergies ? `· Allergies: ${patient.allergies}` : ""}</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">ATTENDING PHYSICIAN</p>
+            <p className="text-sm font-bold text-slate-800">Dr. {(appointment.doctor as any)?.name || "Attending Physician"}</p>
+            <p className="text-slate-600 mt-0.5"><span className="font-semibold">Department:</span> {(appointment.department as any)?.name || "General Medicine"}</p>
+            <p className="text-slate-600"><span className="font-semibold">Consultation Date:</span> {new Date(appointment.date).toLocaleDateString("en-IN")}</p>
+            <p className="text-slate-600"><span className="font-semibold">Consultation Status:</span> Completed</p>
+          </div>
+        </div>
+
+        {/* Clinical Assessment & Diagnosis */}
+        <div className="space-y-4 mb-6">
+          <div className="border border-slate-200 rounded-lg p-3">
+            <p className="text-xs font-bold text-navy-800 uppercase tracking-wider mb-1">Diagnosis Confirmation</p>
+            <p className="text-sm font-semibold text-slate-800">{diagnosis || admitDiagnosis || "Routine Outpatient Consultation"}</p>
+            {chiefComplaint && <p className="text-xs text-slate-600 mt-1"><span className="font-semibold">Chief Complaint:</span> {chiefComplaint}</p>}
+          </div>
+
+          {/* Vitals Summary */}
+          {(temperature || bloodPressure || pulseRate || respiratoryRate || oxygenSaturation || weight) && (
+            <div className="border border-slate-200 rounded-lg p-3">
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Recorded Vitals</p>
+              <div className="grid grid-cols-6 gap-2 text-xs text-center">
+                {bloodPressure && <div className="bg-slate-50 p-2 rounded border border-slate-100"><span className="block text-[10px] text-slate-400">BP</span><span className="font-bold text-slate-700">{bloodPressure}</span></div>}
+                {pulseRate && <div className="bg-slate-50 p-2 rounded border border-slate-100"><span className="block text-[10px] text-slate-400">Pulse</span><span className="font-bold text-slate-700">{pulseRate} bpm</span></div>}
+                {temperature && <div className="bg-slate-50 p-2 rounded border border-slate-100"><span className="block text-[10px] text-slate-400">Temp</span><span className="font-bold text-slate-700">{temperature}°F</span></div>}
+                {oxygenSaturation && <div className="bg-slate-50 p-2 rounded border border-slate-100"><span className="block text-[10px] text-slate-400">SpO₂</span><span className="font-bold text-slate-700">{oxygenSaturation}%</span></div>}
+                {respiratoryRate && <div className="bg-slate-50 p-2 rounded border border-slate-100"><span className="block text-[10px] text-slate-400">Resp Rate</span><span className="font-bold text-slate-700">{respiratoryRate}</span></div>}
+                {weight && <div className="bg-slate-50 p-2 rounded border border-slate-100"><span className="block text-[10px] text-slate-400">Weight</span><span className="font-bold text-slate-700">{weight} kg</span></div>}
+              </div>
+            </div>
+          )}
+
+          {/* Clinical Notes */}
+          {(clinicalNotes || symptoms || treatmentPlan || advice) && (
+            <div className="border border-slate-200 rounded-lg p-3 space-y-2 text-xs">
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Clinical Evaluation & Notes</p>
+              {symptoms && <p><span className="font-semibold text-slate-700">Symptoms:</span> {symptoms}</p>}
+              {clinicalNotes && <p><span className="font-semibold text-slate-700">Notes:</span> {clinicalNotes}</p>}
+              {treatmentPlan && <p><span className="font-semibold text-slate-700">Treatment Plan:</span> {treatmentPlan}</p>}
+              {advice && <p><span className="font-semibold text-slate-700">Doctor Advice:</span> {advice}</p>}
+            </div>
+          )}
+
+          {/* Prescribed Medications Table */}
+          {prescriptionMeds.length > 0 && prescriptionMeds.some(p => p.name) && (
+            <div className="border border-slate-200 rounded-lg p-3">
+              <p className="text-xs font-bold text-navy-800 uppercase tracking-wider mb-2">Rx — Prescribed Medications</p>
+              <table className="w-full text-xs text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
+                    <th className="p-2">#</th>
+                    <th className="p-2">Medicine / Strength</th>
+                    <th className="p-2">Dosage</th>
+                    <th className="p-2">Frequency</th>
+                    <th className="p-2">Duration</th>
+                    <th className="p-2">Instructions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {prescriptionMeds.filter(p => p.name).map((med, idx) => (
+                    <tr key={idx} className="border-b border-slate-100">
+                      <td className="p-2 font-mono">{idx + 1}</td>
+                      <td className="p-2 font-bold text-slate-800">{med.name} {med.strength}</td>
+                      <td className="p-2">{med.dosage || "—"}</td>
+                      <td className="p-2">{med.frequency || "—"}</td>
+                      <td className="p-2">{med.duration || "—"}</td>
+                      <td className="p-2 text-slate-600">{med.instructions || "As directed"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Lab & Radiology Orders */}
+          {(selectedLabTests.length > 0 || selectedRadiologyStudies.length > 0) && (
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              {selectedLabTests.length > 0 && (
+                <div className="border border-slate-200 rounded-lg p-3">
+                  <p className="font-bold text-slate-700 uppercase text-[10px] mb-1">Ordered Laboratory Investigations</p>
+                  <ul className="list-disc list-inside text-slate-600 space-y-0.5">
+                    {selectedLabTests.map((t, i) => <li key={i}>{t}</li>)}
+                  </ul>
+                </div>
+              )}
+              {selectedRadiologyStudies.length > 0 && (
+                <div className="border border-slate-200 rounded-lg p-3">
+                  <p className="font-bold text-slate-700 uppercase text-[10px] mb-1">Ordered Radiology Studies</p>
+                  <ul className="list-disc list-inside text-slate-600 space-y-0.5">
+                    {selectedRadiologyStudies.map((s, i) => <li key={i}>{s}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Admission Recommendation */}
+          {(admitDiagnosis || admitReason || (admitWard && admitWard !== "General")) && (
+            <div className="border border-amber-200 bg-amber-50/40 rounded-lg p-3 text-xs">
+              <p className="font-bold text-amber-800 uppercase text-[10px] mb-1">In-Patient Admission Recommendation</p>
+              <p className="text-slate-800"><span className="font-semibold">Preferred Ward:</span> {admitWard} ({admitBedType}) · <span className="font-semibold">Priority:</span> {admitPriority}</p>
+              {admitReason && <p className="text-slate-600 mt-0.5"><span className="font-semibold">Reason:</span> {admitReason}</p>}
+            </div>
+          )}
+        </div>
+
+        {/* Sign-off Footer */}
+        <div className="mt-12 pt-6 border-t border-slate-200 flex justify-between items-end text-xs">
+          <div>
+            <p className="text-slate-500">Issued by Spesway Hospitals Digital OPD System</p>
+            <p className="text-[10px] text-slate-400 font-mono">Document Security Code: OPD-{appointment._id.slice(-8).toUpperCase()}</p>
+          </div>
+          <div className="text-center">
+            <div className="h-10 border-b border-slate-400 w-48 mb-1"></div>
+            <p className="font-bold text-slate-800">Dr. {(appointment.doctor as any)?.name || "Attending Physician"}</p>
+            <p className="text-[10px] text-slate-500">Authorized Medical Officer</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
