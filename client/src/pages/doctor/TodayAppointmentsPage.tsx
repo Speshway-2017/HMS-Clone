@@ -5,6 +5,7 @@ import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { CalendarClock, Stethoscope, History, Eye } from "lucide-react";
 import toast from "react-hot-toast";
+import { useSocketSync } from "../../hooks/useSocketSync";
 
 const STATUS_BADGES: Record<string, { tone: "success" | "warning" | "info" | "neutral" | "danger"; label: string }> = {
   completed: { tone: "success", label: "Completed" },
@@ -16,6 +17,7 @@ const STATUS_BADGES: Record<string, { tone: "success" | "warning" | "info" | "ne
 };
 
 export function TodayAppointmentsPage() {
+  useSocketSync();
   const navigate = useNavigate();
   const { data: appointments, isLoading, isError, refetch } = useDoctorTodayAppointments();
 

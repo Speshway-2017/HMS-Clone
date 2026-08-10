@@ -39,9 +39,22 @@ async function getLoggedDoctor(req: Request) {
     }
   }
 
+  // 3. Fall back to name lookup within same hospital if email didn't match
+  if (!doctor && req.user.name && req.user.hospital) {
+    const nameRegex = new RegExp(`^${req.user.name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+    doctor = await Doctor.findOne({ hospital: req.user.hospital, name: nameRegex, isActive: { $ne: false } });
+  }
+
   if (!doctor) {
     throw new AppError("Doctor profile not found for the logged-in user.", 404);
   }
+
+  // Self-heal: link doctor.user to user._id if missing
+  if (!doctor.user) {
+    doctor.user = req.user._id as any;
+    await doctor.save().catch(() => {});
+  }
+
   return doctor;
 }
 
@@ -2457,8 +2470,7 @@ export const getAnalytics = catchAsync(async (req: Request, res: Response) => {
 
   // Date ranges
   const now = new Date();
-  const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
-  const endOfToday = new Date(now); endOfToday.setHours(23, 59, 59, 999);
+  const { start: startOfToday, end: endOfToday } = DoctorDashboardRepository.getTodayRange();
 
   const startOfYesterday = new Date(now); startOfYesterday.setDate(startOfYesterday.getDate() - 1); startOfYesterday.setHours(0, 0, 0, 0);
   const endOfYesterday = new Date(now); endOfYesterday.setDate(endOfYesterday.getDate() - 1); endOfYesterday.setHours(23, 59, 59, 999);
@@ -2469,9 +2481,21 @@ export const getAnalytics = catchAsync(async (req: Request, res: Response) => {
   // Fetch all appointments in the last 30 days
   const appointments = await Appointment.find({
     hospital: hospitalId,
-    doctor: doctor._id,
+    doctor: { $in: DoctorDashboardRepository.normalizeDocIds(doctor._id) },
     date: { $gte: startOf30DaysAgo }
   }).populate("patient");
+
+  console.log("\n========== DOCTOR APPOINTMENT DEBUG (getAnalytics) ==========");
+  console.log("Logged-in user ID:   ", req.user?._id?.toString());
+  console.log("Logged-in doctor ID: ", doctor._id?.toString());
+  console.log("Logged-in email:     ", doctor.email);
+  console.log("Logged-in hospital:  ", hospitalId?.toString());
+  console.log("Start of Today (IST):", startOfToday.toISOString());
+  console.log("End of Today (IST):  ", endOfToday.toISOString());
+  console.log("Fetched 30-day appts count:", appointments.length);
+  appointments.forEach(a => {
+    console.log(`  -> Appt _id=${a._id}, ref=${a.referenceId}, date=${a.date?.toISOString()}, status=${a.status}, doc=${a.doctor}`);
+  });
 
   // Fetch all prescriptions in the last 30 days
   const prescriptions = await Prescription.find({
@@ -2564,6 +2588,8 @@ export const getAnalytics = catchAsync(async (req: Request, res: Response) => {
 
   // Filter metrics
   const todayAppts = appointments.filter(a => a.date >= startOfToday && a.date <= endOfToday && a.status !== "cancelled");
+  console.log("Filtered todayAppts count: ", todayAppts.length);
+  console.log("=============================================================\n");
   const yesterdayAppts = appointments.filter(a => a.date >= startOfYesterday && a.date <= endOfYesterday && a.status !== "cancelled");
   
   const lastWeekSameDayStart = new Date(startOfToday); lastWeekSameDayStart.setDate(lastWeekSameDayStart.getDate() - 7);

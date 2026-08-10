@@ -4,6 +4,7 @@ export const DOCTOR_STATUSES = ["on_duty", "on_leave", "off_duty", "ACTIVE", "IN
 
 const doctorSchema = new Schema(
   {
+    user: { type: Schema.Types.ObjectId, ref: "User", default: null },
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
     department: { type: Schema.Types.ObjectId, ref: "Department", default: null },
     name: { type: String, required: true, trim: true },
