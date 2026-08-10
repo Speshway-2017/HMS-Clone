@@ -51,8 +51,7 @@ export function DashboardLayout() {
   }, [user, doctorProfile]);
 
   useEffect(() => {
-    const handleUpdate = (data: unknown) => {
-      console.log("Real-time update received via Socket.IO:", data);
+    const handleUpdate = () => {
       // Invalidate all query keys to trigger real-time auto-updates across dashboards
       queryClient.invalidateQueries();
     };

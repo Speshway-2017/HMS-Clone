@@ -290,7 +290,6 @@ export function AccountantBillingPage() {
   // Socket sync bindings
   useEffect(() => {
     const handleIPUpdate = (data: any) => {
-      console.log("IP Billing real-time update:", data);
       if (selectedAdmissionId && (data.admissionId === selectedAdmissionId || data.type === "IP_DISCHARGE_BILL")) {
         refetchIPDetails();
       }

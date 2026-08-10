@@ -26,7 +26,7 @@ export const listBranches = catchAsync(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req);
   let hospitalId = req.query.hospitalId as string | undefined;
 
-  if (!hospitalId && req.user?.hospital && req.user?.role !== "super_admin") {
+  if (req.user?.role !== "super_admin" && req.user?.hospital) {
     const rawHosp: any = req.user.hospital;
     hospitalId = typeof rawHosp === "object" && rawHosp ? rawHosp._id?.toString() : String(rawHosp);
   }
@@ -65,6 +65,13 @@ export const getBranch = catchAsync(async (req: Request, res: Response) => {
   const branch = await Branch.findById(req.params.id).populate("hospital", "name");
   if (!branch) {
     throw new AppError("Branch not found.", 404);
+  }
+  if (req.user?.role !== "super_admin" && req.user?.hospital) {
+    const userHospId = typeof req.user.hospital === "object" ? (req.user.hospital as any)._id?.toString() : String(req.user.hospital);
+    const branchHospId = typeof branch.hospital === "object" ? (branch.hospital as any)._id?.toString() : String(branch.hospital);
+    if (userHospId !== branchHospId) {
+      throw new AppError("You do not have permission to view this branch.", 403);
+    }
   }
   res.json({ status: "success", data: { branch } });
 });

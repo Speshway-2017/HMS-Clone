@@ -272,7 +272,6 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
   // Socket sync integrations
   useEffect(() => {
     const handleUpdateEvent = (data: any) => {
-      console.log("Socket billing sync received:", data);
       if (selectedAdmissionId && (data.admissionId === selectedAdmissionId || data.type === "BILL_PAYMENT_PROCESSED" || data.type === "BILL_INVOICE_GENERATED")) {
         refetchBillDetails();
       }
