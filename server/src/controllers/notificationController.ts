@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { Types } from "mongoose";
 import { catchAsync } from "../utils/catchAsync";
 import { Appointment } from "../models/Appointment";
 import { InventoryItem } from "../models/InventoryItem";

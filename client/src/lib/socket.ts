@@ -32,7 +32,7 @@ export const socket: Socket = io(SOCKET_URL, {
 });
 
 socket.on("connect", () => {
-  console.log(`[WebSocket] Connected successfully (ID: ${socket.id}) to ${SOCKET_URL}`);
+  // Connected successfully
 });
 
 socket.on("disconnect", (reason) => {
@@ -43,12 +43,12 @@ socket.on("connect_error", (error) => {
   console.error("[WebSocket] Connection error:", error.message);
 });
 
-socket.on("reconnect", (attemptNumber) => {
-  console.log(`[WebSocket] Reconnected after ${attemptNumber} attempts`);
+socket.on("reconnect", () => {
+  // Reconnected successfully
 });
 
-socket.on("reconnect_attempt", (attemptNumber) => {
-  console.log(`[WebSocket] Reconnection attempt #${attemptNumber}`);
+socket.on("reconnect_attempt", () => {
+  // Reconnection attempt
 });
 
 // Periodic ping heartbeat check

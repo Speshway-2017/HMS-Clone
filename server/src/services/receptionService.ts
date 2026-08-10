@@ -1054,7 +1054,7 @@ export class ReceptionService {
 
         if (appointment) {
           try {
-            const docId = provisionalData?.doctorId || (appointment.doctor as any)?._id || appointment.doctor;
+            const docId = (appointment.doctor as any)?._id || appointment.doctor;
             const patName = (invoice.patient as any)?.name || "Patient";
             await createDoctorNotification({
               hospital: hospitalId,
