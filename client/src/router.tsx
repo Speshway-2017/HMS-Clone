@@ -134,6 +134,7 @@ import { NewLabBillPage } from "./pages/laboratory/NewLabBill";
 import { UploadReportPage } from "./pages/laboratory/UploadReportPage";
 import { TestRequestDetailsPage } from "./pages/laboratory/TestRequestDetailsPage";
 import { LaboratoryQualityControl } from "./pages/laboratory/QualityControl";
+import { LaboratoryCompletedReports } from "./pages/laboratory/CompletedReports";
 
 // Nurse & Patient modules
 import { NurseDashboardPage } from "./pages/nurse/DashboardPage";
@@ -397,6 +398,7 @@ export const router = createBrowserRouter([
           { path: "reports", element: <LaboratoryReportDelivery /> },
           { path: "billing", element: <LaboratoryBilling /> },
           { path: "billing/new", element: <NewLabBillPage /> },
+          { path: "completed-reports", element: <LaboratoryCompletedReports /> },
           { path: "settings", element: <LaboratorySettings /> },
         ],
       },
@@ -435,6 +437,16 @@ export const router = createBrowserRouter([
         element: <DashboardLayout />,
         children: [
           { index: true, element: <PatientDashboard /> },
+          { path: "appointments", element: <PatientDashboard activeTab="appointments" /> },
+          { path: "profile", element: <PatientDashboard activeTab="profile" /> },
+          { path: "history", element: <PatientDashboard activeTab="history" /> },
+          { path: "prescriptions", element: <PatientDashboard activeTab="prescriptions" /> },
+          { path: "reports", element: <PatientDashboard activeTab="reports" /> },
+          { path: "imaging", element: <PatientDashboard activeTab="imaging" /> },
+          { path: "billing", element: <PatientDashboard activeTab="billing" /> },
+          { path: "insurance", element: <PatientDashboard activeTab="insurance" /> },
+          { path: "telehealth", element: <PatientDashboard activeTab="telehealth" /> },
+          { path: "notifications", element: <PatientDashboard activeTab="notifications" /> },
           { path: "settings", element: <SettingsPage /> },
         ],
       },

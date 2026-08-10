@@ -1,5 +1,5 @@
 import React from "react";
-import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
+import { motion } from "motion/react";
 
 export interface DepartmentTiltCardProps {
   title: string;
@@ -22,43 +22,10 @@ export function DepartmentTiltCard({
   fee = 300,
   isEmergency = false,
 }: DepartmentTiltCardProps) {
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-
-  const mouseXSpring = useSpring(x, { stiffness: 300, damping: 25 });
-  const mouseYSpring = useSpring(y, { stiffness: 300, damping: 25 });
-
-  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["10deg", "-10deg"]);
-  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-10deg", "10deg"]);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const width = rect.width;
-    const height = rect.height;
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const xPct = mouseX / width - 0.5;
-    const yPct = mouseY / height - 0.5;
-    x.set(xPct);
-    y.set(yPct);
-  };
-
-  const handleMouseLeave = () => {
-    x.set(0);
-    y.set(0);
-  };
-
   return (
-    <div style={{ perspective: "1000px" }} className="w-full h-full">
+    <div className="w-full h-full">
       <motion.div
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        style={{
-          rotateX,
-          rotateY,
-          transformStyle: "preserve-3d",
-        }}
-        className="group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition-all duration-400 ease-out hover:border-blue-600 hover:shadow-2xl hover:shadow-blue-500/25 hover:scale-[1.03] flex flex-col justify-between min-h-[320px] h-full"
+        className="group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition-all duration-400 ease-out hover:border-blue-600 hover:shadow-2xl hover:shadow-blue-500/25 hover:-translate-y-1 flex flex-col justify-between min-h-[320px] h-full"
       >
         {/* Smooth Radial Clipped Circle Blue Background Fill */}
         <div

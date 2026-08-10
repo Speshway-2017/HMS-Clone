@@ -499,18 +499,42 @@ export function IPManagementPage() {
     );
   }
 
-  const formatAttending = (p: any) => {
-    return typeof p.assignedDoctor === "object" && p.assignedDoctor ? p.assignedDoctor.name : "Dr. Montgomery";
+  const getAttendingDoctor = (p: any, admDetail?: any) => {
+    if (admDetail?.admittingDoctor?.name) {
+      return admDetail.admittingDoctor.name.startsWith("Dr.") ? admDetail.admittingDoctor.name : `Dr. ${admDetail.admittingDoctor.name}`;
+    }
+    if (typeof p?.assignedDoctor === "object" && p.assignedDoctor?.name) {
+      return p.assignedDoctor.name.startsWith("Dr.") ? p.assignedDoctor.name : `Dr. ${p.assignedDoctor.name}`;
+    }
+    const admMatch = admissionsList?.find((a: any) => (a.patient?._id || a.patient) === p._id);
+    if (admMatch?.admittingDoctor?.name) {
+      return admMatch.admittingDoctor.name.startsWith("Dr.") ? admMatch.admittingDoctor.name : `Dr. ${admMatch.admittingDoctor.name}`;
+    }
+    return "Dr. On Duty";
+  };
+
+  const getBedDisplay = (p: any, admDetail?: any) => {
+    const adm = admDetail || admissionsList?.find((a: any) => (a.patient?._id || a.patient) === p._id);
+    const bedNum = adm?.bed?.bedNumber || adm?.bed?.bedCode || adm?.bedNumber;
+    const wardName = adm?.ward?.name || (typeof adm?.ward === "string" ? adm.ward : null) || adm?.room?.roomNumber || adm?.room?.name;
+
+    if (bedNum && wardName) return `${wardName} · Bed ${bedNum}`;
+    if (bedNum) return `Bed ${bedNum}`;
+    if (wardName) return `Ward: ${wardName}`;
+    return "Bed Unassigned";
   };
 
   const getDaysAdmitted = (p: any) => {
-    const created = new Date(p.createdAt);
+    const adm = admissionsList?.find((a: any) => (a.patient?._id || a.patient) === p._id);
+    const dateStr = adm?.admissionDate || p.createdAt;
+    const created = new Date(dateStr);
     const diff = Math.floor((new Date().getTime() - created.getTime()) / (1000 * 3600 * 24));
     return Math.max(1, diff);
   };
 
   const getPatientDiagnosis = (p: any) => {
-    return p?.medicalHistory?.[0]?.diagnosis || "Observation / Check-up";
+    const adm = admissionsList?.find((a: any) => (a.patient?._id || a.patient) === p._id);
+    return adm?.primaryDiagnosis || adm?.admissionReason || p?.medicalHistory?.[0]?.diagnosis || "Observation / Check-up";
   };
 
   const renderTimelineIcon = (type: string) => {
@@ -555,12 +579,12 @@ export function IPManagementPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-200 pb-px">
+      <div className="flex gap-2 border-b border-slate-200 pb-px overflow-x-auto max-w-full scrollbar-none flex-nowrap shrink-0">
         {TABS.map((tab, idx) => (
           <button
             key={tab}
             onClick={() => setActiveTab(idx)}
-            className={`border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
+            className={`border-b-2 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap ${
               activeTab === idx
                 ? "border-navy-700 text-navy-700"
                 : "border-transparent text-slate-500 hover:text-slate-700"
@@ -606,7 +630,7 @@ export function IPManagementPage() {
                           <span className="text-sm font-semibold text-slate-800 truncate">{p.name}</span>
                           <Badge tone={STATUS_BADGE[pStatus].tone}>{STATUS_BADGE[pStatus].label}</Badge>
                         </div>
-                        <p className="text-xs text-slate-400">Bed: C-{p.age || "—"} · Day {getDaysAdmitted(p)}</p>
+                        <p className="text-xs text-slate-400">{getBedDisplay(p)} · Day {getDaysAdmitted(p)}</p>
                         <p className="text-xs text-slate-500 truncate mt-1">{getPatientDiagnosis(p)}</p>
                       </div>
                     </div>
@@ -624,10 +648,15 @@ export function IPManagementPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3">
                       <h2 className="text-lg font-bold text-slate-800">{selectedPatient.name}</h2>
-                      <Badge tone={selectedPatient.allergies?.toLowerCase().includes("penicillin") ? "danger" : "success"}>Attending: {formatAttending(selectedPatient)}</Badge>
+                      <Badge tone={selectedPatient.allergies?.toLowerCase().includes("penicillin") ? "danger" : "success"}>
+                        Attending: {getAttendingDoctor(selectedPatient, admissionDetails)}
+                      </Badge>
                     </div>
-                    <p className="text-xs text-slate-400">
-                      {selectedPatient.age} yrs · {selectedPatient.gender} · Blood Group: {selectedPatient.bloodGroup || "—"} · Bed C-{selectedPatient.age || "—"}
+                    <p className="text-xs text-slate-400 mt-1">
+                      {selectedPatient.age || "—"} yrs · {selectedPatient.gender || "—"} · Blood Group: {selectedPatient.bloodGroup || admissionDetails?.patient?.bloodGroup || "—"} · Phone: {selectedPatient.phone || admissionDetails?.patient?.phone || "—"}
+                    </p>
+                    <p className="text-xs font-medium text-navy-700 mt-0.5 font-mono">
+                      {getBedDisplay(selectedPatient, admissionDetails)} {selectedPatient.uhid ? `· UHID: ${selectedPatient.uhid}` : ""}
                     </p>
                   </div>
                 </Card>
@@ -934,7 +963,7 @@ export function IPManagementPage() {
                             {p.name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-slate-800">{p.name} <span className="text-slate-400 font-normal">· Bed C-{p.age || "—"} · Day {getDaysAdmitted(adm)}</span></p>
+                            <p className="text-sm font-semibold text-slate-800">{p.name} <span className="text-slate-400 font-normal">· {getBedDisplay(p, adm)} · Day {getDaysAdmitted(adm)}</span></p>
                             <p className="text-xs text-slate-500">{getPatientDiagnosis(p)}</p>
                           </div>
                           <span className="ml-auto">
@@ -969,7 +998,7 @@ export function IPManagementPage() {
                       <div className="flex items-center justify-between mb-3">
                         <div>
                           <h3 className="text-sm font-semibold text-slate-800">{p.name} — Treatment Plan</h3>
-                          <p className="text-xs text-slate-500">{getPatientDiagnosis(p)} · Attending: {formatAttending(p)}</p>
+                          <p className="text-xs text-slate-500">{getPatientDiagnosis(p)} · Attending: {getAttendingDoctor(p, adm)}</p>
                         </div>
                         <Badge tone={STATUS_BADGE[pStatus].tone}>{STATUS_BADGE[pStatus].label}</Badge>
                       </div>
@@ -1188,7 +1217,7 @@ export function IPManagementPage() {
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <h3 className="text-sm font-semibold text-slate-800">Discharge Summary — {p.name}</h3>
-                        <p className="text-xs text-slate-500">Admitted {getDaysAdmitted(p)} days ago · Bed C-{p.age || "—"}</p>
+                        <p className="text-xs text-slate-500">Admitted {getDaysAdmitted(p)} days ago · {getBedDisplay(p)}</p>
                       </div>
                       {isFinalized ? (
                         <span className="flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-700">

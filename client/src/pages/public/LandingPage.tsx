@@ -3,11 +3,12 @@ import { Link } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import DepthParallaxWords from "../../components/ui/DepthParallaxWords";
-import GlowHoverCard from "../../components/ui/GlowHoverCard";
+import GlowHover, { GlowHoverCard, GlowHoverItem } from "../../components/ui/GlowHoverCard";
 import SocialSelector from "../../components/ui/SocialSelector";
 import GooeyPopover from "../../components/ui/GooeyPopover";
 import { MotionAccordion } from "../../components/ui/MotionAccordion";
 import { DepartmentTiltCard } from "../../components/ui/DepartmentTiltCard";
+import { AnimatedList } from "../../components/ui/AnimatedList";
 import {
   Building2,
   Stethoscope,
@@ -95,11 +96,69 @@ export function LandingPage() {
   const faqs = hospital?.faqs || [];
   const displayFaqs = faqs;
 
-  const socialLinks = hospital?.socialLinks || {
-    facebook: "https://facebook.com",
-    twitter: "https://twitter.com",
-    linkedin: "https://linkedin.com",
-    instagram: "https://instagram.com"
+  const formatSocialUrl = (url?: any): string | null => {
+    if (!url) return null;
+    let str = "";
+    if (typeof url === "string") {
+      str = url.trim();
+    } else if (typeof url === "number") {
+      str = String(url).trim();
+    }
+    if (!str || str === "[object Object]" || str === "undefined" || str === "null") return null;
+    if (/^https?:\/\//i.test(str)) return str;
+    if (/^\/\//.test(str)) return `https:${str}`;
+    return `https://${str}`;
+  };
+
+  const getAdminSocialLink = (keyNames: string[], defaultFallback: string): string => {
+    if (!hospital?.socialLinks) return defaultFallback;
+    const links = hospital.socialLinks as any;
+
+    // 1. Check Map get interface if present
+    if (typeof links?.get === "function") {
+      for (const key of keyNames) {
+        const val = links.get(key);
+        const formatted = formatSocialUrl(val);
+        if (formatted) return formatted;
+      }
+    }
+
+    // 2. Convert to plain JS object if Mongoose document or Map
+    let plainObj: Record<string, any> = links;
+    if (typeof links?.toJSON === "function") {
+      plainObj = links.toJSON();
+    } else if (typeof links?.toObject === "function") {
+      plainObj = links.toObject();
+    }
+
+    if (typeof plainObj === "object" && plainObj !== null) {
+      // Direct property lookup
+      for (const key of keyNames) {
+        if (key in plainObj) {
+          const formatted = formatSocialUrl(plainObj[key]);
+          if (formatted) return formatted;
+        }
+      }
+      // Case-insensitive lookup across plainObj keys
+      const keys = Object.keys(plainObj);
+      for (const keyName of keyNames) {
+        const matchKey = keys.find((k) => k.toLowerCase() === keyName.toLowerCase());
+        if (matchKey) {
+          const formatted = formatSocialUrl(plainObj[matchKey]);
+          if (formatted) return formatted;
+        }
+      }
+    }
+
+    return defaultFallback;
+  };
+
+  const socialLinks = {
+    facebook: getAdminSocialLink(["facebook", "Facebook", "fb", "FB", "facebookUrl"], "https://facebook.com"),
+    twitter: getAdminSocialLink(["twitter", "Twitter", "x", "X", "twitterUrl", "xUrl"], "https://twitter.com"),
+    linkedin: getAdminSocialLink(["linkedin", "LinkedIn", "linkedIn", "linkedinUrl"], "https://linkedin.com"),
+    youtube: getAdminSocialLink(["youtube", "YouTube", "youTube", "youtubeUrl", "yt", "YT", "google", "Google"], "https://youtube.com"),
+    instagram: getAdminSocialLink(["instagram", "Instagram", "insta", "Insta", "instagramUrl"], "https://instagram.com")
   };
 
   const heroTitle = hospital?.heroTitle || "Your Health & Wellness is Our Deepest Commitment";
@@ -134,13 +193,27 @@ export function LandingPage() {
   };
 
   // --- QUERY DEPARTMENTS & DOCTORS ---
-  const { data: departments = [] } = useQuery({
+  const { data: rawDepartments = [] } = useQuery({
     queryKey: ["public", "departments"],
     queryFn: async () => {
       const res = await api.get("/hospitals/public/departments");
       return res.data.data.departments as any[];
     }
   });
+
+  // Deduplicate departments array by ID and trim/lowercased name to remove any duplicates
+  const departments = (rawDepartments || []).reduce((acc: any[], dept: any) => {
+    if (!dept) return acc;
+    const isDuplicate = acc.some(
+      (existing) =>
+        (dept._id && existing._id === dept._id) ||
+        (existing.name && dept.name && existing.name.trim().toLowerCase() === dept.name.trim().toLowerCase())
+    );
+    if (!isDuplicate) {
+      acc.push(dept);
+    }
+    return acc;
+  }, []);
 
   const { data: doctors = [] } = useQuery({
     queryKey: ["public", "doctors"],
@@ -165,6 +238,53 @@ export function LandingPage() {
     }
     return acc;
   }, []);
+
+  // Construct GlowHover items for Services section
+  const serviceHoverItems: GlowHoverItem[] = (departments || [])
+    .filter((dept: any) => (dept.services || []).length > 0)
+    .map((dept: any) => {
+      const deptServices = dept.services || [];
+      return {
+        id: dept._id || `dept-service-${dept.name}`,
+        element: (
+          <div className="grid min-w-[260px] flex-1 grid-rows-[auto_auto_1fr] items-start gap-4 rounded-2xl border border-slate-200/80 bg-white p-6 text-slate-800 shadow-sm hover:shadow-md transition-all">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy-50 text-navy-700 font-bold shadow-xs">
+                  <Stethoscope className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="font-extrabold text-base text-slate-900">{dept.name}</h2>
+                  <span className="block text-[10px] font-bold tracking-wider text-navy-700 uppercase">
+                    {dept.specialization || "Clinical Division"}
+                  </span>
+                </div>
+              </div>
+              <p className="text-slate-500 text-xs leading-relaxed mt-2">
+                {dept.description || `Specialized diagnostic checkups and treatment protocols provided by ${dept.name} medical team.`}
+              </p>
+            </div>
+            <ul className="space-y-2 text-xs leading-relaxed text-slate-700 pt-3 border-t border-slate-100">
+              {deptServices.map((srv: string, idx: number) => (
+                <li key={idx} className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                  <span className="font-medium text-slate-700">{srv}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4 self-end w-full">
+              <button
+                onClick={() => changeTab("doctors")}
+                className="w-full rounded-xl bg-navy-700 py-2.5 px-4 text-center font-bold text-xs text-white shadow-sm hover:bg-navy-800 transition-colors flex items-center justify-center gap-2"
+              >
+                <span>Book Doctor Appointment</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        ),
+      };
+    });
 
   // --- BOOKING FORM STATE ---
   const [bookingForm, setBookingForm] = useState({
@@ -428,7 +548,7 @@ export function LandingPage() {
             </Link>
             <button
               onClick={() => changeTab("doctors")}
-              className="blob-btn blob-btn--sm"
+              className="blob-btn blob-btn--sm blob-btn--reverse"
             >
               <span className="relative z-10 inline-flex items-center gap-1.5 whitespace-nowrap">
                 Book Appointment
@@ -523,7 +643,7 @@ export function LandingPage() {
                   <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row lg:justify-start">
                     <button
                       onClick={() => changeTab("doctors")}
-                      className="blob-btn w-full sm:w-auto"
+                      className="blob-btn blob-btn--reverse w-full sm:w-auto"
                     >
                       <span className="relative z-10 inline-flex items-center gap-2">
                         Book Appointment Online
@@ -621,28 +741,22 @@ export function LandingPage() {
                   </p>
                 </div>
 
-                <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-                  {whyChooseUs.slice(0, 4).map((item, idx) => {
-                    const icons = [Heart, Shield, Clock3, Award];
-                    const IconComp = icons[idx] || Heart;
-                    return (
-                      <GlowHoverCard key={idx} className="w-full h-full" glowColor="rgba(59, 130, 246, 0.08)" borderColor="rgba(37, 99, 235, 0.4)">
-                        <div className="inline-flex rounded-xl bg-navy-50 p-3 text-navy-700">
-                          <IconComp className="h-5 w-5" />
-                        </div>
-                        <h3 className="text-base font-bold text-slate-850">
-                          <DepthParallaxWords delay={100} stagger={30}>
-                            {item.title}
-                          </DepthParallaxWords>
-                        </h3>
-                        <p className="text-xs text-slate-600 leading-relaxed">
-                          <DepthParallaxWords delay={200} stagger={15}>
-                            {item.desc}
-                          </DepthParallaxWords>
-                        </p>
-                      </GlowHoverCard>
-                    );
-                  })}
+                <div className="mt-14">
+                  <AnimatedList
+                    items={whyChooseUs.slice(0, 4).map((item, idx) => {
+                      const icons = [<Heart className="h-5 w-5" />, <Shield className="h-5 w-5" />, <Clock3 className="h-5 w-5" />, <Award className="h-5 w-5" />];
+                      const colors = ["#0505a9", "#0505a9", "#0505a9", "#0505a9"];
+                      const badges = ["Compassion", "Certified", "24/7 OPD", "Top Rated"];
+                      return {
+                        id: `trust-card-${idx}`,
+                        title: item.title,
+                        description: item.desc,
+                        icon: icons[idx] || <Heart className="h-5 w-5" />,
+                        color: colors[idx] || "#0505a9",
+                        badge: badges[idx] || "Verified",
+                      };
+                    })}
+                  />
                 </div>
               </div>
             </section>
@@ -919,49 +1033,123 @@ export function LandingPage() {
             <div className="mx-auto max-w-4xl space-y-16">
 
               <div className="text-center space-y-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-navy-700">Our Institution</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-navy-700">
+                  <DepthParallaxWords delay={60} stagger={30}>Our Institution</DepthParallaxWords>
+                </span>
                 <h1 className="text-4xl font-extrabold text-slate-900">
-                  About Our Hospital
+                  <DepthParallaxWords delay={100} stagger={60}>About Our Hospital</DepthParallaxWords>
                 </h1>
                 <p className="text-base text-slate-600 max-w-xl mx-auto leading-relaxed">
-                  Learn about our clinical legacy, our patient healthcare policies, and the guiding core values driving our medical teams.
+                  <DepthParallaxWords delay={180} stagger={18}>
+                    Learn about our clinical legacy, our patient healthcare policies, and the guiding core values driving our medical teams.
+                  </DepthParallaxWords>
                 </p>
               </div>
 
-              {/* Overviews */}
-              <div className="bg-slate-50 rounded-2xl p-8 border border-slate-200 space-y-4">
-                <h3 className="text-lg font-bold text-slate-850">Hospital Overview</h3>
-                <p className="text-sm leading-relaxed text-slate-650">
+              {/* Hospital Overview */}
+              <div className="bg-slate-50 rounded-2xl p-8 border border-slate-200 space-y-4 shadow-xs">
+                <h3 className="text-xl font-extrabold text-slate-900">
+                  <DepthParallaxWords delay={80} stagger={30}>Hospital Overview</DepthParallaxWords>
+                </h3>
+                <p className="text-sm leading-relaxed text-slate-650 font-medium">
                   {aboutText}
                 </p>
               </div>
 
               {/* Mission/Vision/Values Deck */}
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-850 mb-3">Our Mission</h3>
-                    <p className="text-xs leading-relaxed text-slate-600">
+              <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+                {/* Our Mission */}
+                <article className="smooth-about-card group">
+                  <div className="card__img-wrapper">
+                    <div className="card__info-hover">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-navy-700 bg-navy-50/90 backdrop-blur-xs px-2.5 py-1 rounded-full border border-navy-100">
+                        Pillar 01
+                      </span>
+                      <div className="flex items-center gap-1 text-[11px] font-bold text-navy-700 bg-white/90 backdrop-blur-xs px-2.5 py-1 rounded-full shadow-xs">
+                        <Clock3 className="h-3.5 w-3.5 text-navy-600" />
+                        <span>24/7 OPD</span>
+                      </div>
+                    </div>
+                    <div
+                      className="card__img--hover"
+                      style={{
+                        backgroundImage:
+                          "url('https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=800&q=80')",
+                      }}
+                    />
+                  </div>
+                  <div className="card__info">
+                    <span className="card__category">Clinical Care</span>
+                    <h3 className="card__title text-lg font-black text-slate-900">
+                      <DepthParallaxWords delay={80} stagger={30}>Our Mission</DepthParallaxWords>
+                    </h3>
+                    <p className="text-xs leading-relaxed text-slate-600 font-medium">
                       {missionText}
                     </p>
                   </div>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-850 mb-3">Our Vision</h3>
-                    <p className="text-xs leading-relaxed text-slate-600">
+                </article>
+
+                {/* Our Vision */}
+                <article className="smooth-about-card group">
+                  <div className="card__img-wrapper">
+                    <div className="card__info-hover">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-navy-700 bg-navy-50/90 backdrop-blur-xs px-2.5 py-1 rounded-full border border-navy-100">
+                        Pillar 02
+                      </span>
+                      <div className="flex items-center gap-1 text-[11px] font-bold text-navy-700 bg-white/90 backdrop-blur-xs px-2.5 py-1 rounded-full shadow-xs">
+                        <Award className="h-3.5 w-3.5 text-navy-600" />
+                        <span>Certified</span>
+                      </div>
+                    </div>
+                    <div
+                      className="card__img--hover"
+                      style={{
+                        backgroundImage:
+                          "url('https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=800&q=80')",
+                      }}
+                    />
+                  </div>
+                  <div className="card__info">
+                    <span className="card__category">Innovation</span>
+                    <h3 className="card__title text-lg font-black text-slate-900">
+                      <DepthParallaxWords delay={80} stagger={30}>Our Vision</DepthParallaxWords>
+                    </h3>
+                    <p className="text-xs leading-relaxed text-slate-600 font-medium">
                       {visionText}
                     </p>
                   </div>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-850 mb-3">Our Values</h3>
-                    <p className="text-xs leading-relaxed text-slate-600">
+                </article>
+
+                {/* Our Values */}
+                <article className="smooth-about-card group">
+                  <div className="card__img-wrapper">
+                    <div className="card__info-hover">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-navy-700 bg-navy-50/90 backdrop-blur-xs px-2.5 py-1 rounded-full border border-navy-100">
+                        Pillar 03
+                      </span>
+                      <div className="flex items-center gap-1 text-[11px] font-bold text-rose-600 bg-white/90 backdrop-blur-xs px-2.5 py-1 rounded-full shadow-xs">
+                        <Heart className="h-3.5 w-3.5 text-rose-500 fill-rose-500" />
+                        <span>Patient First</span>
+                      </div>
+                    </div>
+                    <div
+                      className="card__img--hover"
+                      style={{
+                        backgroundImage:
+                          "url('https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=800&q=80')",
+                      }}
+                    />
+                  </div>
+                  <div className="card__info">
+                    <span className="card__category">Integrity</span>
+                    <h3 className="card__title text-lg font-black text-slate-900">
+                      <DepthParallaxWords delay={80} stagger={30}>Our Values</DepthParallaxWords>
+                    </h3>
+                    <p className="text-xs leading-relaxed text-slate-600 font-medium">
                       {valuesText}
                     </p>
                   </div>
-                </div>
+                </article>
               </div>
 
               {/* FAQs accordion */}
@@ -992,11 +1180,17 @@ export function LandingPage() {
           <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-white">
             <div className="mx-auto max-w-[1600px] space-y-12">
               <div className="text-center space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-navy-700">Clinical Specialties</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-navy-700">
+                  <DepthParallaxWords delay={60} stagger={30}>Clinical Specialties</DepthParallaxWords>
+                </span>
                 <h1 className="text-4xl font-extrabold text-slate-900">
-                  Medical Departments
+                  <DepthParallaxWords delay={100} stagger={60}>Medical Departments</DepthParallaxWords>
                 </h1>
-                <p className="text-slate-600 text-sm max-w-md mx-auto">Discover our active clinical branches, operating wards, head doctors, and specialized consulting fees.</p>
+                <p className="text-slate-600 text-sm max-w-md mx-auto">
+                  <DepthParallaxWords delay={180} stagger={18}>
+                    Discover our active clinical branches, operating wards, head doctors, and specialized consulting fees.
+                  </DepthParallaxWords>
+                </p>
               </div>
 
               {/* Departments Grid with Tilt Card Effect */}
@@ -1030,12 +1224,16 @@ export function LandingPage() {
           <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-white">
             <div className="mx-auto max-w-[1600px] space-y-10">
               <div className="text-center space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-navy-700">Clinical Practitioners</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-navy-700">
+                  <DepthParallaxWords delay={60} stagger={30}>Clinical Practitioners</DepthParallaxWords>
+                </span>
                 <h1 className="text-4xl font-extrabold text-slate-900">
-                  Meet Our Specialist Doctors
+                  <DepthParallaxWords delay={100} stagger={60}>Meet Our Specialist Doctors</DepthParallaxWords>
                 </h1>
                 <p className="text-slate-600 text-sm max-w-md mx-auto">
-                  Find expert doctors across key medical departments and schedule online OPD consultations directly.
+                  <DepthParallaxWords delay={180} stagger={18}>
+                    Find expert doctors across key medical departments and schedule online OPD consultations directly.
+                  </DepthParallaxWords>
                 </p>
               </div>
 
@@ -1128,9 +1326,21 @@ export function LandingPage() {
                       <div className="pt-6 border-t border-slate-100 mt-6">
                         <Link
                           to={`/doctors/${doc._id || doc.id}`}
-                          className="w-full flex items-center justify-center gap-2 rounded-xl bg-navy-700 py-3 text-xs font-bold text-white shadow-sm hover:bg-navy-850 active:scale-[0.98] transition-all duration-200"
+                          className="skew-cta-btn group/cta"
                         >
-                          <Calendar className="h-4 w-4" /> Book Appointment
+                          <span className="cta-text">
+                            <Calendar className="h-4 w-4" />
+                            <span>Book Appointment</span>
+                          </span>
+                          <span className="cta-arrow">
+                            <svg width="42px" height="24px" viewBox="0 0 66 43" version="1.1" xmlns="http://www.w3.org/2000/svg">
+                              <g id="arrow" stroke="none" strokeWidth="1" fill="none" fillRule="evenodd">
+                                <path className="one" d="M40.1543933,3.89485454 L43.9763149,0.139296592 C44.1708311,-0.0518420739 44.4826329,-0.0518571125 44.6771675,0.139262789 L65.6916134,20.7848311 C66.0855801,21.1718824 66.0911863,21.8050225 65.704135,22.1989893 C65.7000188,22.2031791 65.6958657,22.2073326 65.6916762,22.2114492 L44.677098,42.8607841 C44.4825957,43.0519059 44.1708242,43.0519358 43.9762853,42.8608513 L40.1545186,39.1069479 C39.9575152,38.9134427 39.9546793,38.5968729 40.1481845,38.3998695 C40.1502893,38.3977268 40.1524132,38.395603 40.1545562,38.3934985 L56.9937789,21.8567812 C57.1908028,21.6632968 57.193672,21.3467273 57.0001876,21.1497035 C56.9980647,21.1475418 56.9959223,21.1453995 56.9937605,21.1432767 L40.1545208,4.60825197 C39.9574869,4.41477773 39.9546013,4.09820839 40.1480756,3.90117456 C40.1501626,3.89904911 40.1522686,3.89694235 40.1543933,3.89485454 Z" fill="#FFFFFF"></path>
+                                <path className="two" d="M20.1543933,3.89485454 L23.9763149,0.139296592 C24.1708311,-0.0518420739 24.4826329,-0.0518571125 24.6771675,0.139262789 L45.6916134,20.7848311 C46.0855801,21.1718824 46.0911863,21.8050225 45.704135,22.1989893 C45.7000188,22.2031791 45.6958657,22.2073326 45.6916762,22.2114492 L24.677098,42.8607841 C24.4825957,43.0519059 24.1708242,43.0519358 23.9762853,42.8608513 L20.1545186,39.1069479 C19.9575152,38.9134427 19.9546793,38.5968729 20.1481845,38.3998695 C20.1502893,38.3977268 20.1524132,38.395603 20.1545562,38.3934985 L36.9937789,21.8567812 C37.1908028,21.6632968 37.193672,21.3467273 37.0001876,21.1497035 C37.6980647,21.1475418 37.6959223,21.1453995 36.9937605,21.1432767 L20.1545208,4.60825197 C19.9574869,4.41477773 19.9546013,4.09820839 20.1480756,3.90117456 C20.1501626,3.89904911 20.1522686,3.89694235 20.1543933,3.89485454 Z" fill="#FFFFFF"></path>
+                                <path className="three" d="M0.154393339,3.89485454 L3.97631488,0.139296592 C4.17083111,-0.0518420739 4.48263286,-0.0518571125 4.67716753,0.139262789 L25.6916134,20.7848311 C26.0855801,21.1718824 26.0911863,21.8050225 25.704135,22.1989893 C25.7000188,22.2031791 25.6958657,22.2073326 25.6916762,22.2114492 L4.67709797,42.8607841 C4.48259567,43.0519059 4.17082418,43.0519358 3.97628526,42.8608513 L0.154518591,39.1069479 C-0.0424848215,38.9134427 -0.0453206733,38.5968729 0.148184538,38.3998695 C0.150289256,38.3977268 0.152413239,38.395603 0.154556228,38.3934985 L16.9937789,21.8567812 C17.1908028,21.6632968 17.193672,21.3467273 17.0001876,21.1497035 C16.9980647,21.1475418 16.9959223,21.1453995 16.9937605,21.1432767 L0.15452076,4.60825197 C-0.0425130651,4.41477773 -0.0453986756,4.09820839 0.148075568,3.90117456 C0.150162624,3.89904911 0.152268631,3.89694235 0.154393339,3.89485454 Z" fill="#FFFFFF"></path>
+                              </g>
+                            </svg>
+                          </span>
                         </Link>
                       </div>
                     </div>
@@ -1148,104 +1358,35 @@ export function LandingPage() {
         )}
         {/* --- VIEW: SERVICES --- */}
         {activeTab === "services" && (
-          <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-slate-50 min-h-screen">
-            <style>{`
-              .services-perspective-container {
-                perspective: 1200px;
-                transform-style: preserve-3d;
-              }
-
-              .service-3d-wrapper {
-                perspective: 1200px;
-                transform-style: preserve-3d;
-                height: 100%;
-              }
-
-              .service-3d-card {
-                position: relative;
-                height: 100%;
-                transform-style: preserve-3d;
-                transform: rotateX(42deg) translateY(-25px) translateZ(-35px);
-                transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.4s ease;
-                box-shadow: 0px 25px 50px -10px rgba(15, 23, 42, 0.25);
-                will-change: transform, box-shadow;
-              }
-
-              .service-3d-wrapper:hover .service-3d-card {
-                transform: rotateX(0deg) translateY(0) translateZ(0) scale(1.04);
-                box-shadow: 0px 20px 45px -5px rgba(37, 99, 235, 0.3);
-                border-color: rgba(37, 99, 235, 0.6) !important;
-              }
-            `}</style>
-            <div className="mx-auto max-w-[1600px] space-y-16">
-              <div className="text-center space-y-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-50 border border-blue-200/60 px-3.5 py-1 rounded-full inline-block">
-                  Clinical Catalog
+          <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-white">
+            <div className="mx-auto max-w-[1600px] space-y-12">
+              <div className="text-center space-y-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-navy-700">
+                  <DepthParallaxWords delay={60} stagger={30}>Clinical Catalog</DepthParallaxWords>
                 </span>
-                <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">
-                  <span className="text-blue-600">Clin</span>
-                  <span className="text-sky-500">ical</span>{" "}
-                  <span className="text-emerald-500">Serv</span>
-                  <span className="text-indigo-600">ices</span>{" "}
-                  <span className="text-purple-600">&</span>{" "}
-                  <span className="text-rose-500">Cata</span>
-                  <span className="text-amber-500">log</span>
+                <h1 className="text-4xl font-extrabold text-slate-900">
+                  <DepthParallaxWords delay={100} stagger={60}>Services Offered</DepthParallaxWords>
                 </h1>
                 <p className="text-slate-600 text-sm max-w-md mx-auto">
-                  A comprehensive listing of diagnostic and clinical services aggregated dynamically from our operating specialties.
+                  <DepthParallaxWords delay={180} stagger={18}>
+                    A comprehensive listing of diagnostic and clinical services aggregated dynamically from our operating specialties.
+                  </DepthParallaxWords>
                 </p>
               </div>
 
-              {/* Grouped Services with 3D Perspective */}
-              <div className="services-perspective-container grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-3 pt-8 pb-16">
-                {departments.map((dept, cardIdx) => {
-                  const deptServices = dept.services || [];
-                  if (deptServices.length === 0) return null;
-
-                  const cardGradients = [
-                    "from-amber-500/10 via-orange-500/5 to-white border-amber-200/60",
-                    "from-indigo-500/10 via-purple-500/5 to-white border-indigo-200/60",
-                    "from-rose-500/10 via-red-500/5 to-white border-rose-200/60",
-                    "from-emerald-500/10 via-teal-500/5 to-white border-emerald-200/60",
-                    "from-cyan-500/10 via-blue-500/5 to-white border-cyan-200/60",
-                    "from-fuchsia-500/10 via-pink-500/5 to-white border-fuchsia-200/60",
-                  ];
-                  const gradientClass = cardGradients[cardIdx % cardGradients.length];
-
-                  return (
-                    <div key={dept._id} className="service-3d-wrapper">
-                      <div
-                        className={`service-3d-card rounded-2xl border bg-gradient-to-br ${gradientClass} p-7 space-y-5`}
-                      >
-                        <div className="flex items-center gap-3.5">
-                          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
-                            <Stethoscope className="h-6 w-6" />
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-extrabold text-slate-900">{dept.name}</h3>
-                            <span className="block text-[10px] font-bold text-blue-600 uppercase tracking-wider">{dept.specialization || "Clinical"}</span>
-                          </div>
-                        </div>
-                        <hr className="border-slate-200/70" />
-                        <ul className="space-y-3 text-xs font-semibold text-slate-700">
-                          {deptServices.map((srv: string, idx: number) => (
-                            <li key={idx} className="flex items-center gap-2.5">
-                              <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                              <span>{srv}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {dynamicServices.length === 0 && (
-                  <div className="col-span-3 text-center py-20 text-slate-400 text-xs">
-                    No services have been defined in clinical department configurations.
-                  </div>
-                )}
-              </div>
+              {/* Grouped Services with Glow Cursor Spotlight Effect */}
+              {serviceHoverItems.length > 0 ? (
+                <GlowHover
+                  className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3"
+                  items={serviceHoverItems}
+                  maskSize={450}
+                  glowIntensity={0.12}
+                />
+              ) : (
+                <div className="text-center py-20 text-slate-400 text-xs">
+                  No services have been defined in clinical department configurations.
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1255,12 +1396,16 @@ export function LandingPage() {
           <div className="transition-all duration-300 ease-in-out py-16 px-6 lg:px-12 bg-white">
             <div className="mx-auto max-w-[1600px] space-y-12">
               <div className="text-center space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-navy-700">Health & Clinical Insights</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-navy-700">
+                  <DepthParallaxWords delay={60} stagger={30}>Health & Clinical Insights</DepthParallaxWords>
+                </span>
                 <h1 className="text-4xl font-extrabold text-slate-900">
-                  Hospital News & Articles
+                  <DepthParallaxWords delay={100} stagger={60}>Hospital News & Articles</DepthParallaxWords>
                 </h1>
                 <p className="text-slate-600 text-sm max-w-md mx-auto">
-                  Stay informed with health recommendations, medical breakthroughs, and operational updates from our practitioners.
+                  <DepthParallaxWords delay={180} stagger={18}>
+                    Stay informed with health recommendations, medical breakthroughs, and operational updates from our practitioners.
+                  </DepthParallaxWords>
                 </p>
               </div>
 
@@ -1331,12 +1476,16 @@ export function LandingPage() {
               {/* Contact info */}
               <div className="lg:col-span-5 space-y-8">
                 <div>
-                  <span className="text-xs font-bold uppercase tracking-wider text-navy-700">Contact Us</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-navy-700">
+                    <DepthParallaxWords delay={60} stagger={30}>Contact Us</DepthParallaxWords>
+                  </span>
                   <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">
-                    Get in Touch
+                    <DepthParallaxWords delay={100} stagger={60}>Get in Touch</DepthParallaxWords>
                   </h1>
                   <p className="mt-4 text-slate-655 text-sm">
-                    Have any operational queries, general concerns, or booking assistance requests? Contact us directly and our medical desk will coordinate with you.
+                    <DepthParallaxWords delay={180} stagger={18}>
+                      Have any operational queries, general concerns, or booking assistance requests? Contact us directly and our medical desk will coordinate with you.
+                    </DepthParallaxWords>
                   </p>
                 </div>
 
@@ -1557,7 +1706,9 @@ export function LandingPage() {
 
           {/* Quick links */}
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-455">Quick Links</div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-455">
+              <DepthParallaxWords delay={60} stagger={30}>Quick Links</DepthParallaxWords>
+            </div>
             <ul className="mt-4 space-y-2.5 text-xs font-semibold text-slate-600">
               <li>
                 <button onClick={() => changeTab("home")} className="hover:text-navy-700 text-left">
@@ -1579,7 +1730,9 @@ export function LandingPage() {
 
           {/* Hospital Links */}
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-455">Hospital</div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-455">
+              <DepthParallaxWords delay={60} stagger={30}>Hospital</DepthParallaxWords>
+            </div>
             <ul className="mt-4 space-y-2.5 text-xs font-semibold text-slate-600">
               <li>
                 <button onClick={() => changeTab("about")} className="hover:text-navy-700 text-left">
@@ -1611,7 +1764,9 @@ export function LandingPage() {
 
           {/* Legal links */}
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-455">Legal & Policies</div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-455">
+              <DepthParallaxWords delay={60} stagger={30}>Legal & Policies</DepthParallaxWords>
+            </div>
             <ul className="mt-4 space-y-2.5 text-xs font-semibold text-slate-600">
               <li>
                 <button onClick={() => changeTab("privacy")} className="hover:text-navy-700 text-left">
@@ -1631,22 +1786,55 @@ export function LandingPage() {
             </ul>
           </div>
 
-          {/* Social Media Selector (Beside Legal & Policies) */}
-          <div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-455">Connect With Us</div>
-            <div className="mt-4">
-              <SocialSelector handle={hospitalName.toLowerCase().replace(/[^a-z0-9]/g, "") || "sunrisehospital"} className="my-0" />
+          {/* Social Media Section with 3D Flip & Background Fill Effect */}
+          <div className="col-span-1 min-w-[240px] -ml-2 sm:-ml-6 lg:-ml-8">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-455 mb-4">
+              <DepthParallaxWords delay={60} stagger={30}>Connect With Us</DepthParallaxWords>
             </div>
+            <ul className="social-hover-list flex-nowrap">
+              {socialLinks.facebook && (
+                <li className="facebook-item">
+                  <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" title="Facebook">
+                    <i className="fab fa-facebook-f icon"></i>
+                  </a>
+                </li>
+              )}
+              {socialLinks.twitter && (
+                <li className="twitter-item">
+                  <a href={socialLinks.twitter} target="_blank" rel="noopener noreferrer" title="Twitter / X">
+                    <i className="fab fa-twitter icon"></i>
+                  </a>
+                </li>
+              )}
+              {socialLinks.linkedin && (
+                <li className="linkedin-item">
+                  <a href={socialLinks.linkedin} target="_blank" rel="noopener noreferrer" title="LinkedIn">
+                    <i className="fab fa-linkedin-in icon"></i>
+                  </a>
+                </li>
+              )}
+              {socialLinks.youtube && (
+                <li className="youtube-item">
+                  <a href={socialLinks.youtube} target="_blank" rel="noopener noreferrer" title="YouTube">
+                    <i className="fab fa-youtube icon"></i>
+                  </a>
+                </li>
+              )}
+              {socialLinks.instagram && (
+                <li className="instagram-item">
+                  <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" title="Instagram">
+                    <i className="fab fa-instagram icon"></i>
+                  </a>
+                </li>
+              )}
+            </ul>
           </div>
         </div>
 
         <div className="mx-auto mt-12 max-w-[1600px] border-t border-slate-150 pt-6 text-center text-xs text-slate-455 flex flex-col sm:flex-row justify-between items-center gap-4">
           <span>© {new Date().getFullYear()} {hospitalName}. All rights reserved.</span>
-          <div className="flex gap-4 font-semibold text-slate-500">
-            {socialLinks.facebook && <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="hover:text-navy-700">Facebook</a>}
-            {socialLinks.twitter && <a href={socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="hover:text-navy-700">Twitter</a>}
-            {socialLinks.linkedin && <a href={socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="hover:text-navy-700">LinkedIn</a>}
-            {socialLinks.instagram && <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="hover:text-navy-700">Instagram</a>}
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] font-medium text-slate-500">Follow us on social media</span>
           </div>
         </div>
       </footer>

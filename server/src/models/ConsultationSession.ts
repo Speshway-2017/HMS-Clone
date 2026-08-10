@@ -6,7 +6,10 @@ const draftMedicationSchema = new Schema({
   dosage: { type: String, default: "" },
   frequency: { type: String, default: "" },
   duration: { type: String, default: "" },
+  quantity: { type: Number, default: 1 },
   instructions: { type: String, default: "" },
+  status: { type: String, default: "Pending" },
+  prescribedAt: { type: Date, default: Date.now },
   morning: { type: Boolean, default: false },
   afternoon: { type: Boolean, default: false },
   night: { type: Boolean, default: false },
@@ -69,6 +72,18 @@ const consultationSessionSchema = new Schema(
       specialInstructions: { type: String, default: "" },
       recommended: { type: Boolean, default: false },
     },
+
+    followUpDate: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
+    completedBy: { type: Schema.Types.ObjectId, ref: "Doctor", default: null },
+
+    history: [
+      {
+        action: { type: String, required: true },
+        timestamp: { type: Date, default: Date.now },
+        details: { type: String, default: "" },
+      },
+    ],
   },
   { timestamps: true }
 );

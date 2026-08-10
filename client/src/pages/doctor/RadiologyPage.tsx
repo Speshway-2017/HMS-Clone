@@ -35,11 +35,24 @@ export function RadiologyPage() {
   const isLoading = patientsLoading || ordersLoading;
   const orders = dbOrders || [];
 
+  // Standardize X-Ray, CT, MRI types for modality filtering
+  const normalizeModality = (raw: string) => {
+    const t = (raw || "").toLowerCase();
+    if (t.includes("x-ray") || t.includes("xray") || t.includes("x ray") || t.includes("radiology")) return "X-Ray";
+    if (t.includes("mri")) return "MRI";
+    if (t.includes("ct")) return "CT Scan";
+    if (t.includes("ultra") || t.includes("usg")) return "Ultrasound";
+    if (t.includes("ecg")) return "ECG";
+    if (t.includes("echo")) return "Echocardiography";
+    return "X-Ray";
+  };
+
   // Construct dynamic radiology reports from database patient orders
   const radiologyReports = orders.map((o: any) => {
     const isCompleted = o.status === "completed";
     const reportUploaded = o.status === "report_uploaded" || o.status === "verified" || o.status === "completed";
-    const type = o.type === "CT" ? "CT Scan" : o.type === "X-ray" ? "X-Ray" : o.type;
+    const type = normalizeModality(o.type);
+    const hasAttachment = o.report?.files && o.report.files.length > 0;
 
     return {
       id: o._id,
@@ -50,12 +63,14 @@ export function RadiologyPage() {
       region: o.notes || "Standard view",
       status: o.status,
       priority: o.priority?.toLowerCase() || "routine",
-      finding: o.report?.observations || (reportUploaded ? "Report uploaded. Review documents below." : "Pending review by radiologist."),
+      finding: o.report?.observations || (reportUploaded ? "Report uploaded. Review documents below." : "Report Pending — Awaiting radiologist upload."),
       impression: o.report?.remarks || (reportUploaded ? "Report uploaded. Review remarks." : "Pending."),
-      radiologist: o.report?.uploadedBy?.name || "Dr. K. Nair",
+      radiologist: o.report?.uploadedBy?.name || (o.doctor?.name ? `Dr. ${o.doctor.name}` : "Radiologist"),
       approved: isCompleted || o.status === "verified",
       files: o.report?.files || [],
       reportId: o.report?._id || "",
+      hasAttachment,
+      reportReady: isCompleted && hasAttachment,
     };
   });
 
@@ -89,7 +104,7 @@ export function RadiologyPage() {
         <p className="text-sm text-slate-500">View and manage imaging reports: X-Ray, MRI, CT Scan, Ultrasound, ECG.</p>
       </div>
 
-      {orders.length === 0 ? (
+      {radiologyReports.length === 0 ? (
         <Card className="flex h-64 flex-col items-center justify-center p-6 text-center border-dashed border-slate-200 bg-slate-50">
           <ScanLine className="mb-2 h-10 w-10 text-slate-400" />
           <h3 className="text-sm font-semibold text-slate-600">No Radiology Studies</h3>
@@ -98,7 +113,7 @@ export function RadiologyPage() {
       ) : (
         <>
           {/* KPIs */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard label="Total Studies"  value={counts.total}    icon={<ScanLine className="h-5 w-5" />} emphasis />
             <KpiCard label="Abnormal"       value={counts.abnormal} icon={<AlertTriangle className="h-5 w-5" />} />
             <KpiCard label="Pending Review" value={counts.pending}  icon={<Clock className="h-5 w-5" />} />
@@ -106,12 +121,12 @@ export function RadiologyPage() {
           </div>
 
           {/* Modality Filter */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2 overflow-x-auto max-w-full scrollbar-none flex-nowrap shrink-0">
             {MODALITIES.map((m) => (
               <button
                 key={m}
                 onClick={() => setActiveModality(m)}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap ${
                   activeModality === m ? "bg-navy-700 text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
               >

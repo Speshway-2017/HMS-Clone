@@ -156,6 +156,8 @@ export const updateHospital = catchAsync(async (req: Request, res: Response) => 
     await User.findOneAndUpdate({ _id: primaryAdminId, role: "hospital_admin" }, { hospital: hospital._id });
   }
 
+  emitToHospital(hospital._id, "hospital:updated", hospital);
+
   res.json({ status: "success", data: { hospital } });
 });
 
@@ -164,6 +166,7 @@ export const deleteHospital = catchAsync(async (req: Request, res: Response) => 
   if (!hospital) {
     throw new AppError("Hospital not found.", 404);
   }
+  emitToHospital(req.params.id, "hospital:deleted", { id: req.params.id });
   res.status(204).send();
 });
 
@@ -194,6 +197,9 @@ export const updateMyHospital = catchAsync(async (req: Request, res: Response) =
     new: true,
     runValidators: true,
   });
+  if (hospital) {
+    emitToHospital(hospital._id, "hospital:updated", hospital);
+  }
   res.json({ status: "success", data: { hospital } });
 });
 
@@ -400,6 +406,7 @@ export const updateEnquiryStatus = catchAsync(async (req: Request, res: Response
   if (!enquiry) {
     throw new AppError("Enquiry not found", 404);
   }
+  emitToHospital(hospitalId, "enquiry:updated", enquiry);
   res.json({ status: "success", data: { enquiry } });
 });
 

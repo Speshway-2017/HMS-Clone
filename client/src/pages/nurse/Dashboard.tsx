@@ -50,6 +50,7 @@ import {
   Lock
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
 import { useAuth } from "../../context/AuthContext";
 import { useStaffProfileMe } from "../../features/staff";
 import {
@@ -418,17 +419,25 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
     toast("Nursing note values loaded for editing.", { icon: "📝" });
   };
 
+  const [deleteTargetNurseNoteId, setDeleteTargetNurseNoteId] = useState<string | null>(null);
+
   // Delete Nursing Note
-  const handleDeleteNurseNoteClick = async (noteId: string) => {
-    if (!window.confirm("Are you sure you want to delete this nursing note?")) return;
+  const handleDeleteNurseNoteClick = (noteId: string) => {
+    setDeleteTargetNurseNoteId(noteId);
+  };
+
+  const confirmDeleteNurseNote = async () => {
+    if (!deleteTargetNurseNoteId) return;
     try {
-      await deleteNurseNoteMutation.mutateAsync(noteId);
+      await deleteNurseNoteMutation.mutateAsync(deleteTargetNurseNoteId);
       toast.success("Nursing note successfully deleted.");
-      if (editingNurseNoteId === noteId) {
+      if (editingNurseNoteId === deleteTargetNurseNoteId) {
         resetNurseNoteForm();
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to delete nursing note.");
+    } finally {
+      setDeleteTargetNurseNoteId(null);
     }
   };
 
@@ -3974,6 +3983,14 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
         onClose={() => setPendingHandoverToAccept(null)}
       />
 
+      <ConfirmDeleteModal
+        isOpen={Boolean(deleteTargetNurseNoteId)}
+        title="Confirm Deletion"
+        message="Are you sure you want to delete this nursing note? This action cannot be undone."
+        isLoading={deleteNurseNoteMutation.isPending}
+        onClose={() => setDeleteTargetNurseNoteId(null)}
+        onConfirm={confirmDeleteNurseNote}
+      />
     </div>
   );
 }

@@ -29,6 +29,7 @@ import { Pagination } from "../../components/ui/Pagination";
 import { useAppointments } from "../../features/appointments";
 import { api } from "../../lib/api";
 import toast from "react-hot-toast";
+import { isTodayDate, isFutureDate, isPastDate, formatDisplayDate } from "../../lib/appointmentDateUtils";
 
 // Validation schema for booking form
 const appointmentSchema = z.object({
@@ -122,10 +123,8 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const calendarAppointments = calendarAppointmentsData?.data || [];
 
   // Unified fallback synchronization so Today's Queue and Scheduled Bookings draw from calendar Appointments
-  const todayDateStr = new Date().toDateString();
   const derivedTodayAppts = (calendarAppointments || []).filter((a: any) => {
-    const apptDateStr = new Date(a.date).toDateString();
-    return apptDateStr === todayDateStr && a.status !== "cancelled" && a.status !== "no_show";
+    return isTodayDate(a.date) && a.status !== "cancelled" && a.status !== "no_show";
   }).map((appt: any, idx: number) => ({
     _id: appt._id,
     tokenNumber: appt.tokenNumber || appt.appointmentNumber || appt.referenceId || `T-${String(idx + 1).padStart(3, "0")}`,
@@ -142,7 +141,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
     : derivedTodayAppts;
 
   const derivedScheduledAppts = (calendarAppointments || []).filter((a: any) => {
-    return a.status !== "completed" && a.status !== "cancelled" && a.status !== "no_show" && a.status !== "missed";
+    return isFutureDate(a.date) && a.status !== "completed" && a.status !== "cancelled" && a.status !== "no_show" && a.status !== "missed";
   });
 
   const scheduledData: any = (scheduledDataRaw?.data && scheduledDataRaw.data.length > 0)
@@ -150,7 +149,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
     : { data: derivedScheduledAppts, total: derivedScheduledAppts.length, page: 1, limit: 50, pagination: { totalPages: Math.ceil(derivedScheduledAppts.length / 50) || 1 } };
 
   const derivedCompletedAppts = (calendarAppointments || []).filter((a: any) => {
-    return a.status === "completed" || a.status === "cancelled" || a.status === "no_show" || a.status === "missed";
+    return (isPastDate(a.date) || a.status === "completed") && a.status !== "cancelled";
   });
 
   const completedData: any = (completedDataRaw?.data && completedDataRaw.data.length > 0)
@@ -345,7 +344,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
 
   const { data: hospital } = useMyHospital();
   const { data: patientDetail, isLoading: patientLoading, isError: patientError } = usePatientDetail(selectedPatientId);
-  const { data: bookedSlots } = useBookedSlots(selectedDoctorId, selectedDate);
+  const { data: bookedSlots } = useBookedSlots(selectedDoctorId, selectedDate, selectedPatientId);
 
   const isWithinRevisitWindow = () => {
     if (!selectedDoc || !selectedDate) return false;

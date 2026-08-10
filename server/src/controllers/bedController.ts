@@ -3,12 +3,12 @@ import { catchAsync } from "../utils/catchAsync";
 import { AppError } from "../utils/AppError";
 import { Bed } from "../models/Bed";
 import { Room } from "../models/Room";
+import { Admission } from "../models/Admission";
 
 export const listBeds = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
   const { search, ward, room, status, page = 1, limit = 10 } = req.query;
 
-  const query: any = { hospital: hospitalId };
+  const query: any = { ...req.hospitalFilter };
 
   if (search) {
     query.$or = [
@@ -36,7 +36,7 @@ export const listBeds = catchAsync(async (req: Request, res: Response) => {
   const [beds, total] = await Promise.all([
     Bed.find(query)
       .populate("ward", "name code")
-      .populate("room", "roomNumber roomName")
+      .populate("room", "roomNumber roomName roomType tariff capacity")
       .populate("patient", "name uhid patientCode phone")
       .populate("admission", "admissionNumber admissionDate status")
       .sort({ bedNumber: 1 })
@@ -46,10 +46,38 @@ export const listBeds = catchAsync(async (req: Request, res: Response) => {
     Bed.countDocuments(query)
   ]);
 
+  // Enrich occupied beds with patient details if missing from direct reference
+  const enrichedBeds = await Promise.all(
+    beds.map(async (b: any) => {
+      if (!b.patient && (b.isOccupied || b.status === "Occupied")) {
+        const activeAdm = await Admission.findOne({
+          hospital: req.hospitalFilter?.hospital,
+          bed: b._id,
+          status: { $nin: ["discharged", "Discharged", "Cancelled", "Expired", "Transferred Out (Final)"] }
+        })
+          .populate("patient", "name uhid patientCode phone")
+          .lean();
+
+        if (activeAdm && activeAdm.patient) {
+          return {
+            ...b,
+            patient: activeAdm.patient,
+            admission: {
+              _id: activeAdm._id,
+              admissionNumber: activeAdm.admissionNumber,
+              status: activeAdm.status
+            }
+          };
+        }
+      }
+      return b;
+    })
+  );
+
   res.json({
     status: "success",
     data: {
-      beds,
+      beds: enrichedBeds,
       pagination: {
         total,
         page: pageNum,
@@ -61,9 +89,8 @@ export const listBeds = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const getBed = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
   const { id } = req.params;
-  const bed = await Bed.findOne({ _id: id, hospital: hospitalId })
+  const bed = await Bed.findOne({ _id: id, ...req.hospitalFilter })
     .populate("ward", "name code")
     .populate("room", "roomNumber roomName capacity");
   if (!bed) {
@@ -74,6 +101,7 @@ export const getBed = catchAsync(async (req: Request, res: Response) => {
 
 export const createBed = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital;
+  const branchId = req.hospitalFilter?.branch ?? null;
   const { bedNumber, roomId, bedType, status } = req.body;
 
   if (!bedNumber || !roomId) {
@@ -81,13 +109,13 @@ export const createBed = catchAsync(async (req: Request, res: Response) => {
   }
 
   // Verify room exists
-  const room = await Room.findOne({ _id: roomId, hospital: hospitalId });
+  const room = await Room.findOne({ _id: roomId, ...req.hospitalFilter });
   if (!room) {
-    throw new AppError("Selected room does not exist.", 404);
+    throw new AppError("Selected room does not exist in this branch.", 404);
   }
 
   // Count existing beds in the room to ensure we do not exceed capacity
-  const activeBedsCount = await Bed.countDocuments({ hospital: hospitalId, room: roomId });
+  const activeBedsCount = await Bed.countDocuments({ ...req.hospitalFilter, room: roomId });
   if (activeBedsCount >= room.capacity) {
     throw new AppError(`Cannot add bed. Room capacity of ${room.capacity} beds has been reached.`, 400);
   }
@@ -98,12 +126,12 @@ export const createBed = catchAsync(async (req: Request, res: Response) => {
 
   // Check unique bedCode or bedNumber in this room
   const [existingCode, existingNumber] = await Promise.all([
-    Bed.findOne({ hospital: hospitalId, bedCode }),
-    Bed.findOne({ hospital: hospitalId, room: roomId, bedNumber: bedNumber.trim() })
+    Bed.findOne({ ...req.hospitalFilter, bedCode }),
+    Bed.findOne({ ...req.hospitalFilter, room: roomId, bedNumber: bedNumber.trim() })
   ]);
 
   if (existingCode) {
-    throw new AppError(`Bed code "${bedCode}" already exists.`, 400);
+    throw new AppError(`Bed code "${bedCode}" already exists in this branch.`, 400);
   }
 
   if (existingNumber) {
@@ -112,6 +140,7 @@ export const createBed = catchAsync(async (req: Request, res: Response) => {
 
   const bed = await Bed.create({
     hospital: hospitalId,
+    branch: branchId,
     ward: room.ward,
     room: roomId,
     bedNumber: bedNumber.trim(),
@@ -124,23 +153,22 @@ export const createBed = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const updateBed = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
   const { id } = req.params;
   const { bedNumber, roomId, bedType, status } = req.body;
 
-  const bed = await Bed.findOne({ _id: id, hospital: hospitalId });
+  const bed = await Bed.findOne({ _id: id, ...req.hospitalFilter });
   if (!bed) {
     throw new AppError("Bed not found.", 404);
   }
 
   if (roomId && String(roomId) !== String(bed.room)) {
-    const room = await Room.findOne({ _id: roomId, hospital: hospitalId });
+    const room = await Room.findOne({ _id: roomId, ...req.hospitalFilter });
     if (!room) {
-      throw new AppError("Selected room does not exist.", 404);
+      throw new AppError("Selected room does not exist in this branch.", 404);
     }
     
     // Validate capacity of new room
-    const activeBedsCount = await Bed.countDocuments({ hospital: hospitalId, room: roomId });
+    const activeBedsCount = await Bed.countDocuments({ ...req.hospitalFilter, room: roomId });
     if (activeBedsCount >= room.capacity) {
       throw new AppError(`Cannot move bed. Destination room capacity of ${room.capacity} beds has been reached.`, 400);
     }
@@ -151,18 +179,18 @@ export const updateBed = catchAsync(async (req: Request, res: Response) => {
 
   // If changing bed number, regenerate bedCode
   if (bedNumber && bedNumber.trim() !== bed.bedNumber) {
-    const currentRoom = await Room.findById(bed.room);
+    const currentRoom = await Room.findOne({ _id: bed.room, ...req.hospitalFilter });
     if (currentRoom) {
       const codeSuffix = bedNumber.trim().toUpperCase().replace(/\s+/g, "-");
       const newBedCode = `${currentRoom.roomNumber}-${codeSuffix}`;
       
       const [existingCode, existingNumber] = await Promise.all([
-        Bed.findOne({ hospital: hospitalId, bedCode: newBedCode }),
-        Bed.findOne({ hospital: hospitalId, room: bed.room, bedNumber: bedNumber.trim() })
+        Bed.findOne({ ...req.hospitalFilter, bedCode: newBedCode }),
+        Bed.findOne({ ...req.hospitalFilter, room: bed.room, bedNumber: bedNumber.trim() })
       ]);
 
       if (existingCode && String(existingCode._id) !== String(id)) {
-        throw new AppError(`Bed code "${newBedCode}" already exists.`, 400);
+        throw new AppError(`Bed code "${newBedCode}" already exists in this branch.`, 400);
       }
 
       if (existingNumber && String(existingNumber._id) !== String(id)) {
@@ -176,8 +204,7 @@ export const updateBed = catchAsync(async (req: Request, res: Response) => {
 
   if (bedType) bed.bedType = bedType;
   if (status) {
-    // If bed is occupied, prevent setting status to available manually without discharge/transfer
-    if (bed.status === "Occupied" && status !== "Occupied") {
+    if (bed.status === "Occupied" && status !== "Occupied" && bed.patient) {
       throw new AppError("Occupied beds can only be made available via inpatient transfer or discharge.", 400);
     }
     bed.status = status;
@@ -189,19 +216,18 @@ export const updateBed = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const deleteBed = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
   const { id } = req.params;
 
-  const bed = await Bed.findOne({ _id: id, hospital: hospitalId });
+  const bed = await Bed.findOne({ _id: id, ...req.hospitalFilter });
   if (!bed) {
     throw new AppError("Bed not found.", 404);
   }
 
-  if (bed.status === "Occupied" || bed.isOccupied) {
+  if (bed.status === "Occupied" || (bed.patient && bed.isOccupied)) {
     throw new AppError("Cannot delete bed because it is currently occupied by a patient.", 400);
   }
 
-  await Bed.deleteOne({ _id: id, hospital: hospitalId });
+  await Bed.deleteOne({ _id: id, ...req.hospitalFilter });
 
   res.json({ status: "success", message: "Bed deleted successfully." });
 });

@@ -18,6 +18,7 @@ import { Hospital } from "../models/Hospital";
 import { DbNotification } from "../models/DbNotification";
 import { Ward } from "../models/Ward";
 import { Staff } from "../models/Staff";
+import { AppointmentSlotService } from "./appointmentSlotService";
 import { emitToHospital, emitToDoctor } from "../config/socket";
 import { createDoctorNotification } from "../utils/notificationHelper";
 import { IPBill } from "../models/IPBill";
@@ -121,9 +122,11 @@ export class ReceptionService {
     // Rooms availability: count active rooms that contain at least one bed and at least one bed is vacant
     const roomBedsMap: Record<string, any[]> = {};
     for (const bed of bedsAvailable) {
-      const rId = bed.room.toString();
-      if (!roomBedsMap[rId]) roomBedsMap[rId] = [];
-      roomBedsMap[rId].push(bed);
+      if (bed.room) {
+        const rId = bed.room.toString();
+        if (!roomBedsMap[rId]) roomBedsMap[rId] = [];
+        roomBedsMap[rId].push(bed);
+      }
     }
 
     let roomsAvailableCount = 0;
@@ -452,6 +455,21 @@ export class ReceptionService {
       );
     }
 
+    // 5b. Patient slot conflict check (patient already has an active appointment at exact same date & time slot with another doctor)
+    const patientSlotClash = await AppointmentSlotService.checkPatientSlotConflict(
+      patientId,
+      bookingDate,
+      time,
+      hospitalId
+    );
+    if (patientSlotClash) {
+      const otherDocName = (patientSlotClash.doctor as any)?.name || "another doctor";
+      throw new AppError(
+        `Patient already has an active appointment scheduled at ${time} with Dr. ${otherDocName}. A patient cannot book appointments with multiple doctors at the exact same time slot.`,
+        409
+      );
+    }
+
     // 6. Generate unique auto-incremented appointment reference ID: APT-YYYYMMDD-XXXXXX (we'll reserve this for later)
     const bookingDateNoHyphens = bookingDate.toISOString().split("T")[0].replace(/-/g, "");
     const aptPrefix = `APT-${bookingDateNoHyphens}-`;
@@ -622,6 +640,26 @@ export class ReceptionService {
 
     const patientRecord = await Patient.findById(patientId);
     const patientName = patientRecord ? patientRecord.name : "Patient";
+
+    // Notify assigned doctor of new appointment booking
+    try {
+      await createDoctorNotification({
+        hospital: hospitalId,
+        title: "New Patient Assigned",
+        message: `Patient ${patientName} (${referenceId}) booked an appointment with you for ${bookingDateStr} at ${time}.`,
+        type: "appointment",
+        severity: "info",
+        recipientDoctor: doctorId,
+        link: "/doctor/op-management",
+        data: {
+          appointmentId: newAppointment._id.toString(),
+          referenceId,
+          patientName,
+        }
+      });
+    } catch (err) {
+      console.error("Failed to notify doctor of new appointment booking:", err);
+    }
 
     let tokenNumber = "N/A";
     let queueNumber = "N/A";
@@ -1029,6 +1067,28 @@ export class ReceptionService {
             await appointment.save({ session });
           }
         }
+
+        if (appointment) {
+          try {
+            const docId = (appointment.doctor as any)?._id || appointment.doctor;
+            const patName = (invoice.patient as any)?.name || "Patient";
+            await createDoctorNotification({
+              hospital: hospitalId,
+              title: "OP Patient Checked In",
+              message: `OP patient ${patName} checked in and is waiting in your queue (Token: ${tokenNumber || "N/A"}).`,
+              type: "appointment",
+              severity: "info",
+              recipientDoctor: docId,
+              link: "/doctor/op-management",
+              data: {
+                appointmentId: appointment._id.toString(),
+                tokenNumber,
+              }
+            });
+          } catch (err) {
+            console.error("Failed to send doctor notification on payment check-in:", err);
+          }
+        }
       }
 
       // Generate Receipt Number: RCP + year + 5-digit serial
@@ -1248,7 +1308,10 @@ export class ReceptionService {
 
   // ── Inpatient (IP) Admissions ──
   static async getAdmissionRequests(hospitalId: Types.ObjectId) {
-    return await AdmissionRequest.find({ hospital: hospitalId, status: "Admission Requested" })
+    return await AdmissionRequest.find({
+      hospital: hospitalId,
+      status: { $in: ["Pending", "pending", "Admission Requested", "AdmissionRequested"] }
+    })
       .populate("patient")
       .populate("doctor")
       .populate("department")
@@ -1377,11 +1440,11 @@ export class ReceptionService {
       if (!room) {
         throw new AppError("Selected room not found.", 404);
       }
-      if (room.status !== "Active") {
-        throw new AppError("Selected room is currently inactive.", 400);
+      if (room.status === "Inactive" || room.status === "Blocked" || room.status === "Maintenance") {
+        throw new AppError(`Selected room is currently ${room.status.toLowerCase()}.`, 400);
       }
-      if (room.wardName !== ward) {
-        throw new AppError("Selected room does not belong to the selected ward.", 400);
+      if (ward && room.wardName && room.wardName !== ward && room.ward.toString() !== ward && room.wardName.trim().toLowerCase() !== ward.trim().toLowerCase()) {
+        throw new AppError(`Selected room (${room.roomNumber}) does not belong to the selected ward.`, 400);
       }
 
       // 2b. Validate ward status
@@ -1389,7 +1452,7 @@ export class ReceptionService {
       if (!wardRecord) {
         throw new AppError("Associated ward not found.", 404);
       }
-      if (wardRecord.status !== "Active") {
+      if (wardRecord.status === "Inactive") {
         throw new AppError("Selected ward is currently inactive.", 400);
       }
 
@@ -1472,6 +1535,8 @@ export class ReceptionService {
 
       // Allocate Bed / Mark as Occupied
       bed.isOccupied = true;
+      bed.status = "Occupied";
+      bed.patient = patientId as any;
       await bed.save({ session });
 
       // Fetch daily tariff and nursing rate for this room/ward
@@ -1540,6 +1605,10 @@ export class ReceptionService {
           }
         ]
       }], { session });
+
+      // Link created admission to bed
+      bed.admission = createdAdmission._id as any;
+      await bed.save({ session });
 
       let createdInvoice: any = null;
       let createdPayment: any = null;
@@ -1820,7 +1889,7 @@ export class ReceptionService {
       }
 
       const newRoom = await Room.findOne({ _id: newRoomId, hospital: hospitalId }).session(session);
-      if (!newRoom || newRoom.status !== "Active") {
+      if (!newRoom || newRoom.status === "Inactive" || newRoom.status === "Blocked" || newRoom.status === "Maintenance") {
         throw new AppError("Selected room is not active or not found.", 404);
       }
 

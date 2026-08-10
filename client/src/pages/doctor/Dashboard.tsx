@@ -61,6 +61,7 @@ import {
   useDoctorTodayAppointments
 } from "../../features/doctorDashboard";
 import { mapAppointmentTypeForDisplay } from "../../features/appointments";
+import { useSocketSync } from "../../hooks/useSocketSync";
 
 const STATUS_BADGE: Record<string, { tone: "success" | "warning" | "info" | "neutral" | "danger"; label: string }> = {
   pending_payment: { tone: "danger",   label: "Pending Payment" },
@@ -124,6 +125,7 @@ const Sparkline = React.memo(({ data, color = "#1e3a8a" }: { data: number[]; col
 Sparkline.displayName = "Sparkline";
 
 export function DoctorDashboard() {
+  useSocketSync();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [dateRange, setDateRange] = useState<string>("7days");
@@ -285,12 +287,12 @@ export function DoctorDashboard() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-slate-100 pb-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 font-sans tracking-tight">Clinical Analytics Cockpit</h1>
-          <p className="text-sm text-slate-500 font-sans">Good Morning, Dr. {user?.name ?? "Doctor"} 👋 · Overview of your medical registry</p>
+          <p className="text-sm text-slate-500 font-sans">Good Morning, Dr. {user?.name ?? "Doctor"} · Overview of your medical registry</p>
         </div>
 
         {/* Date Filters & Quick Actions in One Line */}
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
-          <div className="flex rounded-lg border border-slate-200 bg-white p-0.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-3 shrink-0 max-w-full">
+          <div className="flex rounded-lg border border-slate-200 bg-white p-0.5 shrink-0 overflow-x-auto max-w-full scrollbar-none">
             {[
               { id: "today", label: "Today" },
               { id: "yesterday", label: "Yesterday" },
@@ -302,7 +304,7 @@ export function DoctorDashboard() {
               <button
                 key={f.id}
                 onClick={() => setDateRange(f.id)}
-                className={`rounded-md px-2.5 py-1 text-xs font-bold transition-all font-sans ${
+                className={`rounded-md px-2.5 py-1 text-xs font-bold transition-all font-sans whitespace-nowrap ${
                   dateRange === f.id
                     ? "bg-navy-700 text-white shadow-sm"
                     : "text-slate-600 hover:bg-slate-100"
@@ -352,8 +354,8 @@ export function DoctorDashboard() {
         </Card>
       )}
 
-      {/* SECTION 1: TOP SUMMARY CARDS (Responsive: 2 cols on mobile, 4 cols on desktop) */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      {/* SECTION 1: TOP SUMMARY CARDS (Responsive: 1 col on mobile, 2 on tablet, 4 cols on desktop) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           {
             label: "Today's Appointments",

@@ -51,8 +51,7 @@ export function DashboardLayout() {
   }, [user, doctorProfile]);
 
   useEffect(() => {
-    const handleUpdate = (data: unknown) => {
-      console.log("Real-time update received via Socket.IO:", data);
+    const handleUpdate = () => {
       // Invalidate all query keys to trigger real-time auto-updates across dashboards
       queryClient.invalidateQueries();
     };
@@ -69,10 +68,13 @@ export function DashboardLayout() {
       "appointment_updated",
       "queue_updated",
       "patient_updated",
+      "patient_created",
       "billing_updated",
       "ip_billing_update",
       "ip_bill_update",
       "lab_order_created",
+      "lab_order_updated",
+      "lab_report_uploaded",
       "lab_result_updated",
       "vitals_updated",
       "inventory_updated",
@@ -85,7 +87,24 @@ export function DashboardLayout() {
       "prescription:new",
       "prescription:updated",
       "prescription:dispensed",
-      "notification:new"
+      "notification:new",
+      "doctor:created",
+      "doctor:updated",
+      "doctor:deleted",
+      "staff:created",
+      "staff:updated",
+      "staff:deleted",
+      "blog:created",
+      "blog:updated",
+      "blog:deleted",
+      "enquiry_updated",
+      "enquiry:updated",
+      "branch:created",
+      "branch:updated",
+      "branch:deleted",
+      "hospital:updated",
+      "hospital:deleted",
+      "profile:updated"
     ];
 
     events.forEach((evt) => socket.on(evt, handleUpdate));
@@ -106,7 +125,7 @@ export function DashboardLayout() {
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 min-w-0 overflow-y-auto p-3 sm:p-4 md:p-6">
           <Outlet />
         </main>
       </div>

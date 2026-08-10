@@ -34,6 +34,7 @@ import {
   Heart,
   Bell,
   Clock,
+  CheckCircle2,
 } from "lucide-react";
 import { Role } from "../types/auth";
 import type { ComponentType } from "react";
@@ -103,8 +104,6 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "OP Management", path: "/doctor/op-management", icon: Activity },
     { label: "IP Management", path: "/doctor/ip-management", icon: BedDouble },
     { label: "Patient Records", path: "/doctor/patient-records", icon: Users },
-    { label: "Laboratory", path: "/doctor/laboratory", icon: FlaskConical },
-    { label: "Radiology", path: "/doctor/radiology", icon: ScanLine },
     { label: "Operation Theatre", path: "/doctor/ot", icon: Scissors },
     { label: "Telemedicine", path: "/doctor/telemedicine", icon: Video },
     { label: "Performance", path: "/doctor/performance", icon: BarChart3 },
@@ -124,6 +123,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "Dashboard", path: "/laboratory", icon: LayoutDashboard },
     { label: "Test Requests", path: "/laboratory/requests", icon: ClipboardList },
     { label: "Test Processing", path: "/laboratory/processing", icon: Activity },
+    { label: "Completed Reports", path: "/laboratory/completed-reports", icon: CheckCircle2 },
     { label: "Lab Inventory", path: "/laboratory/inventory", icon: Boxes },
     { label: "Report Delivery", path: "/laboratory/reports", icon: FileText },
     { label: "Billing", path: "/laboratory/billing", icon: Receipt },

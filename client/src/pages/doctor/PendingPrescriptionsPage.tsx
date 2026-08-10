@@ -86,7 +86,7 @@ export function PendingPrescriptionsPage() {
                     <div>
                       <span className="text-slate-400 font-extrabold uppercase text-[9px] block mb-1">Medicines</span>
                       <ul className="list-disc list-inside text-slate-700 space-y-0.5">
-                        {presc.medicines.map((m, idx) => (
+                        {(presc.medications || presc.medicines || []).map((m, idx) => (
                           <li key={idx}>
                             <span className="font-semibold">{m.name}</span> — {m.dosage} ({m.frequency} for {m.duration})
                           </li>
@@ -135,7 +135,7 @@ export function PendingPrescriptionsPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{presc.diagnosis}</td>
                       <td className="px-6 py-4 text-sm text-slate-600">
                         <ul className="list-disc list-inside">
-                          {presc.medicines.map((m, idx) => (
+                          {(presc.medications || presc.medicines || []).map((m, idx) => (
                             <li key={idx}>
                               <span className="font-semibold">{m.name}</span> — {m.dosage} ({m.frequency} for {m.duration})
                             </li>

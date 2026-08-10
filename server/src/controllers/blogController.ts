@@ -46,6 +46,8 @@ export const getBlog = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+import { broadcastGlobal } from "../config/socket";
+
 export const createBlog = catchAsync(async (req: Request, res: Response) => {
   const body = blogSchema.parse(req.body);
   const hospitalId = req.hospitalFilter?.hospital || req.user?.hospital;
@@ -69,6 +71,8 @@ export const createBlog = catchAsync(async (req: Request, res: Response) => {
     entityId: blog._id.toString(),
     details: { title: blog.title, slug: blog.slug },
   });
+
+  broadcastGlobal("blog:created", blog);
 
   res.status(201).json({
     status: "success",
@@ -94,6 +98,8 @@ export const updateBlog = catchAsync(async (req: Request, res: Response) => {
     throw new AppError("Blog post not found or unauthorized.", 404);
   }
 
+  broadcastGlobal("blog:updated", blog);
+
   res.json({
     status: "success",
     data: { blog },
@@ -106,6 +112,8 @@ export const deleteBlog = catchAsync(async (req: Request, res: Response) => {
   if (!blog) {
     throw new AppError("Blog post not found or unauthorized.", 404);
   }
+
+  broadcastGlobal("blog:deleted", { id: blog._id });
 
   res.status(204).send();
 });

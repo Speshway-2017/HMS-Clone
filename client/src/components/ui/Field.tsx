@@ -30,10 +30,47 @@ interface InputFieldProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
-  ({ label, hint, required, className = "", ...props }, ref) => {
+  ({ label, hint, required, className = "", onKeyDown, onChange, onInput, ...props }, ref) => {
+    const isPhoneField =
+      props.type === "tel" ||
+      /phone|mobile|contact number|telephone/i.test(label || "") ||
+      /phone|mobile/i.test(props.name || "");
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (isPhoneField) {
+        // Allow navigation keys, backspace, tab, enter, +, and digits 0-9
+        const allowedKeys = [
+          "Backspace", "Delete", "Tab", "Escape", "Enter",
+          "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "+"
+        ];
+        if (!allowedKeys.includes(e.key) && !e.ctrlKey && !e.metaKey && !/^[0-9]$/.test(e.key)) {
+          e.preventDefault();
+        }
+      }
+      if (onKeyDown) onKeyDown(e);
+    };
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (isPhoneField) {
+        // Strip out non-numeric characters (allow leading +)
+        const cleanValue = e.target.value.replace(/(?!^\+)[^\d]/g, "");
+        if (e.target.value !== cleanValue) {
+          e.target.value = cleanValue;
+        }
+      }
+      if (onChange) onChange(e);
+    };
+
     return (
       <FieldWrapper label={label} required={required} hint={hint}>
-        <input ref={ref} className={`${fieldClasses} ${className}`} required={required} {...props} />
+        <input
+          ref={ref}
+          className={`${fieldClasses} ${className}`}
+          required={required}
+          onKeyDown={handleKeyDown}
+          onChange={handleChange}
+          {...props}
+        />
       </FieldWrapper>
     );
   }

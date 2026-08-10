@@ -9,6 +9,7 @@ import { catchAsync } from "../utils/catchAsync";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/token";
 import { logAudit } from "../utils/auditLogger";
 import { Hospital } from "../models/Hospital";
+import { Doctor } from "../models/Doctor";
 import { Patient } from "../models/Patient";
 import { Staff } from "../models/Staff";
 import { sendEmail } from "../services/emailService";
@@ -46,13 +47,31 @@ const registerSchema = z.object({
   insurancePolicyNumber: z.string().optional().default(""),
 });
 
-function sanitizeUser(user: UserDocument) {
+async function sanitizeUser(user: UserDocument) {
+  let name = user.name;
+
+  if (user.role === "doctor") {
+    const doc = await Doctor.findOne({ email: user.email.toLowerCase() });
+    if (doc?.name) name = doc.name;
+  } else if (user.role === "patient") {
+    const pat = await Patient.findOne({ user: user._id });
+    if (pat?.name) name = pat.name;
+  } else if (user.role !== "super_admin") {
+    const st = await Staff.findOne({ email: user.email.toLowerCase() });
+    if (st?.name) name = st.name;
+  }
+
+  if (name && name !== user.name) {
+    await User.updateOne({ _id: user._id }, { name });
+  }
+
   return {
     id: user._id,
-    name: user.name,
+    name: name || user.name,
     email: user.email,
     role: user.role,
     hospital: user.hospital,
+    branch: user.branch,
     avatarUrl: user.avatarUrl,
     status: user.status,
     lastLogin: user.lastLogin,
@@ -210,7 +229,7 @@ export const register = catchAsync(async (req: Request, res: Response) => {
   res.status(201).json({
     status: "success",
     data: {
-      user: sanitizeUser(user),
+      user: await sanitizeUser(user),
       patient: createdPatient,
       token: accessToken,
       refreshToken: refreshToken,
@@ -363,7 +382,7 @@ export const login = catchAsync(async (req: Request, res: Response) => {
   res.status(200).json({
     status: "success",
     data: {
-      user: sanitizeUser(user),
+      user: await sanitizeUser(user),
       token: accessToken,
       refreshToken: refreshToken,
     },
@@ -450,7 +469,7 @@ export const logout = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const getMe = catchAsync(async (req: Request, res: Response) => {
-  res.status(200).json({ status: "success", data: { user: sanitizeUser(req.user!) } });
+  res.status(200).json({ status: "success", data: { user: await sanitizeUser(req.user!) } });
 });
 
 const changePasswordSchema = z.object({
