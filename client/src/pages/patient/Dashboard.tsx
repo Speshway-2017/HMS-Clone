@@ -278,7 +278,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       const dateStr = new Date(rx.createdAt || Date.now()).toLocaleString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
       list.push({
         id: `rx-notif-${rx._id || rx.id}`,
-        title: `💊 New E-Prescription Issued by Dr. ${docName}`,
+        title: `New E-Prescription Issued by Dr. ${docName}`,
         message: `Dr. ${docName} issued a new digital prescription for ${rx.diagnosis || "your check-up"} containing ${rx.medications?.length || 0} prescribed medications.`,
         time: dateStr,
         timestamp: new Date(rx.createdAt || Date.now()).getTime(),
@@ -299,7 +299,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       // Patient Booking Notification
       list.push({
         id: `apt-book-notif-${apt._id || apt.id}`,
-        title: `📅 Consultation Booked with Dr. ${docName}`,
+        title: `Consultation Booked with Dr. ${docName}`,
         message: `Your ${apt.type || "OPD"} consultation appointment with Dr. ${docName} has been confirmed for ${new Date(apt.date).toLocaleDateString("en-IN")} at ${apt.time}.`,
         time: dateStr,
         timestamp: new Date(apt.createdAt || apt.date || Date.now()).getTime(),
@@ -315,7 +315,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       if (meetUrl) {
         list.push({
           id: `apt-meet-notif-${apt._id || apt.id}`,
-          title: `📹 Video Meeting Link Attached by Dr. ${docName}`,
+          title: `Video Meeting Link Attached by Dr. ${docName}`,
           message: `Dr. ${docName} has updated the Google Meet video call link for your appointment. Click to open telehealth room.`,
           time: dateStr,
           timestamp: new Date(apt.updatedAt || apt.date || Date.now()).getTime() + 1000,
@@ -331,7 +331,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       if (apt.status === "completed" || apt.status === "Completed") {
         list.push({
           id: `apt-done-notif-${apt._id || apt.id}`,
-          title: `✓ Consultation Session Completed by Dr. ${docName}`,
+          title: `Consultation Session Completed by Dr. ${docName}`,
           message: `Dr. ${docName} completed your consultation. Primary diagnosis: ${apt.diagnosis || "Consultation complete"}. View details in Medical History.`,
           time: dateStr,
           timestamp: new Date(apt.updatedAt || apt.date || Date.now()).getTime() + 2000,
@@ -350,7 +350,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       const dateStr = new Date(rep.createdAt || rep.uploadedAt || Date.now()).toLocaleString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
       list.push({
         id: `rep-notif-${rep._id || rep.id}`,
-        title: `🧪 Diagnostic Test Report Uploaded`,
+        title: `Diagnostic Test Report Uploaded`,
         message: `Your lab test report for "${rep.testName || "Laboratory Specimen"}" requested by Dr. ${docName} has been verified and published.`,
         time: dateStr,
         timestamp: new Date(rep.createdAt || Date.now()).getTime(),
@@ -368,7 +368,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       if (inv.status === "paid") {
         list.push({
           id: `inv-paid-notif-${inv._id}`,
-          title: `💳 Hospital Payment Receipt Issued`,
+          title: `Hospital Payment Receipt Issued`,
           message: `Payment of ₹${(inv.totals?.total || 0).toLocaleString("en-IN")} for Invoice INV-${inv._id.slice(-6).toUpperCase()} was completed. Official receipt generated.`,
           time: dateStr,
           timestamp: new Date(inv.updatedAt || Date.now()).getTime(),
@@ -381,7 +381,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       } else {
         list.push({
           id: `inv-due-notif-${inv._id}`,
-          title: `⚠️ Outstanding Hospital Invoice Due`,
+          title: `Outstanding Hospital Invoice Due`,
           message: `Invoice INV-${inv._id.slice(-6).toUpperCase()} (${inv.billingType || "Hospital Dues"}) for ₹${(inv.totals?.patientBalance || 0).toLocaleString("en-IN")} is pending payment. Click to pay online.`,
           time: dateStr,
           timestamp: new Date(inv.createdAt || Date.now()).getTime(),
@@ -754,7 +754,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       setIncomingCallData(data);
       refetchAppts();
       const docName = data.doctorName || "Doctor";
-      toast.success(`🚨 Dr. ${docName} has started your online Google Meet video consultation!`, { duration: 8000 });
+      toast.success(`Dr. ${docName} has started your online Google Meet video consultation!`, { duration: 8000 });
     };
 
     socket.on("telemedicine_session_started", handleCallStarted);
@@ -1374,7 +1374,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 </span>
               </div>
               <h1 className="mt-2 text-2xl font-extrabold tracking-tight sm:text-3xl">
-                Welcome back, {patient?.name ?? user?.name} 👋
+                Welcome back, {patient?.name ?? user?.name}
               </h1>
               <p className="mt-1 text-xs text-indigo-200/80">
                 Manage consultations, prescriptions, lab reports, radiology imaging, billing, and join video doctor appointments.
@@ -2862,10 +2862,10 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   <div className="flex flex-wrap items-center gap-2">
                     {[
                       { id: "all", label: "All History Logs", count: combinedHistoryRecords.length },
-                      { id: "video", label: "📹 Video Consultations", count: combinedHistoryRecords.filter(r => isVideoRecord(r)).length },
-                      { id: "walkin", label: "🏥 Walk-in OPD", count: combinedHistoryRecords.filter(r => isWalkinRecord(r)).length },
-                      { id: "prescription", label: "💊 Prescriptions RX", count: combinedHistoryRecords.filter(r => r.type === "prescription").length },
-                      { id: "report", label: "🧪 Lab Reports", count: combinedHistoryRecords.filter(r => r.type === "report").length },
+                      { id: "video", label: "Video Consultations", count: combinedHistoryRecords.filter(r => isVideoRecord(r)).length },
+                      { id: "walkin", label: "Walk-in OPD", count: combinedHistoryRecords.filter(r => isWalkinRecord(r)).length },
+                      { id: "prescription", label: "Prescriptions RX", count: combinedHistoryRecords.filter(r => r.type === "prescription").length },
+                      { id: "report", label: "Lab Reports", count: combinedHistoryRecords.filter(r => r.type === "report").length },
                     ].map((cat) => {
                       const isActive = historyCategoryFilter === cat.id;
                       return (
@@ -3049,7 +3049,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                               <div className="flex flex-wrap gap-2">
                                 {item.medications.map((med: any, mIdx: number) => (
                                   <div key={mIdx} className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-800 border border-emerald-200">
-                                    💊 {med.name} {med.strength && `(${med.strength})`} · {med.frequency || "As prescribed"}
+                                    {med.name} {med.strength && `(${med.strength})`} · {med.frequency || "As prescribed"}
                                   </div>
                                 ))}
                               </div>
@@ -3191,8 +3191,8 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
               <div className="flex flex-wrap items-center gap-2">
                 {[
                   { id: "all", label: "All RX Copies", count: (prescriptions || []).length },
-                  { id: "active", label: "🟢 Active Prescriptions", count: (prescriptions || []).filter((rx) => rx.status !== "Completed" && rx.status !== "Cancelled").length },
-                  { id: "dispensed", label: "✓ Dispensed & Completed", count: (prescriptions || []).filter((rx) => rx.status === "Dispensed" || rx.status === "Completed").length },
+                  { id: "active", label: "Active Prescriptions", count: (prescriptions || []).filter((rx) => rx.status !== "Completed" && rx.status !== "Cancelled").length },
+                  { id: "dispensed", label: "Dispensed & Completed", count: (prescriptions || []).filter((rx) => rx.status === "Dispensed" || rx.status === "Completed").length },
                 ].map((tab) => {
                   const isActive = rxStatusFilter === tab.id;
                   return (
@@ -3286,7 +3286,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                           <div className="flex justify-between items-start border-b border-slate-100 pb-3">
                             <div className="flex items-center gap-3">
                               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white font-extrabold text-lg shadow-sm">
-                                💊
+                                <Pill className="h-6 w-6" />
                               </div>
                               <div>
                                 <div className="flex items-center gap-2">
@@ -3601,8 +3601,8 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
               <div className="flex flex-wrap items-center gap-2">
                 {[
                   { id: "all", label: "All Invoices", count: (invoices || []).length },
-                  { id: "pending", label: "⚠️ Pending Payables", count: (invoices || []).filter((inv: any) => inv.status === "pending" || inv.status === "partially_paid").length },
-                  { id: "paid", label: "✓ Paid & Receipts", count: (invoices || []).filter((inv: any) => inv.status === "paid").length },
+                  { id: "pending", label: "Pending Payables", count: (invoices || []).filter((inv: any) => inv.status === "pending" || inv.status === "partially_paid").length },
+                  { id: "paid", label: "Paid & Receipts", count: (invoices || []).filter((inv: any) => inv.status === "paid").length },
                 ].map((tab) => {
                   const isActive = billingStatusFilter === tab.id;
                   return (
@@ -4220,11 +4220,11 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       {/* MODAL 1: BOOK APPOINTMENT MODAL */}
       {/* ========================================================================= */}
       {isBookModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-slate-100">
             <div className="flex justify-between items-center mb-4 border-b pb-3">
               <h3 className="text-base font-extrabold text-slate-800">Request New Consultation</h3>
-              <button onClick={() => setIsBookModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+              <button onClick={() => setIsBookModalOpen(false)} className="text-slate-400 hover:bg-slate-100 p-1 rounded-full font-bold">✕</button>
             </div>
             <form onSubmit={handleBookAppointment} className="space-y-4 text-xs font-semibold text-slate-700">
               <div>
@@ -4364,7 +4364,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       {/* MODAL 2: RESCHEDULE MODAL */}
       {/* ========================================================================= */}
       {rescheduleApptId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border">
             <h3 className="text-base font-extrabold text-slate-800 mb-4">Reschedule Appointment</h3>
             <form onSubmit={handleRescheduleSubmit} className="space-y-4 text-xs font-semibold text-slate-700">
@@ -4405,7 +4405,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       {/* MODAL 3: CANCEL MODAL */}
       {/* ========================================================================= */}
       {cancelApptId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border">
             <h3 className="text-base font-extrabold text-rose-700 mb-2">Cancel Appointment</h3>
             <p className="text-xs text-slate-500 mb-4">Are you sure you want to cancel this scheduled appointment?</p>
@@ -4433,13 +4433,11 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
         </div>
       )}
 
-
-
       {/* ========================================================================= */}
       {/* MODAL 5: PRINTABLE RX PRESCRIPTION MODAL */}
       {/* ========================================================================= */}
       {selectedPrescriptionRx && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
           <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl border text-slate-800 space-y-4">
             {/* Header Title */}
             <div className="flex justify-between items-center border-b pb-4">
@@ -4557,7 +4555,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       {/* MODAL 6: BILL PAYMENT GATEWAY SIMULATOR MODAL */}
       {/* ========================================================================= */}
       {payInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border">
             <div className="flex justify-between items-center border-b pb-3 mb-4">
               <h3 className="text-base font-extrabold text-slate-800">Secure Payment Checkout</h3>
@@ -4645,7 +4643,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       {/* MODAL 7: PAYMENT RECEIPT MODAL */}
       {/* ========================================================================= */}
       {paidReceipt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border text-slate-800">
             <div className="text-center mb-4">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-2">
@@ -4676,7 +4674,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       {/* MODAL 8: INSURANCE PRE-AUTHORIZATION CLAIM MODAL */}
       {/* ========================================================================= */}
       {isClaimModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border">
             <div className="flex justify-between items-center border-b pb-3 mb-4">
               <h3 className="text-base font-extrabold text-slate-800">Submit Pre-Authorization Claim</h3>
@@ -4736,9 +4734,9 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       {/* MODAL 10: OFFICIAL APPOINTMENT SLIP MODAL */}
       {/* ========================================================================= */}
       {viewApptSlip && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border text-slate-800">
-            <div className="flex justify-between items-center border-b pb-4 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4 print:p-0 print:static print:block">
+          <div id="opd-receipt-print" className="printable-area w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border text-slate-800">
+            <div className="flex justify-between items-center border-b pb-4 mb-4 print:hidden">
               <div>
                 <span className="rounded bg-indigo-100 text-indigo-700 px-2 py-0.5 text-[10px] font-extrabold uppercase">Official Consultation Pass</span>
                 <h3 className="text-lg font-extrabold text-navy-900 mt-1">Metropolitan Hospital Outpatient Slip</h3>
@@ -4781,7 +4779,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-4 border-t mt-6">
+            <div className="flex justify-end gap-2 pt-4 border-t mt-6 print:hidden">
               <button onClick={() => setViewApptSlip(null)} className="rounded-lg px-4 py-2 border font-bold text-xs">
                 Close
               </button>
@@ -4803,7 +4801,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       {/* MODAL 12: PAYMENT & BILLING CHECKOUT DIALOG MODAL */}
       {/* ========================================================================= */}
       {isPaymentModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
           <div className="w-full max-w-3xl rounded-3xl bg-white p-6 md:p-8 shadow-2xl border border-slate-100 text-slate-800 space-y-6 max-h-[90vh] overflow-y-auto">
             {/* Modal Title Bar */}
             <div className="flex justify-between items-center border-b pb-4">
@@ -5099,7 +5097,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       {/* MODAL 12: DETAILED DIAGNOSTIC REPORT POPUP MODAL */}
       {/* ========================================================================= */}
       {selectedReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4 overflow-y-auto">
           <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 text-slate-800 my-8">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b pb-4 mb-4">
@@ -5252,7 +5250,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       {/* MODAL 13: RADIOLOGY SCAN & DICOM IMAGING VIEWER MODAL */}
       {/* ========================================================================= */}
       {selectedRadiology && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4 overflow-y-auto">
           <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 text-slate-800 my-8">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b pb-4 mb-4">

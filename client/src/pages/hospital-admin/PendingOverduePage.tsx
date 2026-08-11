@@ -195,6 +195,84 @@ function PatientSidePanel({ item, onClose }: { item: PendingOverdueItem; onClose
             <MessageSquare className="h-3.5 w-3.5" /> WhatsApp
           </a>
         </div>
+
+        {/* Hidden Printable Invoice Statement Container (triggers on window.print() via @media print) */}
+        <div id="invoice-print-area" className="hidden print:block p-8 bg-white text-slate-900 font-sans">
+          <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-6">
+            <div>
+              <h1 className="text-2xl font-black tracking-tight text-slate-900">SPESHWAY HOSPITALS</h1>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest mt-0.5">Enterprise Healthcare ERP System</p>
+              <p className="text-xs text-slate-500 mt-1">Main Hospital Branch • Tel: +91 800-SPESHWAY • Email: billing@speshwayhospitals.com</p>
+            </div>
+            <div className="text-right">
+              <span className="inline-block bg-slate-900 text-white text-xs font-extrabold uppercase px-3 py-1 rounded">
+                {item.daysOverdue > 0 ? "OVERDUE INVOICE STATEMENT" : "PATIENT BILL STATEMENT"}
+              </span>
+              <p className="text-sm font-mono font-bold mt-2 text-slate-800">INV #{item.invoiceNo}</p>
+              <p className="text-xs text-slate-500">Issued Date: {new Date(item.issuedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+              {item.dueDate && (
+                <p className="text-xs text-red-600 font-semibold">Due Date: {new Date(item.dueDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Patient Details</h3>
+              <p className="text-sm font-bold text-slate-900">{item.patient?.name || "Patient"}</p>
+              <p className="text-xs text-slate-600 font-mono">UHID: {item.patient?.uhid || "N/A"}</p>
+              <p className="text-xs text-slate-600">Mobile: {item.patient?.phone || "N/A"}</p>
+              <p className="text-xs text-slate-600">Age / Gender: {item.patient?.age ? `${item.patient.age} yrs` : ""} {item.patient?.gender || ""}</p>
+            </div>
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Consultation & Department</h3>
+              <p className="text-xs text-slate-700"><span className="font-semibold text-slate-500">Billing Type:</span> {BILLING_TYPE_LABELS[item.billingType] || item.billingType}</p>
+              <p className="text-xs text-slate-700"><span className="font-semibold text-slate-500">Doctor:</span> {item.doctor?.name || "Attending Physician"}</p>
+              <p className="text-xs text-slate-700"><span className="font-semibold text-slate-500">Department:</span> {item.department?.name || "General"}</p>
+              <p className="text-xs text-slate-700"><span className="font-semibold text-slate-500">Status:</span> <span className="font-bold text-red-600 uppercase">{item.status}</span></p>
+            </div>
+          </div>
+
+          <table className="w-full text-left border-collapse mb-6">
+            <thead>
+              <tr className="border-b-2 border-slate-300 bg-slate-100 text-xs font-bold text-slate-700 uppercase">
+                <th className="py-2.5 px-3">Description</th>
+                <th className="py-2.5 px-3 text-right">Billed Amount</th>
+                <th className="py-2.5 px-3 text-right">Amount Paid</th>
+                <th className="py-2.5 px-3 text-right">Pending Balance</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 text-xs text-slate-800">
+              <tr>
+                <td className="py-3 px-3">
+                  <p className="font-bold">{BILLING_TYPE_LABELS[item.billingType] || item.billingType}</p>
+                  <p className="text-[11px] text-slate-500">Doctor Consultation & Medical Services</p>
+                </td>
+                <td className="py-3 px-3 text-right font-semibold">{formatINR(item.totals?.total || 0)}</td>
+                <td className="py-3 px-3 text-right font-semibold text-emerald-700">{formatINR(item.amountPaid)}</td>
+                <td className="py-3 px-3 text-right font-bold text-red-600">{formatINR(item.pendingAmount)}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-900 bg-slate-50 text-xs">
+                <td colSpan={3} className="py-3 px-3 font-black text-right text-slate-900 uppercase">Total Outstanding Due:</td>
+                <td className="py-3 px-3 font-black text-right text-red-600 text-base">{formatINR(item.pendingAmount)}</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div className="grid grid-cols-2 gap-8 pt-8 border-t border-slate-200 mt-8 text-xs">
+            <div>
+              <p className="font-bold text-slate-800">Payment Notice Instructions:</p>
+              <p className="text-slate-500 mt-1">Please make payment at the hospital billing desk or via online portal referencing Invoice #{item.invoiceNo}.</p>
+            </div>
+            <div className="text-right flex flex-col items-end justify-end">
+              <div className="w-48 border-b border-slate-400 mb-1"></div>
+              <p className="font-bold text-slate-800">Authorized Signature & Seal</p>
+              <p className="text-[10px] text-slate-400">Speshway Hospitals Billing Authority</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

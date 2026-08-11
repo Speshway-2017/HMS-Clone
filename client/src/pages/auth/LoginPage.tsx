@@ -192,7 +192,7 @@ export function LoginPage() {
             </div>
 
             {/* Login Card */}
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-8 shadow-xl">
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-8 shadow-xl">
               <form onSubmit={handleSubmit} className="space-y-6 text-xs font-semibold text-slate-700">
                 {/* Email / Phone input with AnimatedInput */}
                 <div className="pt-2">

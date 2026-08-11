@@ -246,12 +246,25 @@ export const getPublicHospitalDoctors = catchAsync(async (_req: Request, res: Re
       $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }]
     })
       .populate("department", "name consultationFee")
+      .populate("branch", "name code city address")
       .sort({ createdAt: -1 });
 
     return res.json({ status: "success", data: { doctors: doctors || [] } });
   } catch (err: any) {
     console.error("Error fetching public doctors:", err);
     return res.json({ status: "success", data: { doctors: [] } });
+  }
+});
+
+export const getPublicHospitalBranches = catchAsync(async (_req: Request, res: Response) => {
+  try {
+    const branches = await Branch.find({ status: { $ne: "inactive" } })
+      .select("name code city address phone status")
+      .sort({ name: 1 });
+    return res.json({ status: "success", data: { branches: branches || [] } });
+  } catch (err: any) {
+    console.error("Error fetching public branches:", err);
+    return res.json({ status: "success", data: { branches: [] } });
   }
 });
 

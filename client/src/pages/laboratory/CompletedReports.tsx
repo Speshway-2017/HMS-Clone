@@ -84,8 +84,7 @@ export function LaboratoryCompletedReports() {
       {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+          <h1 className="text-2xl font-bold text-slate-900">
             Completed Reports Module
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
@@ -214,7 +213,7 @@ export function LaboratoryCompletedReports() {
 
       {/* View Report Modal */}
       {selectedReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
           <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="bg-navy-900 p-5 text-white flex justify-between items-center">
               <div>
@@ -327,7 +326,7 @@ export function LaboratoryCompletedReports() {
 
       {/* Edit Report Modal */}
       {editingReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
           <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <form onSubmit={handleSaveEdit}>
               <div className="bg-amber-900 p-5 text-white flex justify-between items-center">
