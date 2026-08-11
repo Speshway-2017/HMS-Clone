@@ -394,7 +394,9 @@ export const getDoctorsAvailability = catchAsync(async (req: Request, res: Respo
   const busyDoctorIds = await getBusyDoctorIds(req.hospitalFilter!.hospital as any);
   const doctors = await Doctor.find({ hospital: req.hospitalFilter!.hospital as any }).populate("department", "name");
   const resolvedDoctors = doctors.map(d => {
-    return { ...d.toObject(), status: getDoctorDynamicStatus(d, busyDoctorIds) };
+    const docObj: any = d.toObject();
+    const spec = (docObj.specialization && docObj.specialization.trim() !== "") ? docObj.specialization.trim() : "";
+    return { ...docObj, specialization: spec, status: getDoctorDynamicStatus(d, busyDoctorIds) };
   });
   res.json({ status: "success", data: { doctors: resolvedDoctors } });
 });

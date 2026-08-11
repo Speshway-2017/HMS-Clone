@@ -14,6 +14,7 @@ import {
   getPublicHospital,
   getPublicHospitalDepartments,
   getPublicHospitalDoctors,
+  getPublicHospitalBranches,
   getPublicBookedSlots,
   createPublicAppointment,
   createPublicEnquiry,
@@ -27,6 +28,7 @@ const router = Router();
 router.get("/public", getPublicHospital);
 router.get("/public/departments", getPublicHospitalDepartments);
 router.get("/public/doctors", getPublicHospitalDoctors);
+router.get("/public/branches", getPublicHospitalBranches);
 router.get("/public/appointments/booked-slots", getPublicBookedSlots);
 router.post("/public/appointments", createPublicAppointment);
 router.post("/public/enquiries", createPublicEnquiry);

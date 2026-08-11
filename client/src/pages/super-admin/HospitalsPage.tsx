@@ -77,13 +77,13 @@ export function HospitalsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Hospitals Registry</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Hospitals Registry</h1>
           <p className="text-sm text-slate-500">Manage and monitor health facility performance across the enterprise network.</p>
         </div>
-        <Link to="/super-admin/hospitals/new">
-          <Button variant="primary">
+        <Link to="/super-admin/hospitals/new" className="shrink-0">
+          <Button variant="primary" className="w-full sm:w-auto">
             <Plus className="h-4 w-4" /> Add Hospital
           </Button>
         </Link>

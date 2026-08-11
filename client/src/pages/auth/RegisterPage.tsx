@@ -275,10 +275,10 @@ export function RegisterPage() {
       {/* --- RIGHT PANEL: Patient Registration Form --- */}
       <div className="flex-1 h-full overflow-y-auto px-4 py-8 sm:px-10 lg:px-12 bg-slate-50">
         <div className="mx-auto w-full max-w-3xl space-y-6 pb-12">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-                  <UserPlus className="h-6 w-6 text-indigo-650" />
+                <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+                  <UserPlus className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-650 shrink-0" />
                   Patient Self-Registration
                 </h2>
                 <p className="text-xs text-slate-500 font-medium mt-1">
@@ -287,7 +287,7 @@ export function RegisterPage() {
               </div>
               <Link
                 to="/login"
-                className="text-xs font-bold text-indigo-650 hover:text-indigo-800 hover:underline flex items-center gap-1"
+                className="text-xs font-bold text-indigo-650 hover:text-indigo-800 hover:underline flex items-center gap-1 shrink-0"
               >
                 Already registered? Sign In →
               </Link>

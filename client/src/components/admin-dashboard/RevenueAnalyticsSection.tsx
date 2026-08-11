@@ -59,11 +59,10 @@ export function RevenueAnalyticsSection({ invoices, hospitalCounts }: RevenueAna
       billingTypeMap.set(bType, (billingTypeMap.get(bType) || 0) + invTotal);
     });
 
-    // Fallback to backend aggregated counts if invoices array is filtered/paginated
-    if (yearlyRev === 0 && hospitalCounts?.totalRevenue) {
+    // Fallback to backend aggregated counts if invoices array is empty
+    if (yearlyRev === 0 && hospitalCounts?.totalRevenue && hospitalCounts.totalRevenue > 0) {
       yearlyRev = hospitalCounts.totalRevenue;
-      monthlyRev = hospitalCounts.totalRevenue * 0.4;
-      todaysRev = hospitalCounts.totalRevenue * 0.05;
+      if (monthlyRev === 0) monthlyRev = hospitalCounts.totalRevenue;
     }
 
     const billingTypeData = Array.from(billingTypeMap.entries()).map(([name, value]) => ({

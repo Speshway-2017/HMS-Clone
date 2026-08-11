@@ -150,6 +150,218 @@ export function HospitalAdminDashboard() {
     name: doc.name,
   }));
 
+  // --- FILTERING & RECALCULATING DATA BASED ON GLOBAL CONTROLS ---
+  const getDateObj = (val: any) => {
+    if (!val) return null;
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  const getFilterBounds = () => {
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+
+    if (dateRange === "today") {
+      // Today bounds
+    } else if (dateRange === "yesterday") {
+      start.setDate(start.getDate() - 1);
+      const endYest = new Date(start);
+      endYest.setHours(23, 59, 59, 999);
+      return { start, end: endYest };
+    } else if (dateRange === "7d") {
+      start.setDate(start.getDate() - 7);
+    } else if (dateRange === "30d") {
+      start.setDate(start.getDate() - 30);
+    } else if (dateRange === "3m" || (dateRange as string) === "90d") {
+      start.setDate(start.getDate() - 90);
+    } else if (dateRange === "6m" || (dateRange as string) === "180d") {
+      start.setDate(start.getDate() - 180);
+    } else if (dateRange === "1y") {
+      start.setDate(start.getDate() - 365);
+    }
+    return { start, end };
+  };
+
+  const { start: filterStart, end: filterEnd } = getFilterBounds();
+
+  const isInRange = (val: any) => {
+    if (!val) return true;
+    const d = getDateObj(val);
+    if (!d) return true;
+    return d >= filterStart && d <= filterEnd;
+  };
+
+  // Helper to check if item belongs to selected department
+  const matchesDepartment = (itemDept: any, itemDocDept?: any) => {
+    if (selectedDepartment === "all" || !selectedDepartment) return true;
+
+    const sel = selectedDepartment.toLowerCase().trim();
+
+    if (itemDept) {
+      if (typeof itemDept === "object") {
+        const id = String(itemDept._id || itemDept.id || "").toLowerCase().trim();
+        const name = String(itemDept.name || "").toLowerCase().trim();
+        if (id === sel || name === sel || name.includes(sel) || sel.includes(name)) return true;
+      } else {
+        const str = String(itemDept).toLowerCase().trim();
+        if (str === sel || str.includes(sel) || sel.includes(str)) return true;
+      }
+    }
+
+    if (itemDocDept) {
+      if (typeof itemDocDept === "object") {
+        const id = String(itemDocDept._id || itemDocDept.id || "").toLowerCase().trim();
+        const name = String(itemDocDept.name || "").toLowerCase().trim();
+        if (id === sel || name === sel || name.includes(sel) || sel.includes(name)) return true;
+      } else {
+        const str = String(itemDocDept).toLowerCase().trim();
+        if (str === sel || str.includes(sel) || sel.includes(str)) return true;
+      }
+    }
+
+    return false;
+  };
+
+  // Helper to check if item belongs to selected doctor
+  const matchesDoctor = (itemDoc: any) => {
+    if (selectedDoctor === "all" || !selectedDoctor) return true;
+
+    const sel = selectedDoctor.toLowerCase().trim();
+    if (!itemDoc) return false;
+
+    if (typeof itemDoc === "object") {
+      const id = String(itemDoc._id || itemDoc.id || "").toLowerCase().trim();
+      const name = String(itemDoc.name || "").toLowerCase().trim();
+      const cleanDocName = name.replace(/^dr\.\s*/i, "").trim();
+      const cleanSel = sel.replace(/^dr\.\s*/i, "").trim();
+      if (id === sel || name === sel || cleanDocName === cleanSel || name.includes(cleanSel) || cleanSel.includes(name)) return true;
+    } else {
+      const str = String(itemDoc).toLowerCase().trim();
+      const cleanDocName = str.replace(/^dr\.\s*/i, "").trim();
+      const cleanSel = sel.replace(/^dr\.\s*/i, "").trim();
+      if (str === sel || cleanDocName === cleanSel || str.includes(cleanSel) || cleanSel.includes(str)) return true;
+    }
+
+    return false;
+  };
+
+  // Helper to calculate appointment OPD fee
+  const getAppointmentFee = (app: any) => {
+    const rawFee = app.paidAmount || app.totalAmount || app.amount || app.fee || app.consultationFee;
+    if (rawFee !== undefined && rawFee !== null && rawFee !== "") {
+      const num = parseFloat(String(rawFee).replace(/[^0-9.]/g, ""));
+      if (!isNaN(num) && num > 0) return num;
+    }
+    if (app.doctor && typeof app.doctor === "object") {
+      const docFee = (app.doctor.consultationSettings as any)?.fee || app.doctor.consultationFee || app.doctor.fee;
+      if (docFee) {
+        const num = parseFloat(String(docFee).replace(/[^0-9.]/g, ""));
+        if (!isNaN(num) && num > 0) return num;
+      }
+    }
+    if (app.department && typeof app.department === "object" && app.department.consultationFee) {
+      const num = parseFloat(String(app.department.consultationFee).replace(/[^0-9.]/g, ""));
+      if (!isNaN(num) && num > 0) return num;
+    }
+    return 500;
+  };
+
+  // 1. Filtered Appointments
+  const filteredAppointments = appointmentsList.filter((app: any) => {
+    const appDate = app.appointmentDate || app.date || app.createdAt;
+    if (!isInRange(appDate)) return false;
+
+    const appDept = app.department || app.departmentId;
+    const appDocDept = app.doctor?.department || app.doctorId?.department;
+    if (!matchesDepartment(appDept, appDocDept)) return false;
+
+    const appDoc = app.doctor || app.doctorId;
+    if (!matchesDoctor(appDoc)) return false;
+
+    return true;
+  });
+
+  // 2. Filtered Invoices
+  const filteredInvoices = invoicesList.filter((inv: any) => {
+    const invDate = inv.issueDate || inv.createdAt || inv.date;
+    if (!isInRange(invDate)) return false;
+
+    const invDept = inv.department || inv.appointment?.department;
+    const invDocDept = inv.doctor?.department || inv.appointment?.doctor?.department;
+    if (!matchesDepartment(invDept, invDocDept)) return false;
+
+    const invDoc = inv.doctor || inv.doctorId || inv.appointment?.doctor;
+    if (!matchesDoctor(invDoc)) return false;
+
+    return true;
+  });
+
+  // 3. Filtered Admissions
+  const filteredAdmissions = admissionsList.filter((adm: any) => {
+    const admDate = adm.admissionDate || adm.createdAt;
+    if (!isInRange(admDate)) return false;
+
+    const admDept = adm.department || adm.doctor?.department;
+    if (!matchesDepartment(admDept)) return false;
+
+    const admDoc = adm.doctor || adm.doctorId;
+    if (!matchesDoctor(admDoc)) return false;
+
+    return true;
+  });
+
+  // 4. Filtered Doctors
+  const filteredDoctorsListArray = doctorsListArray.filter((doc: any) => {
+    const docDept = doc.department;
+    if (!matchesDepartment(docDept)) return false;
+    if (!matchesDoctor(doc)) return false;
+    return true;
+  });
+
+  // 5. Filtered Patients
+  const filteredPatientsList = patientsList.filter((pat: any) => {
+    const patDate = pat.createdAt || pat.registrationDate;
+    if (dateRange !== "30d" && dateRange !== "1y" && !isInRange(patDate)) {
+      const hasApp = filteredAppointments.some((a: any) => {
+        const patId = typeof a.patient === "object" ? a.patient?._id : a.patient;
+        return patId === pat._id || patId === pat.id;
+      });
+      if (!hasApp && !isInRange(patDate)) return false;
+    }
+    return true;
+  });
+
+  // 6. Dynamic Total Revenue Calculation (Invoices + Appointments OPD + IP Admissions)
+  const invoiceRevenue = filteredInvoices.reduce((sum: number, inv: any) => {
+    const status = (inv.status || "").toLowerCase();
+    if (status === "paid" || status === "partially_paid" || inv.paidAmount > 0 || inv.totalAmount) {
+      const amt = parseFloat(inv.paidAmount || inv.totalAmount || inv.amount || 0);
+      return sum + (isNaN(amt) ? 0 : amt);
+    }
+    return sum;
+  }, 0);
+
+  const appointmentOpdRevenue = filteredAppointments.reduce((sum: number, app: any) => {
+    const status = (app.status || "").toLowerCase();
+    if (status !== "cancelled") {
+      return sum + getAppointmentFee(app);
+    }
+    return sum;
+  }, 0);
+
+  const admissionIpRevenue = filteredAdmissions.reduce((sum: number, adm: any) => {
+    const amt = parseFloat(adm.paidAmount || adm.totalAmount || adm.advanceAmount || adm.depositAmount || 0);
+    return sum + (isNaN(amt) ? 0 : amt);
+  }, 0);
+
+  const calculatedFilteredRevenue = Math.max(invoiceRevenue, appointmentOpdRevenue + admissionIpRevenue);
+
+  const displayRevenue = (selectedDepartment !== "all" || selectedDoctor !== "all" || dateRange !== "30d")
+    ? (calculatedFilteredRevenue > 0 ? calculatedFilteredRevenue : appointmentOpdRevenue)
+    : (counts?.totalRevenue && counts.totalRevenue > 0 ? counts.totalRevenue : (calculatedFilteredRevenue || appointmentOpdRevenue));
+
   return (
     <div className="space-y-6 pb-12">
       {/* 1. Header with Hospital Identity & Status */}
@@ -199,18 +411,40 @@ export function HospitalAdminDashboard() {
         lastUpdated={lastUpdated}
       />
 
-      {/* 3. Preserved KPI Summary Cards Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Today's Appointments" value={counts?.todaysAppointments ?? 0} icon={<CalendarClock className="h-5 w-5" />} emphasis to="/admin/appointments" />
-        <KpiCard label="Bed Occupancy" value={`${counts?.bedOccupancyPercent ?? 0}%`} icon={<BedDouble className="h-5 w-5" />} trend={{ direction: "up", text: `${counts?.occupiedBeds ?? 0}/${counts?.totalBeds ?? 0} beds` }} to="/admin/departments" />
-        <KpiCard label="Total Revenue (Paid)" value={`₹${(counts?.totalRevenue ?? 0).toFixed(2)}`} icon={<Wallet className="h-5 w-5" />} to="/admin/finance" />
-        <KpiCard label="Critical Stock Alerts" value={counts?.criticalStockCount ?? 0} icon={<AlertTriangle className="h-5 w-5" />} to="/admin/inventory" />
+      {/* 3. Dynamic KPI Summary Cards Grid with Filter Synchronization */}
+      <div key={`kpi-${dateRange}-${selectedDepartment}-${selectedDoctor}`} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 transition-all duration-300 ease-in-out">
+        <KpiCard
+          label={dateRange === "today" ? "Today's Appointments" : "Appointments"}
+          value={filteredAppointments.length}
+          icon={<CalendarClock className="h-5 w-5" />}
+          emphasis
+          to="/admin/appointments"
+        />
+        <KpiCard
+          label="Bed Occupancy"
+          value={`${counts?.bedOccupancyPercent ?? 0}%`}
+          icon={<BedDouble className="h-5 w-5" />}
+          trend={{ direction: "up", text: `${counts?.occupiedBeds ?? 0}/${counts?.totalBeds ?? 0} beds` }}
+          to="/admin/departments"
+        />
+        <KpiCard
+          label="Total Revenue (Paid)"
+          value={`₹${displayRevenue.toFixed(2)}`}
+          icon={<Wallet className="h-5 w-5" />}
+          to="/admin/finance"
+        />
+        <KpiCard
+          label="Critical Stock Alerts"
+          value={counts?.criticalStockCount ?? 0}
+          icon={<AlertTriangle className="h-5 w-5" />}
+          to="/admin/inventory"
+        />
       </div>
 
       {/* Preserved Secondary KPI Grid & Quick Actions */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <KpiCard label="Doctors" value={counts?.totalDoctors ?? 0} icon={<Stethoscope className="h-5 w-5" />} to="/admin/doctors" />
-        <KpiCard label="Patients" value={counts?.totalPatients ?? 0} icon={<Users2 className="h-5 w-5" />} to="/admin/patients" />
+      <div key={`sec-kpi-${dateRange}-${selectedDepartment}-${selectedDoctor}`} className="grid grid-cols-1 gap-4 sm:grid-cols-3 transition-all duration-300 ease-in-out">
+        <KpiCard label="Doctors" value={filteredDoctorsListArray.length} icon={<Stethoscope className="h-5 w-5" />} to="/admin/doctors" />
+        <KpiCard label="Patients" value={filteredPatientsList.length} icon={<Users2 className="h-5 w-5" />} to="/admin/patients" />
 
         <Card className="flex items-center justify-between p-4">
           <div>
@@ -281,35 +515,37 @@ export function HospitalAdminDashboard() {
         </button>
       </div>
 
-      {/* 5. TAB 1: OVERVIEW (Unified Multi-Section ERP View) */}
-      {(activeTab === "overview" || activeTab === "patient_flow") && (
-        <div className="space-y-8">
-          <PatientAnalyticsSection patients={patientsList} admissions={admissionsList} appointments={appointmentsList} isLoading={loadingPatients} />
-          <OpIpAnalyticsSection patients={patientsList} appointments={appointmentsList} admissions={admissionsList} />
-          <PatientFlowSection appointments={appointmentsList} labRequests={labRequestsList} admissions={admissionsList} patients={patientsList} />
-        </div>
-      )}
+      {/* 5. TAB 1: OVERVIEW (Unified Multi-Section ERP View with Smooth Transitions) */}
+      <div key={`sections-${dateRange}-${selectedDepartment}-${selectedDoctor}`} className="transition-all duration-300 ease-in-out">
+        {(activeTab === "overview" || activeTab === "patient_flow") && (
+          <div className="space-y-8">
+            <PatientAnalyticsSection patients={filteredPatientsList} admissions={filteredAdmissions} appointments={filteredAppointments} isLoading={loadingPatients} />
+            <OpIpAnalyticsSection patients={filteredPatientsList} appointments={filteredAppointments} admissions={filteredAdmissions} />
+            <PatientFlowSection appointments={filteredAppointments} labRequests={labRequestsList} admissions={filteredAdmissions} patients={filteredPatientsList} />
+          </div>
+        )}
 
-      {(activeTab === "overview" || activeTab === "dept_doctors") && (
-        <div className="space-y-8 pt-4">
-          <DoctorAnalyticsSection doctors={doctorsListArray} appointments={appointmentsList} />
-          <DepartmentAnalyticsSection departments={departmentsListArray} invoices={invoicesList} appointments={appointmentsList} />
-          <AppointmentAnalyticsSection appointments={appointmentsList} />
-        </div>
-      )}
+        {(activeTab === "overview" || activeTab === "dept_doctors") && (
+          <div className="space-y-8 pt-4">
+            <DoctorAnalyticsSection doctors={filteredDoctorsListArray} appointments={filteredAppointments} />
+            <DepartmentAnalyticsSection departments={departmentsListArray} invoices={filteredInvoices} appointments={filteredAppointments} />
+            <AppointmentAnalyticsSection appointments={filteredAppointments} />
+          </div>
+        )}
 
-      {(activeTab === "overview" || activeTab === "revenue") && (
-        <div className="space-y-8 pt-4">
-          <RevenueAnalyticsSection invoices={invoicesList} hospitalCounts={counts} />
-        </div>
-      )}
+        {(activeTab === "overview" || activeTab === "revenue") && (
+          <div className="space-y-8 pt-4">
+            <RevenueAnalyticsSection invoices={filteredInvoices} hospitalCounts={{ ...counts, totalRevenue: displayRevenue }} />
+          </div>
+        )}
 
-      {(activeTab === "overview" || activeTab === "diagnostics") && (
-        <div className="space-y-8 pt-4">
-          <LabRadiologyPharmacySection labRequests={labRequestsList} inventory={inventoryList} />
-          <BedStaffEmergencySection beds={bedsList} staff={staffList} admissions={admissionsList} hospitalCounts={counts} />
-        </div>
-      )}
+        {(activeTab === "overview" || activeTab === "diagnostics") && (
+          <div className="space-y-8 pt-4">
+            <LabRadiologyPharmacySection labRequests={labRequestsList} inventory={inventoryList} />
+            <BedStaffEmergencySection beds={bedsList} staff={staffList} admissions={filteredAdmissions} hospitalCounts={counts} />
+          </div>
+        )}
+      </div>
 
       {/* 6. Live Activity Stream & Real-time Notification Panel */}
       <div className="pt-4">
