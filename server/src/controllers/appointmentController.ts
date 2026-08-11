@@ -53,7 +53,9 @@ const appointmentSchema = z.object({
   status: z.enum(APPOINTMENT_STATUSES).optional(),
   meetingLink: z.string().optional().default(""),
   notes: z.string().optional().default(""),
+
   reason: z.string().optional().default(""),
+
   billingStatus: z.string().optional(),
   paymentMethod: z.string().optional(),
 });
@@ -159,6 +161,7 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
 export const createAppointment = catchAsync(async (req: Request, res: Response) => {
   const body = appointmentSchema.parse(req.body);
 
+
   // Normalize appointment type string to valid APPOINTMENT_TYPES enum
   let apptType: "Appointment" | "Walk-in" | "Emergency" | "Video Consultation" | "Consultation" = "Appointment";
   const rawType = (req.body.type || body.type || "").toString().toLowerCase();
@@ -174,6 +177,7 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
     apptType = "Appointment";
   }
   body.type = apptType;
+
   const doctor = await Doctor.findById(body.doctor);
   if (!doctor || doctor.isActive === false) {
     throw new AppError("The selected doctor is inactive, retired, or does not exist.", 400);
@@ -217,6 +221,11 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
         isActive: true,
       });
       body.patient = newPat._id.toString();
+  // If patient field is missing or logged in as patient role, auto-find patient document
+  if (!body.patient || req.user!.role === "patient") {
+    const patientDoc = await Patient.findOne({ email: req.user!.email });
+    if (patientDoc) {
+      body.patient = patientDoc._id.toString();
     }
   }
 
@@ -364,6 +373,7 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
   });
   emitToHospital(hospitalId.toString(), "patient_updated", { patientId: body.patient });
   emitToHospital(hospitalId.toString(), "appointments_updated", { appointmentId: appointment._id });
+  emitToHospital(hospitalId.toString(), "appointment_created", { appointmentId: appointment._id, referenceId });
 
   try {
     const patDoc = await Patient.findById(body.patient);

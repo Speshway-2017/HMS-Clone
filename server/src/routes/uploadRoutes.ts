@@ -17,5 +17,7 @@ const handleMulterOptional = (req: any, res: any, next: any) => {
 
 router.use(protect, restrictTo("super_admin", "hospital_admin", "doctor", "receptionist", "accountant", "pharmacist", "laboratory", "nurse", "patient"));
 router.post("/", handleMulterOptional, uploadFile);
+router.use(protect, restrictTo("super_admin", "hospital_admin", "doctor", "receptionist", "accountant", "pharmacist", "laboratory", "nurse", "patient"));
+router.post("/", upload.single("file"), uploadFile);
 
 export default router;

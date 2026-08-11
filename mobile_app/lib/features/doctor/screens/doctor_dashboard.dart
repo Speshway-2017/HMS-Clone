@@ -250,7 +250,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Aditya Sharma (M, 48)',
+                      'No Active Queue Patient',
                       style: TextStyle(
                         fontSize: responsive.scaleText(14.0),
                         fontWeight: FontWeight.bold,
@@ -259,7 +259,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'Chief Complaint: Angina pectoris & palpitations',
+                      'Queue is currently clear. Next patient token will be announced here.',
                       style: TextStyle(
                         fontSize: 11,
                         color: AppColors.slate500,
@@ -272,7 +272,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                 icon: const Icon(Icons.chevron_right_rounded, color: AppColors.navy700),
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Consultation Workspace is pending integration.')),
+                    const SnackBar(content: Text('Consultation Workspace is pending active patient queue.')),
                   );
                 },
               ),
