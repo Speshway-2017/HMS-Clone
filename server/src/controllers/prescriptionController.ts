@@ -407,7 +407,11 @@ export const listPrescriptions = catchAsync(async (req: Request, res: Response) 
   
   const query: any = buildBranchQuery(req.hospitalFilter);
   if (status) {
-    query.status = status;
+    if (typeof status === "string") {
+      query.status = new RegExp(`^${status}$`, "i");
+    } else {
+      query.status = status;
+    }
   }
   if (patient) {
     query.patient = patient;
