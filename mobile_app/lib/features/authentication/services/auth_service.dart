@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/config/api_config.dart';
+import '../../../core/config/user_session.dart';
 
 class AuthService {
   final http.Client _client;
@@ -66,6 +67,17 @@ class AuthService {
         if (decoded['status'] == 'success' && decoded['data'] != null) {
           final data = decoded['data'];
           final user = data['user'];
+          final token = data['token'] as String?;
+          final patient = data['patient'] as Map<String, dynamic>?;
+
+          if (user != null && user['role'] != null) {
+            if (token != null) {
+              await UserSession.saveSession(
+                token: token,
+                user: user,
+                patient: patient,
+              );
+            }
           final token = data['token'];
           
           if (token != null) {
@@ -133,8 +145,21 @@ class AuthService {
 
       final decoded = jsonDecode(response.body);
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 201 || response.statusCode == 200) {
         if (decoded['status'] == 'success' && decoded['data'] != null) {
+          final data = decoded['data'];
+          final user = data['user'];
+          final token = data['token'] as String?;
+          final patient = data['patient'] as Map<String, dynamic>?;
+
+          if (user != null && user['role'] != null) {
+            if (token != null) {
+              await UserSession.saveSession(
+                token: token,
+                user: user,
+                patient: patient,
+              );
+            }
           final user = decoded['data']['user'];
           final token = decoded['data']['token']?.toString();
           if (token != null) {

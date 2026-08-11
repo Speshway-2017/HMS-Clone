@@ -23,6 +23,7 @@ import {
   markAllNurseNotificationsRead,
   snoozeNurseNotification,
   dismissNurseNotification,
+  sendNoteToAssignedDoctor
   sendNoteToAssignedDoctor,
   getNurses,
   administerMedication,
@@ -32,6 +33,14 @@ import { getStaffProfileMe } from "../controllers/staffController";
 
 const router = Router();
 
+// Protect and secure all endpoints — nurse role only
+router.use(protect, restrictTo("nurse"), scopeToHospital);
+
+router.get("/me", getStaffProfileMe);
+router.get("/shift-status", getNurseShiftStatus);
+router.get("/inpatients", getNurseInpatients);
+router.route("/inpatients/:id")
+  .get(getNurseInpatientDetails);
 // Allow nurse and hospital_admin to use these endpoints
 router.use(protect, restrictTo("nurse", "hospital_admin"), scopeToHospital);
 

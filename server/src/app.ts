@@ -39,6 +39,8 @@ import accountantRoutes from "./routes/accountantRoutes";
 import laboratoryRoutes from "./routes/laboratoryRoutes";
 import consultationRoutes from "./routes/consultationRoutes";
 import diagnosticReportRoutes from "./routes/diagnosticReportRoutes";
+import nurseRoutes from "./routes/nurseRoutes";
+
 import blogRoutes from "./routes/blogRoutes";
 import attendanceRoutes from "./routes/attendanceRoutes";
 import leaveRoutes from "./routes/leaveRoutes";

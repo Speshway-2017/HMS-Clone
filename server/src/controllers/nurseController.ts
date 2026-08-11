@@ -1303,6 +1303,7 @@ export const sendNoteToAssignedDoctor = catchAsync(async (req: Request, res: Res
   });
 });
 
+
 // Aliases for backwards compatibility with mobile and web routes
 export const getNursesInpatients = getNurseInpatients;
 export const getInpatientDetailsForNurse = getNurseInpatientDetails;
@@ -1322,3 +1323,4 @@ export const getNurses = catchAsync(async (req: Request, res: Response) => {
     data: nurses
   });
 });
+

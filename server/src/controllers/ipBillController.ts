@@ -15,6 +15,7 @@ import { Bed } from "../models/Bed";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { emitToHospital } from "../config/socket";
+import { buildBranchQuery } from "../utils/branchQueryHelper";
 
 // Helper: Calculate stay duration in days (minimum 1 day)
 const calculateStayDays = (admissionDate: Date, dischargeDate?: Date | null): number => {
@@ -500,11 +501,10 @@ export const getIPBillItemsSummary = async (bill: any, admission: any, hospitalI
 
 // 1. Search Currently Admitted Inpatients
 export const getActiveAdmittedPatients = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
   const search = (req.query.search as string) || "";
 
   let filter: Record<string, any> = {
-    hospital: hospitalId,
+    ...buildBranchQuery(req.hospitalFilter),
     status: { $nin: ["discharged", "Discharged", "Cancelled", "Expired", "Transferred Out (Final)"] }
   };
 
@@ -512,7 +512,7 @@ export const getActiveAdmittedPatients = catchAsync(async (req: Request, res: Re
     const searchRegex = new RegExp(search.trim(), "i");
     
     const matchedPatients = await Patient.find({
-      hospital: hospitalId,
+      ...buildBranchQuery(req.hospitalFilter),
       $or: [
         { name: searchRegex },
         { uhid: searchRegex },
@@ -581,6 +581,7 @@ export const createIPBill = catchAsync(async (req: Request, res: Response) => {
 
   const bill = await IPBill.create({
     hospital: hospitalId,
+    branch: (admission as any).branch || (req.hospitalFilter as any)?.branch || null,
     admission: admissionId,
     patient: admission.patient._id,
     billNumber,

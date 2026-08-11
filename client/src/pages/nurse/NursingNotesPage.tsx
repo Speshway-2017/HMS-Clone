@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { FileText, Search, AlertTriangle, Send, CheckCircle2, Plus, X, Loader2 } from "lucide-react";
+import { FileText, Search, RefreshCw, AlertTriangle, Send, CheckCircle2, Plus, X, Loader2, User } from "lucide-react";
 import toast from "react-hot-toast";
 import { useNurseInpatients, useSaveNurseNote, useSendNoteToDoctor } from "../../features/nurse";
 import { DataTable, Column } from "../../components/ui/DataTable";
@@ -18,6 +18,9 @@ export function NursingNotesPage() {
     mobility: "Ambulatory",
     additionalNotes: "",
   });
+
+
+  const { data: inpatients = [], isLoading, refetch } = useNurseInpatients();
 
   const { data: inpatients = [], refetch } = useNurseInpatients();
   const { data: staffMe } = useStaffProfileMe();
@@ -283,6 +286,7 @@ export function NursingNotesPage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
+
             <form onSubmit={handleSaveNote} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">

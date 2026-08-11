@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { login, register, checkPhone, refresh, logout, getMe, changePassword, forgotPassword, resetPassword, updateProfile } from "../controllers/authController";
 
 import { login, register, refresh, logout, getMe, changePassword, updateProfile, forgotPassword, resetPassword } from "../controllers/authController";
 
@@ -16,6 +17,7 @@ router.post("/refresh", refresh);
 router.post("/logout", logout);
 router.get("/me", protect, getMe);
 router.patch("/change-password", protect, authLimiter, changePassword);
+router.patch("/update-profile", protect, updateProfile);
 
 router.patch("/profile", protect, updateProfile);
 

@@ -13,6 +13,7 @@ import { Bed } from "../models/Bed";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { emitToHospital } from "../config/socket";
+import { buildBranchQuery } from "../utils/branchQueryHelper";
 
 // Helper: Calculate admission duration in days (minimum 1 day)
 const calculateDays = (admissionDate: Date, dischargeDate?: Date | null): number => {
@@ -535,11 +536,10 @@ const getIPRunningCharges = async (admission: any, hospitalId: any) => {
 
 // 1. Get Active Admissions List
 export const getActiveIPAdmissions = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
   const search = (req.query.search as string) || "";
 
   let filter: Record<string, any> = {
-    hospital: hospitalId,
+    ...buildBranchQuery(req.hospitalFilter),
     status: { $nin: ["discharged", "Discharged", "Cancelled", "Expired", "Transferred Out (Final)"] }
   };
 
@@ -548,7 +548,7 @@ export const getActiveIPAdmissions = catchAsync(async (req: Request, res: Respon
     
     // Find patients matching search term
     const matchedPatients = await Patient.find({
-      hospital: hospitalId,
+      ...buildBranchQuery(req.hospitalFilter),
       $or: [
         { name: searchRegex },
         { uhid: searchRegex },

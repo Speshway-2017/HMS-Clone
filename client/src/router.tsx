@@ -153,7 +153,6 @@ import { PatientDashboard } from "./pages/patient/Dashboard";
 // Nurse module
 import { NurseDashboard } from "./pages/nurse/Dashboard";
 import { AssignTaskPage } from "./pages/nurse/AssignTaskPage";
-
 export const router = createBrowserRouter([
   {
     element: <PublicLayout />,
@@ -416,6 +415,7 @@ export const router = createBrowserRouter([
         element: <DashboardLayout />,
         children: [
           { index: true, element: <NurseDashboardPage /> },
+
           { path: "dashboard", element: <NurseDashboardPage /> },
           { path: "assign-task", element: <AssignTaskPage /> },
           { path: "patients", element: <AssignedPatientsPage /> },

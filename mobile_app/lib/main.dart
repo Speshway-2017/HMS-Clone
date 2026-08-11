@@ -3,9 +3,12 @@ import 'core/config/api_config.dart';
 import 'routes/app_routes.dart';
 import 'theme/app_theme.dart';
 
+import 'core/config/user_session.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ApiConfig.init();
+  await UserSession.init();
   runApp(const HMSMobileApp());
 }
 
