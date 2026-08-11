@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { Types } from "mongoose";
 import { z } from "zod";
 import { Hospital } from "../models/Hospital";
 import { Branch } from "../models/Branch";
@@ -12,10 +13,13 @@ import { emitToHospital } from "../config/socket";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
+import { AppointmentSlotService } from "../services/appointmentSlotService";
+
+import { generateUniqueHospitalCode } from "../utils/idGenerator";
 
 const hospitalSchema = z.object({
   name: z.string().min(1),
-  code: z.string().min(1),
+  code: z.string().optional().default(""),
   address: z.string().optional().default(""),
   contactEmail: z.string().email().optional().or(z.literal("")).default(""),
   contactPhone: z.string().optional().default(""),
@@ -83,11 +87,28 @@ export const listHospitals = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+export const getHospitalCode = catchAsync(async (req: Request, res: Response) => {
+  const name = (req.query.name as string) || "";
+  const code = await generateUniqueHospitalCode(name);
+  res.json({ status: "success", data: { code } });
+});
+
 export const createHospital = catchAsync(async (req: Request, res: Response) => {
   const body = hospitalSchema.parse(req.body);
-  const { primaryAdminId, ...hospitalFields } = body;
+  let { code, primaryAdminId, ...hospitalFields } = body;
 
-  const hospital = await Hospital.create({ ...hospitalFields, createdBy: req.user!._id });
+  let generatedCode = code?.trim();
+  if (!generatedCode) {
+    generatedCode = await generateUniqueHospitalCode(body.name);
+  } else if (await Hospital.exists({ code: generatedCode.toUpperCase() })) {
+    generatedCode = await generateUniqueHospitalCode(body.name);
+  }
+
+  const hospital = await Hospital.create({
+    ...hospitalFields,
+    code: generatedCode.toUpperCase(),
+    createdBy: req.user!._id,
+  });
 
   if (primaryAdminId) {
     await User.findOneAndUpdate({ _id: primaryAdminId, role: "hospital_admin", hospital: null }, { hospital: hospital._id });
@@ -135,6 +156,8 @@ export const updateHospital = catchAsync(async (req: Request, res: Response) => 
     await User.findOneAndUpdate({ _id: primaryAdminId, role: "hospital_admin" }, { hospital: hospital._id });
   }
 
+  emitToHospital(hospital._id, "hospital:updated", hospital);
+
   res.json({ status: "success", data: { hospital } });
 });
 
@@ -143,6 +166,7 @@ export const deleteHospital = catchAsync(async (req: Request, res: Response) => 
   if (!hospital) {
     throw new AppError("Hospital not found.", 404);
   }
+  emitToHospital(req.params.id, "hospital:deleted", { id: req.params.id });
   res.status(204).send();
 });
 
@@ -173,6 +197,9 @@ export const updateMyHospital = catchAsync(async (req: Request, res: Response) =
     new: true,
     runValidators: true,
   });
+  if (hospital) {
+    emitToHospital(hospital._id, "hospital:updated", hospital);
+  }
   res.json({ status: "success", data: { hospital } });
 });
 
@@ -185,30 +212,72 @@ export const getPublicHospital = catchAsync(async (_req: Request, res: Response)
 });
 
 export const getPublicHospitalDepartments = catchAsync(async (_req: Request, res: Response) => {
-  let hospital = await Hospital.findOne({ status: "active" }).sort({ createdAt: 1 });
-  if (!hospital) {
-    hospital = await Hospital.findOne().sort({ createdAt: 1 });
+  try {
+    let hospital = await Hospital.findOne({ status: "active" }).sort({ createdAt: 1 });
+    if (!hospital) {
+      hospital = await Hospital.findOne().sort({ createdAt: 1 });
+    }
+
+    let departments: any[] = [];
+    if (hospital) {
+      departments = await Department.find({ hospital: hospital._id, isDisabled: { $ne: true } })
+        .populate("departmentHead", "name")
+        .sort({ displayOrder: 1 });
+    }
+
+    if (!departments || departments.length === 0) {
+      departments = await Department.find({ isDisabled: { $ne: true } })
+        .populate("departmentHead", "name")
+        .sort({ displayOrder: 1 });
+    }
+
+    res.json({ status: "success", data: { departments } });
+  } catch (err: any) {
+    console.error("Error fetching public departments:", err);
+    const fallbackDepts = await Department.find({}).catch(() => []);
+    res.json({ status: "success", data: { departments: fallbackDepts } });
   }
-  if (!hospital) {
-    return res.json({ status: "success", data: { departments: [] } });
-  }
-  const departments = await Department.find({ hospital: hospital._id, isDisabled: { $ne: true } })
-    .populate("departmentHead", "name")
-    .sort({ displayOrder: 1 });
-  res.json({ status: "success", data: { departments } });
 });
 
 export const getPublicHospitalDoctors = catchAsync(async (_req: Request, res: Response) => {
-  let hospital = await Hospital.findOne({ status: "active" }).sort({ createdAt: 1 });
-  if (!hospital) {
-    hospital = await Hospital.findOne().sort({ createdAt: 1 });
-  }
-  if (!hospital) {
+  try {
+    const doctors = await Doctor.find({
+      isActive: { $ne: false },
+      $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }]
+    })
+      .populate("department", "name consultationFee")
+      .populate("branch", "name code city address")
+      .sort({ createdAt: -1 });
+
+    return res.json({ status: "success", data: { doctors: doctors || [] } });
+  } catch (err: any) {
+    console.error("Error fetching public doctors:", err);
     return res.json({ status: "success", data: { doctors: [] } });
   }
-  const doctors = await Doctor.find({ hospital: hospital._id, isActive: { $ne: false } })
-    .populate("department", "name");
-  res.json({ status: "success", data: { doctors } });
+});
+
+export const getPublicHospitalBranches = catchAsync(async (_req: Request, res: Response) => {
+  try {
+    const branches = await Branch.find({ status: { $ne: "inactive" } })
+      .select("name code city address phone status")
+      .sort({ name: 1 });
+    return res.json({ status: "success", data: { branches: branches || [] } });
+  } catch (err: any) {
+    console.error("Error fetching public branches:", err);
+    return res.json({ status: "success", data: { branches: [] } });
+  }
+});
+
+export const getPublicBookedSlots = catchAsync(async (req: Request, res: Response) => {
+  const { doctorId, date } = req.query as Record<string, string>;
+  if (!doctorId || !date) {
+    return res.json({ status: "success", data: { bookedSlots: [] } });
+  }
+
+  // Delegate to the shared AppointmentSlotService — single source of truth.
+  // No hospitalId scope for public routes (doctor may be cross-hospital in a multi-tenant setup).
+  const bookedSlots = await AppointmentSlotService.getBookedSlots(doctorId, date);
+  res.json({ status: "success", data: { bookedSlots } });
 });
 
 export const createPublicAppointment = catchAsync(async (req: Request, res: Response) => {
@@ -287,32 +356,55 @@ export const createPublicAppointment = catchAsync(async (req: Request, res: Resp
 export const createPublicEnquiry = catchAsync(async (req: Request, res: Response) => {
   const { name, email, subject, message } = req.body;
   
+  const nameStr = name?.trim() || "";
+  const emailStr = email?.trim() || "";
+  const messageStr = message?.trim() || "";
+
+  if (!nameStr || !emailStr || !messageStr) {
+    throw new AppError("Name, email, and message are required fields.", 400);
+  }
+
   let hospital = await Hospital.findOne({ status: "active" }).sort({ createdAt: 1 });
   if (!hospital) {
     hospital = await Hospital.findOne().sort({ createdAt: 1 });
   }
   if (!hospital) {
-    throw new AppError("No active hospital configuration found.", 404);
+    hospital = await Hospital.create({
+      name: "Sunrise Hospital",
+      code: "MAIN",
+      tagline: "Advanced Healthcare & Patient Care",
+      status: "active"
+    });
   }
   
   const enquiry = await Enquiry.create({
     hospital: hospital._id,
-    name: name.trim(),
-    email: email.trim(),
-    subject: subject?.trim() || "",
-    message: message.trim(),
+    name: nameStr,
+    email: emailStr,
+    subject: subject?.trim() || "General Enquiry",
+    message: messageStr,
     status: "pending"
   });
   
-  // Emit socket event
-  emitToHospital(hospital._id, "new_enquiry", enquiry);
+  // Emit socket event for real-time admin dashboard update
+  try {
+    emitToHospital(hospital._id.toString(), "new_enquiry", enquiry);
+    emitToHospital(hospital._id.toString(), "dashboard_update", enquiry);
+  } catch (err) {
+    console.error("Socket emit error:", err);
+  }
   
   res.status(201).json({ status: "success", data: { enquiry } });
 });
 
 export const listHospitalEnquiries = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
-  const enquiries = await Enquiry.find({ hospital: hospitalId }).sort({ createdAt: -1 });
+  const hospitalId = req.hospitalFilter?.hospital;
+  let enquiries;
+  if (hospitalId) {
+    enquiries = await Enquiry.find({ hospital: hospitalId }).sort({ createdAt: -1 });
+  } else {
+    enquiries = await Enquiry.find({}).sort({ createdAt: -1 });
+  }
   res.json({ status: "success", data: { enquiries } });
 });
 
@@ -327,6 +419,7 @@ export const updateEnquiryStatus = catchAsync(async (req: Request, res: Response
   if (!enquiry) {
     throw new AppError("Enquiry not found", 404);
   }
+  emitToHospital(hospitalId, "enquiry:updated", enquiry);
   res.json({ status: "success", data: { enquiry } });
 });
 

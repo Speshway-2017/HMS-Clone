@@ -146,6 +146,7 @@ export interface Doctor {
   monthlyAvailability?: Array<{ date: string; from: string; to: string; active: boolean }>;
   languages?: string;
   consultationFee?: string;
+  opExpiryLimit?: number;
 }
 
 export interface Staff {
@@ -163,6 +164,7 @@ export interface Staff {
   checkInTime: string;
   taskLoad: number;
   rating: number;
+  assignedPatients?: any[];
 }
 
 export interface MedicalHistoryEntry {
@@ -192,6 +194,7 @@ export interface Patient {
   uhid?: string;
   insuranceProvider: string;
   insurancePolicyNumber: string;
+  emergencyContact?: { name?: string; phone?: string; relation?: string };
   medicalHistory: MedicalHistoryEntry[];
   createdAt: string;
 }
@@ -206,6 +209,7 @@ export interface Appointment {
   time: string;
   type: string;
   status: "pending_payment" | "scheduled" | "checked_in" | "in_consultation" | "completed" | "cancelled" | "no_show";
+  meetingLink?: string;
   notes: string;
   chiefComplaint?: string;
   symptoms?: string;
@@ -279,4 +283,5 @@ export interface Invoice {
   issuedAt: string;
   dueDate: string | null;
   totals: InvoiceTotals;
+  billingType?: string;
 }

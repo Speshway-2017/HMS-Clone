@@ -8,18 +8,20 @@ import { InputField, SelectField, TextareaField } from "../../components/ui/Fiel
 import { FileUpload } from "../../components/ui/FileUpload";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
+import { api } from "../../lib/api";
 
 export function DoctorFormPage() {
   const { id } = useParams();
   const isEdit = !!id;
   const navigate = useNavigate();
   const { data } = useDoctor(id);
-  const { data: departments } = useDepartments();
+  const { data: departments } = useDepartments({ activeOnly: true });
   const createDoctor = useCreateDoctor();
   const updateDoctor = useUpdateDoctor(id ?? "");
 
   const [form, setForm] = useState({
     name: "",
+    gender: "Male",
     email: "",
     phone: "",
     photoUrl: "",
@@ -30,15 +32,30 @@ export function DoctorFormPage() {
     licenseNo: "",
     status: "on_duty" as "on_duty" | "on_leave" | "off_duty",
     rating: 0,
+    opExpiryLimit: 10,
   });
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ email: string; tempPassword: string } | null>(null);
+
+  useEffect(() => {
+    if (!isEdit) {
+      api.get("/staff/next-employee-id", { params: { role: "doctor" } })
+        .then((res) => {
+          const nextId = res.data.data?.employeeId;
+          if (nextId) {
+            setForm((prev) => ({ ...prev, licenseNo: nextId }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isEdit]);
 
   useEffect(() => {
     if (data?.doctor) {
       const doctor = data.doctor;
       setForm({
         name: doctor.name,
+        gender: (doctor as any).gender || "Male",
         email: doctor.email,
         phone: doctor.phone,
         photoUrl: doctor.photoUrl,
@@ -49,6 +66,7 @@ export function DoctorFormPage() {
         licenseNo: doctor.licenseNo,
         status: doctor.status,
         rating: doctor.rating,
+        opExpiryLimit: doctor.opExpiryLimit ?? 10,
       });
     }
   }, [data]);
@@ -145,6 +163,11 @@ export function DoctorFormPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         <FormSection icon={UserPlus} title="Personal Information">
           <InputField label="Full Name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Sarah J. Montgomery" />
+          <SelectField label="Gender *" required value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </SelectField>
           <InputField
             label="Email Address (used for login)"
             type="email"
@@ -179,7 +202,13 @@ export function DoctorFormPage() {
           </SelectField>
           <InputField label="Specialization" value={form.specialization} onChange={(e) => setForm({ ...form, specialization: e.target.value })} placeholder="e.g. Cardiology" />
           <InputField label="Qualification" value={form.qualification} onChange={(e) => setForm({ ...form, qualification: e.target.value })} placeholder="e.g. MD, FACC, PhD" />
-          <InputField label="License No." value={form.licenseNo} onChange={(e) => setForm({ ...form, licenseNo: e.target.value })} placeholder="e.g. MED-2024-001" />
+          <InputField
+            label="Doctor / License ID (Auto-Generated)"
+            value={form.licenseNo}
+            onChange={(e) => setForm({ ...form, licenseNo: e.target.value })}
+            placeholder="Auto-generating Doctor ID..."
+            hint="Role prefix: DOC (Unique hospital & branch doctor ID)"
+          />
           <InputField
             label="Patient Satisfaction Rating (0-100)"
             type="number"
@@ -187,6 +216,13 @@ export function DoctorFormPage() {
             max={100}
             value={form.rating}
             onChange={(e) => setForm({ ...form, rating: Number(e.target.value) })}
+          />
+          <InputField
+            label="OP Consultation Expiry Limit (Days)"
+            type="number"
+            min={0}
+            value={form.opExpiryLimit}
+            onChange={(e) => setForm({ ...form, opExpiryLimit: Number(e.target.value) })}
           />
         </FormSection>
 

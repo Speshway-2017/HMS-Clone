@@ -59,56 +59,108 @@ export function PendingPrescriptionsPage() {
           <p className="text-xs text-slate-400">All prescriptions are completed and dispensed.</p>
         </Card>
       ) : (
-        <div className="overflow-hidden bg-white rounded-xl border border-slate-200 shadow-sm">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Patient Name</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Diagnosis</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Medicines</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-slate-200">
-              {prescriptions?.map((presc) => {
-                const patient = presc.patient as any;
-                const patientName = patient?.name || "Unknown Patient";
+        <>
+          {/* Card-based layout for mobile and tablet */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:hidden">
+            {prescriptions?.map((presc) => {
+              const patient = presc.patient as any;
+              const patientName = patient?.name || "Unknown Patient";
 
-                return (
-                  <tr key={presc._id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-slate-900">{patientName}</div>
-                      <div className="text-xs text-slate-400">{patient?.age ? `${patient.age} Y · ${patient.gender}` : ""}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{presc.diagnosis}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600">
-                      <ul className="list-disc list-inside">
-                        {presc.medicines.map((m, idx) => (
+              return (
+                <Card key={presc._id} className="p-4 space-y-3 border border-slate-100 hover:border-slate-200 transition-all shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-bold text-slate-800 text-sm">{patientName}</h4>
+                      <p className="text-xs text-slate-400 font-medium">
+                        {patient?.age ? `${patient.age} Y · ${patient.gender}` : ""}
+                      </p>
+                    </div>
+                    <Badge tone="warning">Pending Fulfillment</Badge>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-2 text-xs border-t border-slate-50 pt-2 font-medium">
+                    <div>
+                      <span className="text-slate-400 font-extrabold uppercase text-[9px] block">Diagnosis</span>
+                      <span className="text-slate-700">{presc.diagnosis}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-extrabold uppercase text-[9px] block mb-1">Medicines</span>
+                      <ul className="list-disc list-inside text-slate-700 space-y-0.5">
+                        {(presc.medications || presc.medicines || []).map((m, idx) => (
                           <li key={idx}>
                             <span className="font-semibold">{m.name}</span> — {m.dosage} ({m.frequency} for {m.duration})
                           </li>
                         ))}
                       </ul>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge tone="warning">Pending Fulfillment</Badge>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => handleComplete(presc._id)}
-                        disabled={completeMutation.isPending}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition-colors"
-                      >
-                        <CheckCircle className="h-3.5 w-3.5" /> Complete Prescription
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-50">
+                    <button
+                      onClick={() => handleComplete(presc._id)}
+                      disabled={completeMutation.isPending}
+                      className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition-colors"
+                    >
+                      <CheckCircle className="h-3.5 w-3.5" /> Complete Prescription
+                    </button>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Table layout for desktops */}
+          <div className="hidden lg:block bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Patient Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Diagnosis</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Medicines</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-slate-200">
+                {prescriptions?.map((presc) => {
+                  const patient = presc.patient as any;
+                  const patientName = patient?.name || "Unknown Patient";
+
+                  return (
+                    <tr key={presc._id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-slate-900">{patientName}</div>
+                        <div className="text-xs text-slate-400">{patient?.age ? `${patient.age} Y · ${patient.gender}` : ""}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{presc.diagnosis}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        <ul className="list-disc list-inside">
+                          {(presc.medications || presc.medicines || []).map((m, idx) => (
+                            <li key={idx}>
+                              <span className="font-semibold">{m.name}</span> — {m.dosage} ({m.frequency} for {m.duration})
+                            </li>
+                          ))}
+                        </ul>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Badge tone="warning">Pending Fulfillment</Badge>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={() => handleComplete(presc._id)}
+                          disabled={completeMutation.isPending}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition-colors"
+                        >
+                          <CheckCircle className="h-3.5 w-3.5" /> Complete Prescription
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

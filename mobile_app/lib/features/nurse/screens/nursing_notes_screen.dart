@@ -48,59 +48,7 @@ class _NursingNotesScreenState extends State<NursingNotesScreen> {
       final inpatients = await _nurseService.getInpatients();
       setState(() {
         _inpatients = inpatients;
-        
-        // Seed default mockup notes
-        _notes = [
-          {
-            'id': 'note-1',
-            'patientId': inpatients.isNotEmpty ? inpatients.first['patient']['_id'] : 'pat-1',
-            'patientName': inpatients.isNotEmpty ? inpatients.first['patient']['name'] : 'Sita Devi',
-            'uhid': inpatients.isNotEmpty ? inpatients.first['patient']['uhid'] : 'UHID-982341',
-            'ward': 'General Ward B',
-            'room': 'Room 202 • Bed 3',
-            'date': '28/07/2026',
-            'time': '10:15 AM',
-            'nurse': 'Sr. Priya Nair, RN',
-            'observation': 'Patient is conscious, alert, and oriented. Complaining of mild headache. Administered prescribed analgesic.',
-            'symptoms': 'Mild headache, slight fatigue',
-            'medication': 'Paracetamol 650mg PO',
-            'status': 'Routine',
-            'vitals': {
-              'temp': '98.6 °F',
-              'bp': '120/80',
-              'pulse': '72 bpm',
-              'resp': '16 bpm',
-              'spo2': '98%',
-            },
-            'notes': 'Will monitor vitals again in 2 hours. Urged patient to increase fluid intake.',
-            'attachments': ['observation_chart_v1.pdf'],
-          },
-          {
-            'id': 'note-2',
-            'patientId': inpatients.length > 1 ? inpatients[1]['patient']['_id'] : 'pat-2',
-            'patientName': inpatients.length > 1 ? inpatients[1]['patient']['name'] : 'Rahul Verma',
-            'uhid': inpatients.length > 1 ? inpatients[1]['patient']['uhid'] : 'UHID-184752',
-            'ward': 'ICU Care Station',
-            'room': 'ICU Room 04 • Bed 1',
-            'date': '28/07/2026',
-            'time': '08:30 AM',
-            'nurse': _currentNurseName,
-            'observation': 'SpO2 level dropped suddenly. Patient showed signs of dyspnea. Put on low-flow oxygen mask and called attending doctor.',
-            'symptoms': 'Shortness of breath, anxiety',
-            'medication': 'Albuterol Nebulizer treatment',
-            'status': 'Critical',
-            'vitals': {
-              'temp': '99.1 °F',
-              'bp': '135/90',
-              'pulse': '98 bpm',
-              'resp': '24 bpm',
-              'spo2': '91%',
-            },
-            'notes': 'Oxygen set at 4L/min. Dr. Anand notified. SpO2 recovered to 96% after 15 mins.',
-            'attachments': ['ecg_log_0830.png'],
-          }
-        ];
-
+        _notes = [];
         _isLoading = false;
       });
     } catch (e) {

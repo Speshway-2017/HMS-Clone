@@ -10,7 +10,11 @@ import {
   startProcessing,
   uploadReport,
   verifyReport,
-  publishReport
+  publishReport,
+  collectSample,
+  submitResults,
+  getCompletedReports,
+  editReport
 } from "../controllers/laboratoryController";
 
 const router = Router();
@@ -31,13 +35,17 @@ const uploader = multer({
 router.use(protect, scopeToHospital);
 
 router.get("/requests", restrictTo("laboratory", "hospital_admin"), getRequests);
+router.get("/completed-reports", restrictTo("laboratory", "hospital_admin", "doctor"), getCompletedReports);
 
 router.use(restrictTo("laboratory"));
 
 router.post("/:requestId/accept", acceptRequest);
+router.post("/:requestId/collect-sample", collectSample);
 router.post("/:requestId/reject", rejectRequest);
 router.post("/:requestId/start-processing", startProcessing);
+router.post("/:requestId/results", submitResults);
 router.post("/:requestId/upload-report", uploader.any(), uploadReport);
+router.post("/reports/:reportId/edit", uploader.any(), editReport);
 router.post("/:requestId/verify", verifyReport);
 router.post("/:requestId/publish", publishReport);
 

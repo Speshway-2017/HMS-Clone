@@ -1,9 +1,27 @@
 import { useState, useEffect } from "react";
-import { Eye, EyeOff, KeyRound, ShieldCheck, CheckCircle2, XCircle, Lock } from "lucide-react";
-import { useChangePassword } from "../../features/auth";
+import {
+  User,
+  ShieldCheck,
+  Lock,
+  KeyRound,
+  Bell,
+  Building,
+  CheckCircle2,
+  XCircle,
+  Eye,
+  EyeOff,
+  Save,
+  Smartphone,
+  Globe,
+  Mail
+} from "lucide-react";
+import { useChangePassword, useUpdateProfile } from "../../features/auth";
 import { useAuth } from "../../context/AuthContext";
 import { useMyHospital, useUpdateMyHospital } from "../../features/hospitals";
 import { FileUpload } from "../../components/ui/FileUpload";
+import { Card } from "../../components/ui/Card";
+import { Badge } from "../../components/ui/Badge";
+import toast from "react-hot-toast";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -26,7 +44,7 @@ function PasswordInput({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium text-slate-700">
+      <label htmlFor={id} className="text-xs font-semibold uppercase text-slate-400">
         {label}
       </label>
       <div className="relative">
@@ -52,187 +70,346 @@ function PasswordInput({
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+function Section({ title, subtitle, icon, children }: {
+  title: string; subtitle: string; icon: React.ReactNode; children: React.ReactNode;
+}) {
+  return (
+    <Card>
+      <div className="mb-5 flex items-center gap-3 pb-4 border-b border-slate-100">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy-100 text-navy-700">
+          {icon}
+        </div>
+        <div>
+          <h2 className="text-base font-semibold text-slate-800">{title}</h2>
+          <p className="text-xs text-slate-500">{subtitle}</p>
+        </div>
+      </div>
+      {children}
+    </Card>
+  );
+}
+
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm text-slate-700">{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-navy-500 focus:ring-offset-2 ${
+          checked ? "bg-navy-700" : "bg-slate-200"
+        }`}
+      >
+        <span
+          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform ${
+            checked ? "translate-x-5" : "translate-x-0"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
+// ─── Main Restructured Settings Page ─────────────────────────────────────────
 
 export function SettingsPage() {
-  const { user } = useAuth();
-  const { mutate, isPending } = useChangePassword();
+  const { user, refreshUser } = useAuth();
+  const { mutate: changePassword, isPending: isChangingPassword } = useChangePassword();
+  const updateProfileMutation = useUpdateProfile();
 
+  const [activeSection, setActiveSection] = useState<"profile" | "security" | "notifications" | "hospital">("profile");
+
+  // Profile form state
+  const [fullName, setFullName] = useState(user?.name || "");
+  const [email, setEmail] = useState(user?.email || "");
+
+  // Password state
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  // Notification preferences state (persisted locally)
+  const [emailAlerts, setEmailAlerts] = useState(() => localStorage.getItem("setting_email_alerts") !== "false");
+  const [smsAlerts, setSmsAlerts] = useState(() => localStorage.getItem("setting_sms_alerts") !== "false");
+  const [whatsappAlerts, setWhatsappAlerts] = useState(() => localStorage.getItem("setting_whatsapp_alerts") !== "false");
+  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem("setting_sound_enabled") !== "false");
+
+  useEffect(() => {
+    if (user) {
+      setFullName(user.name || "");
+      setEmail(user.email || "");
+    }
+  }, [user]);
 
   const passwordsMatch = newPassword !== "" && newPassword === confirmPassword;
   const passwordsMismatch = confirmPassword !== "" && newPassword !== confirmPassword;
 
-  function showToast(type: "success" | "error", message: string) {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 4500);
-  }
-
-  function handleSubmit(e: React.FormEvent) {
+  const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
+    updateProfileMutation.mutate(
+      { name: fullName },
+      {
+        onSuccess: () => {
+          refreshUser();
+          toast.success("Profile details updated successfully!");
+        },
+        onError: (err: any) => {
+          toast.error(err?.response?.data?.message || "Failed to update profile.");
+        }
+      }
+    );
+  };
 
+  const handleAvatarChange = async (url: string) => {
+    updateProfileMutation.mutate(
+      { avatarUrl: url },
+      {
+        onSuccess: () => {
+          refreshUser();
+          toast.success("Profile photo updated successfully!");
+        },
+        onError: (err: any) => {
+          toast.error(err?.response?.data?.message || "Failed to save profile photo.");
+        }
+      }
+    );
+  };
+
+  const handleChangePassword = (e: React.FormEvent) => {
+    e.preventDefault();
     if (passwordsMismatch) {
-      showToast("error", "Passwords do not match.");
+      toast.error("Passwords do not match.");
       return;
     }
-
-    mutate(
+    changePassword(
       { newPassword, confirmPassword },
       {
         onSuccess: () => {
-          showToast("success", "Password changed successfully!");
+          toast.success("Password changed successfully!");
           setNewPassword("");
           setConfirmPassword("");
         },
-        onError: (err: unknown) => {
-          const msg =
-            (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-            "Something went wrong. Please try again.";
-          showToast("error", msg);
-        },
-      },
+        onError: (err: any) => {
+          toast.error(err?.response?.data?.message || "Failed to change password.");
+        }
+      }
     );
-  }
+  };
+
+  const handleSavePreferences = (e: React.FormEvent) => {
+    e.preventDefault();
+    localStorage.setItem("setting_email_alerts", String(emailAlerts));
+    localStorage.setItem("setting_sms_alerts", String(smsAlerts));
+    localStorage.setItem("setting_whatsapp_alerts", String(whatsappAlerts));
+    localStorage.setItem("setting_sound_enabled", String(soundEnabled));
+    toast.success("Notification preferences saved successfully!");
+  };
+
+  const TABS = [
+    { id: "profile", label: "Profile", icon: <User className="h-4 w-4" /> },
+    { id: "security", label: "Security", icon: <KeyRound className="h-4 w-4" /> },
+    { id: "notifications", label: "Notifications", icon: <Bell className="h-4 w-4" /> },
+    ...(user?.role === "hospital_admin"
+      ? [{ id: "hospital", label: "Hospital Rules", icon: <Building className="h-4 w-4" /> }]
+      : [])
+  ];
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
-      {/* ── Page header ── */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">Settings</h1>
-        <p className="mt-1 text-sm text-slate-500">Manage your account preferences</p>
+    <div className="space-y-6">
+      {/* ── Page Header ── */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
+          <p className="text-sm text-slate-500">Manage your profile, security, and system preferences.</p>
+        </div>
+        <Badge tone="info">{user?.role ? user.role.replace("_", " ").toUpperCase() + " PORTAL" : "SYSTEM PORTAL"}</Badge>
       </div>
 
-      {/* ── Profile card (read-only info) ── */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-4">
-          {user?.avatarUrl ? (
-            <img
-              src={user.avatarUrl}
-              alt={user.name}
-              className="h-16 w-16 rounded-full object-cover ring-4 ring-navy-100"
-            />
-          ) : (
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-navy-100 text-navy-700 ring-4 ring-navy-50">
-              <span className="text-2xl font-bold">
-                {user?.name?.charAt(0).toUpperCase() ?? "?"}
-              </span>
-            </div>
-          )}
-          <div>
-            <p className="text-lg font-semibold text-slate-800">{user?.name}</p>
-            <p className="text-sm text-slate-500">{user?.email}</p>
-            <span className="mt-1 inline-block rounded-full bg-navy-100 px-2.5 py-0.5 text-xs font-medium capitalize text-navy-700">
-              {user?.role?.replace("_", " ")}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Change password card ── */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy-100">
-            <KeyRound className="h-5 w-5 text-navy-700" />
-          </div>
-          <div>
-            <h2 className="text-base font-semibold text-slate-800">Change Password</h2>
-            <p className="text-xs text-slate-500">Set a new password for your account.</p>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-          <PasswordInput
-            id="newPassword"
-            label="New Password"
-            value={newPassword}
-            onChange={setNewPassword}
-            placeholder="Enter your new password"
-            autoComplete="new-password"
-          />
-
-          <div>
-            <PasswordInput
-              id="confirmPassword"
-              label="Confirm New Password"
-              value={confirmPassword}
-              onChange={setConfirmPassword}
-              placeholder="Re-enter your new password"
-              autoComplete="new-password"
-            />
-            {confirmPassword && (
-              <p
-                className={`mt-1.5 flex items-center gap-1.5 text-xs ${
-                  passwordsMatch ? "text-emerald-600" : "text-red-500"
-                }`}
-              >
-                {passwordsMatch ? (
-                  <>
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Passwords match
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="h-3.5 w-3.5" /> Passwords do not match
-                  </>
-                )}
-              </p>
+      {/* ── Profile Summary Banner ── */}
+      <Card className="p-0 overflow-hidden">
+        <div className="bg-gradient-to-r from-navy-700 to-navy-800 px-6 py-5">
+          <div className="flex items-center gap-5">
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.name}
+                className="h-16 w-16 rounded-full object-cover ring-4 ring-white/30"
+              />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/20 ring-4 ring-white/30">
+                <span className="text-2xl font-bold text-white">
+                  {user?.name?.charAt(0).toUpperCase() ?? "U"}
+                </span>
+              </div>
             )}
+            <div>
+              <p className="text-xl font-bold text-white">{user?.name ?? "User"}</p>
+              <p className="text-sm text-navy-200">{user?.email}</p>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-medium text-white capitalize">
+                  Role: {user?.role?.replace("_", " ") ?? "Staff"}
+                </span>
+              </div>
+            </div>
           </div>
+        </div>
+      </Card>
 
-          <div className="flex items-center justify-between pt-2">
-            <p className="flex items-center gap-1.5 text-xs text-slate-400">
-              <Lock className="h-3.5 w-3.5" />
-              Your password is encrypted end-to-end
-            </p>
-            <button
-              id="btn-change-password"
-              type="submit"
-              disabled={isPending || !newPassword || !confirmPassword}
-              className="flex items-center gap-2 rounded-xl bg-navy-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-navy-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isPending ? (
-                <>
-                  <svg
-                    className="h-4 w-4 animate-spin"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                  >
-                    <circle className="opacity-25" cx="12" cy="12" r="10" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                  </svg>
-                  Saving…
-                </>
-              ) : (
-                <>
-                  <ShieldCheck className="h-4 w-4" />
-                  Update Password
-                </>
-              )}
-            </button>
-          </div>
-        </form>
+      {/* ── Tab Navigation ── */}
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-200 pb-px">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveSection(tab.id as any)}
+            className={`flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 ${
+              activeSection === tab.id
+                ? "border-navy-700 text-navy-700 font-semibold"
+                : "border-transparent text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            {tab.icon} {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* ── Toast notification ── */}
-      {toast && (
-        <div
-          role="alert"
-          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-4 text-sm font-medium shadow-xl transition-all animate-in slide-in-from-bottom-4 ${
-            toast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
-          }`}
-        >
-          {toast.type === "success" ? (
-            <CheckCircle2 className="h-5 w-5 shrink-0" />
-          ) : (
-            <XCircle className="h-5 w-5 shrink-0" />
-          )}
-          {toast.message}
+      {/* ══════════════════ PROFILE TAB ══════════════════ */}
+      {activeSection === "profile" && (
+        <div className="space-y-5">
+          <Section title="Personal Information" subtitle="Your basic personal and account identity details." icon={<User className="h-5 w-5 text-navy-700" />}>
+            <form onSubmit={handleSaveProfile} className="space-y-5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold uppercase text-slate-400">Full Display Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold uppercase text-slate-400">Email Address (ReadOnly)</label>
+                  <input
+                    type="email"
+                    disabled
+                    value={email}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-500 cursor-not-allowed"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 border-t border-slate-100 pt-4">
+                <FileUpload
+                  label="Upload Profile Avatar"
+                  folder={user?.role === "doctor" ? "doctor-photos" : "staff-photos"}
+                  value={user?.avatarUrl || ""}
+                  onChange={handleAvatarChange}
+                  hint="PNG, JPG or WEBP (Max 2MB)"
+                />
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  disabled={updateProfileMutation.isPending}
+                  className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Save className="h-4 w-4" />
+                  {updateProfileMutation.isPending ? "Saving..." : "Save Profile"}
+                </button>
+              </div>
+            </form>
+          </Section>
         </div>
       )}
 
-      {user?.role === "hospital_admin" && (
+      {/* ══════════════════ SECURITY TAB ══════════════════ */}
+      {activeSection === "security" && (
+        <div className="space-y-5">
+          <Section title="Change Password" subtitle="Set a strong new password for your account." icon={<KeyRound className="h-5 w-5 text-navy-700" />}>
+            <form onSubmit={handleChangePassword} className="space-y-5" noValidate>
+              <PasswordInput
+                id="newPassword"
+                label="New Password *"
+                value={newPassword}
+                onChange={setNewPassword}
+                placeholder="Enter your new strong password"
+                autoComplete="new-password"
+              />
+
+              <div>
+                <PasswordInput
+                  id="confirmPassword"
+                  label="Confirm New Password *"
+                  value={confirmPassword}
+                  onChange={setConfirmPassword}
+                  placeholder="Re-enter your new password"
+                  autoComplete="new-password"
+                />
+                {confirmPassword && (
+                  <p className={`mt-1.5 flex items-center gap-1.5 text-xs font-semibold ${passwordsMatch ? "text-emerald-600" : "text-red-500"}`}>
+                    {passwordsMatch ? (
+                      <>
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Passwords match
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-3.5 w-3.5" /> Passwords do not match
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <p className="flex items-center gap-1.5 text-xs text-slate-400">
+                  <Lock className="h-3.5 w-3.5" /> Encrypted end-to-end with bcrypt
+                </p>
+                <button
+                  type="submit"
+                  disabled={isChangingPassword || !newPassword || !confirmPassword || passwordsMismatch}
+                  className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  {isChangingPassword ? "Updating..." : "Update Password"}
+                </button>
+              </div>
+            </form>
+          </Section>
+        </div>
+      )}
+
+      {/* ══════════════════ NOTIFICATIONS TAB ══════════════════ */}
+      {activeSection === "notifications" && (
+        <div className="space-y-5">
+          <Section title="Notification Preferences" subtitle="Customize your alert delivery channels." icon={<Bell className="h-5 w-5 text-navy-700" />}>
+            <form onSubmit={handleSavePreferences} className="space-y-4">
+              <div className="space-y-3 rounded-lg border border-slate-100 p-4">
+                <Toggle checked={emailAlerts} onChange={setEmailAlerts} label="Email Notifications & Receipts" />
+                <Toggle checked={smsAlerts} onChange={setSmsAlerts} label="SMS Phone Text Alerts" />
+                <Toggle checked={whatsappAlerts} onChange={setWhatsappAlerts} label="WhatsApp Appointment Reminders" />
+                <Toggle checked={soundEnabled} onChange={setSoundEnabled} label="Dashboard Sound Alerts & Chimes" />
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors"
+                >
+                  <Save className="h-4 w-4" /> Save Preferences
+                </button>
+              </div>
+            </form>
+          </Section>
+        </div>
+      )}
+
+      {/* ══════════════════ HOSPITAL RULES TAB (HOSPITAL ADMIN ONLY) ══════════════════ */}
+      {activeSection === "hospital" && user?.role === "hospital_admin" && (
         <HospitalSettingsCard />
       )}
     </div>
@@ -250,10 +427,7 @@ function HospitalSettingsCard() {
   const [logoUrl, setLogoUrl] = useState("");
   const [opExpiryLimit, setOpExpiryLimit] = useState(10);
   const [availableLabTests, setAvailableLabTests] = useState<string[]>([]);
-  const [labInput, setLabInput] = useState("");
   const [availableRadiologyTests, setAvailableRadiologyTests] = useState<string[]>([]);
-  const [radioInput, setRadioInput] = useState("");
-  const [toastMsg, setToastMsg] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   useEffect(() => {
     if (hospital) {
@@ -268,35 +442,6 @@ function HospitalSettingsCard() {
     }
   }, [hospital]);
 
-  const showLocalToast = (type: "success" | "error", message: string) => {
-    setToastMsg({ type, message });
-    setTimeout(() => setToastMsg(null), 4000);
-  };
-
-  const handleAddLab = () => {
-    const trimmed = labInput.trim();
-    if (trimmed && !availableLabTests.includes(trimmed)) {
-      setAvailableLabTests([...availableLabTests, trimmed]);
-      setLabInput("");
-    }
-  };
-
-  const handleRemoveLab = (testToRemove: string) => {
-    setAvailableLabTests(availableLabTests.filter((t) => t !== testToRemove));
-  };
-
-  const handleAddRadio = () => {
-    const trimmed = radioInput.trim();
-    if (trimmed && !availableRadiologyTests.includes(trimmed)) {
-      setAvailableRadiologyTests([...availableRadiologyTests, trimmed]);
-      setRadioInput("");
-    }
-  };
-
-  const handleRemoveRadio = (testToRemove: string) => {
-    setAvailableRadiologyTests(availableRadiologyTests.filter((t) => t !== testToRemove));
-  };
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -310,121 +455,104 @@ function HospitalSettingsCard() {
         availableLabTests,
         availableRadiologyTests,
       });
-      showLocalToast("success", "Hospital settings updated successfully!");
+      toast.success("Hospital settings updated successfully!");
     } catch (err: any) {
-      showLocalToast("error", err?.response?.data?.message || err?.message || "Failed to update hospital settings.");
+      toast.error(err?.response?.data?.message || err?.message || "Failed to update hospital settings.");
     }
   };
 
   if (isLoading) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex items-center justify-center">
-        <span className="text-slate-500 text-sm">Loading hospital settings...</span>
-      </div>
+      <Card>
+        <div className="py-8 text-center text-xs font-semibold text-slate-400">Loading hospital settings...</div>
+      </Card>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm relative">
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy-100">
-          <ShieldCheck className="h-5 w-5 text-navy-700" />
-        </div>
-        <div>
-          <h2 className="text-base font-semibold text-slate-800">Hospital Settings</h2>
-          <p className="text-xs text-slate-550">Configure global hospital rules and policies.</p>
-        </div>
-      </div>
-
+    <Section title="Hospital Settings & System Rules" subtitle="Configure global hospital information, branding, and consultation validity." icon={<Building className="h-5 w-5 text-navy-700" />}>
       <form onSubmit={handleSave} className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">Hospital Name</label>
+            <label className="text-xs font-semibold uppercase text-slate-400">Hospital Name *</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-800 outline-none transition focus:border-navy-500 focus:ring-2 focus:ring-navy-200"
+              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
               required
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">Hospital Code (ReadOnly)</label>
+            <label className="text-xs font-semibold uppercase text-slate-400">Hospital Code (ReadOnly)</label>
             <input
               type="text"
               value={hospital?.code || ""}
               disabled
-              className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-500 cursor-not-allowed outline-none"
+              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-500 cursor-not-allowed"
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">Contact Email</label>
+            <label className="text-xs font-semibold uppercase text-slate-400">Contact Email</label>
             <input
               type="email"
               value={contactEmail}
               onChange={(e) => setContactEmail(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-800 outline-none transition focus:border-navy-500 focus:ring-2 focus:ring-navy-200"
+              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">Contact Phone</label>
+            <label className="text-xs font-semibold uppercase text-slate-400">Contact Phone</label>
             <input
-              type="text"
+              type="tel"
               value={contactPhone}
-              onChange={(e) => setContactPhone(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-800 outline-none transition focus:border-navy-500 focus:ring-2 focus:ring-navy-200"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5 sm:col-span-2 border-t border-slate-100 pt-4">
-            <label className="text-sm font-medium text-slate-700">Hospital Logo</label>
-            <FileUpload
-              label="Hospital Logo"
-              folder="hospital-logos"
-              value={logoUrl}
-              onChange={setLogoUrl}
+              onKeyDown={(e) => {
+                const allowed = ["Backspace", "Delete", "Tab", "Escape", "Enter", "ArrowLeft", "ArrowRight", "+"];
+                if (!allowed.includes(e.key) && !e.ctrlKey && !e.metaKey && !/^[0-9]$/.test(e.key)) e.preventDefault();
+              }}
+              onChange={(e) => setContactPhone(e.target.value.replace(/(?!^\+)[^\d]/g, ""))}
+              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
             />
           </div>
         </div>
 
-        <div className="flex flex-col gap-1.5 border-t border-slate-100 pt-4">
-          <label className="text-sm font-semibold text-slate-850">OP Consultation Expiry Limit (Days)</label>
-          <p className="text-xs text-slate-400">Specify the number of days a completed OP consultation remains valid for free revisits. After this period, patients will be charged consultation fees again.</p>
+        <div className="border-t border-slate-100 pt-4">
+          <FileUpload
+            label="Hospital Branding Logo"
+            folder="hospital-logos"
+            value={logoUrl}
+            onChange={setLogoUrl}
+          />
+        </div>
+
+        <div className="border-t border-slate-100 pt-4 space-y-1.5">
+          <label className="text-xs font-semibold uppercase text-slate-400">OP Consultation Expiry Limit (Days)</label>
+          <p className="text-xs text-slate-500">Number of days a completed OP consultation remains valid for free revisits.</p>
           <input
             type="number"
             min="1"
             max="180"
             value={opExpiryLimit}
             onChange={(e) => setOpExpiryLimit(Number(e.target.value))}
-            className="w-full sm:w-1/3 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-800 outline-none transition focus:border-navy-500 focus:ring-2 focus:ring-navy-200"
+            className="w-full sm:w-1/3 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
             required
           />
         </div>
 
-        <div className="flex justify-end pt-2">
+        <div className="flex justify-end pt-3">
           <button
             type="submit"
             disabled={updateMutation.isPending}
-            className="rounded-xl bg-navy-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-navy-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 animate-all"
+            className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {updateMutation.isPending ? "Saving..." : "Save Settings"}
+            <Save className="h-4 w-4" />
+            {updateMutation.isPending ? "Saving..." : "Save Hospital Settings"}
           </button>
         </div>
       </form>
-
-      {toastMsg && (
-        <div
-          role="alert"
-          className={`absolute bottom-4 right-4 z-55 flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold shadow-lg transition-all animate-in slide-in-from-bottom-2 ${
-            toastMsg.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
-          }`}
-        >
-          {toastMsg.message}
-        </div>
-      )}
-    </div>
+    </Section>
   );
 }

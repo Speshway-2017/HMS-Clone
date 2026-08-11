@@ -35,17 +35,26 @@ export function getDoctorDynamicStatus(doctor: any, busyDoctorIds: Set<string>):
   return "off_duty";
 }
 
-export async function getBusyDoctorIds(hospitalId: Types.ObjectId): Promise<Set<string>> {
+export async function getBusyDoctorIds(hospitalId?: any): Promise<Set<string>> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const busyQueues = await Queue.find({
-    hospital: hospitalId,
+  const filter: Record<string, any> = {
     status: "called",
     createdAt: { $gte: today, $lt: tomorrow }
-  }).select("doctor");
+  };
+  if (hospitalId) {
+    if (typeof hospitalId === "object" && (hospitalId.hospital || "branch" in hospitalId)) {
+      if (hospitalId.hospital) filter.hospital = hospitalId.hospital;
+      if (hospitalId.branch) filter.branch = hospitalId.branch;
+    } else {
+      filter.hospital = hospitalId;
+    }
+  }
 
-  return new Set(busyQueues.map(q => q.doctor.toString()));
+  const busyQueues = await Queue.find(filter).select("doctor");
+
+  return new Set(busyQueues.filter(q => q && q.doctor).map(q => q.doctor.toString()));
 }

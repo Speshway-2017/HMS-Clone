@@ -13,14 +13,15 @@ import {
 } from "lucide-react";
 import { Card } from "../../components/ui/Card";
 import { KpiCard } from "../../components/ui/KpiCard";
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar } from "recharts";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, PieChart, Pie, Cell, Legend, LineChart, Line, ComposedChart } from "recharts";
 import { usePatients } from "../../features/patients";
-
+import { useInvoices } from "../../features/invoices";
 import { useLaboratoryRequests } from "../../features/laboratory";
 
 export function LaboratoryDashboard() {
   const navigate = useNavigate();
   const { data: dbRequests = [], isLoading: isRequestsLoading } = useLaboratoryRequests();
+  const { data: invoiceData, isLoading: isInvoicesLoading } = useInvoices({ billingType: "LAB", limit: 100 });
 
   const [stats, setStats] = useState({
     pendingRequests: 0,
@@ -31,6 +32,7 @@ export function LaboratoryDashboard() {
   });
 
   const [criticalAlerts, setCriticalAlerts] = useState<any[]>([]);
+  const [inventoryList, setInventoryList] = useState<any[]>([]);
 
   useEffect(() => {
     const savedInventory = localStorage.getItem("hms_laboratory_inventory") || "[]";
@@ -54,27 +56,127 @@ export function LaboratoryDashboard() {
     // Check inventory alerts
     const lowStock = inventory.filter((item: any) => item.quantity <= item.reorderLevel);
     setCriticalAlerts(lowStock.slice(0, 3));
+
+    if (inventory.length === 0) {
+      const initialItems = [
+        { _id: "LAB-INV-001", name: "CBC Diluent (Cellpack)", sku: "RE-CBC-01", category: "Reagent", quantity: 12, unit: "containers", expiryDate: "2027-02-15", reorderLevel: 5, batchNo: "B-CB991", storageTemp: "15 - 30°C" },
+        { _id: "LAB-INV-002", name: "HbA1c Reagent Kit", sku: "RE-HBA-02", category: "Reagent", quantity: 3, unit: "kits", expiryDate: "2026-09-10", reorderLevel: 5, batchNo: "B-HB202", storageTemp: "2 - 8°C" },
+        { _id: "LAB-INV-003", name: "Lipid Panel Cassettes", sku: "RE-LPD-03", category: "Reagent", quantity: 80, unit: "pieces", expiryDate: "2026-11-20", reorderLevel: 100, batchNo: "B-LP405", storageTemp: "2 - 8°C" },
+        { _id: "LAB-INV-004", name: "Blood Collection Tubes (Purple Top)", sku: "CS-TUBE-01", category: "Consumable", quantity: 450, unit: "pieces", expiryDate: "2028-06-30", reorderLevel: 200, batchNo: "B-PT001", storageTemp: "15 - 30°C" },
+        { _id: "LAB-INV-005", name: "Sterile Syringes 5ml", sku: "CS-SYR-02", category: "Consumable", quantity: 180, unit: "pieces", expiryDate: "2028-08-15", reorderLevel: 200, batchNo: "B-SR002", storageTemp: "15 - 30°C" }
+      ];
+      localStorage.setItem("hms_laboratory_inventory", JSON.stringify(initialItems));
+      setInventoryList(initialItems);
+    } else {
+      setInventoryList(inventory);
+    }
   }, [dbRequests]);
 
-  const weeklyTrendData = [
-    { name: "Mon", CBC: 12, Lipid: 8, LFT: 6, HbA1c: 15 },
-    { name: "Tue", CBC: 19, Lipid: 12, LFT: 10, HbA1c: 18 },
-    { name: "Wed", CBC: 15, Lipid: 10, LFT: 8, HbA1c: 22 },
-    { name: "Thu", CBC: 22, Lipid: 14, LFT: 12, HbA1c: 25 },
-    { name: "Fri", CBC: 28, Lipid: 18, LFT: 15, HbA1c: 30 },
-    { name: "Sat", CBC: 10, Lipid: 6, LFT: 5, HbA1c: 12 },
-    { name: "Sun", CBC: 4, Lipid: 2, LFT: 2, HbA1c: 5 },
-  ];
+  // 1. Weekly priority trends (last 7 days)
+  const last7DaysList = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    return d.toISOString().split("T")[0];
+  }).reverse();
+  const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const liveWeeklyTrend = last7DaysList.map(dateStr => {
+    const dObj = new Date(dateStr);
+    const dayName = daysOfWeek[dObj.getDay()];
+    const dayRequests = dbRequests.filter((r: any) => {
+      const rDate = new Date(r.createdAt || r.date).toISOString().split("T")[0];
+      return rDate === dateStr;
+    });
+    return {
+      name: dayName,
+      Routine: dayRequests.filter((r: any) => r.priority === "Routine").length,
+      Urgent: dayRequests.filter((r: any) => r.priority === "Urgent").length,
+      STAT: dayRequests.filter((r: any) => r.priority === "STAT").length
+    };
+  });
 
-  const deptData = [
-    { name: "Hematology", volume: 145 },
-    { name: "Biochemistry", volume: 189 },
-    { name: "Microbiology", volume: 45 },
-    { name: "Immunology", volume: 68 },
-    { name: "Pathology", volume: 22 }
-  ];
+  // 2. Volume by investigation test name (top 5 requested tests)
+  const testCounts: Record<string, number> = {};
+  dbRequests.forEach((r: any) => {
+    (r.tests || []).forEach((t: string) => {
+      testCounts[t] = (testCounts[t] || 0) + 1;
+    });
+  });
+  const liveDeptData = Object.entries(testCounts)
+    .map(([name, volume]) => ({ name, volume }))
+    .sort((a, b) => b.volume - a.volume)
+    .slice(0, 5);
 
-  if (isRequestsLoading) {
+  // 3. Billing Status (Paid vs Outstanding/Pending LAB Invoices)
+  const rawInvoices = invoiceData?.data || [];
+  let paidAmt = 0;
+  let pendingAmt = 0;
+  rawInvoices.forEach((inv: any) => {
+    const amt = inv.totals?.total || inv.total || 0;
+    if (inv.status === "paid") {
+      paidAmt += amt;
+    } else {
+      pendingAmt += amt;
+    }
+  });
+  const billingStatusData = [
+    { name: "Paid Lab Fees", value: paidAmt, color: "#10b981" },
+    { name: "Outstanding Unpaid", value: pendingAmt, color: "#f59e0b" }
+  ].filter(d => d.value > 0);
+
+  // 4. Test Requests Status split
+  const reqStatusCounts: Record<string, number> = {};
+  dbRequests.forEach((r: any) => {
+    const st = r.status || "pending";
+    const label = st === "report_uploaded" ? "Report Uploaded" : st.charAt(0).toUpperCase() + st.slice(1);
+    reqStatusCounts[label] = (reqStatusCounts[label] || 0) + 1;
+  });
+  const statusDistribution = Object.entries(reqStatusCounts).map(([name, value]) => ({
+    name,
+    value
+  }));
+
+  // 5. Revisits vs New requests
+  const patientRequestCounts: Record<string, number> = {};
+  dbRequests.forEach((r: any) => {
+    if (r.patientId) {
+      patientRequestCounts[r.patientId] = (patientRequestCounts[r.patientId] || 0) + 1;
+    }
+  });
+  let newRequests = 0;
+  let revisitRequests = 0;
+  dbRequests.forEach((r: any) => {
+    if (r.patientId && patientRequestCounts[r.patientId] > 1) {
+      revisitRequests++;
+    } else {
+      newRequests++;
+    }
+  });
+  const patientTypeData = [
+    { name: "First-Time Request", value: newRequests, color: "#3b82f6" },
+    { name: "Follow-up / Revisit", value: revisitRequests, color: "#8b5cf6" }
+  ].filter(d => d.value > 0);
+
+  // 6. Reports Delivery Funnel
+  let delivered = 0;
+  let ready = 0;
+  let processing = 0;
+  let awaitingSample = 0;
+  dbRequests.forEach((r: any) => {
+    if (r.status === "completed") delivered++;
+    else if (r.status === "verified" || r.status === "report_uploaded") ready++;
+    else if (r.status === "processing" || r.status === "accepted") processing++;
+    else if (r.status === "pending") awaitingSample++;
+  });
+  const deliveryStatusData = [
+    { name: "Awaiting Sample", value: awaitingSample, color: "#6b7280" },
+    { name: "Processing", value: processing, color: "#3b82f6" },
+    { name: "Ready for Delivery", value: ready, color: "#f59e0b" },
+    { name: "Delivered & Closed", value: delivered, color: "#10b981" }
+  ].filter(d => d.value > 0);
+
+  const COLORS = ["#1e3a8a", "#10b981", "#3b82f6", "#f59e0b", "#ec4899", "#8b5cf6"];
+
+  if (isRequestsLoading || isInvoicesLoading) {
     return (
       <div className="flex h-[400px] items-center justify-center">
         <div className="text-slate-500 font-medium">Loading laboratory dashboard...</div>
@@ -145,8 +247,8 @@ export function LaboratoryDashboard() {
         <Card className="lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h3 className="text-base font-semibold text-slate-800">Weekly Test Volume</h3>
-              <p className="text-xs text-slate-500">Number of diagnostic reports processed by type.</p>
+              <h3 className="text-base font-semibold text-slate-800">Weekly Test Priority & Growth</h3>
+              <p className="text-xs text-slate-500">Live monitoring of Routine (bar), Urgent (line), and emergency STAT (line) requests.</p>
             </div>
             <Link to="/laboratory/reports" className="text-xs font-semibold text-navy-700 hover:text-navy-800 flex items-center gap-1">
               View Reports <ArrowRight className="h-3 w-3" />
@@ -154,23 +256,18 @@ export function LaboratoryDashboard() {
           </div>
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={weeklyTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorCBC" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563EB" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#2563EB" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
+              <ComposedChart data={liveWeeklyTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                 <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: "#64748B", fontSize: 11 }} />
                 <YAxis tickLine={false} axisLine={false} tick={{ fill: "#64748B", fontSize: 11 }} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: "#FFFFFF", borderRadius: "8px", border: "1px solid #CBD5E1" }}
                 />
-                <Area type="monotone" dataKey="CBC" stroke="#2563EB" strokeWidth={2} fillOpacity={1} fill="url(#colorCBC)" />
-                <Area type="monotone" dataKey="HbA1c" stroke="#10B981" strokeWidth={2} fill="none" />
-                <Area type="monotone" dataKey="Lipid" stroke="#F59E0B" strokeWidth={2} fill="none" />
-              </AreaChart>
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="Routine" name="Routine tests" fill="#3b82f6" opacity={0.85} radius={[4, 4, 0, 0]} maxBarSize={24} />
+                <Line type="monotone" dataKey="Urgent" name="Urgent priority" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="STAT" name="STAT / Emergency" stroke="#ef4444" strokeWidth={3} dot={{ r: 4 }} />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </Card>
@@ -234,21 +331,54 @@ export function LaboratoryDashboard() {
         </Card>
       </div>
 
-      {/* Lab sections bar chart and alerts */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Department Volume Chart */}
+      {/* Lab sections bar chart, inventory quantities and alerts */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Investigation Volume Chart */}
         <Card>
-          <h3 className="mb-4 text-base font-semibold text-slate-800">Diagnostic Volume by Department</h3>
+          <h3 className="mb-4 text-base font-semibold text-slate-800">Diagnostic Volume by Investigation</h3>
           <div className="h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={deptData} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
-                <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: "#64748B", fontSize: 11 }} />
-                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: "#64748B", fontSize: 11 }} width={90} />
-                <Tooltip />
-                <Bar dataKey="volume" fill="#2563EB" radius={[0, 4, 4, 0]} barSize={16} />
-              </BarChart>
-            </ResponsiveContainer>
+            {liveDeptData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-slate-400 text-xs">No investigation requests logged.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={liveDeptData} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                  <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: "#64748B", fontSize: 11 }} />
+                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: "#64748B", fontSize: 11 }} width={90} />
+                  <Tooltip />
+                  <Bar dataKey="volume" fill="#2563EB" radius={[0, 4, 4, 0]} barSize={16} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </Card>
+
+        {/* Lab Inventory Stock Levels */}
+        <Card>
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-base font-semibold text-slate-800">Laboratory Inventory Stock</h3>
+            <Link to="/laboratory/inventory" className="text-xs font-semibold text-navy-700 hover:text-navy-800">
+              Manage
+            </Link>
+          </div>
+          <div className="h-[250px]">
+            {inventoryList.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-slate-400 text-xs">No inventory items.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={inventoryList} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                  <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: "#64748B", fontSize: 11 }} />
+                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: "#64748B", fontSize: 11 }} width={90} />
+                  <Tooltip formatter={(value: number, name: string, props: any) => [`${value} ${props.payload.unit || "units"}`, "Quantity"]} />
+                  <Bar dataKey="quantity" name="Stock Qty" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={16}>
+                    {inventoryList.map((entry, idx) => (
+                      <Cell key={`cell-${idx}`} fill={entry.quantity <= entry.reorderLevel ? "#ef4444" : "#8b5cf6"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </Card>
 
@@ -276,6 +406,134 @@ export function LaboratoryDashboard() {
                   </div>
                 </div>
               ))
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {/* Live Lab Diagnostics & Billing Analytics Grid */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Billing Status collections split */}
+        <Card>
+          <h3 className="mb-4 text-base font-semibold text-slate-800">Laboratory Billing Analytics</h3>
+          <div className="h-[250px]">
+            {billingStatusData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-slate-400 text-xs">No billing logs found.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={billingStatusData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={3}
+                  >
+                    {billingStatusData.map((entry, idx) => (
+                      <Cell key={`cell-${idx}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v: number) => [`₹${v.toLocaleString("en-IN")}`]} />
+                  <Legend
+                    formatter={(value) => <span className="text-[11px] text-slate-650 font-medium">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </Card>
+
+        {/* Test Request Status Split */}
+        <Card>
+          <h3 className="mb-4 text-base font-semibold text-slate-800">Test Requests Status split</h3>
+          <div className="h-[250px]">
+            {statusDistribution.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-slate-400 text-xs">No requests logged.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={statusDistribution}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={0}
+                    outerRadius={80}
+                    paddingAngle={0}
+                  >
+                    {statusDistribution.map((entry, idx) => (
+                      <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v: number) => [`${v} Requests`]} />
+                  <Legend
+                    formatter={(value) => <span className="text-[11px] text-slate-650 font-medium">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Revisits vs New Requests */}
+        <Card>
+          <h3 className="mb-4 text-base font-semibold text-slate-800">Revisits vs New Requests</h3>
+          <div className="h-[250px]">
+            {patientTypeData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-slate-400 text-xs">No patient requests.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={patientTypeData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={3}
+                  >
+                    {patientTypeData.map((entry, idx) => (
+                      <Cell key={`cell-${idx}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v: number) => [`${v} Requests`]} />
+                  <Legend
+                    formatter={(value) => <span className="text-[11px] text-slate-650 font-medium">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </Card>
+
+        {/* Delivery & Processing Pipeline status */}
+        <Card>
+          <h3 className="mb-4 text-base font-semibold text-slate-800">Reports Delivery Pipeline</h3>
+          <div className="h-[250px]">
+            {deliveryStatusData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-slate-400 text-xs">No active reports in delivery.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={deliveryStatusData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: "#64748B" }} />
+                  <YAxis tick={{ fontSize: 10, fill: "#64748B" }} />
+                  <Tooltip formatter={(v: number) => [`${v} Reports`]} />
+                  <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={28}>
+                    {deliveryStatusData.map((entry, idx) => (
+                      <Cell key={`cell-${idx}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             )}
           </div>
         </Card>

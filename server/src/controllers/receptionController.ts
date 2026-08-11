@@ -1,3 +1,4 @@
+import { BillingService } from "../services/billingService";
 import { Request, Response } from "express";
 import { z } from "zod";
 import { catchAsync } from "../utils/catchAsync";
@@ -6,6 +7,7 @@ import { ReceptionRepository } from "../repositories/receptionRepository";
 import { AppError } from "../utils/AppError";
 import { Types } from "mongoose";
 import { getDoctorDynamicStatus, getBusyDoctorIds } from "../utils/doctorStatus";
+import { buildBranchQuery } from "../utils/branchQueryHelper";
 import { Doctor } from "../models/Doctor";
 import { Patient } from "../models/Patient";
 import { Queue } from "../models/Queue";
@@ -16,6 +18,7 @@ import { IPBill } from "../models/IPBill";
 import { IPBillPayment } from "../models/IPBillPayment";
 import { Appointment } from "../models/Appointment";
 import { getIPBillItemsSummary } from "./ipBillController";
+import { AppointmentSlotService } from "../services/appointmentSlotService";
 
 
 // Validation Schemas
@@ -23,7 +26,7 @@ const patientRegistrationSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().min(5, "Phone is required"),
-  age: z.coerce.number().min(0, "Age must be positive"),
+  age: z.coerce.number().min(0, "Age must be at least 0").max(150, "Age cannot exceed 150 years"),
   gender: z.string().min(1, "Gender is required"),
   bloodGroup: z.string().default(""),
   address: z.string().default(""),
@@ -71,8 +74,9 @@ const admissionSchema = z.object({
   ward: z.string().min(1, "Ward is required"),
   roomId: z.string().min(1, "Room ID is required"),
   bedId: z.string().min(1, "Bed ID is required"),
-  attenderName: z.string().min(1, "Attender name is required"),
-  attenderPhone: z.string().min(1, "Attender phone is required"),
+  attenderName: z.string().optional().default(""),
+  attenderPhone: z.string().optional().default(""),
+  assignedNurse: z.string().min(1, "Assigned nurse is required"),
   insuranceProvider: z.string().optional().default(""),
   insurancePolicyNumber: z.string().optional().default(""),
   advanceAmount: z.coerce.number().min(0).default(0),
@@ -96,42 +100,37 @@ const admissionSchema = z.object({
 
 export const getPatientDetail = catchAsync(async (req: Request, res: Response) => {
   const result = await ReceptionService.getPatientDetail(
-    req.hospitalFilter!.hospital as any,
+    req.hospitalFilter as any,
     req.params.id
   );
   res.json({ status: "success", data: result });
 });
 
 export const getDashboardStats = catchAsync(async (req: Request, res: Response) => {
-  await ReceptionService.generateScheduledAlerts(req.hospitalFilter!.hospital as any);
-  const stats = await ReceptionService.getStats(req.hospitalFilter!.hospital as any);
+  const stats = await ReceptionService.getStats(req.hospitalFilter as any);
   res.json({ status: "success", data: stats });
 });
 
 export const registerPatient = catchAsync(async (req: Request, res: Response) => {
   const patientData = patientRegistrationSchema.parse(req.body);
   const patient = await ReceptionService.registerPatient(
-    req.hospitalFilter!.hospital as any,
+    req.hospitalFilter as any,
     patientData,
     req.user!._id
   );
   res.status(201).json({
     success: true,
     patientId: patient._id,
-    patient: {
-      _id: patient._id,
-      uhid: patient.uhid,
-      patientCode: patient.patientCode,
-      name: patient.name,
-      createdAt: patient.createdAt
-    },
-    uhid: patient.uhid
+    patient,
+    uhid: patient.uhid,
+    status: "success",
+    data: { patient }
   });
 });
 
 export const searchPatients = catchAsync(async (req: Request, res: Response) => {
   const query = (req.query.query as string) || "";
-  const patients = await ReceptionService.searchPatients(req.hospitalFilter!.hospital as any, query);
+  const patients = await ReceptionService.searchPatients(req.hospitalFilter as any, query);
   res.json({ status: "success", data: { patients } });
 });
 
@@ -139,7 +138,7 @@ export const listPatients = catchAsync(async (req: Request, res: Response) => {
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
   const search = (req.query.search as string) || "";
-  const result = await ReceptionService.listPatients(req.hospitalFilter!.hospital as any, page, limit, search);
+  const result = await ReceptionService.listPatients(req.hospitalFilter as any, page, limit, search);
   res.json({
     status: "success",
     data: result.data,
@@ -222,13 +221,13 @@ export const processBillingPayment = catchAsync(async (req: Request, res: Respon
 
 export const getQueueState = catchAsync(async (req: Request, res: Response) => {
   const dateStr = (req.query.date as string) || new Date().toISOString();
-  const tokens = await ReceptionRepository.getQueueByDate(req.hospitalFilter!.hospital as any, new Date(dateStr));
+  const tokens = await ReceptionRepository.getQueueByDate(req.hospitalFilter as any, new Date(dateStr));
   res.json({ status: "success", data: { tokens } });
 });
 
 export const simulateDoctorCall = catchAsync(async (req: Request, res: Response) => {
   const queueId = req.params.id;
-  const token = await ReceptionService.simulateDoctorCall(req.hospitalFilter!.hospital as any, queueId, req.user!._id);
+  const token = await ReceptionService.simulateDoctorCall(req.hospitalFilter as any, queueId, req.user!._id);
   res.json({ status: "success", data: { token } });
 });
 
@@ -245,7 +244,7 @@ export const simulateDoctorComplete = catchAsync(async (req: Request, res: Respo
 });
 
 export const getAdmissionRequests = catchAsync(async (req: Request, res: Response) => {
-  const requests = await ReceptionService.getAdmissionRequests(req.hospitalFilter!.hospital as any);
+  const requests = await ReceptionService.getAdmissionRequests(req.hospitalFilter as any);
   res.json({ status: "success", data: { requests } });
 });
 
@@ -255,7 +254,7 @@ export const admitPatient = catchAsync(async (req: Request, res: Response) => {
   }
   const admissionData = admissionSchema.parse(req.body);
   const result = await ReceptionService.admitPatient(
-    req.hospitalFilter!.hospital as any,
+    req.hospitalFilter as any,
     admissionData,
     req.user!._id
   );
@@ -298,7 +297,7 @@ export const getAdmissions = catchAsync(async (req: Request, res: Response) => {
   const patientId = req.query.patientId as string | undefined;
 
   let query: any = {
-    hospital: req.hospitalFilter!.hospital as any,
+    ...buildBranchQuery(req.hospitalFilter),
   };
 
   if (patientId) {
@@ -389,10 +388,13 @@ export const requestDischarge = catchAsync(async (req: Request, res: Response) =
 });
 
 export const getDoctorsAvailability = catchAsync(async (req: Request, res: Response) => {
-  const busyDoctorIds = await getBusyDoctorIds(req.hospitalFilter!.hospital as any);
-  const doctors = await Doctor.find({ hospital: req.hospitalFilter!.hospital as any }).populate("department", "name");
+  const filter = buildBranchQuery(req.hospitalFilter);
+  const busyDoctorIds = await getBusyDoctorIds(req.hospitalFilter?.hospital as any);
+  const doctors = await Doctor.find(filter).populate("department", "name");
   const resolvedDoctors = doctors.map(d => {
-    return { ...d.toObject(), status: getDoctorDynamicStatus(d, busyDoctorIds) };
+    const docObj: any = d.toObject();
+    const spec = (docObj.specialization && docObj.specialization.trim() !== "") ? docObj.specialization.trim() : "";
+    return { ...docObj, specialization: spec, status: getDoctorDynamicStatus(d, busyDoctorIds) };
   });
   res.json({ status: "success", data: { doctors: resolvedDoctors } });
 });
@@ -440,66 +442,23 @@ export const getAuditLogs = catchAsync(async (req: Request, res: Response) => {
 
 /**
  * GET /reception/billing/pending-invoices
- * Returns pending invoices using the SAME query as getStats pendingPayments count.
+ * Returns pending invoices using BillingService (Single Source of Truth).
  * Dashboard card count == table row count.
  */
 export const getPendingInvoices = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as any;
+  const hospitalId = req.hospitalFilter?.hospital as any;
+  const branch = req.hospitalFilter?.branch;
 
-  // 1. Fetch pending OP invoices
-  const rawInvoices = await Invoice.find({ hospital: hospitalId, status: { $in: ["pending", "partially_paid"] } })
-    .populate("patient", "name uhid phone")
-    .sort({ createdAt: -1 });
+  const result = await BillingService.getPendingInvoices(hospitalId, { branch, limit: 1000 });
 
-  const invoices: any[] = [];
-  for (const inv of rawInvoices) {
-    const payments = await Payment.find({ invoice: inv._id, hospital: hospitalId });
-    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-    const remainingBalance = Math.max(0, inv.totals.total - totalPaid);
-
-    if (inv.totals.patientBalance !== remainingBalance || (remainingBalance === 0 && inv.status !== "paid") || (remainingBalance > 0 && inv.status === "pending" && totalPaid > 0)) {
-      inv.totals.patientBalance = remainingBalance;
-      if (remainingBalance === 0) {
-        inv.status = "paid";
-      } else if (totalPaid > 0) {
-        inv.status = "partially_paid";
-      }
-      await inv.save();
+  res.json({
+    status: "success",
+    data: {
+      invoices: result.invoices,
+      total: result.pagination.total,
+      summary: result.summary,
     }
-
-    if (remainingBalance > 0) {
-      invoices.push(inv);
-    }
-  }
-
-  // 2. Fetch pending IP bills
-  const ipBills = await IPBill.find({ hospital: hospitalId, status: "Generated", outstanding: { $gt: 0 } })
-    .populate("patient", "name uhid phone")
-    .populate("admission")
-    .sort({ createdAt: -1 });
-
-  // Map IP bills to conformed invoice structure
-  const mappedIpBills = ipBills.map(bill => {
-    return {
-      _id: bill._id,
-      patient: bill.patient,
-      issuedAt: bill.billingDate || (bill as any).createdAt,
-      billingType: "IP",
-      totals: {
-        subtotal: bill.grandTotal,
-        taxAmount: bill.taxRate,
-        total: bill.grandTotal,
-        patientBalance: bill.outstanding
-      },
-      status: "partially_paid",
-      outstanding: bill.outstanding,
-      admission: bill.admission
-    };
   });
-
-  const combined = [...invoices, ...mappedIpBills];
-
-  res.json({ status: "success", data: { invoices: combined, total: combined.length } });
 });
 
 /**
@@ -508,9 +467,8 @@ export const getPendingInvoices = catchAsync(async (req: Request, res: Response)
  * Dashboard count == table row count.
  */
 export const getPaymentHistory = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as any;
   const dateFilter = req.query.date as string;
-  const filter: any = { hospital: hospitalId };
+  const filter: any = buildBranchQuery(req.hospitalFilter);
 
   if (dateFilter === "today") {
     const today = new Date();
@@ -566,16 +524,16 @@ export const getPaymentHistory = catchAsync(async (req: Request, res: Response) 
  * Returns paid invoices. Dashboard completedPayments count == table row count.
  */
 export const getCompletedInvoices = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as any;
+  const filter = buildBranchQuery(req.hospitalFilter);
 
   // 1. Fetch completed OP invoices
-  const rawInvoices = await Invoice.find({ hospital: hospitalId, status: "paid" })
+  const rawInvoices = await Invoice.find({ ...filter, status: "paid" })
     .populate("patient", "name uhid phone")
     .sort({ updatedAt: -1 });
 
   const invoices: any[] = [];
   for (const inv of rawInvoices) {
-    const payments = await Payment.find({ invoice: inv._id, hospital: hospitalId });
+    const payments = await Payment.find({ invoice: inv._id, ...filter });
     const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
     const remainingBalance = Math.max(0, inv.totals.total - totalPaid);
 
@@ -595,7 +553,7 @@ export const getCompletedInvoices = catchAsync(async (req: Request, res: Respons
   }
 
   // 2. Fetch completed IP bills (Paid status means fully paid)
-  const completedIpBills = await IPBill.find({ hospital: hospitalId, status: "Paid" })
+  const completedIpBills = await IPBill.find({ ...filter, status: "Paid" })
     .populate("patient", "name uhid phone")
     .populate("admission")
     .sort({ updatedAt: -1 });
@@ -630,14 +588,14 @@ export const getCompletedInvoices = catchAsync(async (req: Request, res: Respons
  * Dashboard count == table row count.
  */
 export const getTodayRegistrations = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as any;
+  const filter = buildBranchQuery(req.hospitalFilter);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   const patients = await Patient.find({
-    hospital: hospitalId,
+    ...filter,
     createdAt: { $gte: today, $lt: tomorrow }
   }).sort({ createdAt: -1 });
 
@@ -682,24 +640,19 @@ export const rescheduleAppointment = catchAsync(async (req: Request, res: Respon
 });
 
 export const getBookedSlots = catchAsync(async (req: Request, res: Response) => {
-  const { doctorId, date } = req.query as Record<string, string>;
+  const { doctorId, date, patientId } = req.query as Record<string, string>;
   if (!doctorId || !date) {
     throw new AppError("doctorId and date are required query parameters.", 400);
   }
-  const parsedDate = new Date(date);
-  const startOfDay = new Date(parsedDate);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(parsedDate);
-  endOfDay.setHours(23, 59, 59, 999);
 
-  const appointments = await Appointment.find({
-    hospital: req.hospitalFilter!.hospital,
-    doctor: doctorId,
-    date: { $gte: startOfDay, $lte: endOfDay },
-    status: { $in: ["scheduled", "checked_in", "in_consultation"] }
-  }).select("time");
+  // Delegate entirely to the shared AppointmentSlotService — single source of truth.
+  const bookedSlots = await AppointmentSlotService.getBookedSlots(
+    doctorId,
+    date,
+    req.hospitalFilter!.hospital,
+    patientId
+  );
 
-  const bookedSlots = appointments.map(appt => appt.time);
   res.json({ status: "success", data: { bookedSlots } });
 });
 
@@ -715,10 +668,12 @@ export const checkInAppointment = catchAsync(async (req: Request, res: Response)
 });
 
 export const getQueueDetails = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const hospitalFilter = buildBranchQuery(req.hospitalFilter);
   
   // Update scheduled alerts & mark missed appointments
-  await ReceptionService.generateScheduledAlerts(hospitalId);
+  if (req.hospitalFilter?.hospital) {
+    await ReceptionService.generateScheduledAlerts(req.hospitalFilter.hospital as any);
+  }
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
@@ -727,7 +682,7 @@ export const getQueueDetails = catchAsync(async (req: Request, res: Response) =>
 
   // Fetch all appointments today
   const appointments = await Appointment.find({
-    hospital: hospitalId,
+    ...hospitalFilter,
     date: { $gte: startOfToday, $lte: endOfToday }
   })
     .populate("patient", "name uhid phone age gender")
@@ -737,7 +692,7 @@ export const getQueueDetails = catchAsync(async (req: Request, res: Response) =>
 
   // Fetch all queue items today
   const queueItems = await Queue.find({
-    hospital: hospitalId,
+    ...hospitalFilter,
     $or: [
       { date: { $gte: startOfToday, $lte: endOfToday } },
       { createdAt: { $gte: startOfToday, $lte: endOfToday } }

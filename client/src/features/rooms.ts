@@ -2,6 +2,19 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { WardInfo } from "./wards";
 
+export interface EmbeddedRoomTariff {
+  roomChargePerDay: number;
+  admissionDeposit: number;
+  extraBedCharge: number;
+  nursingCharge: number;
+  serviceCharge: number;
+  emergencyCharge: number;
+  discountPercent: number;
+  gstPercent: number;
+  effectiveFrom: string;
+  status: "Active" | "Inactive";
+}
+
 export interface RoomInfo {
   _id: string;
   roomNumber: string;
@@ -9,11 +22,16 @@ export interface RoomInfo {
   ward: string | WardInfo;
   wardName: string;
   floor: number;
-  roomType: "General" | "Semi-Private" | "Private" | "ICU" | "NICU" | "Emergency";
+  roomType: "General" | "Semi Private" | "Semi-Private" | "Private" | "Deluxe" | "Suite" | "ICU" | "NICU" | "PICU" | "Emergency" | "Isolation";
   acType: "AC" | "Non AC";
+  acSubTypes?: string[];
   capacity: number;
+  totalBeds?: number;
+  occupiedBeds?: number;
+  availableBeds?: number;
   description: string;
-  status: "Active" | "Inactive";
+  status: "Available" | "Occupied" | "Cleaning" | "Maintenance" | "Blocked" | "Active" | "Inactive";
+  tariff?: EmbeddedRoomTariff;
   createdAt: string;
   updatedAt: string;
 }
@@ -45,9 +63,12 @@ export interface CreateRoomPayload {
   floor: number;
   roomType: string;
   acType: string;
+  acSubTypes?: string[];
   capacity: number;
   description?: string;
   status?: string;
+  autoGenerateBeds?: boolean;
+  tariff?: Partial<EmbeddedRoomTariff>;
 }
 
 export function useCreateRoom() {
@@ -59,7 +80,8 @@ export function useCreateRoom() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rooms"] });
-      queryClient.invalidateQueries({ queryKey: ["reception", "rooms"] }); // keep reception rooms list in sync
+      queryClient.invalidateQueries({ queryKey: ["beds"] });
+      queryClient.invalidateQueries({ queryKey: ["reception", "rooms"] });
     }
   });
 }
@@ -70,9 +92,13 @@ export interface UpdateRoomPayload {
   wardId?: string;
   floor?: number;
   roomType?: string;
+  acType?: string;
+  acSubTypes?: string[];
   capacity?: number;
   description?: string;
   status?: string;
+  autoGenerateBeds?: boolean;
+  tariff?: Partial<EmbeddedRoomTariff>;
 }
 
 export function useUpdateRoom() {
@@ -84,8 +110,8 @@ export function useUpdateRoom() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["beds"] });
       queryClient.invalidateQueries({ queryKey: ["reception", "rooms"] });
-      queryClient.invalidateQueries({ queryKey: ["beds"] }); // bed's transit ward might change
     }
   });
 }
@@ -98,6 +124,7 @@ export function useDeleteRoom() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["beds"] });
       queryClient.invalidateQueries({ queryKey: ["reception", "rooms"] });
     }
   });

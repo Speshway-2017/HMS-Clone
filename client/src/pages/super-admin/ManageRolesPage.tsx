@@ -1,16 +1,32 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ShieldCheck, Users2, KeyRound, Plus, Pencil, Trash2 } from "lucide-react";
 import { useRoles, useDeleteRole } from "../../features/roles";
 import { useAuth } from "../../context/AuthContext";
+import toast from "react-hot-toast";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { Button } from "../../components/ui/Button";
+import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
 
 export function ManageRolesPage() {
   const { data: roles, isLoading } = useRoles();
   const { user } = useAuth();
   const deleteRole = useDeleteRole();
+  const [deleteTargetRole, setDeleteTargetRole] = useState<{ id: string; label: string } | null>(null);
+
+  const confirmDeleteRole = async () => {
+    if (!deleteTargetRole) return;
+    try {
+      await deleteRole.mutateAsync(deleteTargetRole.id);
+      toast.success(`Role "${deleteTargetRole.label}" deleted successfully!`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to delete role");
+    } finally {
+      setDeleteTargetRole(null);
+    }
+  };
 
   const totalPermissions = roles ? new Set(roles.flatMap((r) => r.permissions)).size : 0;
   const totalAssigned = roles?.reduce((sum, r) => sum + r.assignedUsers, 0) ?? 0;
@@ -58,14 +74,12 @@ export function ManageRolesPage() {
                     <button
                       onClick={() => {
                         if (role.assignedUsers > 0) {
-                          alert("Cannot delete this role because users are currently assigned to it.");
+                          toast.error("Cannot delete this role because users are currently assigned to it.");
                           return;
                         }
-                        if (confirm(`Delete role "${role.label}"? This cannot be undone.`)) {
-                          deleteRole.mutate(role._id!);
-                        }
+                        setDeleteTargetRole({ id: role._id!, label: role.label });
                       }}
-                      className="hover:text-red-600 transition-colors"
+                      className="hover:text-red-600 transition-colors cursor-pointer"
                       title="Delete Role"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -86,6 +100,15 @@ export function ManageRolesPage() {
           </Card>
         ))}
       </div>
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(deleteTargetRole)}
+        title="Confirm Deletion"
+        message={`Are you sure you want to delete role "${deleteTargetRole?.label || ""}"? This action cannot be undone.`}
+        isLoading={deleteRole.isPending}
+        onClose={() => setDeleteTargetRole(null)}
+        onConfirm={confirmDeleteRole}
+      />
     </div>
   );
 }

@@ -3,11 +3,17 @@ import { z } from "zod";
 import { Appointment, APPOINTMENT_STATUSES, APPOINTMENT_TYPES } from "../models/Appointment";
 import { Doctor } from "../models/Doctor";
 import { Invoice } from "../models/Invoice";
+import { Patient } from "../models/Patient";
+import { Payment } from "../models/Payment";
+import { Queue } from "../models/Queue";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 import { emitToHospital } from "../config/socket";
 import { logAudit } from "../utils/auditLogger";
+import { validateAppointmentTimeRestriction } from "../utils/appointmentTimeValidation";
+import { AppointmentSlotService } from "../services/appointmentSlotService";
+import { createDoctorNotification } from "../utils/notificationHelper";
 
 async function generateReferenceId(hospitalId: string, bookingDate: Date): Promise<string> {
   const dateStr = bookingDate.toISOString().split("T")[0].replace(/-/g, "");
@@ -45,14 +51,19 @@ const appointmentSchema = z.object({
   time: z.string().min(1),
   type: z.enum(APPOINTMENT_TYPES as unknown as [string, ...string[]]).optional().default("Appointment"),
   status: z.enum(APPOINTMENT_STATUSES).optional(),
+  meetingLink: z.string().optional().default(""),
   notes: z.string().optional().default(""),
+  billingStatus: z.string().optional(),
+  paymentMethod: z.string().optional(),
 });
+
+import { buildBranchQuery } from "../utils/branchQueryHelper";
 
 export const listAppointments = catchAsync(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req, 50);
   const { status, doctor, from, to, dateMode } = req.query as Record<string, string | undefined>;
 
-  const filter: Record<string, any> = { ...req.hospitalFilter };
+  const filter: Record<string, any> = buildBranchQuery(req.hospitalFilter);
   if (status) filter.status = status;
   if (doctor) filter.doctor = doctor;
 
@@ -60,20 +71,60 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
   if (req.user!.role === "doctor") {
     const loggedDoctor = await getLoggedDoctor(req);
     filter.doctor = loggedDoctor._id;
-    if (filter.status === "pending_payment") {
-      filter.status = "never_match_status";
-    } else if (!status) {
-      filter.status = { $ne: "pending_payment" };
+  }
+
+  // Enforce patient data isolation for appointment listing
+  if (req.user!.role === "patient") {
+    // Delete hospital filter for patient role so all appointments booked for this patient across hospitals are fetched
+    delete filter.hospital;
+
+    const userEmail = (req.user!.email || "").trim();
+    const userPhone = (req.user!.phone || "").replace(/\D/g, "").slice(-10);
+    const userName = (req.user!.name || "").trim();
+    const userId = req.user!._id;
+
+    const patientConditions: any[] = [];
+    if (userId) {
+      patientConditions.push({ user: userId });
+    }
+    if (userEmail) {
+      patientConditions.push({ email: { $regex: `^${userEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+    }
+    if (userPhone && userPhone.length >= 7) {
+      patientConditions.push({ phone: { $regex: `${userPhone}$` } });
+    }
+    if (userName) {
+      patientConditions.push({ name: { $regex: `^${userName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+    }
+
+    const patientDocs = await Patient.find({
+      $or: patientConditions.length > 0 ? patientConditions : [{ user: userId }]
+    }).select("_id");
+
+    const patientIds = patientDocs.map(p => p._id);
+    if (patientIds.length > 0) {
+      filter.patient = { $in: patientIds };
+    } else {
+      filter.patient = "000000000000000000000000";
     }
   }
 
-  if (dateMode === "other_days") {
-    const today = new Date();
-    const endOfToday = new Date(today);
+  if (dateMode === "today") {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date();
     endOfToday.setHours(23, 59, 59, 999);
-
+    filter.date = { $gte: startOfToday, $lte: endOfToday };
+  } else if (dateMode === "other_days" || dateMode === "scheduled") {
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
     filter.date = { $gt: endOfToday };
     filter.status = { $nin: ["completed", "cancelled", "no_show"] };
+  } else if (dateMode === "past" || dateMode === "missed") {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    filter.date = { $lt: startOfToday };
+    filter.status = { $nin: ["completed", "cancelled"] };
   } else if (dateMode === "completed") {
     filter.status = { $in: ["completed", "cancelled", "no_show"] };
   } else if (from || to) {
@@ -85,8 +136,8 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
 
   const [appointments, total, todayCount] = await Promise.all([
     Appointment.find(filter)
-      .populate("patient", "name uhid")
-      .populate("doctor", "name specialization")
+      .populate("patient", "name uhid phone age gender")
+      .populate("doctor", "name specialization department consultationFee")
       .populate("department", "name")
       .sort(dateMode === "completed" ? { date: -1, time: -1 } : { date: 1, time: 1 })
       .skip(skip)
@@ -106,9 +157,26 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
 
 export const createAppointment = catchAsync(async (req: Request, res: Response) => {
   const body = appointmentSchema.parse(req.body);
-  const doctor = await Doctor.findOne({ _id: body.doctor, hospital: req.hospitalFilter!.hospital, isActive: { $ne: false } });
-  if (!doctor) {
+  const doctor = await Doctor.findById(body.doctor);
+  if (!doctor || doctor.isActive === false) {
     throw new AppError("The selected doctor is inactive, retired, or does not exist.", 400);
+  }
+
+  const hospitalId = req.hospitalFilter?.hospital || doctor.hospital;
+  if (!hospitalId) {
+    throw new AppError("Hospital information is required to book an appointment.", 400);
+  }
+
+  // If patient field is missing or logged in as patient role, auto-find patient document
+  if (!body.patient || req.user!.role === "patient") {
+    const patientDoc = await Patient.findOne({ email: req.user!.email });
+    if (patientDoc) {
+      body.patient = patientDoc._id.toString();
+    }
+  }
+
+  if (!body.department && doctor.department) {
+    body.department = doctor.department.toString();
   }
 
   // 1. Duplicate appointment guard: Patient + Doctor + Date (any status except cancelled/no_show/completed/missed)
@@ -119,7 +187,7 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
     endOfDay.setHours(23, 59, 59, 999);
 
     const existing = await Appointment.findOne({
-      hospital: req.hospitalFilter!.hospital,
+      hospital: hospitalId,
       patient: body.patient,
       doctor: body.doctor,
       date: { $gte: startOfDay, $lte: endOfDay },
@@ -135,28 +203,127 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
     }
   }
 
-  // 2. Prevent two active appointments for the same doctor and same time slot
-  const slotClash = await Appointment.findOne({
-    hospital: req.hospitalFilter!.hospital,
-    doctor: body.doctor,
-    date: body.date,
-    time: body.time,
-    status: { $nin: ["cancelled", "no_show", "completed", "missed"] }
-  });
+  // 2. Prevent two active appointments for the same doctor and same time slot.
+  //    Uses AppointmentSlotService.checkSlotConflict — the SAME logic as the display layer.
+  const slotClash = await AppointmentSlotService.checkSlotConflict(
+    body.doctor,
+    body.date as unknown as Date,
+    body.time,
+    hospitalId
+  );
   if (slotClash) {
-    throw new AppError("This time slot is already booked for this doctor. Please choose a different slot.", 409);
+    throw new AppError(
+      "This appointment slot has already been booked. Please choose another available slot.",
+      409
+    );
   }
 
-  const referenceId = await generateReferenceId(req.hospitalFilter!.hospital.toString(), new Date(body.date));
+  // 3. Prevent patient from booking multiple appointments at the exact same date and time slot (with ANY doctor)
+  if (body.patient && body.date && body.time) {
+    const patientSlotClash = await AppointmentSlotService.checkPatientSlotConflict(
+      body.patient,
+      body.date as unknown as Date,
+      body.time,
+      hospitalId
+    );
+    if (patientSlotClash) {
+      const otherDocName = (patientSlotClash.doctor as any)?.name || "another doctor";
+      throw new AppError(
+        `Patient already has an active appointment scheduled at ${body.time} with Dr. ${otherDocName}. A patient cannot book appointments with multiple doctors at the exact same time slot.`,
+        409
+      );
+    }
+  }
 
+  const referenceId = await generateReferenceId(hospitalId.toString(), new Date(body.date));
+  const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
   const appointment = await Appointment.create({
     ...body,
-    hospital: req.hospitalFilter!.hospital,
+    hospital: hospitalId,
+    branch: branchId,
     referenceId,
   });
 
-  if (req.hospitalFilter?.hospital) {
-    emitToHospital(req.hospitalFilter.hospital, "appointment_created", { appointmentId: appointment._id, referenceId });
+  // If billingStatus is 'Paid', automatically generate a paid Invoice and Payment record
+  if (body.billingStatus === "Paid" || req.body.billingStatus === "Paid") {
+    let consultationFee = 500;
+    if (doctor.consultationFee) {
+      const cleanedFee = String(doctor.consultationFee).replace(/[₹, \s]/g, "");
+      const parsedFee = parseFloat(cleanedFee);
+      if (!isNaN(parsedFee)) {
+        consultationFee = parsedFee;
+      }
+    }
+
+    const invoice = await Invoice.create({
+      hospital: hospitalId,
+      patient: body.patient,
+      appointment: appointment._id,
+      billingType: "OP",
+      items: [
+        {
+          description: `${body.type || "OPD Consultation"} Fee`,
+          category: "consultation",
+          quantity: 1,
+          amount: consultationFee,
+        },
+      ],
+      taxRate: 0,
+      serviceFee: 0,
+      discount: 0,
+      insuranceCoveragePercent: 0,
+      status: "paid",
+      issuedAt: new Date(),
+      dueDate: new Date(),
+      totals: {
+        subtotal: consultationFee,
+        taxAmount: 0,
+        serviceFee: 0,
+        discount: 0,
+        insuranceCovered: 0,
+        total: consultationFee,
+        patientBalance: 0,
+      },
+    });
+
+    let paymentMethod = body.paymentMethod || req.body.paymentMethod || "UPI";
+    if (paymentMethod === "NetBanking") {
+      paymentMethod = "Net Banking";
+    }
+    if (!["UPI", "Cash", "Card", "Net Banking", "Cheque", "Mixed"].includes(paymentMethod)) {
+      paymentMethod = "UPI";
+    }
+
+    const transactionId = `TXN-${Math.floor(1000000000 + Math.random() * 9000000000)}`;
+
+    await Payment.create({
+      hospital: hospitalId,
+      invoice: invoice._id,
+      patient: body.patient,
+      amount: consultationFee,
+      paymentMethod,
+      transactionId,
+      paidAt: new Date(),
+    });
+  }
+
+  emitToHospital(hospitalId.toString(), "appointment_created", { appointmentId: appointment._id, referenceId });
+
+  try {
+    const patDoc = await Patient.findById(body.patient);
+    const patName = patDoc ? patDoc.name : "Patient";
+    await createDoctorNotification({
+      hospital: hospitalId,
+      title: "New Patient Appointment",
+      message: `New appointment booked for ${patName} (${referenceId}) on ${new Date(body.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} at ${body.time}.`,
+      type: "appointment",
+      severity: "info",
+      recipientDoctor: body.doctor,
+      link: "/doctor/op-management",
+      data: { appointmentId: appointment._id.toString(), referenceId }
+    });
+  } catch (err) {
+    console.error("Failed to create doctor notification for appointment:", err);
   }
 
   await logAudit({
@@ -196,16 +363,80 @@ export const updateAppointment = catchAsync(async (req: Request, res: Response) 
   }
 
   const body = appointmentSchema.partial().parse(req.body);
+
+  const existingAppt = await Appointment.findOne(filter);
+  if (!existingAppt) {
+    throw new AppError("Appointment not found or unauthorized.", 403);
+  }
+
+  const isCancelling = body.status === "cancelled";
+  const isRescheduling = (body.date && new Date(body.date).toISOString() !== new Date(existingAppt.date).toISOString()) || (body.time && body.time !== existingAppt.time);
+
+  if (isCancelling || isRescheduling) {
+    validateAppointmentTimeRestriction(existingAppt);
+  }
+
+  if (isRescheduling) {
+    const targetDate = body.date ? (body.date as unknown as Date) : existingAppt.date;
+    const targetTime = body.time || existingAppt.time;
+    const targetPatient = existingAppt.patient;
+
+    const patientSlotClash = await AppointmentSlotService.checkPatientSlotConflict(
+      targetPatient,
+      targetDate,
+      targetTime,
+      existingAppt.hospital,
+      existingAppt._id.toString()
+    );
+    if (patientSlotClash) {
+      const otherDocName = (patientSlotClash.doctor as any)?.name || "another doctor";
+      throw new AppError(
+        `Patient already has an active appointment scheduled at ${targetTime} with Dr. ${otherDocName}. A patient cannot book appointments with multiple doctors at the exact same time slot.`,
+        409
+      );
+    }
+  }
+
   const appointment = await Appointment.findOneAndUpdate(filter, body, {
     new: true,
     runValidators: true,
   });
   if (!appointment) {
-    throw new AppError("Appointment not found or unauthorized.", 403);
+    throw new AppError("Appointment not found or unauthorized.", 404);
   }
 
-  if (req.hospitalFilter?.hospital) {
-    emitToHospital(req.hospitalFilter.hospital, "appointment_updated", { appointmentId: appointment._id, status: appointment.status });
+  if (body.status) {
+    const queueStatusMap: Record<string, string> = {
+      completed: "completed",
+      in_consultation: "called",
+      checked_in: "waiting",
+      cancelled: "skipped",
+      no_show: "skipped"
+    };
+    const newQueueStatus = queueStatusMap[body.status];
+    if (newQueueStatus) {
+      await Queue.updateMany(
+        { appointment: appointment._id },
+        { status: newQueueStatus }
+      );
+      const todayStart = new Date(appointment.date || new Date());
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(todayStart);
+      todayEnd.setHours(23, 59, 59, 999);
+      await Queue.updateMany(
+        {
+          patient: appointment.patient,
+          doctor: appointment.doctor,
+          createdAt: { $gte: todayStart, $lte: todayEnd }
+        },
+        { status: newQueueStatus }
+      );
+    }
+  }
+
+  const targetHospital = req.hospitalFilter?.hospital || (appointment.hospital || "").toString();
+  if (targetHospital) {
+    emitToHospital(targetHospital, "appointment_updated", { appointmentId: appointment._id, status: appointment.status, meetingLink: appointment.meetingLink });
   }
 
   await logAudit({
@@ -255,4 +486,28 @@ export const getInvoiceByAppointmentId = catchAsync(async (req: Request, res: Re
     throw new AppError("Invoice not found for this appointment", 404);
   }
   res.json({ status: "success", data: { invoice } });
+});
+
+/**
+ * GET /appointments/available-slots?doctorId=&date=
+ *
+ * Unified booked-slots endpoint accessible by BOTH patient and receptionist roles.
+ * Returns the list of already-booked time strings for a doctor on a given date,
+ * using the canonical AppointmentSlotService — the single source of truth.
+ *
+ * Frontend must NEVER cache these results between doctor/date changes.
+ */
+export const getAvailableSlots = catchAsync(async (req: Request, res: Response) => {
+  const { doctorId, date } = req.query as Record<string, string>;
+  if (!doctorId || !date) {
+    throw new AppError("doctorId and date are required query parameters.", 400);
+  }
+
+  const bookedSlots = await AppointmentSlotService.getBookedSlots(
+    doctorId,
+    date,
+    req.hospitalFilter?.hospital
+  );
+
+  res.json({ status: "success", data: { bookedSlots } });
 });

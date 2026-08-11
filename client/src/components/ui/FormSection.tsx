@@ -1,6 +1,7 @@
-import { ReactNode } from "react";
-import { LucideIcon } from "lucide-react";
+import { ReactNode, ComponentType } from "react";
 import { Card } from "./Card";
+
+export type LucideIcon = ComponentType<any>;
 
 interface FormSectionProps {
   icon: LucideIcon;

@@ -9,22 +9,24 @@ interface KpiCardProps {
   trend?: { direction: "up" | "down"; text: string };
   emphasis?: boolean;
   to?: string;
+  onClick?: () => void;
   className?: string;
   size?: "sm" | "md";
 }
 
-export function KpiCard({ label, value, icon, trend, emphasis = false, to, className = "", size = "md" }: KpiCardProps) {
+export function KpiCard({ label, value, icon, trend, emphasis = false, to, onClick, className = "", size = "md" }: KpiCardProps) {
   const isSm = size === "sm";
 
   const cardContent = (
     <Card
-      role={to ? "button" : undefined}
-      tabIndex={to ? 0 : undefined}
+      role={(to || onClick) ? "button" : undefined}
+      tabIndex={(to || onClick) ? 0 : undefined}
+      onClick={onClick}
       className={`h-full transition-all duration-300 ${isSm ? "p-4" : "p-6"} ${
         emphasis
           ? "bg-navy-700 text-white hover:bg-navy-800"
           : "hover:bg-slate-50 hover:border-slate-350 focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
-      } ${to ? "cursor-pointer" : ""} ${className}`}
+      } ${(to || onClick) ? "cursor-pointer" : ""} ${className}`}
     >
       <div className="flex items-start justify-between">
         <span className={`text-[10px] sm:text-xs font-semibold uppercase tracking-wide ${emphasis ? "text-navy-100" : "text-slate-500"}`}>

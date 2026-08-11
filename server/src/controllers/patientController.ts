@@ -55,7 +55,7 @@ const patientSchema = z.object({
   name: z.string().min(1),
   email: z.string().optional().default(""),
   phone: z.string().optional().default(""),
-  age: z.coerce.number().min(0).optional().nullable(),
+  age: z.coerce.number().min(0, "Age must be at least 0").max(150, "Age cannot exceed 150 years").optional().nullable(),
   gender: z.string().optional().default(""),
   bloodGroup: z.string().optional().default(""),
   address: z.string().optional().default(""),
@@ -65,6 +65,11 @@ const patientSchema = z.object({
   insuranceProvider: z.string().optional().default(""),
   insurancePolicyNumber: z.string().optional().default(""),
   photoUrl: z.string().optional().default(""),
+  emergencyContact: z.object({
+    name: z.string().optional().default(""),
+    phone: z.string().optional().default(""),
+    relation: z.string().optional().default("")
+  }).optional(),
 });
 
 export const listPatients = catchAsync(async (req: Request, res: Response) => {
@@ -128,7 +133,20 @@ export const listPatients = catchAsync(async (req: Request, res: Response) => {
 
 export const createPatient = catchAsync(async (req: Request, res: Response) => {
   const body = patientSchema.parse(req.body);
-  const patient = await Patient.create({ ...body, hospital: req.hospitalFilter!.hospital });
+  const hospitalId = req.hospitalFilter!.hospital;
+
+  if (body.insurancePolicyNumber && body.insurancePolicyNumber.trim()) {
+    const existingPolicy = await Patient.findOne({
+      hospital: hospitalId,
+      insurancePolicyNumber: body.insurancePolicyNumber.trim()
+    });
+    if (existingPolicy) {
+      throw new AppError("Insurance Policy Number is already registered to another patient.", 400);
+    }
+  }
+
+  const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
+  const patient = await Patient.create({ ...body, hospital: hospitalId, branch: branchId });
 
   if (req.hospitalFilter?.hospital) {
     emitToHospital(req.hospitalFilter.hospital, "patient_created", { patientId: patient._id, name: patient.name, uhid: patient.uhid });
@@ -203,6 +221,19 @@ export const getPatient = catchAsync(async (req: Request, res: Response) => {
 export const updatePatient = catchAsync(async (req: Request, res: Response) => {
   await checkPatientDoctorAccess(req, req.params.id);
   const body = patientSchema.partial().parse(req.body);
+  const hospitalId = req.hospitalFilter!.hospital;
+
+  if (body.insurancePolicyNumber && body.insurancePolicyNumber.trim()) {
+    const existingPolicy = await Patient.findOne({
+      hospital: hospitalId,
+      insurancePolicyNumber: body.insurancePolicyNumber.trim(),
+      _id: { $ne: req.params.id }
+    });
+    if (existingPolicy) {
+      throw new AppError("Insurance Policy Number is already registered to another patient.", 400);
+    }
+  }
+
   const patient = await Patient.findOneAndUpdate({ _id: req.params.id, ...req.hospitalFilter }, body, {
     new: true,
     runValidators: true,
@@ -285,3 +316,105 @@ export const addMedicalHistoryEntry = catchAsync(async (req: Request, res: Respo
 
   res.status(201).json({ status: "success", data: { patient } });
 });
+
+export const getPatientProfileMe = catchAsync(async (req: Request, res: Response) => {
+  const userEmail = (req.user!.email || "").trim();
+  const userPhone = (req.user!.phone || "").replace(/\D/g, "").slice(-10);
+  const userName = (req.user!.name || "").trim();
+  const userId = req.user!._id;
+
+  const conditions: any[] = [{ user: userId }];
+  if (userEmail) {
+    conditions.push({ email: { $regex: `^${userEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+  }
+  if (userPhone && userPhone.length >= 7) {
+    conditions.push({ phone: { $regex: `${userPhone}$` } });
+  }
+  if (userName) {
+    conditions.push({ name: { $regex: `^${userName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+  }
+
+  let patient = await Patient.findOne({ $or: conditions }).populate("assignedDoctor", "name");
+
+  if (patient && !patient.user) {
+    patient.user = userId as any;
+    if (userEmail && !patient.email) patient.email = userEmail;
+    if (userPhone && !patient.phone) patient.phone = req.user!.phone || userPhone;
+    await patient.save();
+  }
+
+  if (!patient) {
+    const generateDigits = (length: number): string => {
+      let result = "";
+      const characters = "0123456789";
+      for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+      }
+      return result;
+    };
+    const uhid = `UHID-${generateDigits(10)}`;
+    const patientCode = `PAT-${generateDigits(6)}`;
+    const qrCode = `HMS|${uhid}|${userName}|${req.user!.phone || ""}`;
+
+    patient = await Patient.create({
+      user: userId,
+      hospital: req.user!.hospital || undefined,
+      uhid,
+      patientCode,
+      qrCode,
+      name: userName || "Patient",
+      email: userEmail,
+      phone: req.user!.phone || "",
+      status: "opd",
+      isActive: true,
+    });
+  }
+
+  res.json({ status: "success", data: { patient } });
+});
+
+export const updatePatientProfileMe = catchAsync(async (req: Request, res: Response) => {
+  const userEmail = (req.user!.email || "").trim();
+  const userPhone = (req.user!.phone || "").replace(/\D/g, "").slice(-10);
+  const userName = (req.user!.name || "").trim();
+  const userId = req.user!._id;
+
+  const conditions: any[] = [{ user: userId }];
+  if (userEmail) {
+    conditions.push({ email: { $regex: `^${userEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+  }
+  if (userPhone && userPhone.length >= 7) {
+    conditions.push({ phone: { $regex: `${userPhone}$` } });
+  }
+  if (userName) {
+    conditions.push({ name: { $regex: `^${userName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+  }
+
+  let patientSelf = await Patient.findOne({ $or: conditions });
+  if (!patientSelf) {
+    throw new AppError("Patient profile not found for the logged-in user.", 404);
+  }
+
+  const body = patientSchema.partial().parse(req.body);
+  delete (body as any).uhid;
+
+  const patient = await Patient.findByIdAndUpdate(patientSelf._id, body, {
+    new: true,
+    runValidators: true,
+  });
+
+  if (patientSelf.hospital) {
+    emitToHospital(patientSelf.hospital.toString(), "patient_updated", { patientId: patient!._id });
+  }
+
+  await logAudit({
+    req,
+    action: "UPDATE_PATIENT_PROFILE",
+    entity: "Patient",
+    entityId: patientSelf._id.toString(),
+    details: body
+  });
+
+  res.json({ status: "success", data: { patient } });
+});
+

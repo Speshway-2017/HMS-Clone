@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { formatINR } from "../../lib/currency";
-import { Calendar, User, Search, Stethoscope, FolderHeart, Clock, Plus, List, AlertTriangle, RefreshCw, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, User, Search, Stethoscope, FolderHeart, Clock, Plus, List, AlertTriangle, AlertCircle, RefreshCw, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   useBookAppointment,
   useReceptionQueue,
@@ -19,6 +19,7 @@ import {
 import { useDepartments } from "../../features/departments";
 import { useMyHospital } from "../../features/hospitals";
 import { useCheckInAppointment } from "../../features/appointments";
+import { generateTimeSlots, isSlotBooked, formatSlot12Hour } from "../../lib/slotUtils";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -28,6 +29,7 @@ import { Pagination } from "../../components/ui/Pagination";
 import { useAppointments } from "../../features/appointments";
 import { api } from "../../lib/api";
 import toast from "react-hot-toast";
+import { isTodayDate, isFutureDate, isPastDate, formatDisplayDate } from "../../lib/appointmentDateUtils";
 
 // Validation schema for booking form
 const appointmentSchema = z.object({
@@ -54,6 +56,25 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
     setTab(normalizedTab);
   }, [activeTab]);
 
+  const isCancellationAllowed = (dateVal: string | Date, timeStr?: string): boolean => {
+    if (!dateVal) return false;
+    const apptDate = new Date(dateVal);
+    if (timeStr && typeof timeStr === "string") {
+      const parts = timeStr.trim().split(":");
+      if (parts.length >= 2) {
+        const hours = parseInt(parts[0], 10);
+        const minutes = parseInt(parts[1], 10);
+        if (!isNaN(hours) && !isNaN(minutes)) {
+          apptDate.setHours(hours, minutes, 0, 0);
+        }
+      }
+    }
+    const now = new Date();
+    const diffMs = apptDate.getTime() - now.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    return diffMinutes >= 60;
+  };
+
   const [patientQuery, setPatientQuery] = useState("");
   const navigate = useNavigate();
 
@@ -65,16 +86,16 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const { data: doctors } = useDoctorsAvailability();
   const { data: departmentsResponse } = useDepartments();
   const { data: searchPatients } = usePatientsSearch(patientQuery);
-  const { data: todayAppointments, isLoading: listLoading, refetch: refetchQueue } = useReceptionQueue();
+  const { data: todayAppointmentsRaw, isLoading: listLoading, refetch: refetchQueue } = useReceptionQueue();
 
   const [scheduledPage, setScheduledPage] = useState(1);
-  const { data: scheduledData, isLoading: scheduledLoading, refetch: refetchScheduled } = useAppointments({
+  const { data: scheduledDataRaw, isLoading: scheduledLoading, refetch: refetchScheduled } = useAppointments({
     page: scheduledPage,
     dateMode: "other_days"
   });
 
   const [completedPage, setCompletedPage] = useState(1);
-  const { data: completedData, isLoading: completedLoading, refetch: refetchCompleted } = useAppointments({
+  const { data: completedDataRaw, isLoading: completedLoading, refetch: refetchCompleted } = useAppointments({
     page: completedPage,
     dateMode: "completed"
   });
@@ -96,10 +117,44 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const { data: calendarAppointmentsData, isLoading: calendarLoading, refetch: refetchCalendar } = useAppointments({
     from: calFromStr,
     to: calToStr,
-    limit: 100
-  }, { enabled: tab === "calendar" });
+    limit: 500
+  });
 
   const calendarAppointments = calendarAppointmentsData?.data || [];
+
+  // Unified fallback synchronization so Today's Queue and Scheduled Bookings draw from calendar Appointments
+  const derivedTodayAppts = (calendarAppointments || []).filter((a: any) => {
+    return isTodayDate(a.date) && a.status !== "cancelled" && a.status !== "no_show";
+  }).map((appt: any, idx: number) => ({
+    _id: appt._id,
+    tokenNumber: appt.tokenNumber || appt.appointmentNumber || appt.referenceId || `T-${String(idx + 1).padStart(3, "0")}`,
+    type: appt.type || "Appointment",
+    status: appt.status || "scheduled",
+    patient: appt.patient,
+    doctor: appt.doctor,
+    department: appt.department,
+    createdAt: appt.createdAt || appt.date
+  }));
+
+  const todayAppointments = (todayAppointmentsRaw && todayAppointmentsRaw.length > 0)
+    ? todayAppointmentsRaw
+    : derivedTodayAppts;
+
+  const derivedScheduledAppts = (calendarAppointments || []).filter((a: any) => {
+    return isFutureDate(a.date) && a.status !== "completed" && a.status !== "cancelled" && a.status !== "no_show" && a.status !== "missed";
+  });
+
+  const scheduledData: any = (scheduledDataRaw?.data && scheduledDataRaw.data.length > 0)
+    ? scheduledDataRaw
+    : { data: derivedScheduledAppts, total: derivedScheduledAppts.length, page: 1, limit: 50, pagination: { totalPages: Math.ceil(derivedScheduledAppts.length / 50) || 1 } };
+
+  const derivedCompletedAppts = (calendarAppointments || []).filter((a: any) => {
+    return (isPastDate(a.date) || a.status === "completed") && a.status !== "cancelled";
+  });
+
+  const completedData: any = (completedDataRaw?.data && completedDataRaw.data.length > 0)
+    ? completedDataRaw
+    : { data: derivedCompletedAppts, total: derivedCompletedAppts.length, page: 1, limit: 50, pagination: { totalPages: Math.ceil(derivedCompletedAppts.length / 50) || 1 } };
 
   // Group appointments by day
   const appointmentsByDay = calendarAppointments.reduce((acc: Record<number, any[]>, appt: any) => {
@@ -139,88 +194,12 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const [rescheduleRemarks, setRescheduleRemarks] = useState("");
   const [rescheduleErrors, setRescheduleErrors] = useState<Record<string, string>>({});
 
-  const ALL_SLOTS = ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "14:00", "14:30", "15:00", "15:30", "16:00"];
-
-  const generateSlots = (from: string, to: string, duration: number, breakTime?: string) => {
-    const slots: string[] = [];
-    const [startH, startM] = from.split(":").map(Number);
-    const [endH, endM] = to.split(":").map(Number);
-    
-    let current = startH * 60 + startM;
-    const end = endH * 60 + endM;
-    
-    let breakStart = -1;
-    let breakEnd = -1;
-    if (breakTime) {
-      const [breakH, breakM] = breakTime.split(":").map(Number);
-      breakStart = breakH * 60 + breakM;
-      breakEnd = breakStart + 60; // 1 hour break
-    }
-    
-    while (current + duration <= end) {
-      if (breakStart !== -1 && current >= breakStart && current < breakEnd) {
-        current += duration;
-        continue;
-      }
-      
-      const h = Math.floor(current / 60);
-      const m = current % 60;
-      const timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-      slots.push(timeStr);
-      current += duration;
-    }
-    return slots;
-  };
-
+  // Slot generation delegates to the shared generateTimeSlots utility (slotUtils.ts).
+  // This is the SAME function used by the Patient Dashboard, ensuring both
+  // dashboards display an identical slot list for any given doctor+date combination.
   const getAvailableSlots = (dateStr: string, doctorId?: string) => {
-    if (!doctorId) {
-      return ALL_SLOTS;
-    }
     const selectedDoc = doctors?.find((d: any) => d._id === doctorId);
-    if (!selectedDoc) {
-      return ALL_SLOTS;
-    }
-
-    let from = "09:00";
-    let to = "17:00";
-    
-    const monthlyOverride = selectedDoc.monthlyAvailability?.find((ma: any) => ma.date === dateStr);
-    if (monthlyOverride) {
-      if (!monthlyOverride.active) {
-        return [];
-      }
-      from = monthlyOverride.from || "09:00";
-      to = monthlyOverride.to || "17:00";
-    } else {
-      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      const dateObj = new Date(dateStr);
-      const dayName = days[dateObj.getDay()];
-
-      const daySchedule = selectedDoc.workingHours?.find((wh: any) => wh.day === dayName);
-
-      // If day is off duty or schedule not active, return no slots
-      if (daySchedule && !daySchedule.active) {
-        return [];
-      }
-
-      from = daySchedule?.from && daySchedule.from !== "—" ? daySchedule.from : "09:00";
-      to = daySchedule?.to && daySchedule.to !== "—" ? daySchedule.to : "17:00";
-    }
-
-    const duration = selectedDoc.consultationSettings?.slotDuration ?? 15;
-    const breakTime = selectedDoc.consultationSettings?.breakTime ?? "13:00";
-
-    let generated = generateSlots(from, to, duration, breakTime);
-
-    const todayStr = new Date().toISOString().split("T")[0];
-    if (dateStr === todayStr) {
-      const now = new Date();
-      generated = generated.filter((slot) => {
-        const [h, m] = slot.split(":").map(Number);
-        return h > now.getHours() || (h === now.getHours() && m > now.getMinutes());
-      });
-    }
-    return generated;
+    return generateTimeSlots(selectedDoc, dateStr);
   };
 
   const openDialog = (row: any) => {
@@ -365,35 +344,56 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
 
   const { data: hospital } = useMyHospital();
   const { data: patientDetail, isLoading: patientLoading, isError: patientError } = usePatientDetail(selectedPatientId);
-  const { data: bookedSlots } = useBookedSlots(selectedDoctorId, selectedDate);
+  const { data: bookedSlots } = useBookedSlots(selectedDoctorId, selectedDate, selectedPatientId);
 
   const isWithinRevisitWindow = () => {
-    if (!selectedDoc || !patientDetail?.patient?.medicalHistory || !selectedDate) return false;
+    if (!selectedDoc || !selectedDate) return false;
     
-    const limitDays = hospital?.opExpiryLimit ?? 10;
+    const limitDays = selectedDoc?.opExpiryLimit ?? hospital?.opExpiryLimit ?? 10;
     
     // Parse the selected appointment date
     const appointmentDate = new Date(selectedDate);
     appointmentDate.setHours(0, 0, 0, 0);
 
-    return patientDetail.patient.medicalHistory.some((history: any) => {
-      const isCompleted = 
-        String(history.status).toLowerCase() === "completed" || 
-        String(history.visitType).toLowerCase().includes("consultation");
-      if (!isCompleted) return false;
+    const selectedDocName = String(selectedDoc.name || "").toLowerCase().replace(/dr\.?\s*/g, "").trim();
+    const selectedDocId = String(selectedDoc._id || "");
 
-      const cleanHistoryDoc = String(history.doctorName).toLowerCase().replace("dr. ", "").replace("dr", "").trim();
-      const cleanSelectedDoc = String(selectedDoc.name).toLowerCase().replace("dr. ", "").replace("dr", "").trim();
-      if (cleanHistoryDoc !== cleanSelectedDoc) return false;
+    // 1. Check recentAppointments from backend patientDetail
+    const recent = (patientDetail as any)?.recentAppointments || [];
+    const matchRecent = recent.some((app: any) => {
+      // Must be a completed or active consultation visit!
+      const isConsultedStatus = app.status === "completed" || app.status === "in_consultation" || app.status === "checked_in";
+      if (!isConsultedStatus) return false;
+
+      const docName = String(app.doctorName || "").toLowerCase().replace(/dr\.?\s*/g, "").trim();
+      const docId = String(app.doctorId || "");
+      const isSameDoctor = (selectedDocId && docId === selectedDocId) || (selectedDocName && docName === selectedDocName) || (docName && selectedDocName && (docName.includes(selectedDocName) || selectedDocName.includes(docName)));
+      if (!isSameDoctor) return false;
+
+      const appDate = new Date(app.date);
+      appDate.setHours(0, 0, 0, 0);
+
+      const diffTime = appointmentDate.getTime() - appDate.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      return diffDays >= 0 && diffDays <= limitDays;
+    });
+
+    if (matchRecent) return true;
+
+    // 2. Check patient medicalHistory array if present
+    const medHistory = patientDetail?.patient?.medicalHistory || [];
+    return medHistory.some((history: any) => {
+      const docName = String(history.doctorName || "").toLowerCase().replace(/dr\.?\s*/g, "").trim();
+      const isSameDoctor = docName === selectedDocName || (docName && selectedDocName && (docName.includes(selectedDocName) || selectedDocName.includes(docName)));
+      if (!isSameDoctor) return false;
 
       const historyDate = new Date(history.date);
       historyDate.setHours(0, 0, 0, 0);
 
-      // Diff in days
       const diffTime = appointmentDate.getTime() - historyDate.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      // Return true if the new appointment date is on/after the history date AND within the limit
       return diffDays >= 0 && diffDays <= limitDays;
     });
   };
@@ -445,8 +445,8 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const isDuplicate = !isFollowUp && dupCheck?.isDuplicate === true;
   const duplicateMessage = dupCheck?.message || "";
 
-  const getFilteredSlots = () => {
-    if (!selectedDate) return ALL_SLOTS;
+  const getFilteredSlots = (): string[] => {
+    if (!selectedDate) return [];
     return getAvailableSlots(selectedDate, selectedDoctorId);
   };
 
@@ -712,43 +712,43 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Outpatient Bookings</h1>
-          <p className="text-sm text-slate-500">Manage consultant appointment scheduling and queues.</p>
-        </div>
-        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-1">
-          <button
-            onClick={() => setTab("today")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "today" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
-          >
-            <List className="h-3.5 w-3.5" /> Today's Queue
-          </button>
-          <button
-            onClick={() => setTab("scheduled")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "scheduled" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
-          >
-            <Clock className="h-3.5 w-3.5" /> Scheduled Bookings
-          </button>
-          <button
-            onClick={() => setTab("completed")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "completed" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
-          >
-            <CheckCircle className="h-3.5 w-3.5" /> Completed
-          </button>
-          <button
-            onClick={() => setTab("new")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "new" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
-          >
-            <Plus className="h-3.5 w-3.5" /> Book Appointment
-          </button>
-          <button
-            onClick={() => setTab("calendar")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "calendar" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
-          >
-            <Calendar className="h-3.5 w-3.5" /> Calendar View
-          </button>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Outpatient Bookings</h1>
+        <p className="text-sm text-slate-500">Manage consultant appointment scheduling and queues.</p>
+      </div>
+
+      {/* Tabs Navigation Row */}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 max-w-max">
+        <button
+          onClick={() => setTab("today")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "today" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
+        >
+          <List className="h-3.5 w-3.5" /> Today's Queue
+        </button>
+        <button
+          onClick={() => setTab("scheduled")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "scheduled" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
+        >
+          <Clock className="h-3.5 w-3.5" /> Scheduled Bookings
+        </button>
+        <button
+          onClick={() => setTab("completed")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "completed" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
+        >
+          <CheckCircle className="h-3.5 w-3.5" /> Completed
+        </button>
+        <button
+          onClick={() => setTab("new")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "new" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
+        >
+          <Plus className="h-3.5 w-3.5" /> Book Appointment
+        </button>
+        <button
+          onClick={() => setTab("calendar")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "calendar" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
+        >
+          <Calendar className="h-3.5 w-3.5" /> Calendar View
+        </button>
       </div>
 
       {/* Today's Queue */}
@@ -946,15 +946,25 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                   <h4 className="font-bold text-xs uppercase tracking-wider text-slate-500 border-b pb-1.5 flex items-center gap-1.5">
                     <FolderHeart className="h-4 w-4 text-navy-600" /> Previous Visits & Appointments
                   </h4>
-                  {patientDetail.patient.medicalHistory && patientDetail.patient.medicalHistory.length > 0 ? (
+                  {((patientDetail as any)?.recentAppointments?.length > 0 || (patientDetail.patient.medicalHistory && patientDetail.patient.medicalHistory.length > 0)) ? (
                     <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
-                      {patientDetail.patient.medicalHistory.map((item: any, idx: number) => (
-                        <div key={idx} className="border-b border-slate-100 pb-2 last:border-0 last:pb-0 text-xs">
-                          <div className="flex justify-between text-slate-400 font-semibold">
+                      {((patientDetail as any)?.recentAppointments || []).map((item: any, idx: number) => (
+                        <div key={`rec-${idx}`} className="border-b border-slate-100 pb-2 last:border-0 last:pb-0 text-xs">
+                          <div className="flex justify-between text-slate-500 font-semibold">
+                            <span>{new Date(item.date).toLocaleDateString("en-IN")} — {item.visitType || "Consultation"}</span>
+                            <span className="font-bold text-slate-600 uppercase text-[10px]">{item.status}</span>
+                          </div>
+                          <div className="mt-0.5 text-slate-800 font-bold">Dr. {item.doctorName}</div>
+                          {item.notes && <div className="text-[10px] text-slate-500 mt-1 bg-slate-50 p-1.5 rounded border border-slate-100 leading-snug">{item.notes}</div>}
+                        </div>
+                      ))}
+                      {(patientDetail.patient.medicalHistory || []).map((item: any, idx: number) => (
+                        <div key={`med-${idx}`} className="border-b border-slate-100 pb-2 last:border-0 last:pb-0 text-xs">
+                          <div className="flex justify-between text-slate-500 font-semibold">
                             <span>{new Date(item.date).toLocaleDateString("en-IN")} — {item.visitType}</span>
                             <span className="font-bold text-slate-600 uppercase text-[10px]">{item.status}</span>
                           </div>
-                          <div className="mt-0.5 text-slate-700 font-bold">{item.diagnosis}</div>
+                          <div className="mt-0.5 text-slate-800 font-bold">{item.diagnosis}</div>
                           {item.notes && <div className="text-[10px] text-slate-500 mt-1 bg-slate-50 p-1.5 rounded border border-slate-100 leading-snug">{item.notes}</div>}
                         </div>
                       ))}
@@ -1110,8 +1120,8 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                     </div>
                   ) : (
                     <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
-                      {getFilteredSlots().map((slot) => {
-                        const isBooked = bookedSlots?.includes(slot);
+                      {getFilteredSlots().map((slot: string) => {
+                        const isBooked = isSlotBooked(slot, bookedSlots || []);
                         const isSelected = watch("time") === slot;
 
                         return (
@@ -1122,15 +1132,15 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                             onClick={() => {
                               setValue("time", slot, { shouldValidate: true });
                             }}
-                            className={`flex flex-col items-center justify-center rounded-lg border py-2 text-xs font-semibold shadow-sm transition-all focus:outline-none ${
+                            className={`flex flex-col items-center justify-center rounded-lg border py-2 text-xs font-semibold shadow-xs transition-all focus:outline-none ${
                               isBooked
-                                ? "border-rose-100 bg-rose-50 text-rose-450 line-through cursor-not-allowed"
+                                ? "border-rose-100 bg-rose-50 text-rose-450 line-through cursor-not-allowed opacity-60"
                                 : isSelected
                                 ? "border-navy-600 bg-navy-600 text-white ring-2 ring-navy-100"
                                 : "border-emerald-200 bg-emerald-50/50 text-emerald-700 hover:border-emerald-400 hover:bg-emerald-100 active:scale-95"
                             }`}
                           >
-                            <span>{slot}</span>
+                            <span>{formatSlot12Hour(slot)}</span>
                             {isBooked && <span className="text-[8px] font-bold tracking-tight mt-0.5 opacity-80">Booked</span>}
                           </button>
                         );
@@ -1429,36 +1439,45 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
               </div>
             </div>
 
-            {/* Action Selector — always visible */}
             {(() => {
               const alreadyRescheduled = getIsAlreadyRescheduled(selectedAppt);
+              const timeAllowed = isCancellationAllowed(selectedAppt?.date, selectedAppt?.time);
               return (
                 <div className="rounded-lg border border-slate-200 p-3 space-y-2">
                   <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">Select Action</p>
-                  <label className="flex items-center gap-3 cursor-pointer">
+                  <label className={`flex items-center gap-3 ${!timeAllowed ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
                     <input
                       type="radio"
                       name="dialogAction"
                       value="cancel"
                       checked={dialogAction === "cancel"}
-                      onChange={() => setDialogAction("cancel")}
+                      onChange={() => timeAllowed && setDialogAction("cancel")}
+                      disabled={!timeAllowed}
                       className="h-4 w-4 accent-red-600"
                     />
                     <span className="text-sm font-semibold text-slate-800">Cancel Appointment</span>
                   </label>
-                  <label className={`flex items-center gap-3 ${alreadyRescheduled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
+                  <label className={`flex items-center gap-3 ${alreadyRescheduled || !timeAllowed ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
                     <input
                       type="radio"
                       name="dialogAction"
                       value="reschedule"
                       checked={dialogAction === "reschedule"}
-                      onChange={() => !alreadyRescheduled && setDialogAction("reschedule")}
-                      disabled={alreadyRescheduled}
+                      onChange={() => !alreadyRescheduled && timeAllowed && setDialogAction("reschedule")}
+                      disabled={alreadyRescheduled || !timeAllowed}
                       className="h-4 w-4 accent-navy-600"
                     />
                     <span className="text-sm font-semibold text-slate-800">Reschedule Appointment</span>
                   </label>
-                  {alreadyRescheduled && (
+                  {!timeAllowed && (
+                    <div className="mt-2 flex items-start gap-2 rounded-md bg-rose-50 border border-rose-200 px-3 py-2">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
+                      <p className="text-xs font-medium text-rose-700 leading-snug">
+                        Appointments can only be cancelled or rescheduled up to 1 hour before the scheduled appointment time.
+                      </p>
+                    </div>
+                  )}
+                  {timeAllowed && alreadyRescheduled && (
                     <div className="mt-2 flex items-start gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2">
                       <svg className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
@@ -1597,11 +1616,11 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                 Close
               </Button>
               {dialogAction === "cancel" ? (
-                <Button type="submit" variant="danger" disabled={isMutating}>
+                <Button type="submit" variant="danger" disabled={isMutating || !isCancellationAllowed(selectedAppt?.date, selectedAppt?.time)}>
                   {cancelMutation.isPending ? "Cancelling..." : "Confirm Cancellation"}
                 </Button>
               ) : (
-                <Button type="submit" disabled={isMutating} className="bg-navy-600 hover:bg-navy-700 text-white">
+                <Button type="submit" disabled={isMutating || !isCancellationAllowed(selectedAppt?.date, selectedAppt?.time)} className="bg-navy-600 hover:bg-navy-700 text-white">
                   {rescheduleMutation.isPending ? "Rescheduling..." : "Confirm Reschedule"}
                 </Button>
               )}

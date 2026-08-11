@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 // ── SECURITY FIX: use doctor-scoped hook, NOT usePatients() ──────────────────
 // usePatients() calls /api/v1/patients which returns ALL hospital patients.
 // useDoctorPatients() calls /doctors/dashboard/my-patients — the server
@@ -15,15 +16,127 @@ const STATUS_TONE: Record<string, "success" | "warning" | "danger" | "info" | "n
   discharged: "neutral",
 };
 
+interface GroupedHistoryItem {
+  key: string;
+  date: Date;
+  dateFormatted: string;
+  visitType: string;
+  doctorName: string;
+  department?: string;
+  diagnoses: string[];
+  items: { diagnosis: string; notes: string; status: string }[];
+}
+
+function groupMedicalHistory(historyList: any[]): GroupedHistoryItem[] {
+  if (!historyList || !Array.isArray(historyList) || historyList.length === 0) {
+    return [];
+  }
+
+  const groupMap = new Map<string, GroupedHistoryItem>();
+
+  historyList.forEach((mh) => {
+    if (!mh) return;
+
+    const dateVal = mh.date ? new Date(mh.date) : new Date();
+    const dateStr = !isNaN(dateVal.getTime()) ? dateVal.toISOString().split("T")[0] : "no-date";
+    const docName = String(mh.doctorName || "Attending Doctor").trim();
+    const vType = String(mh.visitType || "Consultation").trim();
+
+    const key = `${dateStr}_${docName.toLowerCase()}_${vType.toLowerCase()}`;
+
+    if (!groupMap.has(key)) {
+      groupMap.set(key, {
+        key,
+        date: dateVal,
+        dateFormatted: dateVal.toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric"
+        }),
+        visitType: vType,
+        doctorName: docName,
+        department: mh.department || "",
+        diagnoses: [],
+        items: []
+      });
+    }
+
+    const group = groupMap.get(key)!;
+    if (mh.diagnosis && !group.diagnoses.includes(mh.diagnosis)) {
+      group.diagnoses.push(mh.diagnosis);
+    }
+    group.items.push({
+      diagnosis: mh.diagnosis || "",
+      notes: mh.notes || "",
+      status: mh.status || "Completed"
+    });
+  });
+
+  return Array.from(groupMap.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
+}
+
 export function PatientsPage() {
-  const [search, setSearch] = useState("");
-  const { data: myData, isLoading, isError, refetch } = useDoctorPatients({ search });
+  const [searchParams] = useSearchParams();
+  const urlPatientId = searchParams.get("patientId") || "";
+  const urlSearch = searchParams.get("search") || "";
+
+  const [searchInput, setSearchInput] = useState(urlSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(urlSearch);
+
+  useEffect(() => {
+    if (urlSearch && searchInput !== urlSearch) {
+      setSearchInput(urlSearch);
+      setDebouncedSearch(urlSearch);
+    }
+  }, [urlSearch]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  const { data: myData, isLoading, isError, refetch } = useDoctorPatients({
+    search: debouncedSearch,
+    patientId: urlPatientId || undefined
+  });
 
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
   const patients: Patient[] = myData?.patients ?? [];
 
-  if (isLoading && patients.length === 0) {
+  // Automatically select target patient when list loads or changes
+  useEffect(() => {
+    if (patients.length > 0) {
+      let target: Patient | undefined;
+
+      if (urlPatientId) {
+        target = patients.find(
+          (p: any) => p._id?.toString() === urlPatientId || p.id?.toString() === urlPatientId
+        );
+      }
+
+      if (!target && urlSearch) {
+        const queryLower = urlSearch.trim().toLowerCase();
+        target = patients.find(
+          (p: any) =>
+            (p.uhid && p.uhid.toLowerCase() === queryLower) ||
+            (p.name && p.name.toLowerCase() === queryLower) ||
+            (p.uhid && p.uhid.toLowerCase().includes(queryLower)) ||
+            (p.name && p.name.toLowerCase().includes(queryLower))
+        );
+      }
+
+      if (target) {
+        setSelectedPatient(target);
+      } else if (!selectedPatient) {
+        setSelectedPatient(patients[0]);
+      }
+    }
+  }, [patients, urlPatientId, urlSearch]);
+
+  if (isLoading && !debouncedSearch && patients.length === 0) {
     return (
       <div className="space-y-4">
         <div className="h-8 w-48 animate-pulse rounded bg-slate-200"></div>
@@ -64,8 +177,8 @@ export function PatientsPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Search your patients..."
                 className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-navy-500 focus:border-navy-500"
               />
@@ -92,10 +205,13 @@ export function PatientsPage() {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-bold text-slate-800">{p.name}</h4>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800">{p.name}</h4>
+                      {p.uhid && <p className="text-[11px] font-mono text-slate-500 font-medium">{p.uhid}</p>}
+                    </div>
                     <Badge tone={STATUS_TONE[p.status] ?? "neutral"}>{p.status}</Badge>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">{p.phone ? `Phone: ${p.phone}` : ""}</p>
+                  <p className="text-xs text-slate-400 mt-1">{p.phone ? `Phone: ${p.phone}` : ""}</p>
                 </div>
               ))}
             </div>
@@ -109,6 +225,11 @@ export function PatientsPage() {
               <div className="border-b pb-4">
                 <h2 className="text-lg font-bold text-slate-900">{selectedPatient.name}</h2>
                 <p className="text-sm text-slate-500 mt-1">
+                  {selectedPatient.uhid && (
+                    <span className="font-mono text-slate-700 font-semibold mr-2">
+                      {selectedPatient.uhid} ·
+                    </span>
+                  )}
                   Age: {selectedPatient.age || "—"} · Gender: {selectedPatient.gender || "—"}
                 </p>
                 {selectedPatient.allergies && (
@@ -126,25 +247,42 @@ export function PatientsPage() {
                   <p className="text-xs text-slate-400 py-4">No medical history entries recorded for this patient.</p>
                 ) : (
                   <div className="space-y-4">
-                    {selectedPatient.medicalHistory.map((mh, idx) => {
-                      const mhDate = new Date(mh.date).toLocaleDateString("en-IN", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      });
+                    {groupMedicalHistory(selectedPatient.medicalHistory).map((group) => {
+                      const isMultiple = group.items.length > 1;
 
                       return (
-                        <div key={idx} className="border-l-2 border-navy-100 pl-4 py-1">
+                        <div key={group.key} className="border-l-2 border-navy-100 pl-4 py-1.5 space-y-1">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-semibold text-navy-700 bg-navy-50 px-2 py-0.5 rounded">
-                              {mh.visitType || "Consultation"}
+                              {group.visitType} {isMultiple ? `(${group.items.length} Orders)` : ""}
                             </span>
-                            <span className="text-[10px] text-slate-400">{mhDate}</span>
+                            <span className="text-[10px] text-slate-400">{group.dateFormatted}</span>
                           </div>
-                          <p className="text-sm font-semibold text-slate-800 mt-2">Dr. {mh.doctorName || "Attending Doctor"}</p>
-                          <p className="text-xs text-slate-600 mt-1"><span className="font-medium text-slate-800">Diagnosis:</span> {mh.diagnosis || "Observation"}</p>
-                          {mh.notes && (
-                            <p className="text-xs text-slate-500 mt-1 rounded bg-slate-50 p-2 border border-slate-100 whitespace-pre-wrap">{mh.notes}</p>
+                          <p className="text-sm font-semibold text-slate-800">Dr. {group.doctorName}</p>
+                          <p className="text-xs text-slate-600">
+                            <span className="font-medium text-slate-800">Diagnosis:</span>{" "}
+                            {group.diagnoses.join(", ") || "Observation"}
+                          </p>
+                          {isMultiple ? (
+                            <div className="mt-1.5 rounded-lg bg-slate-50 p-2.5 border border-slate-150 space-y-2">
+                              {group.items.map((item, idx) => (
+                                <div key={idx} className="text-xs text-slate-700 border-b border-slate-200/60 pb-1.5 last:border-0 last:pb-0">
+                                  <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                                    <span className="text-navy-600 font-bold">•</span>
+                                    <span>{item.diagnosis || group.visitType}</span>
+                                  </div>
+                                  {item.notes && (
+                                    <p className="text-[11px] text-slate-500 mt-0.5 pl-3 whitespace-pre-wrap">{item.notes}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            group.items[0]?.notes && (
+                              <p className="text-xs text-slate-500 mt-1 rounded bg-slate-50 p-2 border border-slate-100 whitespace-pre-wrap">
+                                {group.items[0].notes}
+                              </p>
+                            )
                           )}
                         </div>
                       );

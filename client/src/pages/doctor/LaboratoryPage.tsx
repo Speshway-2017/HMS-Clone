@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FlaskConical, Plus, CheckCircle2, Clock, AlertTriangle, Search, User, ShieldAlert, X, Eye, Download } from "lucide-react";
 import toast from "react-hot-toast";
 import { Card } from "../../components/ui/Card";
@@ -43,7 +43,16 @@ const TABS = ["View Reports", "Order Tests", "Approve Results"];
 
 export function LaboratoryPage() {
   const [activeTab, setActiveTab] = useState(0);
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   const [selectedTests, setSelectedTests] = useState<string[]>([]);
   const [priority, setPriority] = useState("Routine");
   const [patientId, setPatientId] = useState("");
@@ -53,7 +62,7 @@ export function LaboratoryPage() {
   const [selectedOrderReportId, setSelectedOrderReportId] = useState<string | null>(null);
 
   // Fetch only doctor-owned lab orders from secured endpoints
-  const { data: labOrdersData, isLoading: isLabOrdersLoading, isError: isLabError } = useDoctorLabOrders({ search });
+  const { data: labOrdersData, isLoading: isLabOrdersLoading, isError: isLabError } = useDoctorLabOrders({ search: debouncedSearch });
 
   // Fetch only doctor-assigned patients for the placement selector dropdown to prevent leakage
   const { data: myPatientsData, isLoading: isPatientsLoading } = useDoctorPatients();
@@ -157,7 +166,7 @@ export function LaboratoryPage() {
       ) : (
         <>
           {/* KPIs */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard label="Total Reports" value={counts?.total ?? orders.length} icon={<FlaskConical className="h-5 w-5" />} emphasis />
             <KpiCard label="Pending" value={counts?.pending ?? orders.filter(o => o.status === "pending").length} icon={<Clock className="h-5 w-5" />} />
             <KpiCard label="Completed" value={counts?.completed ?? orders.filter(o => o.status === "completed").length} icon={<CheckCircle2 className="h-5 w-5" />} />
@@ -165,12 +174,12 @@ export function LaboratoryPage() {
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-1 border-b border-slate-200">
+          <div className="flex gap-1 border-b border-slate-200 overflow-x-auto max-w-full scrollbar-none flex-nowrap shrink-0">
             {TABS.map((tab, i) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(i)}
-                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
                   activeTab === i ? "border-navy-700 text-navy-700" : "border-transparent text-slate-500 hover:text-slate-700"
                 }`}
               >
@@ -185,8 +194,8 @@ export function LaboratoryPage() {
               <div className="relative max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   placeholder="Search patient or test..."
                   className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
                 />
@@ -201,6 +210,10 @@ export function LaboratoryPage() {
                   month: "short",
                   year: "numeric",
                 });
+
+                const isCompleted = order.status === "completed" || order.status === "Completed";
+                const hasReport = order.report && order.report.files && order.report.files.length > 0;
+                const reportReady = isCompleted && hasReport;
 
                 return (
                   <Card key={order._id}>
@@ -232,6 +245,25 @@ export function LaboratoryPage() {
                       </div>
                     </div>
 
+                    {/* Report Status Banner */}
+                    <div className={`mt-3 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold ${
+                      reportReady
+                        ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                        : "bg-amber-50 border border-amber-200 text-amber-700"
+                    }`}>
+                      {reportReady ? (
+                        <>
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                          Report Ready — Attachment available for download
+                        </>
+                      ) : (
+                        <>
+                          <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse inline-block" />
+                          Report Pending — Awaiting lab technician upload
+                        </>
+                      )}
+                    </div>
+
                     <div className="mt-4 flex gap-2">
                       <Button
                         variant="secondary"
@@ -240,7 +272,7 @@ export function LaboratoryPage() {
                       >
                         View Detailed Report
                       </Button>
-                      {order.status === "completed" && (
+                      {isCompleted && (
                         <Button
                           variant="primary"
                           size="sm"
@@ -456,20 +488,36 @@ interface ReportDetailModalProps {
 function ReportDetailModal({ orderId, onClose }: ReportDetailModalProps) {
   // Triggers API request which enforces ownership and writes an audit log in controller
   const { data: detailData, isLoading, isError } = useDoctorLabOrderById(orderId);
+  const [previewFile, setPreviewFile] = useState<{ url: string; name: string } | null>(null);
 
   if (!orderId) return null;
 
   const order = detailData?.order;
-  const report = detailData?.report;
+  const reportsList: any[] = detailData?.reports && detailData.reports.length > 0
+    ? detailData.reports
+    : detailData?.report
+      ? [detailData.report]
+      : [];
 
   const patient = order?.patient as any;
   const doctor = order?.doctor as any;
 
+  const getResolvedFileUrl = (file: any, repId?: string) => {
+    const rawUrl = file?.secure_url || file?.url || file?.path || "";
+    if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://") || rawUrl.startsWith("data:")) {
+      return rawUrl;
+    }
+    if (rawUrl.startsWith("/")) {
+      return `${window.location.origin}${rawUrl}`;
+    }
+    return `/api/v1/diagnostic-reports/${repId || reportsList[0]?._id}/download?token=${sessionStorage.getItem("hms_token") || ""}`;
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-sm">
-      <div className="relative my-8 w-full max-w-xl rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-transparent">
+      <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200/80 max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-navy-700 to-navy-800 px-6 py-4 rounded-t-2xl">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-navy-700 to-navy-800 px-6 py-4 shrink-0">
           <div className="flex items-center gap-2">
             <FlaskConical className="h-5 w-5 text-white" />
             <h2 className="text-base font-semibold text-white">Laboratory Investigation Report</h2>
@@ -480,7 +528,7 @@ function ReportDetailModal({ orderId, onClose }: ReportDetailModalProps) {
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-5 overflow-y-auto flex-1">
           {isLoading && (
             <div className="py-12 flex justify-center">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-navy-700 border-t-transparent"></div>
@@ -555,77 +603,92 @@ function ReportDetailModal({ orderId, onClose }: ReportDetailModalProps) {
                           </tr>
                         ))
                       ) : (
-                        order.tests.map((t: string, idx: number) => (
-                          <tr key={idx}>
-                            <td className="p-3 font-medium text-slate-800">{t}</td>
-                            <td className={`p-3 ${report ? "text-blue-700 font-semibold" : "text-slate-400 italic font-medium"}`}>
-                              {report ? "Report Document Uploaded" : "Pending..."}
-                            </td>
-                            <td className="p-3 text-slate-400">—</td>
-                            <td className="p-3">
-                              <Badge tone={report ? "info" : "neutral"}>
-                                {report ? "uploaded" : "pending"}
-                              </Badge>
-                            </td>
-                          </tr>
-                        ))
+                        order.tests.map((t: string, idx: number) => {
+                          const matchedReport = reportsList.find((r) => r.testName?.toLowerCase() === t.toLowerCase()) || reportsList[idx];
+                          return (
+                            <tr key={idx}>
+                              <td className="p-3 font-medium text-slate-800">{t}</td>
+                              <td className={`p-3 ${matchedReport ? "text-blue-700 font-semibold" : "text-slate-400 italic font-medium"}`}>
+                                {matchedReport ? "Report Document Uploaded" : "Pending..."}
+                              </td>
+                              <td className="p-3 text-slate-400">—</td>
+                              <td className="p-3">
+                                <Badge tone={matchedReport ? "info" : "neutral"}>
+                                  {matchedReport ? "uploaded" : "pending"}
+                                </Badge>
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              {/* Technician Observations & Files */}
-              {report && (
-                <div className="mt-4 border-t border-slate-100 pt-4 space-y-3">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Technician Observations & Documents</p>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 text-xs">
-                    {report.observations && (
-                      <div>
-                        <div className="text-[10px] text-slate-400 font-semibold uppercase">Findings / Observations</div>
-                        <div className="text-xs font-medium text-slate-800 mt-0.5 whitespace-pre-wrap">{report.observations}</div>
-                      </div>
-                    )}
-                    {report.remarks && (
-                      <div>
-                        <div className="text-[10px] text-slate-400 font-semibold uppercase">Remarks</div>
-                        <div className="text-xs text-slate-500 italic mt-0.5 whitespace-pre-wrap">{report.remarks}</div>
-                      </div>
-                    )}
-                    {report.files && report.files.length > 0 && (
-                      <div>
-                        <div className="text-[10px] text-slate-400 font-semibold uppercase mb-1.5">Attached Files ({report.files.length})</div>
-                        <div className="flex flex-col gap-2">
-                          {report.files.map((file: any, index: number) => (
-                            <div key={index} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-2 text-xs">
-                              <span className="font-semibold text-slate-700 truncate max-w-[220px]">{file.original_filename}</span>
-                              <div className="flex items-center gap-2">
-                                <a
-                                  href={file.secure_url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex items-center gap-1 hover:underline text-blue-700 font-bold"
-                                >
-                                  <Eye className="h-3.5 w-3.5" /> View
-                                </a>
-                                <a
-                                  href={`/api/v1/diagnostic-reports/${report._id}/download?token=${sessionStorage.getItem("hms_token") || ""}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex items-center gap-1 hover:underline text-green-700 font-bold ml-2"
-                                >
-                                  <Download className="h-3.5 w-3.5" /> Download
-                                </a>
-                              </div>
-                            </div>
-                          ))}
+              {/* Technician Observations & Files across ALL reports */}
+              {reportsList.length > 0 && (
+                <div className="mt-4 border-t border-slate-100 pt-4 space-y-4">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Technician Observations & Documents ({reportsList.length})</p>
+                  {reportsList.map((reportItem: any, rIdx: number) => (
+                    <div key={reportItem._id || rIdx} className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3 text-xs">
+                      {reportItem.testName && (
+                        <div className="flex justify-between items-center border-b border-slate-200/80 pb-2">
+                          <span className="font-bold text-navy-800 text-sm">{reportItem.testName}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">Report #{reportItem._id?.slice(-6)?.toUpperCase()}</span>
                         </div>
+                      )}
+                      {reportItem.observations && (
+                        <div>
+                          <div className="text-[10px] text-slate-400 font-semibold uppercase">Findings / Observations</div>
+                          <div className="text-xs font-medium text-slate-800 mt-0.5 whitespace-pre-wrap">{reportItem.observations}</div>
+                        </div>
+                      )}
+                      {reportItem.remarks && (
+                        <div>
+                          <div className="text-[10px] text-slate-400 font-semibold uppercase">Remarks</div>
+                          <div className="text-xs text-slate-500 italic mt-0.5 whitespace-pre-wrap">{reportItem.remarks}</div>
+                        </div>
+                      )}
+                      {reportItem.files && reportItem.files.length > 0 && (
+                        <div>
+                          <div className="text-[10px] text-slate-400 font-semibold uppercase mb-1.5">Attached Files ({reportItem.files.length})</div>
+                          <div className="flex flex-col gap-2">
+                            {reportItem.files.map((file: any, index: number) => {
+                              const resolvedUrl = getResolvedFileUrl(file, reportItem._id);
+                              const filename = file.original_filename || file.name || `${reportItem.testName || "Report"}_file_${index + 1}.jpg`;
+                              return (
+                                <div key={index} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-2.5 text-xs shadow-xs">
+                                  <span className="font-semibold text-slate-700 truncate max-w-[220px]">{filename}</span>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setPreviewFile({ url: resolvedUrl, name: filename })}
+                                      className="inline-flex items-center gap-1 hover:underline text-blue-700 font-bold px-2.5 py-1 bg-blue-50 hover:bg-blue-100 rounded-md text-xs transition-colors"
+                                    >
+                                      <Eye className="h-3.5 w-3.5" /> View
+                                    </button>
+                                    <a
+                                      href={resolvedUrl}
+                                      download={filename}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-1 hover:underline text-emerald-700 font-bold px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 rounded-md text-xs transition-colors"
+                                    >
+                                      <Download className="h-3.5 w-3.5" /> Download
+                                    </a>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      <div className="text-[10px] text-slate-400 border-t border-slate-200/60 pt-2">
+                        Uploaded By: <span className="font-bold text-slate-650">{reportItem.uploadedBy?.name || "Technician"}</span> on {new Date(reportItem.uploadedAt || reportItem.createdAt).toLocaleString()}
                       </div>
-                    )}
-                    <div className="text-[10px] text-slate-400 border-t border-slate-200/60 pt-2">
-                      Uploaded By: <span className="font-bold text-slate-650">{report.uploadedBy?.name || "Technician"}</span> on {new Date(report.uploadedAt).toLocaleString()}
                     </div>
-                  </div>
+                  ))}
                 </div>
               )}
 
@@ -639,12 +702,65 @@ function ReportDetailModal({ orderId, onClose }: ReportDetailModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end border-t border-slate-100 bg-slate-50 px-6 py-4 rounded-b-2xl">
+        <div className="flex justify-end border-t border-slate-100 bg-slate-50 px-6 py-4 shrink-0">
           <Button onClick={onClose} variant="secondary" size="sm">
             Close
           </Button>
         </div>
       </div>
+
+      {/* Inline Document & Image Lightbox Previewer Modal */}
+      {previewFile && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-transparent animate-in fade-in duration-200">
+          <div className="relative w-full max-w-4xl rounded-2xl bg-white shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] overflow-hidden">
+            {/* Lightbox Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-900 px-6 py-3.5 text-white shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <Eye className="h-4 w-4 text-blue-400 shrink-0" />
+                <h3 className="text-sm font-semibold truncate">{previewFile.name}</h3>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <a
+                  href={previewFile.url}
+                  download={previewFile.name}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+                >
+                  <Download className="h-3.5 w-3.5" /> Download
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPreviewFile(null)}
+                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Lightbox Body */}
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-100/80 min-h-[350px]">
+              {/\.(png|jpe?g|webp|gif|svg)($|\?)/i.test(previewFile.url) || /\.(png|jpe?g|webp|gif|svg)/i.test(previewFile.name) ? (
+                <img
+                  src={previewFile.url}
+                  alt={previewFile.name}
+                  className="max-h-[78vh] w-auto max-w-full rounded-xl object-contain shadow-2xl border border-slate-200 bg-white p-2"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = "none";
+                  }}
+                />
+              ) : (
+                <iframe
+                  src={previewFile.url}
+                  title={previewFile.name}
+                  className="w-full h-[78vh] rounded-xl border border-slate-200 bg-white"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

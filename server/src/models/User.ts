@@ -9,6 +9,7 @@ export interface UserDocument extends Document {
   passwordHash: string;
   role: Role;
   hospital: Types.ObjectId | null;
+  branch?: Types.ObjectId | null;
   title: string;
   phone: string;
   employeeId: string;
@@ -29,6 +30,7 @@ const userSchema = new Schema<UserDocument>(
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, required: true },
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", default: null },
+    branch: { type: Schema.Types.ObjectId, ref: "Branch", default: null },
     title: { type: String, default: "" },
     phone: { type: String, default: "" },
     employeeId: { type: String, default: "" },

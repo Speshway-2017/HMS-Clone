@@ -44,8 +44,12 @@ export function InventoryFormPage() {
         supplier: item.supplier,
         storageCondition: item.storageCondition,
       });
+    } else if (!isEdit && !form.sku) {
+      const catPrefix = form.category ? form.category.substring(0, 3).toUpperCase() : "MED";
+      const randomNum = Math.floor(100 + Math.random() * 900);
+      setForm((prev) => ({ ...prev, sku: `${catPrefix}-ITEM-${randomNum}` }));
     }
-  }, [item]);
+  }, [item, isEdit]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

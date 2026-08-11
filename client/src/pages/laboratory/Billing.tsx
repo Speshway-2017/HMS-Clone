@@ -14,12 +14,33 @@ import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
+import { InputField, SelectField } from "../../components/ui/Field";
 import toast from "react-hot-toast";
 
 interface LabBillItem {
   testName: string;
   price: number;
 }
+
+const getTestCategory = (name: string): string => {
+  const n = (name || "").toLowerCase();
+  if (n.includes("x-ray") || n.includes("mri") || n.includes("ct") || n.includes("ultrasound") || n.includes("usg") || n.includes("scan") || n.includes("radiology")) {
+    return "Radiology & Imaging";
+  }
+  if (n.includes("blood") || n.includes("cbc") || n.includes("hemogram") || n.includes("platelet") || n.includes("esr") || n.includes("anemia")) {
+    return "Hematology";
+  }
+  if (n.includes("lipid") || n.includes("glucose") || n.includes("sugar") || n.includes("hba1c") || n.includes("lft") || n.includes("kft") || n.includes("creatinine") || n.includes("thyroid") || n.includes("t3") || n.includes("t4") || n.includes("tsh") || n.includes("liver") || n.includes("kidney") || n.includes("panel")) {
+    return "Biochemistry";
+  }
+  if (n.includes("ecg") || n.includes("echo") || n.includes("tmt") || n.includes("cardiac") || n.includes("troponin") || n.includes("heart")) {
+    return "Cardiology";
+  }
+  if (n.includes("urine") || n.includes("stool") || n.includes("culture") || n.includes("sputum") || n.includes("swab")) {
+    return "Microbiology";
+  }
+  return "Laboratory Specimen";
+};
 
 interface ReceiptInfo {
   invoiceId: string;
@@ -46,9 +67,51 @@ export function LaboratoryBilling() {
   const [activeTab, setActiveTab] = useState<"pending" | "paid" | "today">("pending");
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [receiptInfo, setReceiptInfo] = useState<ReceiptInfo | null>(null);
+  const [selectedInvoiceForTestsModal, setSelectedInvoiceForTestsModal] = useState<any | null>(null);
+
+  // Payment collection modal state
+  const [selectedInvoiceForPay, setSelectedInvoiceForPay] = useState<any | null>(null);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [payAmount, setPayAmount] = useState("");
+  const [payMethod, setPayMethod] = useState("Cash");
+
   const printRef = useRef<HTMLDivElement>(null);
 
   const prices: Record<string, number> = (hospitalData as any)?.investigationPrices || {};
+
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedInvoiceForPay) return;
+
+    const amt = parseFloat(payAmount);
+    if (isNaN(amt) || amt <= 0) {
+      toast.error("Payment amount must be greater than zero.");
+      return;
+    }
+
+    if (amt > selectedInvoiceForPay.patientBalance + 0.01) {
+      toast.error(`Entered amount (₹${amt.toFixed(2)}) exceeds remaining balance (₹${selectedInvoiceForPay.patientBalance.toFixed(2)})`);
+      return;
+    }
+
+    try {
+      await api.post("/reception/billing/pay", {
+        invoiceId: selectedInvoiceForPay._id,
+        amount: amt,
+        paymentMethod: payMethod,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["reception", "billing", "payment-history"] });
+      queryClient.invalidateQueries({ queryKey: ["laboratory", "requests"] });
+
+      toast.success("Payment Processed Successfully!");
+      setIsPaymentModalOpen(false);
+      setSelectedInvoiceForPay(null);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to process payment.");
+    }
+  };
 
   const rawInvoices: any[] = invoiceData?.data || [];
   const invoices = rawInvoices.map((inv: any) => ({
@@ -202,8 +265,7 @@ export function LaboratoryBilling() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <FlaskConical className="h-6 w-6 text-blue-600" />
+          <h1 className="text-2xl font-bold text-slate-900">
             Laboratory Billing
           </h1>
           <p className="text-sm text-slate-500 mt-1">Create and manage laboratory invoices for test charges.</p>
@@ -301,75 +363,81 @@ export function LaboratoryBilling() {
               </thead>
               <tbody>
                 {filteredInvoices.map((inv) => (
-                  <tr key={inv._id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3 font-mono text-xs text-blue-700 font-bold">
+                  <tr key={inv._id} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
+                    <td className="px-4 py-3.5 align-middle font-mono text-xs text-blue-700 font-bold">
                       {inv.isInvoice ? inv._id.slice(-8).toUpperCase() : `REQ-${inv._id.slice(-6).toUpperCase()}`}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-800">{inv.patientName}</div>
-                      {inv.patientUhid && <div className="text-[10px] text-slate-400 font-mono">{inv.patientUhid}</div>}
+                    <td className="px-4 py-3.5 align-middle">
+                      <div className="font-semibold text-slate-800 text-xs">{inv.patientName}</div>
+                      {inv.patientUhid && <div className="text-[10px] text-slate-400 font-mono mt-0.5">{inv.patientUhid}</div>}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {inv.items.map((it: LabBillItem, i: number) => (
-                          <span key={i} className="bg-blue-50 border border-blue-100 text-blue-700 text-[10px] font-semibold px-2 py-0.5 rounded-full">{it.testName}</span>
-                        ))}
-                      </div>
+                    <td className="px-4 py-3.5 align-middle">
+                      {(() => {
+                        const items: LabBillItem[] = inv.items || [];
+                        const maxVisible = 2;
+                        const visible = items.slice(0, maxVisible);
+                        const extraCount = items.length - maxVisible;
+
+                        return (
+                          <div className="flex flex-wrap items-center gap-1.5 max-w-[240px]">
+                            {visible.map((it: LabBillItem, i: number) => (
+                              <span
+                                key={i}
+                                onClick={() => setSelectedInvoiceForTestsModal(inv)}
+                                className="bg-blue-50 hover:bg-blue-100 border border-blue-200/80 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-md cursor-pointer transition-all active:scale-95"
+                                title="Click to view all billed tests"
+                              >
+                                {it.testName}
+                              </span>
+                            ))}
+                            {extraCount > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedInvoiceForTestsModal(inv);
+                                }}
+                                className="rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 px-2 py-0.5 text-[10px] font-extrabold cursor-pointer transition-all shadow-2xs hover:shadow-xs active:scale-95 flex items-center gap-1"
+                                title="Click to view full billed tests popup"
+                              >
+                                +{extraCount} more
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
-                    <td className="px-4 py-3 font-bold text-slate-800">
+                    <td className="px-4 py-3.5 align-middle font-extrabold text-slate-800 text-xs">
                       {activeTab === "today" ? (
                         <div>
-                          <div className="flex items-center gap-0.5 text-green-600 font-bold">
+                          <div className="flex items-center gap-0.5 text-emerald-600 font-extrabold">
                             <IndianRupee className="h-3 w-3" />
                             {inv.amountPaid.toLocaleString()}
                           </div>
                           <div className="text-[10px] text-slate-400 font-normal">of ₹{inv.total.toLocaleString()}</div>
                         </div>
                       ) : (
-                        <span className="flex items-center gap-0.5"><IndianRupee className="h-3 w-3" />{inv.total.toLocaleString()}</span>
+                        <span className="flex items-center gap-0.5 font-extrabold"><IndianRupee className="h-3 w-3 text-slate-500" />{inv.total.toLocaleString()}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-500">
+                    <td className="px-4 py-3.5 align-middle text-xs text-slate-500 font-medium">
                       {activeTab === "today"
                         ? new Date(inv.issuedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                         : new Date(inv.issuedAt).toLocaleDateString()}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5 align-middle">
                       {activeTab === "today" ? (
                         <Badge tone="success">{inv.paymentMethod.toUpperCase()}</Badge>
                       ) : (
                         <Badge tone={statusTone(inv.status)}>{inv.status.replace("_", " ").toUpperCase()}</Badge>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      {activeTab === "today" ? (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              setReceiptInfo({
-                                invoiceId: inv.invoiceId || inv._id,
-                                patientName: inv.patientName,
-                                patientUhid: inv.patientUhid,
-                                items: inv.items,
-                                subtotal: inv.subtotal,
-                                tax: inv.taxAmount,
-                                total: inv.total,
-                                patientBalance: inv.patientBalance,
-                                status: inv.status,
-                                issuedAt: inv.issuedAt,
-                              });
-                              setIsReceiptOpen(true);
-                            }}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                            title="View Receipt"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ) : inv.isInvoice ? (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
+                    <td className="px-4 py-3.5 align-middle">
+                      <div className="flex items-center gap-2">
+                        {/* Eye Button for ALL rows */}
+                        <button
+                          onClick={() => {
+                            if (inv.isInvoice) {
                               setReceiptInfo({
                                 invoiceId: inv._id,
                                 patientName: inv.patientName,
@@ -383,63 +451,57 @@ export function LaboratoryBilling() {
                                 issuedAt: inv.issuedAt,
                               });
                               setIsReceiptOpen(true);
-                            }}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                            title="View Receipt"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                          {inv.status !== "paid" && (
+                            } else {
+                              setSelectedInvoiceForTestsModal(inv);
+                            }
+                          }}
+                          className="h-8 w-8 shrink-0 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-all shadow-2xs cursor-pointer active:scale-95"
+                          title={inv.isInvoice ? "View Receipt" : "View Tests & Order Details"}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+
+                        {/* Action Button: Pay Balance or Bill & Accept */}
+                        {activeTab !== "today" && (
+                          inv.isInvoice ? (
+                            inv.status !== "paid" && (
+                              <button
+                                onClick={() => {
+                                  setSelectedInvoiceForPay(inv);
+                                  setPayAmount(inv.patientBalance.toFixed(2));
+                                  setPayMethod("Cash");
+                                  setIsPaymentModalOpen(true);
+                                }}
+                                className="h-8 px-3 rounded-lg bg-navy-700 hover:bg-navy-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 whitespace-nowrap cursor-pointer"
+                                title="Collect Payment"
+                              >
+                                <IndianRupee className="h-3.5 w-3.5" /> Pay Balance
+                              </button>
+                            )
+                          ) : (
                             <button
-                              onClick={async () => {
-                                try {
-                                  if (inv.patientBalance > 0) {
-                                    await api.post("/reception/billing/pay", {
-                                      invoiceId: inv._id,
-                                      amount: inv.patientBalance,
-                                      paymentMethod: "Cash",
-                                    });
-                                  } else {
-                                    await api.patch(`/invoices/${inv._id}`, { status: "paid" });
+                              onClick={() => {
+                                const req = inv.rawRequest;
+                                navigate("/laboratory/billing/new", {
+                                  state: {
+                                    fromRequest: true,
+                                    patientId: req.patientId,
+                                    patientName: req.patientName,
+                                    patientUhid: req.patientUhid || "",
+                                    tests: req.tests,
+                                    priority: req.priority,
+                                    requestId: req._id,
                                   }
-                                  queryClient.invalidateQueries({ queryKey: ["invoices"] });
-                                  queryClient.invalidateQueries({ queryKey: ["reception", "billing", "payment-history"] });
-                                  toast.success("Bill marked as paid!");
-                                } catch {
-                                  toast.error("Failed to update status.");
-                                }
+                                });
                               }}
-                              className="p-1.5 rounded-lg text-slate-500 hover:text-green-600 hover:bg-green-50 transition-colors"
-                              title="Mark as Paid"
+                              className="h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 whitespace-nowrap cursor-pointer"
+                              title="Bill and Accept Request"
                             >
-                              <Check className="h-4 w-4" />
+                              <IndianRupee className="h-3.5 w-3.5" /> Bill & Accept
                             </button>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              const req = inv.rawRequest;
-                              navigate("/laboratory/billing/new", {
-                                state: {
-                                  fromRequest: true,
-                                  patientId: req.patientId,
-                                  patientName: req.patientName,
-                                  patientUhid: req.patientUhid || "",
-                                  tests: req.tests,
-                                  priority: req.priority,
-                                  requestId: req._id,
-                                }
-                              });
-                            }}
-                            className="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-750 text-white px-2.5 py-1 rounded text-xs font-bold transition-colors shadow-xs"
-                            title="Bill and Accept Request"
-                          >
-                            <IndianRupee className="h-3 w-3" /> Bill & Accept
-                          </button>
-                        </div>
-                      )}
+                          )
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -448,6 +510,71 @@ export function LaboratoryBilling() {
           )}
         </div>
       </Card>
+
+      {/* ── Collect Payment Modal ── */}
+      {selectedInvoiceForPay && (
+        <Modal
+          title="Collect Balance Payment"
+          isOpen={isPaymentModalOpen}
+          onClose={() => setIsPaymentModalOpen(false)}
+        >
+          <form onSubmit={handlePaymentSubmit} className="space-y-4 text-xs">
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Patient:</span>
+                <span className="font-bold text-slate-800">
+                  {selectedInvoiceForPay.patientName} {selectedInvoiceForPay.patientUhid ? `(${selectedInvoiceForPay.patientUhid})` : ""}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Invoice Total:</span>
+                <span className="font-bold text-slate-800">₹{selectedInvoiceForPay.total.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Total Paid So Far:</span>
+                <span className="font-bold text-slate-800">₹{(selectedInvoiceForPay.total - selectedInvoiceForPay.patientBalance).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold border-t border-dashed border-slate-200 pt-1.5 text-blue-900">
+                <span>Remaining Balance Due:</span>
+                <span>₹{selectedInvoiceForPay.patientBalance.toLocaleString()}</span>
+              </div>
+            </div>
+
+            <InputField
+              label="Amount to Pay (₹)"
+              type="number"
+              required
+              min={0.01}
+              step={0.01}
+              max={selectedInvoiceForPay.patientBalance}
+              value={payAmount}
+              onChange={(e) => setPayAmount(e.target.value)}
+            />
+
+            <SelectField
+              label="Payment Option"
+              required
+              value={payMethod}
+              onChange={(e) => setPayMethod(e.target.value)}
+            >
+              <option value="Cash">Cash</option>
+              <option value="UPI">UPI</option>
+              <option value="Card">Card</option>
+              <option value="Net Banking">Net Banking</option>
+              <option value="Cheque">Cheque</option>
+            </SelectField>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button type="button" variant="secondary" onClick={() => setIsPaymentModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1">
+                <IndianRupee className="h-3.5 w-3.5" /> Process Payment
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
 
 
@@ -543,6 +670,168 @@ export function LaboratoryBilling() {
                 <Printer className="h-4 w-4" />
                 Print Receipt
               </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* POPUP MODAL: FULL BILLED TESTS BREAKDOWN */}
+      {selectedInvoiceForTestsModal && (
+        <Modal
+          isOpen={!!selectedInvoiceForTestsModal}
+          onClose={() => setSelectedInvoiceForTestsModal(null)}
+          title="Laboratory Invoice & Prescribed Tests Breakdown"
+          size="lg"
+        >
+          <div className="space-y-5 text-slate-800">
+            {/* Patient & Invoice Meta Summary */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs font-semibold">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Patient Name & UHID</span>
+                <span className="font-extrabold text-slate-900 text-sm">{selectedInvoiceForTestsModal.patientName}</span>
+                <span className="text-slate-500 block text-[11px] font-medium mt-0.5">
+                  UHID: <strong className="text-indigo-600 font-bold">{selectedInvoiceForTestsModal.patientUhid || "HMS-PT-88201"}</strong>
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Invoice / Request Reference</span>
+                <span className="font-mono font-extrabold text-blue-700 text-xs">
+                  {selectedInvoiceForTestsModal.isInvoice
+                    ? selectedInvoiceForTestsModal._id.toUpperCase()
+                    : `REQ-${selectedInvoiceForTestsModal._id.slice(-6).toUpperCase()}`}
+                </span>
+                <span className="text-slate-500 block text-[11px] font-medium mt-0.5">
+                  Issued on {new Date(selectedInvoiceForTestsModal.issuedAt || Date.now()).toLocaleDateString("en-IN")}
+                </span>
+              </div>
+            </div>
+
+            {/* Billing Summary Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-y border-slate-150 py-3 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="bg-indigo-100 text-indigo-800 font-extrabold text-xs px-3 py-1 rounded-lg border border-indigo-200">
+                  {selectedInvoiceForTestsModal.items?.length || 0} Billed Test{selectedInvoiceForTestsModal.items?.length > 1 ? "s" : ""}
+                </span>
+                <span className="font-extrabold text-slate-800 text-sm flex items-center">
+                  Total: <IndianRupee className="h-3.5 w-3.5 ml-1 text-slate-500" />{(selectedInvoiceForTestsModal.total || 0).toLocaleString()}
+                </span>
+              </div>
+              <Badge tone={selectedInvoiceForTestsModal.status === "paid" ? "success" : selectedInvoiceForTestsModal.status === "partially_paid" ? "warning" : "info"}>
+                Status: {(selectedInvoiceForTestsModal.status || "UNBILLED").replace("_", " ").toUpperCase()}
+              </Badge>
+            </div>
+
+            {/* Complete Tests List Grid with Price Breakdown */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <FlaskConical className="h-4 w-4 text-blue-600" /> Prescribed Investigation & Price Breakdown
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[48vh] overflow-y-auto pr-1">
+                {(selectedInvoiceForTestsModal.items || []).map((it: LabBillItem, index: number) => {
+                  const category = getTestCategory(it.testName);
+                  return (
+                    <div
+                      key={index}
+                      className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs hover:border-blue-300 hover:bg-blue-50/40 transition-all flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700 font-black text-xs">
+                          #{index + 1}
+                        </div>
+                        <div className="min-w-0">
+                          <h5 className="font-extrabold text-slate-900 text-xs truncate" title={it.testName}>
+                            {it.testName}
+                          </h5>
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 mt-0.5">
+                            {category}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-xs font-black text-emerald-700 flex items-center justify-end">
+                          <IndianRupee className="h-3 w-3" />{it.price > 0 ? it.price.toLocaleString() : "Included"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setSelectedInvoiceForTestsModal(null)}
+                className="rounded-lg px-4 py-2 border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
+              >
+                Close
+              </button>
+
+              <div className="flex items-center gap-2">
+                {selectedInvoiceForTestsModal.isInvoice && selectedInvoiceForTestsModal.status !== "paid" && (
+                  <Button
+                    onClick={() => {
+                      const inv = selectedInvoiceForTestsModal;
+                      setSelectedInvoiceForTestsModal(null);
+                      setSelectedInvoiceForPay(inv);
+                      setPayAmount(inv.patientBalance?.toFixed(2) || inv.total?.toFixed(2) || "0.00");
+                      setPayMethod("Cash");
+                      setIsPaymentModalOpen(true);
+                    }}
+                    className="py-2 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    <IndianRupee className="h-4 w-4" /> Pay Balance
+                  </Button>
+                )}
+                {selectedInvoiceForTestsModal.isInvoice && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      const inv = selectedInvoiceForTestsModal;
+                      setSelectedInvoiceForTestsModal(null);
+                      setReceiptInfo({
+                        invoiceId: inv._id,
+                        patientName: inv.patientName,
+                        patientUhid: inv.patientUhid,
+                        items: inv.items,
+                        subtotal: inv.subtotal,
+                        tax: inv.taxAmount,
+                        total: inv.total,
+                        patientBalance: inv.patientBalance,
+                        status: inv.status,
+                        issuedAt: inv.issuedAt,
+                      });
+                      setIsReceiptOpen(true);
+                    }}
+                    className="py-2 px-4 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Eye className="h-4 w-4" /> View Full Receipt
+                  </Button>
+                )}
+                {!selectedInvoiceForTestsModal.isInvoice && (
+                  <Button
+                    onClick={() => {
+                      const req = selectedInvoiceForTestsModal.rawRequest;
+                      setSelectedInvoiceForTestsModal(null);
+                      navigate("/laboratory/billing/new", {
+                        state: {
+                          fromRequest: true,
+                          patientId: req.patientId,
+                          patientName: req.patientName,
+                          patientUhid: req.patientUhid || "",
+                          tests: req.tests,
+                          priority: req.priority,
+                          requestId: req._id,
+                        }
+                      });
+                    }}
+                    className="py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    <IndianRupee className="h-4 w-4" /> Bill & Accept Order
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </Modal>

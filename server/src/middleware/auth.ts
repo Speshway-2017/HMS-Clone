@@ -33,6 +33,26 @@ export const protect = catchAsync(async (req: Request, _res: Response, next: Nex
   next();
 });
 
+export const protectOptional = catchAsync(async (req: Request, _res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : undefined;
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const payload = jwt.verify(token, env.jwtSecret) as TokenPayload;
+    const user = await User.findById(payload.id);
+    if (user && user.status === "active") {
+      req.user = user;
+    }
+  } catch {
+    // Optional token parsing — proceed silently if token is invalid or expired
+  }
+
+  next();
+});
+
 export function restrictTo(...roles: Role[]) {
   return (req: Request, _res: Response, next: NextFunction) => {
     if (!req.user || !roles.includes(req.user.role)) {

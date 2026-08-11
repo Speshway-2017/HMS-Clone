@@ -68,6 +68,16 @@ export function TestRequestDetailsPage() {
     return "Rejected";
   };
 
+  const handleDirectAccept = async (req: UnifiedRequest) => {
+    try {
+      await acceptRequest.mutateAsync(req._id);
+      toast.success("Request accepted! Moved to Test Processing queue.");
+      navigate("/laboratory/processing");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to accept request.");
+    }
+  };
+
   const handleAccept = (req: UnifiedRequest) => {
     toast.success("Redirecting to billing to complete test request...");
     navigate("/laboratory/billing/new", {
@@ -273,17 +283,24 @@ export function TestRequestDetailsPage() {
 
           {/* Action Footer (Only shown when pending) */}
           {mapStatusTab(request.status) === "Pending" && (
-            <Card className="p-4 flex justify-end gap-3">
+            <Card className="p-4 flex justify-end gap-3 flex-wrap">
               <Button
                 onClick={() => setIsRejectOpen(true)}
                 variant="danger"
-                className="px-6 py-2.5"
+                className="px-4 py-2 text-xs font-semibold"
               >
                 Reject Request
               </Button>
               <Button
+                onClick={() => handleDirectAccept(request)}
+                variant="secondary"
+                className="px-4 py-2 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100"
+              >
+                Accept Directly
+              </Button>
+              <Button
                 onClick={() => handleAccept(request)}
-                className="bg-green-600 hover:bg-green-750 text-white px-6 py-2.5 font-bold"
+                className="bg-green-600 hover:bg-green-750 text-white px-5 py-2 text-xs font-bold"
               >
                 Accept & Bill
               </Button>

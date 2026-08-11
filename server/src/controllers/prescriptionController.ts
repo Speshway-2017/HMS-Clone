@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { buildBranchQuery } from "../utils/branchQueryHelper";
 import mongoose, { Types } from "mongoose";
 import jwt from "jsonwebtoken";
 import path from "path";
@@ -21,6 +22,7 @@ import { InventoryItem } from "../models/InventoryItem";
 import { Invoice } from "../models/Invoice";
 import { AuditLog } from "../models/AuditLog";
 import { DbNotification } from "../models/DbNotification";
+import { ConsultationSession } from "../models/ConsultationSession";
 
 async function getLoggedDoctor(req: Request) {
   const doctor = await Doctor.findOne({ email: req.user!.email, isActive: { $ne: false } });
@@ -28,6 +30,46 @@ async function getLoggedDoctor(req: Request) {
     throw new AppError("Doctor profile not found for the logged-in user.", 404);
   }
   return doctor;
+}
+
+export function formatAndSanitizeMedications(rawMeds: any[]) {
+  if (!Array.isArray(rawMeds)) return [];
+  return rawMeds
+    .map((m: any) => {
+      const name = String(m.name || m.medicineName || "").trim();
+      if (!name) return null;
+
+      const strength = String(m.strength || "").trim();
+      const dosage = String(m.dosage || "").trim();
+      const frequency = String(m.frequency || "").trim();
+      const duration = String(m.duration || "").trim();
+      const instructions = String(m.instructions || "").trim();
+
+      // Compute total recommended quantity if missing
+      let qty = Number(m.quantity);
+      if (!qty || isNaN(qty) || qty <= 0) {
+        const dNum = parseFloat(dosage) || 1;
+        const fNum = parseFloat(frequency) || 1;
+        const durNum = parseFloat(duration) || 1;
+        qty = dNum * fNum * durNum;
+      }
+
+      return {
+        name,
+        strength,
+        dosage,
+        frequency,
+        duration,
+        quantity: Math.max(1, Math.round(qty)),
+        instructions,
+        status: m.status || "Pending",
+        prescribedAt: m.prescribedAt ? new Date(m.prescribedAt) : new Date(),
+        morning: !!m.morning,
+        afternoon: !!m.afternoon,
+        night: !!m.night,
+      };
+    })
+    .filter((m): m is NonNullable<typeof m> => m !== null);
 }
 
 /**
@@ -51,30 +93,13 @@ export async function createOrUpdatePrescriptionCore(
   },
   reqHostUrl: string
 ) {
-  // 1. Validation
-  const hasMed = data.medications && data.medications.length > 0;
+  // 1. Sanitize medications
+  const medsFormatted = formatAndSanitizeMedications(data.medications || []);
+  const hasMed = medsFormatted.length > 0;
   const hasLab = data.labOrders && data.labOrders.length > 0 && data.labOrders.some(l => l && l.trim());
   const hasRadio = data.radiologyOrders && data.radiologyOrders.length > 0 && data.radiologyOrders.some(r => r && r.trim());
 
-  if (hasMed) {
-    for (const m of data.medications) {
-      if (!m.name || !m.name.trim()) {
-        throw new AppError("Medicine name is required for all rows.", 400);
-      }
-      if (!m.strength || !m.strength.trim()) {
-        throw new AppError(`Strength is required for ${m.name}.`, 400);
-      }
-      if (!m.frequency || !m.frequency.trim()) {
-        throw new AppError(`Frequency is required for ${m.name}.`, 400);
-      }
-      if (!m.duration || !m.duration.trim()) {
-        throw new AppError(`Duration is required for ${m.name}.`, 400);
-      }
-      if (!m.instructions || !m.instructions.trim()) {
-        throw new AppError(`Instructions are required for ${m.name}.`, 400);
-      }
-    }
-  } else if (!hasLab && !hasRadio) {
+  if (!hasMed && !hasLab && !hasRadio) {
     throw new AppError("Cannot save empty prescription. At least one medicine, lab test, or radiology order must be prescribed.", 400);
   }
 
@@ -100,15 +125,6 @@ export async function createOrUpdatePrescriptionCore(
   let prescription = await Prescription.findOne({ appointment: appointmentId, hospital: hospitalId }).session(session);
   const isNew = !prescription;
 
-  const medsFormatted = (data.medications || []).map(m => ({
-    name: m.name,
-    strength: m.strength || "",
-    dosage: m.dosage || "",
-    frequency: m.frequency || "",
-    duration: m.duration || "",
-    instructions: m.instructions || "",
-  }));
-
   const diagnosisVal = data.diagnosis || appointment.diagnosis || "Consultation visit";
   const chiefComplaintVal = data.chiefComplaint || appointment.chiefComplaint || "";
   const clinicalNotesVal = data.clinicalNotes || appointment.clinicalNotes || "";
@@ -121,8 +137,10 @@ export async function createOrUpdatePrescriptionCore(
     const currentYear = new Date().getFullYear();
     const rxNumber = `RX-${currentYear}-${sequence}`;
 
+    const targetBranch = appointment.branch || doctor.branch || null;
     const [newRx] = await Prescription.create([{
       hospital: hospitalId,
+      branch: targetBranch,
       patient: patient._id,
       appointment: appointmentId,
       consultation: appointmentId,
@@ -166,6 +184,20 @@ export async function createOrUpdatePrescriptionCore(
     };
     await prescription.save({ session });
   }
+
+  // Also sync ConsultationSession draft if present
+  await ConsultationSession.findOneAndUpdate(
+    { appointment: appointmentId, hospital: hospitalId },
+    {
+      $set: {
+        prescriptions: medsFormatted,
+        diagnosis: diagnosisVal,
+        clinicalNotes: clinicalNotesVal,
+        advice: adviceVal
+      }
+    },
+    { session }
+  );
 
   // Narrow the prescription type for the compiler
   if (!prescription) {
@@ -371,10 +403,9 @@ export const savePrescription = catchAsync(async (req: Request, res: Response) =
  * Controller endpoint: List all prescriptions (scoped to hospital, for doctor/pharmacist)
  */
 export const listPrescriptions = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const { status, patient } = req.query;
   
-  const query: any = { hospital: hospitalId };
+  const query: any = buildBranchQuery(req.hospitalFilter);
   if (status) {
     query.status = status;
   }
@@ -590,6 +621,74 @@ export const downloadPrescription = catchAsync(async (req: Request, res: Respons
 });
 
 /**
+ * Controller endpoint: Update Prescription Status (Pharmacist / Doctor)
+ */
+export const updatePrescriptionStatus = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital;
+  const prescriptionId = req.params.id;
+  const { status } = req.body;
+
+  const validStatuses = ["Pending", "Preparing", "Ready for Pickup", "Partially Dispensed", "Dispensed", "Completed", "Cancelled"];
+  if (!status || !validStatuses.includes(status)) {
+    throw new AppError("Invalid prescription status specified.", 400);
+  }
+
+  const prescription = await Prescription.findOne({
+    _id: prescriptionId,
+    ...req.hospitalFilter
+  }).populate("patient doctor department");
+
+  if (!prescription) {
+    throw new AppError("Prescription not found.", 404);
+  }
+
+  prescription.status = status;
+  if (Array.isArray(prescription.medications)) {
+    prescription.medications.forEach((m: any) => {
+      m.status = status;
+    });
+  }
+  if (req.user) {
+    prescription.dispensedBy = req.user._id as any;
+    prescription.dispensedByName = req.user.name || "Pharmacist";
+    if (status === "Dispensed" || status === "Completed") {
+      prescription.dispensedAt = new Date();
+    }
+  }
+  await prescription.save();
+
+  if (prescription.appointment) {
+    await ConsultationSession.findOneAndUpdate(
+      { appointment: prescription.appointment, hospital: hospitalId },
+      { $set: { "prescriptions.$[].status": status } }
+    );
+  }
+
+  // Create notifications for Doctor & Patient
+  await DbNotification.create({
+    hospital: hospitalId,
+    title: `Prescription Status Updated: ${status}`,
+    message: `Prescription ${prescription.prescriptionNumber || prescription._id} is now ${status}.`,
+    type: "general",
+    recipientRole: "doctor",
+    recipientDoctor: prescription.doctor._id
+  });
+
+  emitToHospital(hospitalId.toString(), "prescription:updated", prescription);
+  emitToHospital(hospitalId.toString(), "dashboard_update", {
+    type: "PRESCRIPTION_STATUS_CHANGED",
+    prescriptionId: prescription._id,
+    status: prescription.status,
+    timestamp: new Date()
+  });
+
+  res.json({
+    status: "success",
+    data: { prescription }
+  });
+});
+
+/**
  * Controller endpoint: Dispense Medicines (Pharmacist)
  */
 export const dispensePrescription = catchAsync(async (req: Request, res: Response) => {
@@ -602,7 +701,7 @@ export const dispensePrescription = catchAsync(async (req: Request, res: Respons
   try {
     const prescription = await Prescription.findOne({
       _id: prescriptionId,
-      hospital: hospitalId
+      ...buildBranchQuery(req.hospitalFilter)
     }).populate("patient doctor department").session(session);
 
     if (!prescription) {
@@ -647,11 +746,19 @@ export const dispensePrescription = catchAsync(async (req: Request, res: Respons
       if (item.quantity <= 0) {
         throw new AppError(`Cannot dispense zero or negative quantity for medicine: ${item.name}`, 400);
       }
-      const invItem = await InventoryItem.findOne({
-        hospital: hospitalId,
+      let invItem = await InventoryItem.findOne({
+        ...req.hospitalFilter,
         name: new RegExp(`^${item.name.trim()}$`, "i"),
         category: "medicines"
       }).session(session);
+
+      if (!invItem) {
+        invItem = await InventoryItem.findOne({
+          hospital: hospitalId,
+          name: new RegExp(`^${item.name.trim()}$`, "i"),
+          category: "medicines"
+        }).session(session);
+      }
 
       if (!invItem) {
         throw new AppError(`Medicine ${item.name} not found in inventory.`, 404);
@@ -679,8 +786,27 @@ export const dispensePrescription = catchAsync(async (req: Request, res: Respons
 
     // Determine status (Partial vs Complete)
     const isPartial = req.body.isPartial || false;
-    prescription.status = isPartial ? "Partially Dispensed" : "Completed";
+    const finalStatus = isPartial ? "Partially Dispensed" : "Dispensed";
+    prescription.status = finalStatus;
+    prescription.dispensedAt = new Date();
+    if (req.user) {
+      prescription.dispensedBy = req.user._id as any;
+      prescription.dispensedByName = req.user.name || "Pharmacist";
+    }
+    if (Array.isArray(prescription.medications)) {
+      prescription.medications.forEach((m: any) => {
+        m.status = finalStatus;
+      });
+    }
     await prescription.save({ session });
+
+    if (prescription.appointment) {
+      await ConsultationSession.findOneAndUpdate(
+        { appointment: prescription.appointment, hospital: hospitalId },
+        { $set: { "prescriptions.$[].status": finalStatus } },
+        { session }
+      );
+    }
 
     // Generate Invoice Items and totals
     const roundToTwo = (num: number): number => Math.round((num + Number.EPSILON) * 100) / 100;
@@ -705,6 +831,7 @@ export const dispensePrescription = catchAsync(async (req: Request, res: Respons
 
     const newInvoiceDoc = new Invoice({
       hospital: hospitalId,
+      branch: prescription.branch || req.hospitalFilter?.branch || (req.user as any)?.branch || null,
       patient: prescription.patient._id,
       appointment: prescription.appointment,
       prescription: prescription._id,
@@ -815,17 +942,38 @@ export const dispensePrescription = catchAsync(async (req: Request, res: Respons
  * Controller endpoint: Get Patient Prescriptions (Patient Portal API support)
  */
 export const getPatientPrescriptions = catchAsync(async (req: Request, res: Response) => {
-  // Read patient ID from JWT (if logged as patient) or query param
-  const patientId = req.user?._id || req.query.patientId;
-  
-  if (!patientId) {
+  const patientIds: any[] = [];
+
+  if (req.query.patientId) {
+    patientIds.push(req.query.patientId);
+  }
+
+  if (req.user) {
+    patientIds.push(req.user._id);
+
+    // Look up the corresponding Patient model document
+    const patientDoc = await Patient.findOne({
+      $or: [
+        { _id: req.user._id },
+        { user: req.user._id },
+        { email: req.user.email },
+        { phone: req.user.phone },
+      ],
+    });
+
+    if (patientDoc) {
+      patientIds.push(patientDoc._id);
+    }
+  }
+
+  if (patientIds.length === 0) {
     throw new AppError("Patient identification is required.", 400);
   }
 
-  const prescriptions = await Prescription.find({ patient: patientId })
-    .populate("doctor")
-    .populate("department")
-    .populate("hospital")
+  const prescriptions = await Prescription.find({ patient: { $in: patientIds } })
+    .populate("doctor", "name specialization department avatar")
+    .populate("department", "name")
+    .populate("hospital", "name")
     .sort({ createdAt: -1 });
 
   res.json({ status: "success", data: prescriptions });

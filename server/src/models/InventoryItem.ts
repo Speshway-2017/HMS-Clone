@@ -5,6 +5,7 @@ export const INVENTORY_CATEGORIES = ["medicines", "equipment", "consumables"] as
 const inventoryItemSchema = new Schema(
   {
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
+    branch: { type: Schema.Types.ObjectId, ref: "Branch", default: null },
     name: { type: String, required: true, trim: true },
     sku: { type: String, required: true },
     category: { type: String, enum: INVENTORY_CATEGORIES, default: "medicines" },

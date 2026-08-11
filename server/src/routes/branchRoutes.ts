@@ -4,9 +4,15 @@ import { listBranches, createBranch, getBranch, updateBranch, deleteBranch } fro
 
 const router = Router();
 
-router.use(protect, restrictTo("super_admin"));
+router.use(protect);
 
-router.route("/").get(listBranches).post(createBranch);
-router.route("/:id").get(getBranch).patch(updateBranch).delete(deleteBranch);
+router.route("/")
+  .get(listBranches)
+  .post(restrictTo("super_admin", "hospital_admin"), createBranch);
+
+router.route("/:id")
+  .get(getBranch)
+  .patch(restrictTo("super_admin", "hospital_admin"), updateBranch)
+  .delete(restrictTo("super_admin"), deleteBranch);
 
 export default router;

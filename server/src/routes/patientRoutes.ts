@@ -8,11 +8,18 @@ import {
   updatePatient,
   deletePatient,
   addMedicalHistoryEntry,
+  getPatientProfileMe,
+  updatePatientProfileMe,
 } from "../controllers/patientController";
 
 const router = Router();
 
-router.use(protect, restrictTo("hospital_admin", "doctor", "receptionist", "accountant", "pharmacist", "laboratory"), scopeToHospital);
+// Allow patient to retrieve and update their own profile details
+router.route("/me")
+  .get(protect, restrictTo("patient"), getPatientProfileMe)
+  .patch(protect, restrictTo("patient"), updatePatientProfileMe);
+
+router.use(protect, restrictTo("hospital_admin", "doctor", "receptionist", "accountant", "pharmacist", "laboratory", "nurse", "patient"), scopeToHospital);
 
 router.route("/")
   .get(listPatients)
@@ -22,7 +29,7 @@ router.post("/:id/medical-history", restrictTo("hospital_admin", "doctor"), addM
 
 router.route("/:id")
   .get(getPatient)
-  .patch(restrictTo("hospital_admin", "doctor", "receptionist"), updatePatient)
+  .patch(restrictTo("hospital_admin", "doctor", "receptionist", "patient"), updatePatient)
   .delete(restrictTo("hospital_admin"), deletePatient);
 
 export default router;

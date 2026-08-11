@@ -17,11 +17,15 @@ import { OPVisit } from "../models/OPVisit";
 import { Hospital } from "../models/Hospital";
 import { DbNotification } from "../models/DbNotification";
 import { Ward } from "../models/Ward";
+import { Staff } from "../models/Staff";
+import { AppointmentSlotService } from "./appointmentSlotService";
 import { emitToHospital, emitToDoctor } from "../config/socket";
 import { createDoctorNotification } from "../utils/notificationHelper";
 import { IPBill } from "../models/IPBill";
 import { IPBillPayment } from "../models/IPBillPayment";
 import { RoomTariff } from "../models/RoomTariff";
+import { User } from "../models/User";
+import { validateAppointmentTimeRestriction } from "../utils/appointmentTimeValidation";
 
 
 function generateDigits(length: number): string {
@@ -32,9 +36,20 @@ function generateDigits(length: number): string {
   return out;
 }
 
+function parseHospitalAndBranch(filterOrId: any): { targetHospital: any; targetBranch: any } {
+  if (filterOrId && typeof filterOrId === "object" && (filterOrId.hospital || "branch" in filterOrId)) {
+    return {
+      targetHospital: filterOrId.hospital,
+      targetBranch: filterOrId.branch !== undefined ? filterOrId.branch : null,
+    };
+  }
+  return { targetHospital: filterOrId, targetBranch: null };
+}
+
 export class ReceptionService {
   // ── Dashboard Statistics ──
-  static async getStats(hospitalId: Types.ObjectId) {
+  static async getStats(filterOrId: any) {
+    const filter = typeof filterOrId === "object" && (filterOrId.hospital || "branch" in filterOrId) ? filterOrId : { hospital: filterOrId };
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
@@ -57,33 +72,33 @@ export class ReceptionService {
       completedIpBillsCount
     ] = await Promise.all([
       // Today's Registrations
-      Patient.countDocuments({ hospital: hospitalId, createdAt: { $gte: today, $lt: tomorrow } }),
+      Patient.countDocuments({ ...filter, createdAt: { $gte: today, $lt: tomorrow } }),
       // Today's OP Visits
-      ReceptionRepository.getOPHistory(hospitalId, 1, 1).then(r => r?.total ?? 0),
+      ReceptionRepository.getOPHistory(filter, 1, 1).then(r => r?.total ?? 0),
       // Current IP Admissions (all currently admitted inpatients)
-      Admission.countDocuments({ hospital: hospitalId, status: "admitted" }),
+      Admission.countDocuments({ ...filter, status: "admitted" }),
       // Invoices for pending/paid status check
-      Invoice.find({ hospital: hospitalId }),
+      Invoice.find(filter),
       // Today's collections from payment
-      Payment.find({ hospital: hospitalId, paidAt: { $gte: today, $lt: tomorrow } }),
+      Payment.find({ ...filter, paidAt: { $gte: today, $lt: tomorrow } }),
       // Today's Appointments
-      ReceptionRepository.listAppointments(hospitalId, today).then(r => r.length),
+      ReceptionRepository.listAppointments(filter, today).then(r => r.length),
       // Waiting Queue
-      Queue.countDocuments({ hospital: hospitalId, status: "waiting", createdAt: { $gte: today, $lt: tomorrow } }),
+      Queue.countDocuments({ ...filter, status: "waiting", createdAt: { $gte: today, $lt: tomorrow } }),
       // Emergency Queue
-      Queue.countDocuments({ hospital: hospitalId, type: "emergency", status: "waiting", createdAt: { $gte: today, $lt: tomorrow } }),
+      Queue.countDocuments({ ...filter, type: "emergency", status: "waiting", createdAt: { $gte: today, $lt: tomorrow } }),
       // Doctors Status
-      Doctor.find({ hospital: hospitalId }),
+      Doctor.find(filter),
       // Active rooms
-      Room.find({ hospital: hospitalId, status: { $in: ["active", "Active"] } }),
+      Room.find({ ...filter, status: { $in: ["active", "Active"] } }),
       // Bed counts
-      Bed.find({ hospital: hospitalId }),
+      Bed.find(filter),
       // Today's IP collections from IPBillPayment
-      IPBillPayment.find({ hospital: hospitalId, paidAt: { $gte: today, $lt: tomorrow } }),
+      IPBillPayment.find({ ...filter, paidAt: { $gte: today, $lt: tomorrow } }),
       // Pending IP bills
-      IPBill.countDocuments({ hospital: hospitalId, status: "Generated", outstanding: { $gt: 0 } }),
+      IPBill.countDocuments({ ...filter, status: "Generated", outstanding: { $gt: 0 } }),
       // Completed IP bills
-      IPBill.countDocuments({ hospital: hospitalId, status: "Paid" })
+      IPBill.countDocuments({ ...filter, status: "Paid" })
     ]);
 
     const pendingPaymentsCount = invoices.filter((inv: any) => inv.status === "pending" || inv.status === "partially_paid").length + pendingIpBillsCount;
@@ -92,7 +107,7 @@ export class ReceptionService {
       collectionsToday.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) +
       ipCollectionsToday.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
-    const busyDoctorIds = await getBusyDoctorIds(hospitalId);
+    const busyDoctorIds = await getBusyDoctorIds(filter.hospital || filterOrId);
     const resolvedDoctors = doctorsCount.map((d: any) => {
       return { ...d.toObject(), status: getDoctorDynamicStatus(d, busyDoctorIds) };
     });
@@ -107,9 +122,11 @@ export class ReceptionService {
     // Rooms availability: count active rooms that contain at least one bed and at least one bed is vacant
     const roomBedsMap: Record<string, any[]> = {};
     for (const bed of bedsAvailable) {
-      const rId = bed.room.toString();
-      if (!roomBedsMap[rId]) roomBedsMap[rId] = [];
-      roomBedsMap[rId].push(bed);
+      if (bed.room) {
+        const rId = bed.room.toString();
+        if (!roomBedsMap[rId]) roomBedsMap[rId] = [];
+        roomBedsMap[rId].push(bed);
+      }
     }
 
     let roomsAvailableCount = 0;
@@ -138,14 +155,66 @@ export class ReceptionService {
   }
 
   // ── Patient Registration ──
-  static async registerPatient(hospitalId: Types.ObjectId, patientData: any, userId: Types.ObjectId) {
+  static async registerPatient(filterOrId: any, patientData: any, userId: Types.ObjectId) {
+    const { targetHospital, targetBranch } = parseHospitalAndBranch(filterOrId);
+
+    // Duplicate Check 1: Check by phone and name within the same hospital
+    const cleanPhone = (patientData.phone || "").replace(/\D/g, "").slice(-10);
+    const cleanEmail = (patientData.email || "").trim();
+    const cleanName = (patientData.name || "").trim();
+
+    if (cleanPhone && cleanPhone.length >= 7) {
+      const existingByPhone = await Patient.findOne({
+        hospital: targetHospital,
+        phone: { $regex: `${cleanPhone}$` },
+        name: { $regex: `^${cleanName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" }
+      });
+      if (existingByPhone) {
+        throw new AppError(
+          `Patient "${existingByPhone.name}" is already registered at this hospital (UHID: ${existingByPhone.uhid}, Phone: ${existingByPhone.phone}). Please search for UHID or select existing record.`,
+          409
+        );
+      }
+    }
+
+    // Duplicate Check 2: Insurance policy number uniqueness within the same hospital
+    if (patientData.insurancePolicyNumber && patientData.insurancePolicyNumber.trim()) {
+      const existingPolicy = await Patient.findOne({
+        hospital: targetHospital,
+        insurancePolicyNumber: patientData.insurancePolicyNumber.trim()
+      });
+      if (existingPolicy) {
+        throw new AppError(
+          `Insurance Policy Number "${patientData.insurancePolicyNumber.trim()}" is already registered to patient ${existingPolicy.name} (UHID: ${existingPolicy.uhid}).`,
+          409
+        );
+      }
+    }
+
     const uhid = `UHID-${generateDigits(10)}`;
     const patientCode = `PAT-${generateDigits(6)}`;
     const qrCode = `HMS|${uhid}|${patientData.name}|${patientData.phone}`;
 
+    let linkedUserId = patientData.user;
+    if (!linkedUserId) {
+      const userConds: any[] = [];
+      if (cleanEmail) userConds.push({ email: { $regex: `^${cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+      if (cleanPhone && cleanPhone.length >= 7) userConds.push({ phone: { $regex: `${cleanPhone}$` } });
+      if (cleanName) userConds.push({ name: { $regex: `^${cleanName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+
+      if (userConds.length > 0) {
+        const existingUser = await User.findOne({ role: "patient", $or: userConds });
+        if (existingUser) {
+          linkedUserId = existingUser._id;
+        }
+      }
+    }
+
     const newPatient = await ReceptionRepository.createPatient({
       ...patientData,
-      hospital: hospitalId,
+      ...(linkedUserId ? { user: linkedUserId } : {}),
+      hospital: targetHospital,
+      branch: targetBranch || patientData.branch || null,
       uhid,
       patientCode,
       qrCode,
@@ -153,7 +222,8 @@ export class ReceptionService {
     });
 
     await ReceptionRepository.createAuditLog({
-      hospital: hospitalId,
+      hospital: targetHospital,
+      branch: targetBranch,
       user: userId,
       action: "PATIENT_REGISTER",
       details: `Registered patient ${newPatient.name} with UHID ${uhid}`
@@ -173,21 +243,26 @@ export class ReceptionService {
       throw new AppError("Patient not found", 404);
     }
     
-    // Get last active consultation today or most recent one
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
+    // Find all patient document IDs associated with this patient (by patientId or linked user account)
+    let allPatientIds: any[] = [patientId];
+    if (patient.user) {
+      const relatedDocs = await Patient.find({ hospital: hospitalId, user: patient.user }).select("_id");
+      if (relatedDocs.length > 0) {
+        allPatientIds = relatedDocs.map(p => p._id);
+      }
+    }
 
-    const lastAppointment = await Appointment.findOne({
+    const recentAppointmentsList = await Appointment.find({
       hospital: hospitalId,
-      patient: patientId,
+      patient: { $in: allPatientIds },
       status: { $nin: ["cancelled", "no_show"] }
-    }).sort({ createdAt: -1 }).populate("doctor department");
+    }).sort({ date: -1, createdAt: -1 }).limit(20).populate("doctor department");
+
+    const lastAppointment = recentAppointmentsList.length > 0 ? recentAppointmentsList[0] : null;
 
     const activeAdmission = await Admission.findOne({
       hospital: hospitalId,
-      patient: patientId,
+      patient: { $in: allPatientIds },
       status: {
         $in: [
           "admitted",
@@ -204,14 +279,19 @@ export class ReceptionService {
       }
     });
 
-    const hasExistingAppointments = await Appointment.exists({
-      hospital: hospitalId,
-      patient: patientId
-    });
-
     return {
       patient,
-      hasExistingAppointments: !!hasExistingAppointments,
+      hasExistingAppointments: recentAppointmentsList.length > 0,
+      recentAppointments: recentAppointmentsList.map(a => ({
+        _id: a._id,
+        date: a.date,
+        doctorName: (a.doctor as any)?.name || "N/A",
+        doctorId: (a.doctor as any)?._id ? String((a.doctor as any)._id) : (a.doctor ? String(a.doctor) : ""),
+        departmentName: (a.department as any)?.name || "N/A",
+        status: a.status,
+        visitType: a.type || "Consultation",
+        notes: a.notes || a.chiefComplaint || ""
+      })),
       activeAdmission: activeAdmission ? {
         _id: activeAdmission._id,
         admissionNumber: activeAdmission.admissionNumber,
@@ -395,9 +475,29 @@ export class ReceptionService {
       }
     }
     // 5. Doctor slot occupancy check (other patients in same time slot)
+    //    Uses the updated ReceptionRepository.checkDoctorSlotOverlap which now applies
+    //    the same $nin status filter as the display layer (AppointmentSlotService).
     const overlap = await ReceptionRepository.checkDoctorSlotOverlap(hospitalId, doctorId, bookingDate, time);
     if (overlap) {
-      throw new AppError("Doctor is already booked for this time slot. Please choose a different slot.", 400);
+      throw new AppError(
+        "This appointment slot has already been booked. Please choose another available slot.",
+        409
+      );
+    }
+
+    // 5b. Patient slot conflict check (patient already has an active appointment at exact same date & time slot with another doctor)
+    const patientSlotClash = await AppointmentSlotService.checkPatientSlotConflict(
+      patientId,
+      bookingDate,
+      time,
+      hospitalId
+    );
+    if (patientSlotClash) {
+      const otherDocName = (patientSlotClash.doctor as any)?.name || "another doctor";
+      throw new AppError(
+        `Patient already has an active appointment scheduled at ${time} with Dr. ${otherDocName}. A patient cannot book appointments with multiple doctors at the exact same time slot.`,
+        409
+      );
     }
 
     // 6. Generate unique auto-incremented appointment reference ID: APT-YYYYMMDD-XXXXXX (we'll reserve this for later)
@@ -419,9 +519,20 @@ export class ReceptionService {
     const referenceId = `${aptPrefix}${String(nextSerial).padStart(6, "0")}`;
 
     // 7. Calculate consultation/registration fees first to check if appointment is free
+    // Find all patient document IDs associated with this patient (by patientId or linked user account)
+    const currentPatientDoc = await Patient.findById(patientId);
+    let allPatientIds: any[] = [patientId];
+    if (currentPatientDoc?.user) {
+      const relatedDocs = await Patient.find({ hospital: hospitalId, user: currentPatientDoc.user }).select("_id");
+      if (relatedDocs.length > 0) {
+        allPatientIds = relatedDocs.map(p => p._id);
+      }
+    }
+
     const hasOtherAppointments = await Appointment.exists({
       hospital: hospitalId,
-      patient: patientId
+      patient: { $in: allPatientIds },
+      status: { $nin: ["cancelled", "no_show"] }
     });
 
     const registrationFee = hasOtherAppointments ? 0 : (type === "Emergency" ? 200 : 100);
@@ -434,9 +545,9 @@ export class ReceptionService {
       }
     }
 
-    // Check if patient has a completed appointment with this doctor within the opExpiryLimit
+    // Check if patient has any prior COMPLETED or IN_CONSULTATION appointment with this doctor within opExpiryLimit
     const hospitalRecord = await Hospital.findById(hospitalId);
-    const opExpiryLimit = hospitalRecord?.opExpiryLimit ?? 10;
+    const opExpiryLimit = doctor.opExpiryLimit ?? hospitalRecord?.opExpiryLimit ?? 10;
     const expiryDate = new Date(bookingDate);
     expiryDate.setDate(expiryDate.getDate() - opExpiryLimit);
     expiryDate.setHours(0, 0, 0, 0);
@@ -444,15 +555,15 @@ export class ReceptionService {
     const bookingDateEnd = new Date(bookingDate);
     bookingDateEnd.setHours(23, 59, 59, 999);
 
-    const pastCompletedAppt = await Appointment.findOne({
+    const pastApptWithinLimit = await Appointment.findOne({
       hospital: hospitalId,
-      patient: patientId,
+      patient: { $in: allPatientIds },
       doctor: doctorId,
-      status: "completed",
+      status: { $in: ["completed", "in_consultation", "checked_in"] },
       date: { $gte: expiryDate, $lte: bookingDateEnd }
     });
 
-    const isWithinExpiry = !!pastCompletedAppt;
+    const isWithinExpiry = !!pastApptWithinLimit;
     if (isWithinExpiry) {
       consultationFee = 0;
     }
@@ -528,130 +639,141 @@ export class ReceptionService {
       details: `Created provisional invoice ${newInvoice._id} for patient ID ${patientId} with Dr. ${doctor.name}. Reference ID: ${referenceId}`
     });
 
-    // If the appointment is free, create the appointment immediately (since payment is not needed)
-    if (isFree) {
-      const isToday = bookingDateStr === todayStr;
-      const appointmentStatus = isToday ? "checked_in" : "scheduled";
+    const isToday = bookingDateStr === todayStr;
+    const appointmentStatus = isFree ? (isToday ? "checked_in" : "scheduled") : "pending_payment";
 
-      const appointmentPayload: Record<string, unknown> = {
-        hospital: hospitalId,
-        referenceId,
-        patient: patientId,
-        doctor: doctorId,
-        department: departmentId,
-        date: bookingDate,
-        time,
-        type: type || "Consultation",
-        status: appointmentStatus,
-        notes: notes || "",
-      };
+    const appointmentPayload: Record<string, unknown> = {
+      hospital: hospitalId,
+      referenceId,
+      patient: patientId,
+      doctor: doctorId,
+      department: departmentId,
+      date: bookingDate,
+      time,
+      type: type || "Consultation",
+      status: appointmentStatus,
+      notes: notes || "",
+    };
 
-      // Attach follow-up metadata if applicable
-      if (followUp) {
-        appointmentPayload.followUp = true;
-        appointmentPayload.parentAppointmentId = parentAppointmentId;
-        appointmentPayload.followUpDate = bookingDate;
-        appointmentPayload.followUpReason = followUpReason || "";
-      }
-
-      const newAppointment = await ReceptionRepository.createAppointment(appointmentPayload);
-      
-      // Update invoice to link appointment
-      newInvoice.appointment = newAppointment._id;
-      await newInvoice.save();
-
-      const patientRecord = await Patient.findById(patientId);
-      const patientName = patientRecord ? patientRecord.name : "Patient";
-
-      let tokenNumber = "N/A";
-      let queueNumber = "N/A";
-      let queueRecord = null;
-
-      if (isToday) {
-        // Auto check-in and queue token generation for free consultations
-        const startOfToday = new Date();
-        startOfToday.setHours(0, 0, 0, 0);
-        const endOfToday = new Date();
-        endOfToday.setHours(23, 59, 59, 999);
-
-        const todayTokenCount = await Queue.countDocuments({
-          hospital: hospitalId,
-          createdAt: { $gte: startOfToday, $lte: endOfToday }
-        });
-        tokenNumber = `T${String(todayTokenCount + 1).padStart(3, "0")}`;
-
-        const doctorQueueCount = await Queue.countDocuments({
-          hospital: hospitalId,
-          doctor: doctorId,
-          createdAt: { $gte: startOfToday, $lte: endOfToday }
-        });
-        queueNumber = `Q${String(doctorQueueCount + 1).padStart(3, "0")}`;
-
-        queueRecord = await ReceptionRepository.createQueueToken({
-          hospital: hospitalId,
-          tokenNumber,
-          type: type === "Emergency" ? "emergency" : "regular",
-          status: "waiting",
-          patient: patientId,
-          doctor: doctorId,
-          department: departmentId || doctor.department,
-          appointment: newAppointment._id,
-          date: newAppointment.date
-        });
-
-        // Notify doctor of checked in OP patient
-        try {
-          await createDoctorNotification({
-            hospital: hospitalId,
-            title: "OP Patient Checked In",
-            message: `OP patient ${patientName} has checked in. You have been assigned this patient (Token: ${tokenNumber}, Queue: ${queueNumber}).`,
-            type: "appointment",
-            severity: "info",
-            recipientDoctor: doctorId,
-            link: `/doctor/op-management`,
-            data: {
-              appointmentId: newAppointment._id.toString(),
-              tokenNumber,
-              queueNumber,
-            }
-          });
-        } catch (err) {
-          console.error("Failed to notify doctor of checked-in OP patient:", err);
-        }
-      }
-
-      await ReceptionRepository.createAuditLog({
-        hospital: hospitalId,
-        user: userId,
-        action: "APPOINTMENT_BOOKED_FREE",
-        details: `Booked ${followUp ? "follow-up " : ""}appointment ${referenceId} for patient ID ${patientId} with Dr. ${doctor.name} (free visit).`
-      });
-
-      let checkInResult = null;
-      if (type === "Walk-in" || type === "Emergency") {
-        try {
-          checkInResult = await this.checkInAppointment(hospitalId, newAppointment._id.toString(), userId);
-        } catch (err) {
-          console.error("Immediate check-in failed for walk-in/emergency:", err);
-        }
-      }
-
-      return {
-        appointment: newAppointment,
-        invoice: newInvoice,
-        billing: {
-          registrationFee,
-          consultationFee,
-          gst,
-          discount,
-          total
-        },
-        token: checkInResult ? { tokenNumber: checkInResult.tokenNumber } : null
-      };
+    if (followUp) {
+      appointmentPayload.followUp = true;
+      appointmentPayload.parentAppointmentId = parentAppointmentId;
+      appointmentPayload.followUpDate = bookingDate;
+      appointmentPayload.followUpReason = followUpReason || "";
     }
 
-    // For paid appointments, only return the invoice
+    const newAppointment = await ReceptionRepository.createAppointment(appointmentPayload);
+    
+    // Update invoice to link appointment
+    newInvoice.appointment = newAppointment._id;
+    await newInvoice.save();
+
+    const patientRecord = await Patient.findById(patientId);
+    const patientName = patientRecord ? patientRecord.name : "Patient";
+
+    // Notify assigned doctor of new appointment booking
+    try {
+      await createDoctorNotification({
+        hospital: hospitalId,
+        title: "New Patient Assigned",
+        message: `Patient ${patientName} (${referenceId}) booked an appointment with you for ${bookingDateStr} at ${time}.`,
+        type: "appointment",
+        severity: "info",
+        recipientDoctor: doctorId,
+        link: "/doctor/op-management",
+        data: {
+          appointmentId: newAppointment._id.toString(),
+          referenceId,
+          patientName,
+        }
+      });
+    } catch (err) {
+      console.error("Failed to notify doctor of new appointment booking:", err);
+    }
+
+    let tokenNumber = "N/A";
+    let queueNumber = "N/A";
+    let queueRecord = null;
+
+    if (isFree && isToday) {
+      // Auto check-in and queue token generation for free consultations on today's date
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const endOfToday = new Date();
+      endOfToday.setHours(23, 59, 59, 999);
+
+      const todayTokenCount = await Queue.countDocuments({
+        hospital: hospitalId,
+        createdAt: { $gte: startOfToday, $lte: endOfToday }
+      });
+      tokenNumber = `T${String(todayTokenCount + 1).padStart(3, "0")}`;
+
+      const doctorQueueCount = await Queue.countDocuments({
+        hospital: hospitalId,
+        doctor: doctorId,
+        createdAt: { $gte: startOfToday, $lte: endOfToday }
+      });
+      queueNumber = `Q${String(doctorQueueCount + 1).padStart(3, "0")}`;
+
+      queueRecord = await ReceptionRepository.createQueueToken({
+        hospital: hospitalId,
+        tokenNumber,
+        type: type === "Emergency" ? "emergency" : "regular",
+        status: "waiting",
+        patient: patientId,
+        doctor: doctorId,
+        department: departmentId || doctor.department,
+        appointment: newAppointment._id,
+        date: newAppointment.date
+      });
+
+      // Notify doctor of checked in OP patient
+      try {
+        await createDoctorNotification({
+          hospital: hospitalId,
+          title: "OP Patient Checked In",
+          message: `OP patient ${patientName} has checked in. You have been assigned this patient (Token: ${tokenNumber}, Queue: ${queueNumber}).`,
+          type: "appointment",
+          severity: "info",
+          recipientDoctor: doctorId,
+          link: `/doctor/op-management`,
+          data: {
+            appointmentId: newAppointment._id.toString(),
+            tokenNumber,
+            queueNumber,
+          }
+        });
+      } catch (err) {
+        console.error("Failed to notify doctor of checked-in OP patient:", err);
+      }
+    }
+
+    await ReceptionRepository.createAuditLog({
+      hospital: hospitalId,
+      user: userId,
+      action: isFree ? "APPOINTMENT_BOOKED_FREE" : "APPOINTMENT_BOOKED_PROVISIONAL",
+      details: `Booked ${followUp ? "follow-up " : ""}appointment ${referenceId} for patient ID ${patientId} with Dr. ${doctor.name}.`
+    });
+
+    let checkInResult = null;
+    if (isFree && (type === "Walk-in" || type === "Emergency")) {
+      try {
+        checkInResult = await this.checkInAppointment(hospitalId, newAppointment._id.toString(), userId);
+      } catch (err) {
+        console.error("Immediate check-in failed for walk-in/emergency:", err);
+      }
+    }
+
+    // Emit socket events so Patient Dashboard and Reception update in real time
+    try {
+      emitToHospital(hospitalId.toString(), "appointment_updated", { appointment: newAppointment });
+      emitToHospital(hospitalId.toString(), "dashboard_update", {});
+    } catch (err) {
+      console.error("Failed to emit socket events for appointment booking:", err);
+    }
+
     return {
+      appointment: newAppointment,
       invoice: newInvoice,
       billing: {
         registrationFee,
@@ -659,7 +781,8 @@ export class ReceptionService {
         gst,
         discount,
         total
-      }
+      },
+      token: checkInResult ? { tokenNumber: checkInResult.tokenNumber } : null
     };
   }
 
@@ -800,68 +923,82 @@ export class ReceptionService {
           };
         }
 
-        // Check duplicate appointment
-        const startOfDay = new Date(bookingDate);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(bookingDate);
-        endOfDay.setHours(23, 59, 59, 999);
-
-        const existingAppointment = await Appointment.findOne({
-          hospital: hospitalId,
-          patient: invoice.patient._id,
-          doctor: provisionalData.doctorId,
-          date: { $gte: startOfDay, $lte: endOfDay },
-          status: { $nin: ["cancelled", "no_show", "completed"] }
-        }).session(session);
-
-        if (existingAppointment) {
-          throw new AppError("Duplicate appointment already exists for this patient and doctor on this date.", 409);
-        }
-
-        // Generate reference ID
-        const bookingDateNoHyphens = new Date(provisionalData.date).toISOString().split("T")[0].replace(/-/g, "");
-        const aptPrefix = `APT-${bookingDateNoHyphens}-`;
-        const latestAppt = await Appointment.findOne({
-          hospital: hospitalId,
-          referenceId: new RegExp(`^${aptPrefix}`)
-        }).sort({ createdAt: -1 }).session(session);
-
-        let nextSerial = 1;
-        if (latestAppt) {
-          const serialPart = latestAppt.referenceId.replace(aptPrefix, "");
-          const lastSerial = parseInt(serialPart, 10);
-          if (!isNaN(lastSerial)) {
-            nextSerial = lastSerial + 1;
-          }
-        }
-        const referenceId = `${aptPrefix}${String(nextSerial).padStart(6, "0")}`;
-
-        // Create appointment payload
         const isToday = new Date(provisionalData.date).toDateString() === today.toDateString();
         const appointmentStatus = isToday ? "checked_in" : "scheduled";
-        const appointmentPayload: Record<string, any> = {
-          hospital: hospitalId,
-          referenceId,
-          patient: invoice.patient._id,
-          doctor: provisionalData.doctorId,
-          department: provisionalData.departmentId,
-          date: new Date(provisionalData.date),
-          time: provisionalData.time,
-          type: provisionalData.type,
-          status: appointmentStatus,
-          notes: provisionalData.notes
-        };
-        if (provisionalData.followUp) {
-          appointmentPayload.followUp = true;
-          appointmentPayload.parentAppointmentId = provisionalData.parentAppointmentId;
-          appointmentPayload.followUpDate = new Date(provisionalData.date);
-          appointmentPayload.followUpReason = provisionalData.followUpReason;
+
+        if (invoice.appointment) {
+          const apptDoc = await Appointment.findById(invoice.appointment).session(session);
+          if (apptDoc) {
+            apptDoc.status = appointmentStatus;
+            await apptDoc.save({ session });
+            appointment = apptDoc;
+          }
         }
 
-        appointment = await ReceptionRepository.createAppointment(appointmentPayload);
+        if (!appointment) {
+          // Check duplicate appointment
+          const startOfDay = new Date(bookingDate);
+          startOfDay.setHours(0, 0, 0, 0);
+          const endOfDay = new Date(bookingDate);
+          endOfDay.setHours(23, 59, 59, 999);
 
-        // Update invoice with appointment ID
-        invoice.appointment = appointment._id;
+          const existingAppointment = await Appointment.findOne({
+            hospital: hospitalId,
+            patient: invoice.patient._id,
+            doctor: provisionalData.doctorId,
+            date: { $gte: startOfDay, $lte: endOfDay },
+            status: { $nin: ["cancelled", "no_show", "completed"] }
+          }).session(session);
+
+          if (existingAppointment) {
+            existingAppointment.status = appointmentStatus;
+            await existingAppointment.save({ session });
+            appointment = existingAppointment;
+          } else {
+            // Generate reference ID
+            const bookingDateNoHyphens = new Date(provisionalData.date).toISOString().split("T")[0].replace(/-/g, "");
+            const aptPrefix = `APT-${bookingDateNoHyphens}-`;
+            const latestAppt = await Appointment.findOne({
+              hospital: hospitalId,
+              referenceId: new RegExp(`^${aptPrefix}`)
+            }).sort({ createdAt: -1 }).session(session);
+
+            let nextSerial = 1;
+            if (latestAppt) {
+              const serialPart = latestAppt.referenceId.replace(aptPrefix, "");
+              const lastSerial = parseInt(serialPart, 10);
+              if (!isNaN(lastSerial)) {
+                nextSerial = lastSerial + 1;
+              }
+            }
+            const referenceId = `${aptPrefix}${String(nextSerial).padStart(6, "0")}`;
+
+            // Create appointment payload
+            const appointmentPayload: Record<string, any> = {
+              hospital: hospitalId,
+              referenceId,
+              patient: invoice.patient._id,
+              doctor: provisionalData.doctorId,
+              department: provisionalData.departmentId,
+              date: new Date(provisionalData.date),
+              time: provisionalData.time,
+              type: provisionalData.type,
+              status: appointmentStatus,
+              notes: provisionalData.notes
+            };
+            if (provisionalData.followUp) {
+              appointmentPayload.followUp = true;
+              appointmentPayload.parentAppointmentId = provisionalData.parentAppointmentId;
+              appointmentPayload.followUpDate = new Date(provisionalData.date);
+              appointmentPayload.followUpReason = provisionalData.followUpReason;
+            }
+
+            appointment = await ReceptionRepository.createAppointment(appointmentPayload);
+          }
+
+          // Update invoice with appointment ID
+          invoice.appointment = appointment._id;
+        }
 
         // If it's today, generate token
         const startOfToday = new Date();
@@ -958,6 +1095,28 @@ export class ReceptionService {
           } else {
             appointment.status = "scheduled";
             await appointment.save({ session });
+          }
+        }
+
+        if (appointment) {
+          try {
+            const docId = (appointment.doctor as any)?._id || appointment.doctor;
+            const patName = (invoice.patient as any)?.name || "Patient";
+            await createDoctorNotification({
+              hospital: hospitalId,
+              title: "OP Patient Checked In",
+              message: `OP patient ${patName} checked in and is waiting in your queue (Token: ${tokenNumber || "N/A"}).`,
+              type: "appointment",
+              severity: "info",
+              recipientDoctor: docId,
+              link: "/doctor/op-management",
+              data: {
+                appointmentId: appointment._id.toString(),
+                tokenNumber,
+              }
+            });
+          } catch (err) {
+            console.error("Failed to send doctor notification on payment check-in:", err);
           }
         }
       }
@@ -1070,6 +1229,10 @@ export class ReceptionService {
       details: `Simulated Dr. Calling Patient Token ${queueItem.tokenNumber}`
     });
 
+    emitToHospital(hospitalId.toString(), "queue_updated", { queueItem });
+    emitToHospital(hospitalId.toString(), "appointment_updated", { appointmentId: queueItem.appointment, status: "in_consultation" });
+    emitToHospital(hospitalId.toString(), "dashboard_update", { action: "simulate_doctor_call", queueId });
+
     return queueItem;
   }
 
@@ -1166,12 +1329,19 @@ export class ReceptionService {
       details: `Simulated consult completion for Token ${queueItem.tokenNumber}. Outcome: ${outcome}`
     });
 
+    emitToHospital(hospitalId.toString(), "queue_updated", { queueItem });
+    emitToHospital(hospitalId.toString(), "appointment_updated", { appointmentId: queueItem.appointment, status: "completed" });
+    emitToHospital(hospitalId.toString(), "dashboard_update", { action: "simulate_doctor_complete", queueId });
+
     return { opVisit, outcome };
   }
 
   // ── Inpatient (IP) Admissions ──
   static async getAdmissionRequests(hospitalId: Types.ObjectId) {
-    return await AdmissionRequest.find({ hospital: hospitalId, status: "Admission Requested" })
+    return await AdmissionRequest.find({
+      hospital: hospitalId,
+      status: { $in: ["Pending", "pending", "Admission Requested", "AdmissionRequested"] }
+    })
       .populate("patient")
       .populate("doctor")
       .populate("department")
@@ -1246,8 +1416,9 @@ export class ReceptionService {
       ward,
       roomId,
       bedId,
-      attenderName,
-      attenderPhone,
+      attenderName = "",
+      attenderPhone = "",
+      assignedNurse,
       insuranceProvider,
       insurancePolicyNumber,
       advanceAmount,
@@ -1299,11 +1470,11 @@ export class ReceptionService {
       if (!room) {
         throw new AppError("Selected room not found.", 404);
       }
-      if (room.status !== "Active") {
-        throw new AppError("Selected room is currently inactive.", 400);
+      if (room.status === "Inactive" || room.status === "Blocked" || room.status === "Maintenance") {
+        throw new AppError(`Selected room is currently ${room.status.toLowerCase()}.`, 400);
       }
-      if (room.wardName !== ward) {
-        throw new AppError("Selected room does not belong to the selected ward.", 400);
+      if (ward && room.wardName && room.wardName !== ward && room.ward.toString() !== ward && room.wardName.trim().toLowerCase() !== ward.trim().toLowerCase()) {
+        throw new AppError(`Selected room (${room.roomNumber}) does not belong to the selected ward.`, 400);
       }
 
       // 2b. Validate ward status
@@ -1311,7 +1482,7 @@ export class ReceptionService {
       if (!wardRecord) {
         throw new AppError("Associated ward not found.", 404);
       }
-      if (wardRecord.status !== "Active") {
+      if (wardRecord.status === "Inactive") {
         throw new AppError("Selected ward is currently inactive.", 400);
       }
 
@@ -1394,6 +1565,8 @@ export class ReceptionService {
 
       // Allocate Bed / Mark as Occupied
       bed.isOccupied = true;
+      bed.status = "Occupied";
+      bed.patient = patientId as any;
       await bed.save({ session });
 
       // Fetch daily tariff and nursing rate for this room/ward
@@ -1431,6 +1604,7 @@ export class ReceptionService {
         bed: bedId,
         attenderName,
         attenderPhone,
+        assignedNurse: assignedNurse || null,
         insuranceProvider,
         insurancePolicyNumber,
         advanceAmount: Number(advanceAmount) || 0,
@@ -1461,6 +1635,10 @@ export class ReceptionService {
           }
         ]
       }], { session });
+
+      // Link created admission to bed
+      bed.admission = createdAdmission._id as any;
+      await bed.save({ session });
 
       let createdInvoice: any = null;
       let createdPayment: any = null;
@@ -1658,6 +1836,14 @@ export class ReceptionService {
         ? docRecord?.name
         : (lastOpVisit?.doctor as any)?.name || "N/A";
 
+      let nurseName = "N/A";
+      if (assignedNurse) {
+        const nurseRecord = await Staff.findById(assignedNurse).session(session);
+        if (nurseRecord) {
+          nurseName = nurseRecord.name;
+        }
+      }
+
       const admissionSlip = {
         hospitalName,
         admissionNumber,
@@ -1670,8 +1856,9 @@ export class ReceptionService {
         ward,
         roomNumber: room.roomNumber,
         bedNumber: bed.bedNumber,
-        attenderName,
-        attenderPhone,
+        assignedNurseName: nurseName,
+        attenderName: attenderName || "N/A",
+        attenderPhone: attenderPhone || "N/A",
         insuranceProvider: insuranceProvider || "N/A",
         advancePaid: Number(advanceAmount) || 0,
         paymentMethod: paymentMethod || "Cash",
@@ -1732,7 +1919,7 @@ export class ReceptionService {
       }
 
       const newRoom = await Room.findOne({ _id: newRoomId, hospital: hospitalId }).session(session);
-      if (!newRoom || newRoom.status !== "Active") {
+      if (!newRoom || newRoom.status === "Inactive" || newRoom.status === "Blocked" || newRoom.status === "Maintenance") {
         throw new AppError("Selected room is not active or not found.", 404);
       }
 
@@ -1926,9 +2113,8 @@ export class ReceptionService {
         throw new AppError("Appointment not found.", 404);
       }
 
-      if (["in_consultation", "completed"].includes(appointment.status)) {
-        throw new AppError("Cannot cancel appointment. Consultation has already started or is completed.", 400);
-      }
+      // Enforce strict 1-hour cancellation restriction
+      validateAppointmentTimeRestriction(appointment);
 
       // Check queue state if any
       const queueItem = await Queue.findOne({ appointment: appointmentId, hospital: hospitalId }).session(session);
@@ -2054,7 +2240,10 @@ export class ReceptionService {
     // ── 3. Slot occupancy check (doctor already booked for this slot) ──────────
     const slotOverlap = await ReceptionRepository.checkDoctorSlotOverlap(hospitalId, doctorId, parsedDate, newTime);
     if (slotOverlap && slotOverlap._id.toString() !== appointmentId) {
-      throw new AppError("The doctor is already booked for this date and time slot. Please choose a different slot.", 400);
+      throw new AppError(
+        "This appointment slot has already been booked. Please choose another available slot.",
+        409
+      );
     }
 
     // ── 4. Open transaction ────────────────────────────────────────────────────
@@ -2071,10 +2260,8 @@ export class ReceptionService {
         throw new AppError("Appointment not found.", 404);
       }
 
-      // ── 5. Status guard ────────────────────────────────────────────────────
-      if (["in_consultation", "completed", "cancelled"].includes(appointment.status)) {
-        throw new AppError("Cannot reschedule. Appointment is already in consultation, completed, or cancelled.", 400);
-      }
+      // Enforce strict 1-hour cancellation & rescheduling restriction
+      validateAppointmentTimeRestriction(appointment);
 
       // ── 6. ONE-RESCHEDULE LIMIT ────────────────────────────────────────────
       const currentRescheduleCount = (appointment as any).rescheduleCount ?? appointment.rescheduleHistory?.length ?? 0;

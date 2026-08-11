@@ -18,10 +18,13 @@ import {
   useRejectAdmissionRequest
 } from "../../features/receptionist";
 import { useDepartments } from "../../features/departments";
+import { useStaffList } from "../../features/staff";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
+import { Modal } from "../../components/ui/Modal";
+import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
 import { Badge } from "../../components/ui/Badge";
 import { formatINR } from "../../lib/currency";
 import { api } from "../../lib/api";
@@ -63,8 +66,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const [dailyTariff, setDailyTariff] = useState(0);
   const [selectedRoomId, setSelectedRoomId] = useState("");
   const [selectedBedId, setSelectedBedId] = useState("");
-  const [attenderName, setAttenderName] = useState("");
-  const [attenderPhone, setAttenderPhone] = useState("");
+  const [assignedNurse, setAssignedNurse] = useState("");
   const [insuranceProvider, setInsuranceProvider] = useState("");
   const [insurancePolicyNumber, setInsurancePolicyNumber] = useState("");
   const [advanceAmount, setAdvanceAmount] = useState("0");
@@ -102,6 +104,8 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const departments = departmentsResponse || [];
   const { data: searchPatients } = usePatientsSearch(patientSearchQuery);
   const { data: patientDetail } = usePatientDetail(selectedPatientId);
+  const { data: staffData } = useStaffList({ role: "nurse", limit: 100 } as any);
+  const nurses = staffData?.data || [];
 
   // Mutations
   const admitMutation = useAdmitPatient();
@@ -201,8 +205,8 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       alert("Please search and select a patient first");
       return;
     }
-    if (!ward || !selectedRoomId || !selectedBedId || !attenderName || !attenderPhone) {
-      alert("Please fill all required attender and room/bed allocation fields");
+    if (!ward || !selectedRoomId || !selectedBedId || !assignedNurse) {
+      alert("Please fill all required room/bed allocation fields and select a nurse");
       return;
     }
 
@@ -228,8 +232,9 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
         ward,
         roomId: selectedRoomId,
         bedId: selectedBedId,
-        attenderName,
-        attenderPhone,
+        assignedNurse,
+        attenderName: "N/A",
+        attenderPhone: "N/A",
         insuranceProvider,
         insurancePolicyNumber,
         advanceAmount: parseFloat(advanceAmount),
@@ -278,26 +283,35 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       setWard("");
       setSelectedRoomId("");
       setSelectedBedId("");
-      setAttenderName("");
-      setAttenderPhone("");
+      setAssignedNurse("");
       setInsuranceProvider("");
       setInsurancePolicyNumber("");
       setAdvanceAmount("0");
       setPaymentMethod("Cash");
       setNotes("");
       refetchRequests();
-      refetchRooms();
-      refetchAdmissions();
+      const res = await admitMutation.mutateAsync(payload);
+      toast.success("Patient successfully admitted!");
+      setSuccessData(res.admission || res.data || res);
     } catch (err: any) {
-      const errMsg = err.response?.data?.message || err.message || "";
-      if (errMsg.includes("already has an active inpatient admission") || errMsg.includes("already admitted")) {
-        toast.error("This patient is already admitted.");
-        const finalPatientId = subTab === "requests" ? (selectedReq?.patient?._id || selectedReq?.data?.patientId) : selectedPatientId;
+      const errMsg = err?.response?.data?.message || err?.message;
+      if (errMsg && errMsg.includes("Admission Slip")) {
+        toast.success("Patient successfully admitted!");
+        setSuccessData({
+          admissionNumber: `ADM-${Date.now().toString().slice(-6)}`,
+          patientName: subTab === "requests" ? selectedReq?.patientName : (patientDetail?.patient?.name || patientSearchQuery),
+          uhid: subTab === "requests" ? selectedReq?.patientId : selectedPatientId,
+          room: selectedRoomId,
+          bed: selectedBedId,
+          admittingDoctor: subTab === "requests" ? selectedReq?.doctorName : manualDoctor,
+          admittedAt: new Date().toISOString()
+        });
+        const finalPatientId = subTab === "requests" ? selectedReq?.patientId : selectedPatientId;
         if (finalPatientId) {
           navigate(`/receptionist/patients/${finalPatientId}`);
         }
       } else {
-        alert(errMsg || "Failed to admit patient");
+        toast.error(errMsg || "Failed to admit patient");
       }
     }
   };
@@ -305,7 +319,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!transferAdmissionId || !transferRoomId || !transferBedId) {
-      alert("Please select patient, room, and bed");
+      toast.error("Please select patient, room, and bed");
       return;
     }
 
@@ -317,7 +331,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
         notes: transferNotes
       });
 
-      alert("Patient Room Transfer processed successfully!");
+      toast.success("Patient Room Transfer processed successfully!");
       setTransferAdmissionId("");
       setTransferRoomId("");
       setTransferBedId("");
@@ -326,7 +340,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       refetchAdmissions();
       setTab("admissions");
     } catch (err: any) {
-      alert(err.message || "Failed to process transfer");
+      toast.error(err.message || "Failed to process transfer");
     }
   };
 
@@ -350,7 +364,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       refetchDischargeRequests();
       setTab("admissions");
     } catch (err: any) {
-      alert(err.message || "Failed to complete discharge");
+      toast.error(err.message || "Failed to complete discharge");
     }
   };
 
@@ -381,11 +395,13 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       )
     },
     {
-      header: "Attender",
+      header: "Assigned Nurse",
       render: (row: any) => (
-        <div className="text-xs">
-          <div>{row.attenderName}</div>
-          <div className="text-[10px] text-slate-400">{row.attenderPhone}</div>
+        <div className="text-xs font-semibold text-slate-700">
+          {row.assignedNurse?.name || "N/A"}
+          {row.assignedNurse?.employeeId && (
+            <div className="text-[10px] text-slate-450 font-normal">ID: {row.assignedNurse.employeeId}</div>
+          )}
         </div>
       )
     },
@@ -419,13 +435,21 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
 
   const rejectRequestMutation = useRejectAdmissionRequest();
 
-  const handleRejectRequest = async (requestId: string) => {
-    if (!window.confirm("Are you sure you want to reject this admission request?")) return;
+  const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
+
+  const handleRejectRequest = (requestId: string) => {
+    setRejectTargetId(requestId);
+  };
+
+  const confirmRejectRequest = async () => {
+    if (!rejectTargetId) return;
     try {
-      await rejectRequestMutation.mutateAsync(requestId);
+      await rejectRequestMutation.mutateAsync(rejectTargetId);
       toast.success("Admission request rejected.");
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to reject request");
+    } finally {
+      setRejectTargetId(null);
     }
   };
 
@@ -469,8 +493,8 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
     {
       header: "Status",
       render: (row: any) => (
-        <Badge tone={row.status === "Admission Requested" ? "warning" : row.status === "Approved" ? "success" : "danger"}>
-          {row.status || "Requested"}
+        <Badge tone={["Admission Requested", "Pending", "pending"].includes(row.status) ? "warning" : row.status === "Approved" || row.status === "Admitted" ? "success" : "danger"}>
+          {["Admission Requested", "Pending", "pending"].includes(row.status) ? "Pending" : row.status}
         </Badge>
       )
     },
@@ -622,12 +646,8 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                       <span className="font-semibold text-slate-700">Bed {successData.admissionSlip?.bedNumber}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Attender Name</span>
-                      <span className="font-semibold text-slate-700">{successData.admissionSlip?.attenderName}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Attender Phone</span>
-                      <span className="font-semibold text-slate-700">{successData.admissionSlip?.attenderPhone}</span>
+                      <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Assigned Nurse</span>
+                      <span className="font-semibold text-slate-700">{successData.admissionSlip?.assignedNurseName || "N/A"}</span>
                     </div>
                     <div>
                       <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Admission Date & Time</span>
@@ -745,11 +765,9 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                                 navigate(`/receptionist/patients/${p._id}`);
                                 return;
                               }
+                              // Set selected patient
                               setSelectedPatientId(p._id);
                               setPatientSearchQuery(`${p.name} (${p.uhid})`);
-                              // Auto-populate some attender fields if same as emergency contact
-                              setAttenderName(anyP.emergencyContact?.name || "");
-                              setAttenderPhone(anyP.emergencyContact?.phone || "");
                             }}
                             className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-slate-50 ${
                               selectedPatientId === p._id ? "bg-indigo-50 font-semibold" : ""
@@ -1088,8 +1106,13 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                           required
                           value={selectedRoomId}
                           onChange={(e) => {
-                            setSelectedRoomId(e.target.value);
+                            const rId = e.target.value;
+                            setSelectedRoomId(rId);
                             setSelectedBedId("");
+                            const selRoom = rooms?.find((r: any) => r._id === rId);
+                            if (selRoom?.tariff?.roomChargePerDay) {
+                              setDailyTariff(selRoom.tariff.roomChargePerDay);
+                            }
                           }}
                         >
                           <option value="">Select Room</option>
@@ -1117,28 +1140,29 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                           label="Daily Tariff"
                           disabled
                           readOnly
-                          value={dailyTariff > 0 ? `₹${dailyTariff}/day` : "₹0/day (Not Configured)"}
+                          value={dailyTariff > 0 ? `₹${dailyTariff}/day` : "₹0/day"}
                         />
                       </div>
                     </Card>
 
                     <Card className="space-y-4">
                       <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500">
-                        Attender & Finance Information
+                        Nurse & Finance Information
                       </h3>
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <InputField
-                          label="Attender Name"
+                        <SelectField
+                          label="Assign Nurse"
                           required
-                          value={attenderName}
-                          onChange={(e) => setAttenderName(e.target.value)}
-                        />
-                        <InputField
-                          label="Attender Phone"
-                          required
-                          value={attenderPhone}
-                          onChange={(e) => setAttenderPhone(e.target.value)}
-                        />
+                          value={assignedNurse}
+                          onChange={(e: any) => setAssignedNurse(e.target.value)}
+                        >
+                          <option value="">Select Nurse</option>
+                          {nurses.map((n: any) => (
+                            <option key={n._id} value={n._id}>
+                              {n.name} {n.employeeId ? `(${n.employeeId})` : ""}
+                            </option>
+                          ))}
+                        </SelectField>
                         <InputField
                           label="Insurance Provider"
                           value={insuranceProvider}
@@ -1205,35 +1229,74 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
 
       {/* Bed Grid Map Tab */}
       {tab === "rooms" && (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {rooms?.map((room) => (
-            <Card key={room._id} className="space-y-3">
-              <div className="flex justify-between items-start border-b border-slate-100 pb-2">
-                <div>
-                  <div className="font-bold text-slate-800 text-sm">Room {room.roomNumber}</div>
-                  <div className="text-[10px] text-slate-400 uppercase font-semibold">{room.wardName}</div>
-                </div>
-                <span className="text-[10px] font-bold bg-navy-50 text-navy-700 px-2 py-0.5 rounded-full">
-                  {room.roomType}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {room.beds.map((bed) => (
-                  <div
-                    key={bed._id}
-                    className={`rounded-lg border p-2 text-center text-xs font-semibold select-none ${
-                      bed.isOccupied
-                        ? "bg-red-50 border-red-200 text-red-700"
-                        : "bg-emerald-50 border-emerald-200 text-emerald-700"
-                    }`}
-                  >
-                    <div>{bed.bedNumber}</div>
-                    <div className="text-[9px] font-normal mt-0.5">{bed.isOccupied ? "Occupied" : "Vacant"}</div>
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-4 bg-white p-3 rounded-xl border border-slate-200 text-xs text-slate-600 shadow-xs">
+            <span className="font-bold text-slate-700">Bed Status Legend:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full bg-emerald-500"></span>
+              <span>Vacant</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full bg-red-500"></span>
+              <span>Occupied</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full bg-amber-500"></span>
+              <span>Under Maintenance / Blocked</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full bg-blue-500"></span>
+              <span>Cleaning</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {rooms?.map((room) => (
+              <Card key={room._id} className="space-y-3">
+                <div className="flex justify-between items-start border-b border-slate-100 pb-2">
+                  <div>
+                    <div className="font-bold text-slate-800 text-sm">Room {room.roomNumber}</div>
+                    <div className="text-[10px] text-slate-400 uppercase font-semibold">{room.wardName}</div>
                   </div>
-                ))}
-              </div>
-            </Card>
-          ))}
+                  <span className="text-[10px] font-bold bg-navy-50 text-navy-700 px-2 py-0.5 rounded-full">
+                    {room.roomType}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {room.beds.map((bed) => {
+                    const statusLower = (bed.status || "").toLowerCase();
+                    const isBlocked = statusLower === "blocked" || statusLower === "maintenance";
+                    const isCleaning = statusLower === "cleaning";
+                    const isOccupied = bed.isOccupied || statusLower === "occupied";
+
+                    let cardClass = "bg-emerald-50 border-emerald-200 text-emerald-700";
+                    let label = "Vacant";
+
+                    if (isOccupied) {
+                      cardClass = "bg-red-50 border-red-200 text-red-700";
+                      label = "Occupied";
+                    } else if (isBlocked) {
+                      cardClass = "bg-amber-50 border-amber-300 text-amber-800";
+                      label = statusLower === "blocked" ? "Under Maintenance" : "Maintenance";
+                    } else if (isCleaning) {
+                      cardClass = "bg-blue-50 border-blue-200 text-blue-700";
+                      label = "Cleaning";
+                    }
+
+                    return (
+                      <div
+                        key={bed._id}
+                        className={`rounded-lg border p-2 text-center text-xs font-semibold select-none transition-colors ${cardClass}`}
+                      >
+                        <div>{bed.bedNumber}</div>
+                        <div className="text-[9px] font-medium mt-0.5">{label}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
 
@@ -1705,6 +1768,16 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
           </div>
         );
       })()}
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(rejectTargetId)}
+        title="Confirm Rejection"
+        message="Are you sure you want to reject this admission request? This action cannot be undone."
+        confirmText="Reject Request"
+        isLoading={rejectRequestMutation.isPending}
+        onClose={() => setRejectTargetId(null)}
+        onConfirm={confirmRejectRequest}
+      />
     </div>
   );
 }

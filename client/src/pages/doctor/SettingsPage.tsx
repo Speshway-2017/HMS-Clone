@@ -127,7 +127,7 @@ const WORKING_HOURS = [
 ];
 
 export function DoctorSettingsPage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { mutate, isPending } = useChangePassword();
 
   // Security tab state
@@ -147,8 +147,9 @@ export function DoctorSettingsPage() {
     qualification:  "",
     licenseNo:      "",
     bio:            "",
-    consultationFee:"₹500",
+    consultationFee:"500",
     languages:      "English, Hindi",
+    opExpiryLimit:  10,
   });
 
   // Notification state
@@ -221,8 +222,9 @@ export function DoctorSettingsPage() {
         qualification: doctorProfile.qualification || "",
         licenseNo: doctorProfile.licenseNo || "",
         bio: doctorProfile.bio || "",
-        consultationFee: doctorProfile.consultationFee || "₹500",
+        consultationFee: doctorProfile.consultationFee ? String(doctorProfile.consultationFee).replace(/[^0-9.]/g, "") : "500",
         languages: doctorProfile.languages || "English, Hindi",
+        opExpiryLimit: doctorProfile.opExpiryLimit ?? 10,
       });
       if (doctorProfile.workingHours && doctorProfile.workingHours.length > 0) {
         setHours(doctorProfile.workingHours);
@@ -259,7 +261,9 @@ export function DoctorSettingsPage() {
         bio: profileForm.bio,
         consultationFee: profileForm.consultationFee,
         languages: profileForm.languages,
+        opExpiryLimit: Number(profileForm.opExpiryLimit),
       });
+      await refreshUser();
       showToast("success", "Profile updated successfully!");
     } catch (err: any) {
       showToast("error", err?.response?.data?.message || err?.message || "Failed to update profile.");
@@ -398,6 +402,7 @@ export function DoctorSettingsPage() {
                 { label: "Qualification",     key: "qualification"  },
                 { label: "License Number",    key: "licenseNo"      },
                 { label: "Consultation Fee",  key: "consultationFee"},
+                { label: "OP Consultation Expiry Limit (Days)", key: "opExpiryLimit"},
               ].map((f) => (
                 <div key={f.key} className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold uppercase text-slate-400">{f.label}</label>
@@ -423,9 +428,9 @@ export function DoctorSettingsPage() {
                 type="button"
                 onClick={handleSaveProfile}
                 disabled={updateProfileMutation.isPending}
-                className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-2 w-full sm:w-auto rounded-lg bg-navy-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {updateProfileMutation.isPending ? "Saving..." : <><Save className="h-4 w-4" /> Save Profile</>}
+                {updateProfileMutation.isPending ? "Saving..." : <><Save className="h-4 w-4 shrink-0" /> Save Profile</>}
               </button>
             </div>
           </Section>
@@ -491,15 +496,15 @@ export function DoctorSettingsPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between pt-2">
-                <p className="flex items-center gap-1.5 text-xs text-slate-400">
-                  <Lock className="h-3.5 w-3.5" /> Encrypted end-to-end
+              <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                <p className="flex items-center justify-center sm:justify-start gap-1.5 text-xs text-slate-400">
+                  <Lock className="h-3.5 w-3.5 shrink-0" /> Encrypted end-to-end
                 </p>
                 <button
                   id="btn-doctor-change-password"
                   type="submit"
                   disabled={isPending || !newPassword || !confirmPassword || passwordsMismatch}
-                  className="flex items-center gap-2 rounded-xl bg-navy-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-navy-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex items-center justify-center gap-2 w-full sm:w-auto rounded-xl bg-navy-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-navy-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isPending ? (
                     <>
@@ -510,7 +515,7 @@ export function DoctorSettingsPage() {
                       Saving…
                     </>
                   ) : (
-                    <><ShieldCheck className="h-4 w-4" /> Update Password</>
+                    <><ShieldCheck className="h-4 w-4 shrink-0" /> Update Password</>
                   )}
                 </button>
               </div>
@@ -554,35 +559,44 @@ export function DoctorSettingsPage() {
           <Section title="Working Hours" subtitle="Set your available consultation hours for each day." icon={<Clock className="h-5 w-5 text-navy-700" />}>
             <div className="space-y-3">
               {hours.map((h, i) => (
-                <div key={h.day} className={`flex items-center gap-4 rounded-lg border px-4 py-3 transition-colors ${h.active ? "border-slate-200" : "border-slate-100 bg-slate-50 opacity-60"}`}>
-                  <div className="w-24 shrink-0">
-                    <p className="text-sm font-semibold text-slate-700">{h.day}</p>
+                <div key={h.day} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 rounded-xl border p-3.5 sm:px-4 sm:py-3 transition-colors ${h.active ? "border-slate-200 bg-white" : "border-slate-100 bg-slate-50/70 opacity-60"}`}>
+                  <div className="flex items-center justify-between sm:w-28 shrink-0">
+                    <p className="text-sm font-semibold text-slate-800">{h.day}</p>
+                    <label className="flex items-center gap-2 cursor-pointer sm:hidden">
+                      <input
+                        type="checkbox"
+                        checked={h.active}
+                        onChange={() => toggleDay(i)}
+                        className="accent-navy-700 h-4 w-4"
+                      />
+                      <span className="text-xs font-semibold text-slate-600">{h.active ? "Available" : "Off"}</span>
+                    </label>
                   </div>
-                  <div className="flex flex-1 items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3 flex-1">
                     <input
                       type="time"
                       value={h.from === "—" ? "" : h.from}
                       disabled={!h.active}
                       onChange={(e) => setHours((prev) => prev.map((d, idx) => idx === i ? { ...d, from: e.target.value } : d))}
-                      className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm disabled:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-navy-200"
+                      className="w-full sm:w-auto rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs sm:text-sm text-slate-800 disabled:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-navy-200"
                     />
-                    <span className="text-xs text-slate-400">to</span>
+                    <span className="text-xs text-slate-400 font-medium shrink-0">to</span>
                     <input
                       type="time"
                       value={h.to === "—" ? "" : h.to}
                       disabled={!h.active}
                       onChange={(e) => setHours((prev) => prev.map((d, idx) => idx === i ? { ...d, to: e.target.value } : d))}
-                      className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm disabled:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-navy-200"
+                      className="w-full sm:w-auto rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs sm:text-sm text-slate-800 disabled:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-navy-200"
                     />
                   </div>
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <label className="hidden sm:flex items-center gap-2 cursor-pointer shrink-0">
                     <input
                       type="checkbox"
                       checked={h.active}
                       onChange={() => toggleDay(i)}
                       className="accent-navy-700 h-4 w-4"
                     />
-                    <span className="text-xs text-slate-500">{h.active ? "Available" : "Off"}</span>
+                    <span className="text-xs font-semibold text-slate-600">{h.active ? "Available" : "Off"}</span>
                   </label>
                 </div>
               ))}

@@ -40,6 +40,28 @@ class NurseService {
     }
   }
 
+  /// Fetches detailed clinical info for a specific admission
+  Future<dynamic> getInpatientDetails(String admissionId) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/nurse/inpatients/$admissionId/details');
+    final headers = await _getHeaders();
+
+    try {
+      final response = await _client.get(url, headers: headers).timeout(const Duration(seconds: 10));
+      final decoded = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && decoded['status'] == 'success') {
+        return decoded['data'];
+      } else {
+        final message = decoded['message'] ?? 'Failed to load admission details.';
+        throw Exception(message);
+      }
+    } on SocketException {
+      throw Exception('Unable to connect to the server. Please check your network connection.');
+    } catch (e) {
+      throw Exception('Error loading admission details: ${e.toString().replaceFirst('Exception: ', '')}');
+    }
+  }
+
   /// Records vitals for a specific admission
   Future<dynamic> recordVitals({
     required String admissionId,
@@ -156,6 +178,62 @@ class NurseService {
       throw Exception('Unable to connect to the server. Please check your network connection.');
     } catch (e) {
       throw Exception('Error loading nurse list: ${e.toString().replaceFirst('Exception: ', '')}');
+    }
+  }
+  /// Lists all active wards in the hospital
+  Future<List<dynamic>> getWards() async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/wards');
+    final headers = await _getHeaders();
+
+    try {
+      final response = await _client.get(url, headers: headers).timeout(const Duration(seconds: 10));
+      final decoded = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && decoded['status'] == 'success') {
+        final data = decoded['data'];
+        if (data is Map && data.containsKey('wards')) {
+          return data['wards'] ?? [];
+        } else if (data is List) {
+          return data;
+        }
+        return [];
+      } else {
+        final message = decoded['message'] ?? 'Failed to load wards.';
+        throw Exception(message);
+      }
+    } on SocketException {
+      throw Exception('Unable to connect to the server. Please check your network connection.');
+    } catch (e) {
+      throw Exception('Error loading wards: ${e.toString().replaceFirst('Exception: ', '')}');
+    }
+  }
+
+  /// Lists all beds in the hospital with ward, room, and patient details
+  Future<List<dynamic>> getBeds({String? wardId}) async {
+    final query = wardId != null && wardId.isNotEmpty ? '?ward=$wardId&limit=100' : '?limit=100';
+    final url = Uri.parse('${ApiConfig.baseUrl}/beds$query');
+    final headers = await _getHeaders();
+
+    try {
+      final response = await _client.get(url, headers: headers).timeout(const Duration(seconds: 10));
+      final decoded = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && decoded['status'] == 'success') {
+        final data = decoded['data'];
+        if (data is Map && data.containsKey('beds')) {
+          return data['beds'] ?? [];
+        } else if (data is List) {
+          return data;
+        }
+        return [];
+      } else {
+        final message = decoded['message'] ?? 'Failed to load beds.';
+        throw Exception(message);
+      }
+    } on SocketException {
+      throw Exception('Unable to connect to the server. Please check your network connection.');
+    } catch (e) {
+      throw Exception('Error loading beds: ${e.toString().replaceFirst('Exception: ', '')}');
     }
   }
 }

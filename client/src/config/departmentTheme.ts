@@ -1,4 +1,6 @@
-import { HeartPulse, Microscope, Baby, Brain, Radiation, Siren, Building2, type LucideIcon } from "lucide-react";
+import { HeartPulse, Microscope, Baby, Brain, Radiation, Siren, Building2 } from "lucide-react";
+import type { ComponentType } from "react";
+export type LucideIcon = ComponentType<any>;
 
 interface DepartmentTheme {
   icon: LucideIcon;

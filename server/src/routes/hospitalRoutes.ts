@@ -4,6 +4,7 @@ import { scopeToHospital } from "../middleware/scopeToHospital";
 import {
   listHospitals,
   createHospital,
+  getHospitalCode,
   getHospital,
   updateHospital,
   deleteHospital,
@@ -13,6 +14,8 @@ import {
   getPublicHospital,
   getPublicHospitalDepartments,
   getPublicHospitalDoctors,
+  getPublicHospitalBranches,
+  getPublicBookedSlots,
   createPublicAppointment,
   createPublicEnquiry,
   listHospitalEnquiries,
@@ -25,6 +28,8 @@ const router = Router();
 router.get("/public", getPublicHospital);
 router.get("/public/departments", getPublicHospitalDepartments);
 router.get("/public/doctors", getPublicHospitalDoctors);
+router.get("/public/branches", getPublicHospitalBranches);
+router.get("/public/appointments/booked-slots", getPublicBookedSlots);
 router.post("/public/appointments", createPublicAppointment);
 router.post("/public/enquiries", createPublicEnquiry);
 
@@ -37,6 +42,7 @@ router.patch("/me", protect, restrictTo("hospital_admin", "laboratory"), updateM
 
 router.use(protect, restrictTo("super_admin"));
 
+router.get("/generate-code", getHospitalCode);
 router.get("/unassigned-admins", listUnassignedHospitalAdmins);
 router.route("/").get(listHospitals).post(createHospital);
 router.route("/:id").get(getHospital).patch(updateHospital).delete(deleteHospital);

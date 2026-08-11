@@ -1,61 +1,92 @@
-import { Search, Settings } from "lucide-react";
-import { Link } from "react-router-dom";
+import { LogOut, Menu } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useMyHospital } from "../../features/hospitals";
 import { NotificationPanel } from "./NotificationPanel";
+import { BranchSwitcher } from "../layout/BranchSwitcher";
 
-const SETTINGS_PATH: Record<string, string> = {
-  super_admin: "/super-admin/settings",
-  hospital_admin: "/admin/settings",
-  accountant: "/accountant/settings",
-  pharmacist: "/pharmacy/settings",
-  laboratory: "/laboratory/settings",
-  doctor: "/doctor/settings",
-};
+interface TopbarProps {
+  onMenuClick?: () => void;
+}
 
-export function Topbar() {
-  const { user } = useAuth();
-  const settingsPath = user?.role ? (SETTINGS_PATH[user.role] ?? "/") : "/";
+export function getAvatarInitials(name?: string): string {
+  if (!name || !name.trim()) return "U";
+  const cleanName = name.replace(/^Dr\.\s*|^Dr\s+/i, "").trim();
+  const parts = cleanName.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "U";
+  if (parts.length === 1) {
+    return parts[0].charAt(0).toUpperCase();
+  }
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+
+export function Topbar({ onMenuClick }: TopbarProps) {
+  const { user, logout } = useAuth();
+  const { data: hospital } = useMyHospital({ enabled: !!user?.hospital });
+
+  // Always display user's Full Name (or fallback to email prefix if name is missing)
+  const displayName = (user?.name && user.name.trim()) ? user.name.trim() : (user?.email ? user.email.split("@")[0] : "User");
+  const userInitials = getAvatarInitials(displayName);
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6">
-      <div className="flex w-full max-w-md items-center gap-2 rounded-lg bg-slate-100 px-3 py-2">
-        <Search className="h-4 w-4 text-slate-400" />
-        <input
-          type="text"
-          placeholder="Search..."
-          className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-        />
-      </div>
-
-      <div className="flex items-center gap-3">
-        {/* Notification bell — for hospital_admin, doctor, receptionist, accountant, pharmacist, and laboratory roles */}
-        {(user?.role === "hospital_admin" || 
-          user?.role === "doctor" || 
-          user?.role === "receptionist" ||
-          user?.role === "accountant" || 
-          user?.role === "pharmacist" ||
-          user?.role === "laboratory") && <NotificationPanel />}
-
-        {/* Avatar + name → Settings */}
-        <Link
-          to={settingsPath}
-          aria-label="Go to Settings"
-          className="flex items-center gap-2 rounded-lg px-2 py-1 transition hover:bg-slate-100"
+    <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-100 bg-white px-3 sm:px-4 md:px-6 sticky top-0 z-40">
+      {/* Left side spacing - Mobile Menu Button and Logo */}
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <button
+          onClick={onMenuClick}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-50 hover:text-slate-700 active:bg-slate-100 transition-colors md:hidden"
+          aria-label="Open menu"
         >
-          {user?.avatarUrl ? (
-            <img
-              src={user.avatarUrl}
-              alt={user.name}
-              className="h-9 w-9 rounded-full object-cover ring-2 ring-slate-200"
-            />
+          <Menu className="h-6 w-6" />
+        </button>
+
+        {/* Mobile-only hospital branding */}
+        <div className="flex items-center gap-2 md:hidden min-w-0">
+          {hospital?.logoUrl ? (
+            <img src={hospital.logoUrl} alt={hospital.name} className="h-8 w-8 shrink-0 rounded-lg object-contain bg-slate-50 p-0.5 border" />
           ) : (
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-navy-100 text-sm font-bold text-navy-700">
-              {user?.name?.charAt(0).toUpperCase() ?? "?"}
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-navy-100 text-navy-700 font-bold text-sm">
+              {hospital?.name ? hospital.name.charAt(0).toUpperCase() : "H"}
             </div>
           )}
-          <span className="text-sm font-medium text-slate-700">{user?.name}</span>
-          <Settings className="h-3.5 w-3.5 text-slate-400" />
-        </Link>
+          <span className="text-sm font-bold text-slate-800 max-w-[110px] xs:max-w-[150px] sm:max-w-[220px] truncate">
+            {hospital?.name || "HMS"}
+          </span>
+        </div>
+      </div>
+
+      {/* Master Top-Right Header */}
+      <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+        {/* Branch Context Switcher (Shown on desktop/tablet) */}
+        <div className="hidden md:block">
+          <BranchSwitcher />
+        </div>
+
+        {/* 1. Notification Bell */}
+        <NotificationPanel />
+
+        {/* 2. Circular User Avatar */}
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-extrabold text-navy-800">
+          {user?.avatarUrl ? (
+            <img src={user.avatarUrl} alt={displayName} className="h-8 w-8 rounded-full object-cover" />
+          ) : (
+            <span>{userInitials}</span>
+          )}
+        </div>
+
+        {/* 3. Logged-in User Name */}
+        <span className="hidden sm:inline-block text-sm font-semibold text-slate-700 max-w-[140px] truncate">
+          {displayName}
+        </span>
+
+        {/* 4. Logout Icon */}
+        <button
+          onClick={() => logout()}
+          aria-label="Log out"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:bg-slate-200 transition-colors cursor-pointer"
+          title="Sign Out"
+        >
+          <LogOut className="h-4 w-4" />
+        </button>
       </div>
     </header>
   );
