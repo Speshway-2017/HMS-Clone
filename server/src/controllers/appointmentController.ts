@@ -44,15 +44,16 @@ async function getLoggedDoctor(req: Request) {
 }
 
 const appointmentSchema = z.object({
-  patient: z.string().min(1),
-  doctor: z.string().min(1),
+  patient: z.string().optional().nullable().default(""),
+  doctor: z.string().min(1, "Doctor ID is required."),
   department: z.string().optional().nullable(),
   date: z.coerce.date(),
-  time: z.string().min(1),
-  type: z.enum(APPOINTMENT_TYPES as unknown as [string, ...string[]]).optional().default("Appointment"),
+  time: z.string().min(1, "Time slot is required."),
+  type: z.string().optional().default("Appointment"),
   status: z.enum(APPOINTMENT_STATUSES).optional(),
   meetingLink: z.string().optional().default(""),
   notes: z.string().optional().default(""),
+  reason: z.string().optional().default(""),
   billingStatus: z.string().optional(),
   paymentMethod: z.string().optional(),
 });
@@ -157,6 +158,22 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
 
 export const createAppointment = catchAsync(async (req: Request, res: Response) => {
   const body = appointmentSchema.parse(req.body);
+
+  // Normalize appointment type string to valid APPOINTMENT_TYPES enum
+  let apptType: "Appointment" | "Walk-in" | "Emergency" | "Video Consultation" | "Consultation" = "Appointment";
+  const rawType = (req.body.type || body.type || "").toString().toLowerCase();
+  if (rawType.includes("video") || rawType.includes("online")) {
+    apptType = "Video Consultation";
+  } else if (rawType.includes("walk")) {
+    apptType = "Walk-in";
+  } else if (rawType.includes("emergency")) {
+    apptType = "Emergency";
+  } else if (rawType.includes("consultation") && !rawType.includes("opd") && !rawType.includes("person")) {
+    apptType = "Consultation";
+  } else {
+    apptType = "Appointment";
+  }
+  body.type = apptType;
   const doctor = await Doctor.findById(body.doctor);
   if (!doctor || doctor.isActive === false) {
     throw new AppError("The selected doctor is inactive, retired, or does not exist.", 400);
@@ -167,11 +184,39 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
     throw new AppError("Hospital information is required to book an appointment.", 400);
   }
 
-  // If patient field is missing or logged in as patient role, auto-find patient document
+  // Auto-find or create patient profile for logged in user
   if (!body.patient || req.user!.role === "patient") {
-    const patientDoc = await Patient.findOne({ email: req.user!.email });
+    let patientDoc = null;
+    const userEmail = (req.user!.email || "").trim();
+    const userPhone = (req.user!.phone || "").replace(/\D/g, "").slice(-10);
+    const userId = req.user!._id;
+
+    if (userId) {
+      patientDoc = await Patient.findOne({ user: userId });
+    }
+    if (!patientDoc && userEmail) {
+      patientDoc = await Patient.findOne({ email: { $regex: `^${userEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+    }
+    if (!patientDoc && userPhone && userPhone.length >= 7) {
+      patientDoc = await Patient.findOne({ phone: { $regex: `${userPhone}$` } });
+    }
+
     if (patientDoc) {
       body.patient = patientDoc._id.toString();
+    } else if (req.user!.role === "patient") {
+      const generateDigits = (len: number) => Array.from({ length: len }, () => Math.floor(Math.random() * 10)).join("");
+      const newPat = await Patient.create({
+        user: userId,
+        hospital: hospitalId,
+        uhid: `UHID-${generateDigits(10)}`,
+        patientCode: `PAT-${generateDigits(6)}`,
+        name: req.user!.name || "Patient",
+        email: userEmail,
+        phone: req.user!.phone || "",
+        status: "opd",
+        isActive: true,
+      });
+      body.patient = newPat._id.toString();
     }
   }
 
@@ -307,7 +352,18 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
     });
   }
 
-  emitToHospital(hospitalId.toString(), "appointment_created", { appointmentId: appointment._id, referenceId });
+  const populatedAppt = await Appointment.findById(appointment._id)
+    .populate("patient", "name uhid phone age gender")
+    .populate("doctor", "name specialization department consultationFee")
+    .populate("department", "name");
+
+  emitToHospital(hospitalId.toString(), "appointment_created", {
+    appointmentId: appointment._id,
+    referenceId,
+    appointment: populatedAppt,
+  });
+  emitToHospital(hospitalId.toString(), "patient_updated", { patientId: body.patient });
+  emitToHospital(hospitalId.toString(), "appointments_updated", { appointmentId: appointment._id });
 
   try {
     const patDoc = await Patient.findById(body.patient);

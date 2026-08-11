@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { Patient, PATIENT_STATUSES } from "../models/Patient";
 import { Doctor } from "../models/Doctor";
+import { User } from "../models/User";
 import mongoose, { Types } from "mongoose";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
@@ -395,13 +396,29 @@ export const updatePatientProfileMe = catchAsync(async (req: Request, res: Respo
     throw new AppError("Patient profile not found for the logged-in user.", 404);
   }
 
+  const photo = typeof req.body.photoUrl === "string" && req.body.photoUrl.trim().length > 0
+      ? req.body.photoUrl.trim()
+      : (typeof req.body.avatarUrl === "string" && req.body.avatarUrl.trim().length > 0 ? req.body.avatarUrl.trim() : null);
+
+  if (photo && !req.body.photoUrl) {
+    req.body.photoUrl = photo;
+  }
+
   const body = patientSchema.partial().parse(req.body);
   delete (body as any).uhid;
+
+  if (photo && !body.photoUrl) {
+    body.photoUrl = photo;
+  }
 
   const patient = await Patient.findByIdAndUpdate(patientSelf._id, body, {
     new: true,
     runValidators: true,
   });
+
+  if (userId && photo) {
+    await User.findByIdAndUpdate(userId, { avatarUrl: photo, name: body.name || userName });
+  }
 
   if (patientSelf.hospital) {
     emitToHospital(patientSelf.hospital.toString(), "patient_updated", { patientId: patient!._id });

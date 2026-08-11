@@ -5,6 +5,7 @@ import '../features/admin/screens/admin_dashboard.dart';
 import '../features/doctor/screens/doctor_dashboard.dart';
 import '../features/nurse/screens/nurse_dashboard.dart';
 import '../features/patient/screens/patient_dashboard.dart';
+import '../features/patient/screens/patient_profile_screen.dart';
 
 class AppRoutes {
   static const String splash = '/';
@@ -13,6 +14,7 @@ class AppRoutes {
   static const String doctorDashboard = '/doctor/dashboard';
   static const String nurseDashboard = '/nurse/dashboard';
   static const String patientDashboard = '/patient/dashboard';
+  static const String patientProfile = '/patient/profile';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -80,6 +82,18 @@ class AppRoutes {
             );
           },
           transitionDuration: const Duration(milliseconds: 500),
+        );
+      case patientProfile:
+        return PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => const PatientProfileScreen(),
+          settings: settings,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: animation,
+              child: child,
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 300),
         );
       default:
         return MaterialPageRoute(

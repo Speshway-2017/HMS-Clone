@@ -5,7 +5,17 @@ import { uploadFile } from "../controllers/uploadController";
 
 const router = Router();
 
+const handleMulterOptional = (req: any, res: any, next: any) => {
+  upload.single("file")(req, res, (err) => {
+    if (err && req.headers["content-type"]?.includes("application/json")) {
+      return next();
+    }
+    if (err) return next(err);
+    next();
+  });
+};
+
 router.use(protect, restrictTo("super_admin", "hospital_admin", "doctor", "receptionist", "accountant", "pharmacist", "laboratory", "nurse", "patient"));
-router.post("/", upload.single("file"), uploadFile);
+router.post("/", handleMulterOptional, uploadFile);
 
 export default router;
