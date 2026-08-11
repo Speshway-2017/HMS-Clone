@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
@@ -62,63 +62,72 @@ export function PharmacyBilling() {
   const [cashAmount, setCashAmount] = useState("0");
   const [cardAmount, setCardAmount] = useState("0");
 
+  const handledInvoiceIdRef = useRef<string | null>(null);
+
   // Map live database invoices conformed to billing list
   const rawInvoices = dbInvoiceData?.data || [];
-  const invoices: PharmacyInvoice[] = rawInvoices
-    .filter((inv: any) => inv.billingType === "PHARMACY")
-    .map((inv: any) => {
-      const p = inv.patient as any;
-      const items = (inv.items || []).map((item: any) => ({
-        name: item.description,
-        quantity: item.quantity,
-        price: item.amount,
-      }));
-      
-      // Normalise every money field through roundCurrency to eliminate DB floating-point residuals
-      const subtotal = roundCurrency(inv.totals?.subtotal || 0);
-      const tax = roundCurrency(inv.totals?.taxAmount || 0);
-      const discount = roundCurrency(inv.totals?.discount || inv.discount || 0);
-      const total = roundCurrency(inv.totals?.total || 0);
-      const rawBalance = inv.totals?.patientBalance !== undefined ? inv.totals.patientBalance : total;
-      const patientBalance = roundCurrency(rawBalance);
-      const amountPaid = Math.max(0, roundCurrency(total - patientBalance));
+  const invoices: PharmacyInvoice[] = useMemo(() => {
+    return rawInvoices
+      .filter((inv: any) => inv.billingType === "PHARMACY")
+      .map((inv: any) => {
+        const p = inv.patient as any;
+        const items = (inv.items || []).map((item: any) => ({
+          name: item.description,
+          quantity: item.quantity,
+          price: item.amount,
+        }));
+        
+        // Normalise every money field through roundCurrency to eliminate DB floating-point residuals
+        const subtotal = roundCurrency(inv.totals?.subtotal || 0);
+        const tax = roundCurrency(inv.totals?.taxAmount || 0);
+        const discount = roundCurrency(inv.totals?.discount || inv.discount || 0);
+        const total = roundCurrency(inv.totals?.total || 0);
+        const rawBalance = inv.totals?.patientBalance !== undefined ? inv.totals.patientBalance : total;
+        const patientBalance = roundCurrency(rawBalance);
+        const amountPaid = Math.max(0, roundCurrency(total - patientBalance));
 
-      let prescriptionNumber = "N/A";
-      if (inv.provisionalData?.notes) {
-        const match = inv.provisionalData.notes.match(/Prescription Ref:\s*(\S+)/i);
-        if (match) {
-          prescriptionNumber = match[1];
-        } else {
-          prescriptionNumber = inv.provisionalData.notes;
+        let prescriptionNumber = "N/A";
+        if (inv.provisionalData?.notes) {
+          const match = inv.provisionalData.notes.match(/Prescription Ref:\s*(\S+)/i);
+          if (match) {
+            prescriptionNumber = match[1];
+          } else {
+            prescriptionNumber = inv.provisionalData.notes;
+          }
         }
-      }
 
-      return {
-        _id: inv._id,
-        patientName: p ? p.name : "Walk-in Patient",
-        patientId: p ? p._id : "",
-        patientUhid: p ? p.uhid : "N/A",
-        patientPhone: p ? p.phone : "N/A",
-        prescriptionNumber,
-        date: new Date(inv.issuedAt || inv.createdAt).toISOString().split("T")[0],
-        items,
-        taxRate: inv.taxRate || 0,
-        discount,
-        subtotal,
-        tax,
-        total,
-        patientBalance,
-        amountPaid,
-        paymentMethod: inv.paymentMode || "Cash",
-        status: inv.status,
-      };
-    });
+        return {
+          _id: inv._id,
+          patientName: p ? p.name : "Walk-in Patient",
+          patientId: p ? p._id : "",
+          patientUhid: p ? p.uhid : "N/A",
+          patientPhone: p ? p.phone : "N/A",
+          prescriptionNumber,
+          date: new Date(inv.issuedAt || inv.createdAt).toISOString().split("T")[0],
+          items,
+          taxRate: inv.taxRate || 0,
+          discount,
+          subtotal,
+          tax,
+          total,
+          patientBalance,
+          amountPaid,
+          paymentMethod: inv.paymentMode || "Cash",
+          status: inv.status,
+        };
+      });
+  }, [rawInvoices]);
 
   // Auto-open payment collection modal for highlighed invoice from search parameter
   useEffect(() => {
-    if (highlightInvoiceId && invoices.length > 0) {
+    if (!highlightInvoiceId) {
+      handledInvoiceIdRef.current = null;
+      return;
+    }
+    if (invoices.length > 0 && handledInvoiceIdRef.current !== highlightInvoiceId) {
       const found = invoices.find(inv => inv._id === highlightInvoiceId);
       if (found) {
+        handledInvoiceIdRef.current = highlightInvoiceId;
         setSelectedInvoice(found);
         setPayAmount(found.patientBalance.toFixed(2));
         setPayMethod("Cash");
@@ -127,10 +136,10 @@ export function PharmacyBilling() {
         setCardAmount("0");
         setIsPaymentModalOpen(true);
         // Clear param to avoid repeated pops
-        setSearchParams({});
+        setSearchParams({}, { replace: true });
       }
     }
-  }, [highlightInvoiceId, invoices]);
+  }, [highlightInvoiceId, invoices, setSearchParams]);
 
   // Handle Payment Submit
   const handlePaymentSubmit = async (e: React.FormEvent) => {

@@ -84,10 +84,19 @@ function groupReportsByConsultation(reportsList: any[]): ConsultationGroup[] {
 }
 
 export function PatientRecordsPage() {
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   // Doctor-scoped — only returns patients that have an appointment/admission/
   // lab order/radiology order with the logged-in doctor.
-  const { data: myPatientsData, isLoading, isError } = useDoctorPatients({ search });
+  const { data: myPatientsData, isLoading, isError } = useDoctorPatients({ search: debouncedSearch });
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
@@ -169,7 +178,7 @@ export function PatientRecordsPage() {
       ) : (
         <>
           {/* KPIs — scoped to this doctor's patients only */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard label="My Patients" value={counts?.total ?? patients.length} icon={<User className="h-5 w-5" />} emphasis />
             <KpiCard label="OPD" value={counts?.opd ?? patients.filter(p => p.status === "opd").length} icon={<Activity className="h-5 w-5" />} />
             <KpiCard label="Admitted" value={counts?.admitted ?? patients.filter(p => p.status === "admitted").length} icon={<Stethoscope className="h-5 w-5" />} />
@@ -182,13 +191,13 @@ export function PatientRecordsPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   placeholder="Search your patients..."
                   className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
                 />
               </div>
-              <div className="space-y-2 h-[500px] overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-48 sm:max-h-56 lg:h-[500px] lg:max-h-none overflow-y-auto pr-1">
                 {patients.map((p) => (
                   <div
                     key={p._id}
@@ -223,15 +232,15 @@ export function PatientRecordsPage() {
 
             {/* Record Detail */}
             {selectedPatient && (
-              <div className="space-y-4 lg:col-span-3">
+              <div className="space-y-4 lg:col-span-3 min-w-0">
                 {/* Tabs */}
-                <div className="flex flex-wrap gap-1 border-b border-slate-200">
+                <div className="flex gap-1 border-b border-slate-200 overflow-x-auto max-w-full scrollbar-none flex-nowrap shrink-0 pb-0.5 pr-6">
                   {RECORD_TABS.map((tab, i) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(i)}
-                      className={`px-3 py-2 text-xs font-medium transition-colors border-b-2 whitespace-nowrap ${
-                        activeTab === i ? "border-navy-700 text-navy-700" : "border-transparent text-slate-500 hover:text-slate-700"
+                      className={`px-3 py-2 text-xs font-semibold shrink-0 transition-colors border-b-2 whitespace-nowrap ${
+                        activeTab === i ? "border-navy-700 text-navy-700 font-bold" : "border-transparent text-slate-500 hover:text-slate-700"
                       }`}
                     >
                       {tab}
@@ -263,7 +272,7 @@ export function PatientRecordsPage() {
                       ].map((f) => (
                         <div key={f.label} className="rounded-lg bg-slate-50 p-3">
                           <p className="text-xs font-semibold uppercase text-slate-400 mb-1">{f.label}</p>
-                          <p className="text-sm text-slate-700">{f.value}</p>
+                          <p className="text-sm text-slate-700 break-all sm:break-normal">{f.value}</p>
                         </div>
                       ))}
                     </div>
@@ -391,7 +400,12 @@ export function PatientRecordsPage() {
                 {/* Helper for consultation grouping */}
                 {/* Lab Reports Tab */}
                 {activeTab === 4 && (() => {
-                  const labReports = reports.filter((r: any) => r.requestType === "Laboratory");
+                  const isRadiologyReport = (r: any) => {
+                    if (r.requestType === "Radiology") return true;
+                    const name = String(r.testName || r.title || r.category || "").toLowerCase();
+                    return /mri|x-ray|xray|ct\s*scan|ct\b|ultrasound|radiology|scan\b|mammogram|pet\s*scan|echo\b|ecg\b|usg\b|x\s*ray/.test(name);
+                  };
+                  const labReports = reports.filter((r: any) => !isRadiologyReport(r));
                   const labGroups = groupReportsByConsultation(labReports);
 
                   return (
@@ -515,7 +529,12 @@ export function PatientRecordsPage() {
 
                 {/* Radiology Tab */}
                 {activeTab === 5 && (() => {
-                  const radReports = reports.filter((r: any) => r.requestType === "Radiology");
+                  const isRadiologyReport = (r: any) => {
+                    if (r.requestType === "Radiology") return true;
+                    const name = String(r.testName || r.title || r.category || "").toLowerCase();
+                    return /mri|x-ray|xray|ct\s*scan|ct\b|ultrasound|radiology|scan\b|mammogram|pet\s*scan|echo\b|ecg\b|usg\b|x\s*ray/.test(name);
+                  };
+                  const radReports = reports.filter((r: any) => isRadiologyReport(r));
                   const radGroups = groupReportsByConsultation(radReports);
 
                   return (
@@ -720,29 +739,40 @@ export function PatientRecordsPage() {
               <div className="space-y-2">
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Attached Files ({selectedReport.files.length})</p>
                 <div className="flex flex-col gap-2">
-                  {selectedReport.files.map((file: any, index: number) => (
-                    <div key={index} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-2.5 text-xs">
-                      <span className="font-semibold text-slate-700 truncate max-w-[250px]">{file.original_filename}</span>
-                      <div className="flex items-center gap-2">
-                        <a
-                          href={file.secure_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 hover:underline text-blue-700 font-bold"
-                        >
-                          <Eye className="h-3.5 w-3.5" /> View Report
-                        </a>
-                        <a
-                          href={`/api/v1/diagnostic-reports/${selectedReport._id}/download?token=${sessionStorage.getItem("hms_token") || ""}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 hover:underline text-green-700 font-bold ml-2"
-                        >
-                          <Download className="h-3.5 w-3.5" /> Download
-                        </a>
+                  {selectedReport.files.map((file: any, index: number) => {
+                    const rawUrl = file.secure_url || file.url || file.path || "";
+                    const resolvedUrl = rawUrl.startsWith("http") || rawUrl.startsWith("data:")
+                      ? rawUrl
+                      : rawUrl.startsWith("/")
+                        ? `${window.location.origin}${rawUrl}`
+                        : `/api/v1/diagnostic-reports/${selectedReport._id}/download?token=${sessionStorage.getItem("hms_token") || ""}`;
+                    const filename = file.original_filename || file.name || "report_attachment.jpg";
+
+                    return (
+                      <div key={index} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-2.5 text-xs shadow-xs">
+                        <span className="font-semibold text-slate-700 truncate max-w-[250px]">{filename}</span>
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={resolvedUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 hover:underline text-blue-700 font-bold px-2 py-1 bg-blue-50 hover:bg-blue-100 rounded text-xs transition-colors"
+                          >
+                            <Eye className="h-3.5 w-3.5" /> View Report
+                          </a>
+                          <a
+                            href={resolvedUrl}
+                            download={filename}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 hover:underline text-emerald-700 font-bold ml-2 px-2 py-1 bg-emerald-50 hover:bg-emerald-100 rounded text-xs transition-colors"
+                          >
+                            <Download className="h-3.5 w-3.5" /> Download
+                          </a>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

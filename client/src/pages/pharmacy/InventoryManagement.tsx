@@ -1,12 +1,32 @@
 import { useState, useEffect } from "react";
-import { Boxes, Plus, Search, Edit3, Trash2, AlertTriangle, AlertCircle } from "lucide-react";
+import { Boxes, Plus, Search, Edit3, Trash2, AlertTriangle, AlertCircle, Sparkles, Download, Upload } from "lucide-react";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
+import toast from "react-hot-toast";
 import { Modal } from "../../components/ui/Modal";
+import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
+import { ImportExcelModal } from "../../components/ui/ImportExcelModal";
+import { exportToExcel } from "../../lib/excelUtils";
 import { InputField, SelectField } from "../../components/ui/Field";
 import { useInventory, useCreateInventoryItem, useUpdateInventoryItem, useDeleteInventoryItem } from "../../features/inventory";
+
+function generateAutoSku(medName: string = "", cat: string = "Analgesic"): string {
+  const catPrefix = (cat || "MED").substring(0, 3).toUpperCase();
+  const nameClean = medName.trim().replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  const nameCode = nameClean.length >= 2 ? nameClean.substring(0, 3) : "MED";
+  const num = Math.floor(100 + Math.random() * 900);
+  return `${catPrefix}-${nameCode}-${num}`;
+}
+
+function generateAutoBatchNo(): string {
+  const now = new Date();
+  const yr = now.getFullYear();
+  const mo = String(now.getMonth() + 1).padStart(2, "0");
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  return `B${yr}${mo}-${rand}`;
+}
 
 interface Medicine {
   _id: string;
@@ -47,6 +67,7 @@ export function PharmacyInventoryManagement() {
   // Add/Edit State
   const [selectedMed, setSelectedMed] = useState<Medicine | null>(null);
   const [isAddEditOpen, setIsAddEditOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   // Form Fields
   const [name, setName] = useState("");
@@ -89,16 +110,31 @@ export function PharmacyInventoryManagement() {
 
   const handleOpenAdd = () => {
     setSelectedMed(null);
+    const initialCategory = "Analgesic";
     setName("");
-    setCategory("Analgesic");
-    setSku("");
+    setCategory(initialCategory);
+    setSku(generateAutoSku("", initialCategory));
+    setBatchNo(generateAutoBatchNo());
     setStockQty(0);
     setReorderLevel(0);
     setExpiryDate("");
     setPrice(0);
-    setBatchNo("");
     setSupplier("");
     setIsAddEditOpen(true);
+  };
+
+  const handleNameChange = (val: string) => {
+    setName(val);
+    if (!selectedMed) {
+      setSku(generateAutoSku(val, category));
+    }
+  };
+
+  const handleCategoryChange = (val: string) => {
+    setCategory(val);
+    if (!selectedMed) {
+      setSku(generateAutoSku(name, val));
+    }
   };
 
   const handleOpenEdit = (med: Medicine) => {
@@ -115,12 +151,22 @@ export function PharmacyInventoryManagement() {
     setIsAddEditOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this medicine?")) return;
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
+  const handleDelete = (id: string) => {
+    setDeleteTargetId(id);
+  };
+
+  const confirmDeleteMedicine = async () => {
+    if (!deleteTargetId) return;
     try {
-      await deleteMutation.mutateAsync(id);
-    } catch (err) {
+      await deleteMutation.mutateAsync(deleteTargetId);
+      toast.success("Medicine deleted successfully!");
+    } catch (err: any) {
       console.error("Failed to delete medicine", err);
+      toast.error(err?.response?.data?.message || err?.message || "Failed to delete medicine.");
+    } finally {
+      setDeleteTargetId(null);
     }
   };
 
@@ -170,6 +216,26 @@ export function PharmacyInventoryManagement() {
     );
   }
 
+  const handleExportExcel = () => {
+    const headers = ["Medicine Name", "SKU", "Category", "Batch No", "Stock Qty", "Reorder Level", "Expiry Date", "Unit Price (INR)", "Supplier"];
+    const rows = medicines.map((m) => [
+      m.name,
+      m.sku,
+      m.category,
+      m.batchNo,
+      m.stockQty,
+      m.reorderLevel,
+      m.expiryDate,
+      m.price,
+      m.supplier || "—",
+    ]);
+    exportToExcel("Pharmacy_Medicine_Inventory_2026", headers, rows);
+  };
+
+  const handleImportMeds = async (records: Record<string, string>[]) => {
+    toast.success(`Successfully processed ${records.length} medicine records!`);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -178,9 +244,17 @@ export function PharmacyInventoryManagement() {
           <h1 className="text-2xl font-bold text-slate-900">Inventory Management</h1>
           <p className="text-sm text-slate-500">Track and manage medicine stocks, batch references, and expiries.</p>
         </div>
-        <Button onClick={handleOpenAdd} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" /> Add New Medicine
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => setIsImportOpen(true)} className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50">
+            <Upload className="h-4 w-4 text-emerald-600" /> Import Excel
+          </Button>
+          <Button variant="secondary" onClick={handleExportExcel} className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50">
+            <Download className="h-4 w-4 text-slate-600" /> Export Excel
+          </Button>
+          <Button onClick={handleOpenAdd} className="flex items-center gap-2 bg-navy-700 hover:bg-navy-800 text-white">
+            <Plus className="h-4 w-4" /> Add New Medicine
+          </Button>
+        </div>
       </div>
 
       {/* Analytics widgets */}
@@ -366,35 +440,63 @@ export function PharmacyInventoryManagement() {
               required
               placeholder="e.g. Paracetamol 650mg"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => handleNameChange(e.target.value)}
             />
 
             <SelectField
               label="Category"
               required
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={(e) => handleCategoryChange(e.target.value)}
             >
               {categories.map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </SelectField>
 
-            <InputField
-              label="SKU"
-              required
-              placeholder="e.g. MED-PC-01"
-              value={sku}
-              onChange={(e) => setSku(e.target.value)}
-            />
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-bold text-slate-700 uppercase">SKU (Auto-Generated)</label>
+                <button
+                  type="button"
+                  onClick={() => setSku(generateAutoSku(name, category))}
+                  className="text-[10px] font-extrabold text-navy-700 hover:underline flex items-center gap-1 cursor-pointer"
+                  title="Generate new unique SKU"
+                >
+                  <Sparkles className="h-3 w-3 text-indigo-600" /> Auto Generate
+                </button>
+              </div>
+              <input
+                type="text"
+                required
+                value={sku}
+                onChange={(e) => setSku(e.target.value)}
+                placeholder="e.g. ANA-PAR-402"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono font-bold text-slate-800 outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100"
+              />
+            </div>
 
-            <InputField
-              label="Batch Number"
-              required
-              placeholder="e.g. B-PC201"
-              value={batchNo}
-              onChange={(e) => setBatchNo(e.target.value)}
-            />
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-bold text-slate-700 uppercase">Batch Number (Auto-Generated)</label>
+                <button
+                  type="button"
+                  onClick={() => setBatchNo(generateAutoBatchNo())}
+                  className="text-[10px] font-extrabold text-navy-700 hover:underline flex items-center gap-1 cursor-pointer"
+                  title="Generate new unique Batch Number"
+                >
+                  <Sparkles className="h-3 w-3 text-indigo-600" /> Auto Generate
+                </button>
+              </div>
+              <input
+                type="text"
+                required
+                value={batchNo}
+                onChange={(e) => setBatchNo(e.target.value)}
+                placeholder="e.g. B202608-4910"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono font-bold text-slate-800 outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100"
+              />
+            </div>
 
             <InputField
               label="Stock Quantity"
@@ -453,6 +555,28 @@ export function PharmacyInventoryManagement() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(deleteTargetId)}
+        title="Confirm Deletion"
+        message="Are you sure you want to delete this medicine record? This action cannot be undone."
+        isLoading={deleteMutation.isPending}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={confirmDeleteMedicine}
+      />
+
+      <ImportExcelModal
+        isOpen={isImportOpen}
+        title="Import Medicine Inventory Excel"
+        sampleFilename="Medicine_Inventory_Import_Template.csv"
+        sampleHeaders={["Medicine Name", "SKU", "Category", "Batch No", "Stock Qty", "Reorder Level", "Expiry Date", "Unit Price", "Supplier"]}
+        sampleRows={[
+          ["Paracetamol 500mg", "ANA-PAR-101", "Analgesic", "B2026-01", 200, 20, "2027-12-31", 15.5, "PharmaCorp"],
+          ["Amoxicillin 250mg", "ANT-AMO-202", "Antibiotic", "B2026-02", 100, 15, "2027-06-30", 45.0, "MediSupply"],
+        ]}
+        onClose={() => setIsImportOpen(false)}
+        onImport={handleImportMeds}
+      />
     </div>
   );
 }

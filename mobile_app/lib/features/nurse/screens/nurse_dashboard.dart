@@ -8,6 +8,7 @@ import '../../../routes/app_routes.dart';
 import '../../../utils/responsive_helper.dart';
 import '../services/nurse_service.dart';
 import '../../authentication/services/auth_service.dart';
+import 'shift_handover_screen.dart';
 
 class NurseDashboard extends StatefulWidget {
   const NurseDashboard({super.key});
@@ -37,14 +38,11 @@ class _NurseDashboardState extends State<NurseDashboard> {
   List<Map<String, dynamic>> _patients = [];
   List<Map<String, dynamic>> _medications = [];
   List<Map<String, dynamic>> _fluidLogs = [];
+  List<Map<String, dynamic>> _wards = [];
+  String _selectedWardFilter = 'All Wards';
+  final List<Map<String, dynamic>> _nursingNotes = [];
 
-  // Local Checklist Tasks (can be added dynamically)
-  final List<Map<String, dynamic>> _shiftTasks = [
-    {'title': 'Complete Handover Log', 'done': true},
-    {'title': 'Verify Emergency Cart Inventory', 'done': false},
-    {'title': 'Collect Blood Samples for Room 102', 'done': false},
-    {'title': 'Update Ward Intake/Output Chart', 'done': false},
-  ];
+
 
   @override
   void initState() {
@@ -216,10 +214,82 @@ class _NurseDashboardState extends State<NurseDashboard> {
         });
       }
 
+      // 4. Fetch Real Wards & Compute Occupancy
+      List<dynamic> wardsData = [];
+      try {
+        wardsData = await _nurseService.getWards();
+      } catch (_) {
+        wardsData = [];
+      }
+
+      final List<Map<String, dynamic>> mappedWards = [];
+      for (var w in wardsData) {
+        final wardName = w['name']?.toString() ?? 'Ward';
+        final wardCode = w['code']?.toString() ?? '';
+        final wardType = w['wardType']?.toString() ?? 'General';
+        final floorNumber = w['floorNumber'] ?? 1;
+        final description = w['description']?.toString() ?? '';
+
+        int occupiedBeds = mappedPatients.where((p) {
+          final roomStr = (p['room'] ?? '').toString().toLowerCase();
+          return roomStr.contains(wardName.toLowerCase()) ||
+                 (wardCode.isNotEmpty && roomStr.contains(wardCode.toLowerCase()));
+        }).length;
+
+        int totalBeds = 10;
+        if (occupiedBeds > totalBeds) totalBeds = occupiedBeds + 2;
+
+        mappedWards.add({
+          'id': w['_id']?.toString() ?? wardName,
+          'name': wardName,
+          'code': wardCode,
+          'wardType': wardType,
+          'floorNumber': floorNumber,
+          'description': description,
+          'occupiedBeds': occupiedBeds,
+          'totalBeds': totalBeds,
+          'occupancyRate': (occupiedBeds / totalBeds * 100).round(),
+        });
+      }
+
+      // Fallback: If no backend ward documents found, extract unique wards from patient room allocations!
+      if (mappedWards.isEmpty) {
+        final Set<String> uniqueWardNames = {};
+        for (var p in mappedPatients) {
+          final r = p['room']?.toString() ?? '';
+          if (r.contains('•')) {
+            uniqueWardNames.add(r.split('•').first.trim());
+          } else if (r.isNotEmpty) {
+            uniqueWardNames.add(r);
+          }
+        }
+        if (uniqueWardNames.isEmpty) {
+          uniqueWardNames.addAll(['General Ward A', 'ICU Care Station', 'Private Ward B']);
+        }
+
+        for (var wName in uniqueWardNames) {
+          int occupied = mappedPatients.where((p) => (p['room']?.toString() ?? '').contains(wName)).length;
+          int totalBeds = 10;
+          if (occupied > totalBeds) totalBeds = occupied + 2;
+          mappedWards.add({
+            'id': wName,
+            'name': wName,
+            'code': wName.length >= 3 ? wName.substring(0, 3).toUpperCase() : wName.toUpperCase(),
+            'wardType': wName.toLowerCase().contains('icu') ? 'ICU' : 'General',
+            'floorNumber': 1,
+            'description': 'Active Inpatient Ward Unit',
+            'occupiedBeds': occupied,
+            'totalBeds': totalBeds,
+            'occupancyRate': (occupied / totalBeds * 100).round(),
+          });
+        }
+      }
+
       setState(() {
         _patients = mappedPatients;
         _medications = mappedMeds;
         _fluidLogs = mappedFluidLogs;
+        _wards = mappedWards;
         _isLoading = false;
       });
     } catch (e) {
@@ -237,8 +307,9 @@ class _NurseDashboardState extends State<NurseDashboard> {
     final List<Widget> pages = [
       _buildHomeScreen(responsive),
       _buildVitalsScreen(responsive),
-      _buildMedsScreen(responsive),
-      _buildSettingsScreen(responsive),
+      const ShiftHandoverScreen(),
+      _buildNotesScreen(responsive),
+      _buildMoreQuickActionsScreen(responsive),
     ];
 
     return Scaffold(
@@ -251,8 +322,10 @@ class _NurseDashboardState extends State<NurseDashboard> {
           _currentIndex == 0
               ? 'Nurse Workspace'
               : (_currentIndex == 1
-                  ? 'Vitals Tracker'
-                  : (_currentIndex == 2 ? 'Medication Schedule' : 'Account Settings')),
+                  ? 'Assigned Patients & Vitals'
+                  : (_currentIndex == 2
+                      ? 'Shift Handover Hub'
+                      : (_currentIndex == 3 ? 'Nursing Notes & Logs' : 'Nurse Quick Actions'))),
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -269,10 +342,9 @@ class _NurseDashboardState extends State<NurseDashboard> {
             icon: const Icon(Icons.logout_rounded),
             tooltip: 'Log Out',
             onPressed: () async {
+              final nav = Navigator.of(context);
               await AuthService.logout();
-              if (mounted) {
-                Navigator.pushReplacementNamed(context, AppRoutes.login);
-              }
+              nav.pushReplacementNamed(AppRoutes.login);
             },
           ),
         ],
@@ -305,19 +377,24 @@ class _NurseDashboardState extends State<NurseDashboard> {
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.favorite_border_rounded),
-            activeIcon: Icon(Icons.favorite_rounded),
-            label: 'Vitals',
+            icon: Icon(Icons.people_alt_outlined),
+            activeIcon: Icon(Icons.people_alt_rounded),
+            label: 'Patients',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.medication_outlined),
-            activeIcon: Icon(Icons.medication_rounded),
-            label: 'Meds Due',
+            icon: Icon(Icons.swap_horiz_rounded),
+            activeIcon: Icon(Icons.swap_horizontal_circle_rounded),
+            label: 'Handover',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings_outlined),
-            activeIcon: Icon(Icons.settings_rounded),
-            label: 'Settings',
+            icon: Icon(Icons.note_alt_outlined),
+            activeIcon: Icon(Icons.note_alt_rounded),
+            label: 'Notes',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.grid_view_outlined),
+            activeIcon: Icon(Icons.grid_view_rounded),
+            label: 'More',
           ),
         ],
       ),
@@ -393,7 +470,6 @@ class _NurseDashboardState extends State<NurseDashboard> {
             ),
             SizedBox(height: responsive.scaleHeight(20.0)),
           ] else ...[
-            // Default placeholder card to look like the design if no admissions exist yet
             const Text(
               'Fluid Monitoring Logs',
               style: TextStyle(
@@ -403,17 +479,30 @@ class _NurseDashboardState extends State<NurseDashboard> {
               ),
             ),
             const SizedBox(height: 10),
-            _buildFluidLogCard({
-              'admissionId': '',
-              'patientName': 'Mark Wu',
-              'room': 'Room 208 • Post-Op',
-              'monitoringReason': 'Post-Op monitoring',
-              'badge': 'STANDARD',
-              'totalIntake': '0 ml',
-              'totalOutput': '0 ml',
-              'balance': '0 ml',
-              'history': [],
-            }, responsive),
+            Container(
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(16.0),
+                border: Border.all(color: const Color(0xFFEFF1F7)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.water_drop_outlined, color: AppColors.slate400, size: 22),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'No active fluid monitoring logs recorded.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.slate500,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             SizedBox(height: responsive.scaleHeight(20.0)),
           ],
 
@@ -423,6 +512,10 @@ class _NurseDashboardState extends State<NurseDashboard> {
 
           // Stats Row
           _buildStatsRow(responsive),
+          SizedBox(height: responsive.scaleHeight(24.0)),
+
+          // Ward Management & Occupancy Overview
+          _buildWardManagementSection(responsive),
           SizedBox(height: responsive.scaleHeight(24.0)),
 
           // Urgent Care Alerts
@@ -438,31 +531,7 @@ class _NurseDashboardState extends State<NurseDashboard> {
           _buildUrgentCareCard(responsive),
           SizedBox(height: responsive.scaleHeight(24.0)),
 
-          // Shift Checklist
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'My Shift Checklist',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.slate800,
-                ),
-              ),
-              Text(
-                '${_shiftTasks.where((t) => t['done']).length}/${_shiftTasks.length} Done',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.navy600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          _buildShiftChecklist(responsive),
-          SizedBox(height: responsive.scaleHeight(20.0)),
+
         ],
       ),
     );
@@ -477,7 +546,7 @@ class _NurseDashboardState extends State<NurseDashboard> {
         border: Border.all(color: const Color(0xFFF1F3F9)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -537,7 +606,7 @@ class _NurseDashboardState extends State<NurseDashboard> {
         border: Border.all(color: const Color(0xFFEFF1F7)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.015),
+            color: Colors.black.withValues(alpha: 0.015),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -644,15 +713,12 @@ class _NurseDashboardState extends State<NurseDashboard> {
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
         _buildActionCircle(
-          icon: Icons.add_task_rounded,
-          label: 'New Task',
-          onTap: () async {
-            final result = await Navigator.pushNamed(context, AppRoutes.nurseAssignTask);
-            if (result != null && result is Map<String, dynamic>) {
-              setState(() {
-                _shiftTasks.add(result);
-              });
-            }
+          icon: Icons.speed_rounded,
+          label: 'Vitals',
+          onTap: () {
+            setState(() {
+              _currentIndex = 1;
+            });
           },
         ),
         _buildActionCircle(
@@ -660,19 +726,27 @@ class _NurseDashboardState extends State<NurseDashboard> {
           label: 'Patients',
           onTap: () {
             setState(() {
-              _currentIndex = 1; // Switches tab index to Vitals Tracker
+              _currentIndex = 1;
             });
           },
         ),
         _buildActionCircle(
           icon: Icons.chat_bubble_outline_rounded,
           label: 'Log Note',
-          onTap: () => Navigator.pushNamed(context, AppRoutes.nurseNursingNotes),
+          onTap: () {
+            setState(() {
+              _currentIndex = 3;
+            });
+          },
         ),
         _buildActiveActionSquare(
           icon: Icons.add_rounded,
           label: 'Shift Log',
-          onTap: () => Navigator.pushNamed(context, AppRoutes.nurseShiftHandover),
+          onTap: () {
+            setState(() {
+              _currentIndex = 2;
+            });
+          },
         ),
       ],
     );
@@ -694,7 +768,7 @@ class _NurseDashboardState extends State<NurseDashboard> {
             border: Border.all(color: const Color(0xFFECEEF5), width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 3),
               ),
@@ -741,7 +815,7 @@ class _NurseDashboardState extends State<NurseDashboard> {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF0F3E92).withOpacity(0.3),
+                color: const Color(0xFF0F3E92).withValues(alpha: 0.3),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -825,7 +899,7 @@ class _NurseDashboardState extends State<NurseDashboard> {
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(color: color.withOpacity(0.15)),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -937,43 +1011,7 @@ class _NurseDashboardState extends State<NurseDashboard> {
     );
   }
 
-  Widget _buildShiftChecklist(ResponsiveHelper responsive) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(color: AppColors.slate200),
-      ),
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: _shiftTasks.length,
-        separatorBuilder: (context, index) => const Divider(color: AppColors.slate100, height: 1),
-        itemBuilder: (context, index) {
-          final task = _shiftTasks[index];
-          return CheckboxListTile(
-            value: task['done'],
-            activeColor: AppColors.navy700,
-            title: Text(
-              task['title'],
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: task['done'] ? AppColors.slate400 : AppColors.slate800,
-                decoration: task['done'] ? TextDecoration.lineThrough : null,
-              ),
-            ),
-            controlAffinity: ListTileControlAffinity.leading,
-            onChanged: (val) {
-              setState(() {
-                task['done'] = val;
-              });
-            },
-          );
-        },
-      ),
-    );
-  }
+
 
   // --- VITALS SCREEN ---
   Widget _buildVitalsScreen(ResponsiveHelper responsive) {
@@ -1178,19 +1216,18 @@ class _NurseDashboardState extends State<NurseDashboard> {
                   });
 
                   try {
+                    final messenger = ScaffoldMessenger.of(context);
                     await _nurseService.administerMedication(
                       admissionId: med['admissionId'],
                       medicationId: med['id'],
                     );
                     await _loadDashboardData();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          backgroundColor: AppColors.emerald600,
-                          content: Text('${med['medication']} marked as administered.'),
-                        ),
-                      );
-                    }
+                    messenger.showSnackBar(
+                      SnackBar(
+                        backgroundColor: AppColors.emerald600,
+                        content: Text('${med['medication']} marked as administered.'),
+                      ),
+                    );
                   } catch (e) {
                     setState(() {
                       _isLoading = false;
@@ -1269,6 +1306,191 @@ class _NurseDashboardState extends State<NurseDashboard> {
           ),
         );
       },
+    );
+  }
+
+  // --- NURSING NOTES SCREEN (Tab 3) ---
+  Widget _buildNotesScreen(ResponsiveHelper responsive) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F8FC),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final result = await Navigator.pushNamed(context, AppRoutes.nurseNursingNotes);
+          if (result != null && result is Map<String, dynamic>) {
+            setState(() {
+              _nursingNotes.insert(0, result);
+            });
+          }
+        },
+        backgroundColor: AppColors.navy700,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add_comment_rounded, size: 18),
+        label: const Text('Add Note', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+      ),
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.all(responsive.scaleWidth(16.0)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Nursing Notes & Logs',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.slate900,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Ward observations, clinical logs, and patient notes.',
+                      style: TextStyle(fontSize: 11, color: AppColors.slate500),
+                    ),
+                  ],
+                ),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final result = await Navigator.pushNamed(context, AppRoutes.nurseNursingNotes);
+                    if (result != null && result is Map<String, dynamic>) {
+                      setState(() {
+                        _nursingNotes.insert(0, result);
+                      });
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.navy700,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.edit_note_rounded, size: 16),
+                  label: const Text('New Note', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_nursingNotes.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24.0),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(16.0),
+                  border: Border.all(color: const Color(0xFFEFF1F7)),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(Icons.note_alt_outlined, color: AppColors.slate400, size: 40),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'No nursing notes recorded today.',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.slate700),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Tap "New Note" to add a clinical observation or shift note.',
+                      style: TextStyle(fontSize: 11, color: AppColors.slate500),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final result = await Navigator.pushNamed(context, AppRoutes.nurseNursingNotes);
+                        if (result != null && result is Map<String, dynamic>) {
+                          setState(() {
+                            _nursingNotes.insert(0, result);
+                          });
+                        }
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.navy700,
+                        side: const BorderSide(color: AppColors.navy700),
+                      ),
+                      icon: const Icon(Icons.add_rounded, size: 16),
+                      label: const Text('Create First Note'),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _nursingNotes.length,
+                itemBuilder: (context, index) {
+                  final note = _nursingNotes[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12.0),
+                    padding: const EdgeInsets.all(16.0),
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(16.0),
+                      border: Border.all(color: const Color(0xFFEFF1F7)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              note['patientName'] ?? 'General Ward Note',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.slate900,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: note['priority'] == 'Critical' 
+                                    ? AppColors.errorBg 
+                                    : AppColors.navy50,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                (note['category'] ?? 'Observation').toString().toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: note['priority'] == 'Critical' 
+                                      ? AppColors.errorRed 
+                                      : AppColors.navy700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          note['note'] ?? note['content'] ?? '',
+                          style: const TextStyle(fontSize: 12, color: AppColors.slate700),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'By $_nurseName • ${note['time'] ?? 'Just now'}',
+                              style: const TextStyle(fontSize: 10, color: AppColors.slate400),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1473,6 +1695,326 @@ class _NurseDashboardState extends State<NurseDashboard> {
           ),
         ],
       ),
+    );
+  }
+
+  // --- MORE / QUICK ACTIONS HUB SCREEN ---
+  Widget _buildMoreQuickActionsScreen(ResponsiveHelper responsive) {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: EdgeInsets.all(responsive.scaleWidth(16.0)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Nurse Quick Actions',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.slate900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Clinical management tools, ward logging, and account settings.',
+            style: TextStyle(fontSize: 12, color: AppColors.slate500),
+          ),
+          const SizedBox(height: 20),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              int crossAxisCount = width >= 1025 ? 4 : (width >= 768 ? 3 : 2);
+              return GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1.4,
+                children: [
+                  _buildQuickActionHubCard(
+                    title: 'Ward Management',
+                    subtitle: 'Bed Roster & Occupancy',
+                    icon: Icons.king_bed_rounded,
+                    color: Colors.indigo.shade700,
+                    bgColor: Colors.indigo.shade50,
+                    onTap: () => _showWardManagementSheet(responsive),
+                  ),
+                  _buildQuickActionHubCard(
+                    title: 'Medication Schedule',
+                    subtitle: 'Administration Log',
+                    icon: Icons.medication_rounded,
+                    color: AppColors.emerald600,
+                    bgColor: AppColors.emerald50,
+                    onTap: () => _showMedsSheet(responsive),
+                  ),
+                  _buildQuickActionHubCard(
+                    title: 'Bedside Care Log',
+                    subtitle: 'Intake & Output Chart',
+                    icon: Icons.water_drop_rounded,
+                    color: Colors.blue.shade700,
+                    bgColor: Colors.blue.shade50,
+                    onTap: () => _showBedsideCareSheet(responsive),
+                  ),
+                  _buildQuickActionHubCard(
+                    title: 'Emergency Alert',
+                    subtitle: 'Broadcast Ward Notice',
+                    icon: Icons.error_rounded,
+                    color: AppColors.errorRed,
+                    bgColor: AppColors.errorBg,
+                    onTap: () => _showEmergencyAlertSheet(responsive),
+                  ),
+                  _buildQuickActionHubCard(
+                    title: 'Discharge Prep',
+                    subtitle: 'Readiness Checklist',
+                    icon: Icons.assignment_turned_in_rounded,
+                    color: Colors.teal.shade700,
+                    bgColor: Colors.teal.shade50,
+                    onTap: () => _showDischargePrepSheet(responsive),
+                  ),
+                  _buildQuickActionHubCard(
+                    title: 'Account Settings',
+                    subtitle: 'Profile & Security',
+                    icon: Icons.settings_rounded,
+                    color: AppColors.slate700,
+                    bgColor: AppColors.slate100,
+                    onTap: () => _showSettingsSheet(responsive),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionHubCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required Color bgColor,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16.0),
+        border: Border.all(color: const Color(0xFFEFF1F7)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16.0),
+          child: Padding(
+            padding: const EdgeInsets.all(14.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: color, size: 20),
+                ),
+                const Spacer(),
+                Text(
+                  title,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.slate900),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(fontSize: 10, color: AppColors.slate500),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSettingsSheet(ResponsiveHelper responsive) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
+          child: SingleChildScrollView(
+            child: _buildSettingsScreen(responsive),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showMedsSheet(ResponsiveHelper responsive) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.only(left: 16, right: 16, top: 20, bottom: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Medication Schedule',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: _buildMedsScreen(responsive),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showBedsideCareSheet(ResponsiveHelper responsive) {
+    if (_fluidLogs.isNotEmpty) {
+      _showFluidDetailsSheet(_fluidLogs.first);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.slate700,
+          content: Text('No active fluid logs recorded yet.'),
+        ),
+      );
+    }
+  }
+
+  void _showEmergencyAlertSheet(ResponsiveHelper responsive) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: AppColors.errorRed, size: 28),
+                  SizedBox(width: 10),
+                  Text('Emergency Alert Broadcast', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Text('Select emergency type to notify all ward staff and attending physicians instantly:'),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorRed, foregroundColor: Colors.white),
+                onPressed: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(backgroundColor: AppColors.errorRed, content: Text('CODE BLUE Emergency Broadcasted!')),
+                  );
+                },
+                icon: const Icon(Icons.emergency_rounded),
+                label: const Text('Broadcast CODE BLUE (Cardiac Arrest)'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(foregroundColor: AppColors.navy700),
+                onPressed: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(backgroundColor: AppColors.navy700, content: Text('Rapid Response Team Alerted.')),
+                  );
+                },
+                icon: const Icon(Icons.notifications_active_rounded),
+                label: const Text('Rapid Response Team Alert'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showDischargePrepSheet(ResponsiveHelper responsive) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Discharge Readiness Prep', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+              const SizedBox(height: 12),
+              const CheckboxListTile(value: true, onChanged: null, title: Text('Take-Home Medications Reconciled', style: TextStyle(fontSize: 12))),
+              const CheckboxListTile(value: true, onChanged: null, title: Text('Physician Discharge Summary Signed', style: TextStyle(fontSize: 12))),
+              const CheckboxListTile(value: false, onChanged: null, title: Text('Patient Transport & Escort Confirmed', style: TextStyle(fontSize: 12))),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700, foregroundColor: Colors.white),
+                onPressed: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(backgroundColor: AppColors.emerald600, content: Text('Discharge checklist updated.')),
+                  );
+                },
+                child: const Text('Confirm Readiness'),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -1844,6 +2386,7 @@ class _NurseDashboardState extends State<NurseDashboard> {
                         });
 
                         try {
+                          final messenger = ScaffoldMessenger.of(context);
                           await _nurseService.logFluid(
                             admissionId: log['admissionId'],
                             intakeVolume: intakeValController.text.trim().isEmpty ? '0' : intakeValController.text.trim(),
@@ -1853,15 +2396,12 @@ class _NurseDashboardState extends State<NurseDashboard> {
                           );
                           
                           await _loadDashboardData();
-                          
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                backgroundColor: AppColors.emerald600,
-                                content: Text('Fluid log recorded for ${log['patientName']}.'),
-                              ),
-                            );
-                          }
+                          messenger.showSnackBar(
+                            SnackBar(
+                              backgroundColor: AppColors.emerald600,
+                              content: Text('Fluid log recorded for ${log['patientName']}.'),
+                            ),
+                          );
                         } catch (e) {
                           setState(() {
                             _isLoading = false;
@@ -1893,6 +2433,584 @@ class _NurseDashboardState extends State<NurseDashboard> {
         Text(
           value,
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWardManagementSection(ResponsiveHelper responsive) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.indigo.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.king_bed_rounded, color: Colors.indigo.shade700, size: 18),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Ward Management & Occupancy',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.slate800,
+                  ),
+                ),
+              ],
+            ),
+            GestureDetector(
+              onTap: () => _showWardManagementSheet(responsive),
+              child: Text(
+                'Bed Roster (${_wards.length} Wards)',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.indigo.shade700,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (_wards.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFEFF1F7)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.bed_outlined, color: AppColors.slate400, size: 20),
+                SizedBox(width: 10),
+                Text(
+                  'No ward allocation records found.',
+                  style: TextStyle(fontSize: 12, color: AppColors.slate500),
+                ),
+              ],
+            ),
+          )
+        else
+          SizedBox(
+            height: 145,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: _wards.length,
+              itemBuilder: (context, index) {
+                final ward = _wards[index];
+                final String name = ward['name'] ?? 'Ward';
+                final String type = ward['wardType'] ?? 'General';
+                final int occupied = ward['occupiedBeds'] ?? 0;
+                final int total = ward['totalBeds'] ?? 10;
+                final int rate = ward['occupancyRate'] ?? 0;
+                final int floor = ward['floorNumber'] ?? 1;
+
+                Color badgeColor = Colors.blue.shade700;
+                Color badgeBg = Colors.blue.shade50;
+                if (type.toUpperCase().contains('ICU')) {
+                  badgeColor = Colors.amber.shade800;
+                  badgeBg = Colors.amber.shade50;
+                } else if (type.toUpperCase().contains('PRIVATE')) {
+                  badgeColor = Colors.purple.shade700;
+                  badgeBg = Colors.purple.shade50;
+                }
+
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedWardFilter = name;
+                    });
+                    _showWardManagementSheet(responsive);
+                  },
+                  child: Container(
+                    width: 220,
+                    margin: const EdgeInsets.only(right: 12),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFEAEFF8)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.indigo.withValues(alpha: 0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.slate900,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: badgeBg,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                type,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: badgeColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            const Icon(Icons.layers_outlined, size: 12, color: AppColors.slate400),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Floor $floor',
+                              style: const TextStyle(fontSize: 11, color: AppColors.slate500),
+                            ),
+                            const Spacer(),
+                            Text(
+                              '$occupied/$total Beds',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.slate700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Occupancy Rate',
+                                  style: TextStyle(fontSize: 10, color: AppColors.slate400, fontWeight: FontWeight.w500),
+                                ),
+                                Text(
+                                  '$rate%',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: rate > 85 ? AppColors.errorRed : Colors.indigo.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: (occupied / (total == 0 ? 1 : total)).clamp(0.0, 1.0),
+                                minHeight: 6,
+                                backgroundColor: const Color(0xFFF0F3FA),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  rate > 85 ? AppColors.errorRed : Colors.indigo.shade600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _showWardManagementSheet(ResponsiveHelper responsive) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final List<String> wardOptions = ['All Wards', ..._wards.map((w) => w['name']?.toString() ?? '').where((n) => n.isNotEmpty)];
+
+            final List<Map<String, dynamic>> filteredPatients = _selectedWardFilter == 'All Wards'
+                ? _patients
+                : _patients.where((p) => (p['room'] ?? '').toString().toLowerCase().contains(_selectedWardFilter.toLowerCase())).toList();
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.88,
+              decoration: const BoxDecoration(
+                color: Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  // Modal Header
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
+                    decoration: const BoxDecoration(
+                      color: AppColors.navy700,
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.king_bed_rounded, color: Colors.white, size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Ward Management & Bed Roster',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Real-time ward occupancy & patient allocations',
+                                style: TextStyle(
+                                  color: Color(0xFFCBD5E1),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close_rounded, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Filter Chips Strip
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    color: Colors.white,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        children: wardOptions.map((wardName) {
+                          final isSelected = _selectedWardFilter == wardName;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              label: Text(wardName),
+                              selected: isSelected,
+                              selectedColor: AppColors.navy700,
+                              backgroundColor: const Color(0xFFF1F5F9),
+                              labelStyle: TextStyle(
+                                color: isSelected ? Colors.white : AppColors.slate700,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                              onSelected: (selected) {
+                                if (selected) {
+                                  setState(() {
+                                    _selectedWardFilter = wardName;
+                                  });
+                                  setModalState(() {});
+                                }
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+
+                  // Active Inpatients Bed Roster Count & Summary
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Inpatient Roster (${filteredPatients.length} Admitted)',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.slate800,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.emerald50,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFA7F3D0)),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.check_circle_rounded, size: 12, color: AppColors.emerald600),
+                              SizedBox(width: 4),
+                              Text(
+                                'Ward Live Sync',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.emerald600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Bed Roster List
+                  Expanded(
+                    child: filteredPatients.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(32.0),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.bed_outlined, size: 48, color: AppColors.slate400),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'No admitted patients in this ward',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.slate700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'All beds in this ward section are currently available or unallocated.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(fontSize: 11, color: AppColors.slate500),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            itemCount: filteredPatients.length,
+                            itemBuilder: (context, index) {
+                              final pt = filteredPatients[index];
+                              final String name = pt['name'] ?? 'Inpatient';
+                              final String roomStr = pt['room'] ?? 'General Ward';
+                              final String status = pt['vitalsStatus'] ?? 'Pending';
+                              final String bp = pt['bp'] ?? '--/--';
+                              final String pulse = pt['pulse'] ?? '--';
+                              final String spo2 = pt['spo2'] ?? '--';
+                              final String temp = pt['temp'] ?? '--';
+
+                              Color statusColor = AppColors.emerald600;
+                              Color statusBg = AppColors.emerald50;
+                              if (status == 'Critical') {
+                                statusColor = AppColors.errorRed;
+                                statusBg = AppColors.errorBg;
+                              } else if (status == 'Pending') {
+                                statusColor = Colors.amber.shade800;
+                                statusBg = Colors.amber.shade50;
+                              }
+
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.02),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 20,
+                                          backgroundColor: AppColors.navy100,
+                                          child: Text(
+                                            name.isNotEmpty ? name[0].toUpperCase() : 'P',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.navy700,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                name,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppColors.slate900,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                roomStr,
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.indigo.shade700,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: statusBg,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            status,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: statusColor,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 10.0),
+                                      child: Divider(height: 1, color: Color(0xFFF1F5F9)),
+                                    ),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        _buildVitalMiniItem('BP', bp),
+                                        _buildVitalMiniItem('Pulse', pulse),
+                                        _buildVitalMiniItem('SpO2', spo2),
+                                        _buildVitalMiniItem('Temp', temp),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: OutlinedButton.icon(
+                                            onPressed: () {
+                                              Navigator.pop(context);
+                                              setState(() {
+                                                _currentIndex = 1; // Switch to Patients Vitals tab
+                                              });
+                                            },
+                                            style: OutlinedButton.styleFrom(
+                                              padding: const EdgeInsets.symmetric(vertical: 8),
+                                              side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(10),
+                                              ),
+                                            ),
+                                            icon: const Icon(Icons.favorite_outline_rounded, size: 14, color: AppColors.navy700),
+                                            label: const Text(
+                                              'Vitals',
+                                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.navy700),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: ElevatedButton.icon(
+                                            onPressed: () {
+                                              Navigator.pop(context);
+                                              _showBedsideCareSheet(responsive);
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              padding: const EdgeInsets.symmetric(vertical: 8),
+                                              backgroundColor: AppColors.navy700,
+                                              foregroundColor: Colors.white,
+                                              elevation: 0,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(10),
+                                              ),
+                                            ),
+                                            icon: const Icon(Icons.water_drop_outlined, size: 14),
+                                            label: const Text(
+                                              'Log Fluid',
+                                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildVitalMiniItem(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 9, color: AppColors.slate400, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 1),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.slate800),
         ),
       ],
     );
@@ -1934,7 +3052,7 @@ class DropletPainter extends CustomPainter {
     canvas.drawPath(path, paint);
 
     final fillPaint = Paint()
-      ..color = const Color(0xFF0F3E92).withOpacity(0.85)
+      ..color = const Color(0xFF0F3E92).withValues(alpha: 0.85)
       ..style = PaintingStyle.fill;
     
     canvas.save();

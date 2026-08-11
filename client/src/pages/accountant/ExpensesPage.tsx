@@ -16,7 +16,9 @@ import {
 import { Card } from "../../components/ui/Card";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { Badge } from "../../components/ui/Badge";
+import toast from "react-hot-toast";
 import { Modal } from "../../components/ui/Modal";
+import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 import { api } from "../../lib/api";
@@ -118,13 +120,25 @@ export function AccountantExpensesPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this expense record?")) return;
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = (id: string) => {
+    setDeleteTargetId(id);
+  };
+
+  const confirmDeleteExpense = async () => {
+    if (!deleteTargetId) return;
+    setIsDeleting(true);
     try {
-      await api.delete(`/accountant/expenses/${id}`);
+      await api.delete(`/accountant/expenses/${deleteTargetId}`);
+      toast.success("Expense record deleted successfully!");
       fetchExpenses();
     } catch (err: any) {
-      alert(err.response?.data?.message ?? err.message ?? "Failed to delete expense.");
+      toast.error(err.response?.data?.message ?? err.message ?? "Failed to delete expense.");
+    } finally {
+      setIsDeleting(false);
+      setDeleteTargetId(null);
     }
   };
 
@@ -486,6 +500,15 @@ export function AccountantExpensesPage() {
           </div>
         )}
       </Modal>
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(deleteTargetId)}
+        title="Confirm Deletion"
+        message="Are you sure you want to delete this expense record? This action cannot be undone."
+        isLoading={isDeleting}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={confirmDeleteExpense}
+      />
     </div>
   );
 }

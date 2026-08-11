@@ -405,10 +405,10 @@ export function AssignTaskPage() {
                 <div className="flex items-center gap-3 border-t border-slate-100 pt-6">
                   <Button
                     type="submit"
-                    isLoading={isSubmitting}
+                    disabled={isSubmitting}
                     className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold px-6"
                   >
-                    Assign Task
+                    {isSubmitting ? "Assigning..." : "Assign Task"}
                   </Button>
                   <button
                     type="button"

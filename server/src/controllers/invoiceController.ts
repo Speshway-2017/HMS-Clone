@@ -1,9 +1,16 @@
 import { Request, Response } from "express";
+import { Types } from "mongoose";
 import { z } from "zod";
 import { Invoice, INVOICE_STATUSES } from "../models/Invoice";
 import { Payment } from "../models/Payment";
 import { IPBill } from "../models/IPBill";
 import { IPBillPayment } from "../models/IPBillPayment";
+import { Patient } from "../models/Patient";
+import { Admission } from "../models/Admission";
+import { Doctor } from "../models/Doctor";
+import { Department } from "../models/Department";
+import { Appointment } from "../models/Appointment";
+import { BillingService } from "../services/billingService";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
@@ -29,7 +36,7 @@ const invoiceSchema = z.object({
 });
 
 function computeTotals(
-  invoice: { items: { quantity: number; amount: number }[]; taxRate: number; serviceFee: number; insuranceCoveragePercent: number; discount?: number },
+  invoice: { items: { quantity: number; amount: number }[]; taxRate: number; serviceFee: number; insuranceCoveragePercent: number; discount?: number; status?: string; totals?: any },
   totalPaid: number = 0
 ) {
   const subtotal = invoice.items.reduce((sum, i) => sum + i.quantity * i.amount, 0);
@@ -37,18 +44,45 @@ function computeTotals(
   const discount = invoice.discount || 0;
   const total = Math.max(0, subtotal + taxAmount + invoice.serviceFee - discount);
   const insuranceCovered = total * (invoice.insuranceCoveragePercent / 100);
-  const patientBalance = Math.max(0, total - insuranceCovered - totalPaid);
+
+  const isPaidInDb = (invoice.status || "").toLowerCase() === "paid" || invoice.totals?.patientBalance === 0;
+  const patientBalance = isPaidInDb ? 0 : Math.max(0, total - insuranceCovered - totalPaid);
   return { subtotal, taxAmount, total, insuranceCovered, patientBalance };
 }
+
+import { buildBranchQuery } from "../utils/branchQueryHelper";
 
 export const listInvoices = catchAsync(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req, 20);
   const { status, patient, billingType } = req.query as Record<string, string | undefined>;
 
-  const filter: Record<string, unknown> = { ...req.hospitalFilter };
-  if (status) filter.status = status;
+  const filter: Record<string, any> = buildBranchQuery(req.hospitalFilter);
+  // "pending" in business logic = any invoice with outstanding balance (pending + partially_paid + overdue)
+  if (status) {
+    if (status === "pending") {
+      filter.status = { $in: ["pending", "partially_paid", "overdue"] };
+    } else {
+      filter.status = status;
+    }
+  }
   if (patient) filter.patient = patient;
   if (billingType) filter.billingType = billingType;
+
+  // Determine IP Bill filters
+  const ipFilter: any = buildBranchQuery(req.hospitalFilter);
+  if (patient) ipFilter.patient = patient;
+
+  // Enforce patient data isolation for invoices listing
+  if (req.user!.role === "patient") {
+    const patientDoc = await Patient.findOne({ email: req.user!.email });
+    if (patientDoc) {
+      filter.patient = patientDoc._id;
+      ipFilter.patient = patientDoc._id;
+    } else {
+      filter.patient = "000000000000000000000000";
+      ipFilter.patient = "000000000000000000000000";
+    }
+  }
 
   // Query OP invoices
   const opInvoicesPromise = Invoice.find(filter)
@@ -56,11 +90,9 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
     .populate("appointment")
     .populate("admission")
     .sort({ createdAt: -1 });
-
-  // Determine IP Bill filters
-  const ipFilter: any = { ...req.hospitalFilter };
   if (status) {
-    if (status === "pending" || status === "partially_paid") {
+    if (status === "pending" || status === "partially_paid" || status === "overdue") {
+      // All unpaid IP bills
       ipFilter.status = "Generated";
       ipFilter.outstanding = { $gt: 0 };
     } else if (status === "paid") {
@@ -101,6 +133,7 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
 
   // Map IP bills to conformed invoice structure
   const mappedIpInvoices = ipBills.map((bill: any) => {
+    const ipAmountPaid = Math.max(0, (bill.grandTotal || 0) - (bill.outstanding || 0));
     return {
       _id: bill._id,
       patient: bill.patient,
@@ -109,6 +142,7 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
       billingType: "IP",
       status: bill.status === "Paid" ? "paid" : (bill.status === "Generated" ? "partially_paid" : "pending"),
       items: [{ description: "Inpatient stay & treatment charges", quantity: 1, amount: bill.grandTotal }],
+      amountPaid: ipAmountPaid,
       totals: {
         subtotal: bill.grandTotal,
         taxAmount: bill.taxRate,
@@ -132,23 +166,32 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
   const mappedOpInvoices = opInvoices.map((inv: any) => {
     const totalPaid = paymentsMap[inv._id.toString()] || 0;
     const computedTotals = computeTotals(inv, totalPaid);
-    // Derive a real-time status from actual payments (guards against stale DB status after partial->full payment)
+    // Derive a real-time status from actual payments (guards against stale DB status)
     let derivedStatus = inv.status;
-    if (computedTotals.patientBalance === 0 && inv.status !== "paid") {
+    if (computedTotals.patientBalance === 0) {
       derivedStatus = "paid";
-    } else if (computedTotals.patientBalance > 0 && computedTotals.patientBalance < computedTotals.total && inv.status === "pending") {
+    } else if (totalPaid > 0 && computedTotals.patientBalance > 0) {
       derivedStatus = "partially_paid";
+    } else if (inv.dueDate && new Date(inv.dueDate) < new Date() && computedTotals.patientBalance > 0) {
+      derivedStatus = "overdue";
     }
     return {
       ...inv.toObject(),
+      amountPaid: totalPaid,
       status: derivedStatus,
       totals: computedTotals
     };
   });
 
   // Combine and sort
-  const combined = [...mappedOpInvoices, ...mappedIpInvoices];
+  let combined = [...mappedOpInvoices, ...mappedIpInvoices];
   combined.sort((a: any, b: any) => new Date(b.issuedAt).getTime() - new Date(a.issuedAt).getTime());
+
+  // Post-filter: when status=pending, keep ONLY invoices with outstanding balance > 0
+  // This ensures partially_paid and overdue are included, and any that became fully-paid are excluded
+  if (status === "pending") {
+    combined = combined.filter((inv: any) => (inv.totals?.patientBalance ?? 0) > 0);
+  }
 
   // Paginate combined list
   const paginatedData = combined.slice(skip, skip + limit);
@@ -373,7 +416,11 @@ export const getInvoice = catchAsync(async (req: Request, res: Response) => {
 export const updateInvoice = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital!;
   const body = invoiceSchema.partial().parse(req.body);
-  const invoice = await Invoice.findOneAndUpdate({ _id: req.params.id, ...req.hospitalFilter }, body, {
+  const updatePayload: any = { ...body };
+  if (body.status && body.status.toLowerCase() === "paid") {
+    updatePayload["totals.patientBalance"] = 0;
+  }
+  const invoice = await Invoice.findOneAndUpdate({ _id: req.params.id, ...req.hospitalFilter }, updatePayload, {
     new: true,
     runValidators: true,
   });
@@ -425,4 +472,31 @@ export const deleteInvoice = catchAsync(async (req: Request, res: Response) => {
   });
 
   res.status(204).send();
+});
+
+/**
+ * GET /invoices/pending-overdue
+ * Returns all pending/partially_paid/overdue invoices with full patient, doctor, department details.
+ * Delegates to BillingService.getPendingInvoices (Single Source of Truth).
+ */
+export const getPendingOverdue = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const {
+    dateFrom, dateTo, department, doctor, billingType, status,
+    branch, search, uhid, page, limit
+  } = req.query as Record<string, string | undefined>;
+
+  const result = await BillingService.getPendingInvoices(hospitalId, {
+    dateFrom, dateTo, department, doctor, billingType, status,
+    branch, search, uhid,
+    page: page ? parseInt(page) : 1,
+    limit: limit ? parseInt(limit) : 20
+  });
+
+  res.json({
+    status: "success",
+    data: result.invoices,
+    pagination: result.pagination,
+    summary: result.summary,
+  });
 });

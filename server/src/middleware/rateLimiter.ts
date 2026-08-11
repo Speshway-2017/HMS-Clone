@@ -24,7 +24,7 @@ export const uploadLimiter = rateLimit({
 
 export const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 300, // Max 300 requests per minute per IP
+  max: 3000, // Generous limit per minute for active hospital workstation sessions
   standardHeaders: true,
   legacyHeaders: false,
   message: {

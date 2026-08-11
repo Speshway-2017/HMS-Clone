@@ -18,52 +18,58 @@ export const listRoles = catchAsync(async (req: Request, res: Response) => {
   const isHospitalScoped = req.user!.role !== "super_admin";
   const hospitalId = req.user!.hospital;
 
-  // Lazy-initialize default roles for this hospital if no roles exist in DB
+  // Lazy-initialize default roles for this hospital if missing in DB
   if (isHospitalScoped && hospitalId) {
-    const existingRolesCount = await CustomRole.countDocuments({ hospital: hospitalId });
-    if (existingRolesCount === 0) {
-      const defaultRoles = [
-        {
-          role: "hospital_admin",
-          label: "Hospital Admin",
-          description: "Runs day-to-day operations for a single assigned hospital.",
-          permissions: ["Manage Staff", "View Hospital Analytics", "Manage Departments", "Inventory Control"],
-        },
-        {
-          role: "accountant",
-          label: "Accountant",
-          description: "Handles billing, payroll, claims, and financial reporting for an assigned hospital.",
-          permissions: ["Billing Operations", "Payroll Processing", "Insurance Claims", "Financial Reports"],
-        },
-        {
-          role: "doctor",
-          label: "Doctor",
-          description: "Provides medical care, creates prescriptions, manages IP/OP records, and orders lab tests.",
-          permissions: ["Patient Consultation", "Electronic Prescriptions", "Clinical Notes", "IP/OP Management"],
-        },
-        {
-          role: "receptionist",
-          label: "Receptionist",
-          description: "Manages patient onboarding, schedules appointments, and handles clinic front desk operations.",
-          permissions: ["Patient Registration", "Appointment Scheduling", "Visitor Log", "Billing Intake"],
-        },
-        {
-          role: "pharmacist",
-          label: "Pharmacist",
-          description: "Verifies prescriptions, dispenses medicines, manages inventory, and handles pharmacy billing.",
-          permissions: ["Verify Prescriptions", "Dispense Medicines", "Inventory Management", "Pharmacy Billing"],
-        },
-        {
-          role: "laboratory",
-          label: "Laboratory",
-          description: "The Laboratory role manages lab test requests, sample collections, test processing, quality control, laboratory inventory, and report delivery.",
-          permissions: ["Manage Test Requests", "Collect Samples", "Process Tests", "Quality Control", "Lab Inventory", "Report Delivery"],
-        },
-      ];
+    const defaultRoles = [
+      {
+        role: "hospital_admin",
+        label: "Hospital Admin",
+        description: "Runs day-to-day operations for a single assigned hospital.",
+        permissions: ["Manage Staff", "View Hospital Analytics", "Manage Departments", "Inventory Control"],
+      },
+      {
+        role: "accountant",
+        label: "Accountant",
+        description: "Handles billing, payroll, claims, and financial reporting for an assigned hospital.",
+        permissions: ["Billing Operations", "Payroll Processing", "Insurance Claims", "Financial Reports"],
+      },
+      {
+        role: "doctor",
+        label: "Doctor",
+        description: "Provides medical care, creates prescriptions, manages IP/OP records, and orders lab tests.",
+        permissions: ["Patient Consultation", "Electronic Prescriptions", "Clinical Notes", "IP/OP Management"],
+      },
+      {
+        role: "nurse",
+        label: "Nurse",
+        description: "Provides direct patient care, records vital signs, administers medications, and manages ward workflows.",
+        permissions: ["Record Vitals", "Administer Medications", "Ward Management", "Patient Care"],
+      },
+      {
+        role: "receptionist",
+        label: "Receptionist",
+        description: "Manages patient onboarding, schedules appointments, and handles clinic front desk operations.",
+        permissions: ["Patient Registration", "Appointment Scheduling", "Visitor Log", "Billing Intake"],
+      },
+      {
+        role: "pharmacist",
+        label: "Pharmacist",
+        description: "Verifies prescriptions, dispenses medicines, manages inventory, and handles pharmacy billing.",
+        permissions: ["Verify Prescriptions", "Dispense Medicines", "Inventory Management", "Pharmacy Billing"],
+      },
+      {
+        role: "laboratory",
+        label: "Laboratory",
+        description: "The Laboratory role manages lab test requests, sample collections, test processing, quality control, laboratory inventory, and report delivery.",
+        permissions: ["Manage Test Requests", "Collect Samples", "Process Tests", "Quality Control", "Lab Inventory", "Report Delivery"],
+      },
+    ];
 
-      await CustomRole.insertMany(
-        defaultRoles.map((dr) => ({ ...dr, hospital: hospitalId }))
-      );
+    for (const dr of defaultRoles) {
+      const exists = await CustomRole.findOne({ hospital: hospitalId, role: dr.role });
+      if (!exists) {
+        await CustomRole.create({ ...dr, hospital: hospitalId });
+      }
     }
   }
 

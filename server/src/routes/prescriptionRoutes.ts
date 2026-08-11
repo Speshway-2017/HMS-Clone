@@ -7,6 +7,7 @@ import {
   verifyPrescriptionPublic,
   downloadPrescription,
   dispensePrescription,
+  updatePrescriptionStatus,
   getPatientPrescriptions,
 } from "../controllers/prescriptionController";
 
@@ -34,5 +35,6 @@ router.route("/")
   .post(restrictTo("doctor"), savePrescription);
 
 router.patch("/:id/dispense", restrictTo("pharmacist"), dispensePrescription);
+router.patch("/:id/status", restrictTo("pharmacist", "doctor", "hospital_admin"), updatePrescriptionStatus);
 
 export default router;

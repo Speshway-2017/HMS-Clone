@@ -9,6 +9,8 @@ import { KpiCard } from "../../components/ui/KpiCard";
 import { Badge } from "../../components/ui/Badge";
 import { DataTable, Column } from "../../components/ui/DataTable";
 import { Pagination } from "../../components/ui/Pagination";
+import toast from "react-hot-toast";
+import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
 import { Doctor } from "../../types/domain";
 
 const STATUS_TONE: Record<Doctor["status"], "success" | "danger" | "neutral"> = {
@@ -25,6 +27,19 @@ export function DoctorsPage() {
   const { data, isLoading } = useDoctors({ page, department: department || undefined, status: status || undefined, search: search || undefined });
   const { data: departments } = useDepartments();
   const deleteDoctor = useDeleteDoctor();
+  const [deleteTargetDoctor, setDeleteTargetDoctor] = useState<{ id: string; name: string } | null>(null);
+
+  const confirmDeleteDoctor = async () => {
+    if (!deleteTargetDoctor) return;
+    try {
+      await deleteDoctor.mutateAsync(deleteTargetDoctor.id);
+      toast.success(`Doctor ${deleteTargetDoctor.name} removed successfully!`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to remove doctor");
+    } finally {
+      setDeleteTargetDoctor(null);
+    }
+  };
 
   const columns: Column<Doctor>[] = [
     {
@@ -60,10 +75,9 @@ export function DoctorsPage() {
             <Pencil className="h-4 w-4" />
           </Link>
           <button
-            onClick={() => {
-              if (confirm(`Remove ${d.name}?`)) deleteDoctor.mutate(d._id);
-            }}
-            className="hover:text-red-600"
+            onClick={() => setDeleteTargetDoctor({ id: d._id, name: d.name })}
+            className="hover:text-red-600 cursor-pointer"
+            title="Remove Doctor"
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -74,13 +88,13 @@ export function DoctorsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Doctor Directory</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Doctor Directory</h1>
           <p className="text-sm text-slate-500">Manage medical professionals and their clinical status.</p>
         </div>
-        <Link to="/admin/doctors/new">
-          <Button variant="primary">
+        <Link to="/admin/doctors/new" className="shrink-0">
+          <Button variant="primary" className="w-full sm:w-auto">
             <UserPlus className="h-4 w-4" /> Add Doctor
           </Button>
         </Link>
@@ -139,6 +153,15 @@ export function DoctorsPage() {
           <Pagination page={page} totalPages={data?.pagination.totalPages ?? 1} onPageChange={setPage} />
         </div>
       </Card>
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(deleteTargetDoctor)}
+        title="Confirm Deletion"
+        message={`Are you sure you want to remove ${deleteTargetDoctor?.name || "this doctor"} from staff registry? This action cannot be undone.`}
+        isLoading={deleteDoctor.isPending}
+        onClose={() => setDeleteTargetDoctor(null)}
+        onConfirm={confirmDeleteDoctor}
+      />
     </div>
   );
 }

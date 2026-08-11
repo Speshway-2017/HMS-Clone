@@ -31,11 +31,11 @@ import {
   FileText,
   Heart,
   FileCheck,
-  AlertTriangle
+  AlertTriangle,
+  X
 } from "lucide-react";
 import {
   useRegisterPatient,
-  usePatientsSearch,
   usePatientsList,
   usePatientDetails,
   useTodayRegistrations,
@@ -48,6 +48,7 @@ import { usePrescriptions } from "../../features/doctorDashboard";
 import { useInvoices } from "../../features/invoices";
 import { usePatientReports } from "../../features/laboratory";
 import { useMyHospital } from "../../features/hospitals";
+import { useStaffList } from "../../features/staff";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { FileUpload } from "../../components/ui/FileUpload";
 import { api } from "../../lib/api";
@@ -279,7 +280,7 @@ const registerSchema = z.object({
   phone: z.string().min(5, "Phone is required"),
   age: z.preprocess(
     (val) => (val === "" || val === null || val === undefined || isNaN(Number(val)) ? 0 : Number(val)),
-    z.number().min(0, "Age must be positive")
+    z.number().min(0, "Age must be at least 0").max(150, "Age cannot exceed 150 years")
   ),
   gender: z.string().min(1, "Gender is required"),
   bloodGroup: z.string().default(""),
@@ -316,7 +317,7 @@ const getFlatErrors = (errs: any): { field: string; message: string }[] => {
 };
 
 interface Props {
-  activeTab?: "new" | "search" | "list";
+  activeTab?: "new" | "list";
 }
 
 export function PatientManagementPage({ activeTab = "list" }: Props) {
@@ -325,7 +326,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
   // Read ?filter=today from URL (set by dashboard "Today's Registrations" card click)
   const todayFilter = new URLSearchParams(window.location.search).get("filter") === "today";
 
-  const [tab, setTab] = useState<"new" | "search" | "list">(activeTab);
+  const [tab, setTab] = useState<"new" | "list">(activeTab);
 
   useEffect(() => {
     setTab(activeTab);
@@ -340,14 +341,17 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
 
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery]);
+
   // Success modal states
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [registeredPatient, setRegisteredPatient] = useState<any | null>(null);
 
   // Queries & Mutations
   const registerMutation = useRegisterPatient();
-  const { data: searchResults, isFetching: searchLoading } = usePatientsSearch(searchQuery);
-  const { data: listData, isLoading: listLoading } = usePatientsList({ page, limit: 10 });
+  const { data: listData, isLoading: listLoading } = usePatientsList({ page, limit: 10, search: searchQuery });
   const { data: todayData, isLoading: todayLoading } = useTodayRegistrations();
   const { data: patient, isLoading: patientLoading, error: patientError } = usePatientDetails(id);
   const { data: hospitalData } = useMyHospital();
@@ -371,6 +375,8 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
   const { data: rooms } = useRoomsAvailability();
   const { data: doctors } = useDoctorsAvailability();
   const admitMutation = useAdmitPatient();
+  const { data: staffData } = useStaffList({ role: "nurse", limit: 100 } as any);
+  const nurses = staffData?.data || [];
   const uniqueWards = Array.from(new Set(rooms?.map((r: any) => r.wardName).filter(Boolean)));
 
   const [isConvertOpen, setIsConvertOpen] = useState(false);
@@ -385,8 +391,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
   const [ward, setWard] = useState("");
   const [selectedRoomId, setSelectedRoomId] = useState("");
   const [selectedBedId, setSelectedBedId] = useState("");
-  const [attenderName, setAttenderName] = useState("");
-  const [attenderPhone, setAttenderPhone] = useState("");
+  const [assignedNurse, setAssignedNurse] = useState("");
   const [insuranceProvider, setInsuranceProvider] = useState("");
   const [insurancePolicyNumber, setInsurancePolicyNumber] = useState("");
   const [advanceAmount, setAdvanceAmount] = useState("0");
@@ -398,23 +403,19 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
     e.preventDefault();
     if (!patient) return;
     if (!admissionReason || !admissionReason.trim()) {
-      alert("Admission reason is required.");
+      toast.error("Admission reason is required.");
       return;
     }
     if (!selectedDocId) {
-      alert("Admitting doctor selection is mandatory.");
+      toast.error("Admitting doctor selection is mandatory.");
       return;
     }
-    if (!ward || !selectedRoomId || !selectedBedId) {
-      alert("Please select ward, room and bed.");
-      return;
-    }
-    if (!attenderName || !attenderPhone) {
-      alert("Attender details are required.");
+    if (!ward || !selectedRoomId || !selectedBedId || !assignedNurse) {
+      toast.error("Please select ward, room, bed, and assign a nurse.");
       return;
     }
     if (!verbalApproval) {
-      alert("You must verify doctor verbal order approval.");
+      toast.error("You must verify doctor verbal order approval.");
       return;
     }
 
@@ -426,8 +427,9 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
         ward,
         roomId: selectedRoomId,
         bedId: selectedBedId,
-        attenderName,
-        attenderPhone,
+        assignedNurse,
+        attenderName: "N/A",
+        attenderPhone: "N/A",
         insuranceProvider,
         insurancePolicyNumber,
         advanceAmount: parseFloat(advanceAmount),
@@ -452,8 +454,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
       setWard("");
       setSelectedRoomId("");
       setSelectedBedId("");
-      setAttenderName("");
-      setAttenderPhone("");
+      setAssignedNurse("");
       setInsuranceProvider("");
       setInsurancePolicyNumber("");
       setAdvanceAmount("0");
@@ -461,9 +462,9 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
       setVerbalApproval(false);
       setRemarks("");
       
-      alert("OP Patient successfully converted to Inpatient (IP) Admission!");
+      toast.success("OP Patient successfully converted to Inpatient (IP) Admission!");
     } catch (err: any) {
-      alert(err.message || "Failed to process admission");
+      toast.error(err.message || "Failed to process admission");
     }
   };
 
@@ -588,17 +589,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
     }
   };
 
-  const triggerWebcamSimulation = () => {
-    const avatars = [
-      "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150",
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150"
-    ];
-    const chosen = avatars[Math.floor(Math.random() * avatars.length)];
-    setPhotoUrl(chosen);
-    toast.success("Photo captured successfully via simulated webcam!");
-  };
+
 
   // Columns for DataTable
   const columns = [
@@ -743,12 +734,8 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                   <span className="font-semibold text-slate-700">Dr. {successData.admissionSlip?.admittingDoctorName}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Attender Name</span>
-                  <span className="font-semibold text-slate-700">{successData.admissionSlip?.attenderName}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Attender Phone</span>
-                  <span className="font-semibold text-slate-700">{successData.admissionSlip?.attenderPhone}</span>
+                  <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Assigned Nurse</span>
+                  <span className="font-semibold text-slate-700">{successData.admissionSlip?.assignedNurseName || "N/A"}</span>
                 </div>
                 <div>
                   <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Admission Date & Time</span>
@@ -1425,8 +1412,13 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
 
               {/* TAB 4: REPORTS */}
               {profileTab === "reports" && (() => {
-                const labReports = reports.filter((r: any) => r.requestType === "Laboratory");
-                const radReports = reports.filter((r: any) => r.requestType === "Radiology" || r.requestType === "Combined");
+                const isRadiologyReport = (r: any) => {
+                  if (r.requestType === "Radiology") return true;
+                  const name = String(r.testName || r.title || r.category || "").toLowerCase();
+                  return /mri|x-ray|xray|ct\s*scan|ct\b|ultrasound|radiology|scan\b|mammogram|pet\s*scan|echo\b|ecg\b|usg\b|x\s*ray/.test(name);
+                };
+                const labReports = reports.filter((r: any) => !isRadiologyReport(r));
+                const radReports = reports.filter((r: any) => isRadiologyReport(r));
 
                 const labGroups = groupReportsByConsultation(labReports);
                 const radGroups = groupReportsByConsultation(radReports);
@@ -1910,57 +1902,64 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
           <p className="text-sm text-slate-500">Register new patient files, search records, or list active registry files.</p>
         </div>
 
-        {/* Tab triggers */}
-        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-1">
-          <button
+        {/* CTA Button */}
+        {tab === "new" ? (
+          <Button
             onClick={() => setTab("list")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "list" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
-            }`}
+            variant="secondary"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold"
           >
-            <List className="h-3.5 w-3.5" /> Patient List
-          </button>
-          <button
-            onClick={() => setTab("search")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "search" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            <Search className="h-3.5 w-3.5" /> Patient Search
-          </button>
-          <button
+            <List className="h-4 w-4" /> View Patient Registry
+          </Button>
+        ) : (
+          <Button
             onClick={() => setTab("new")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "new" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
-            }`}
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold"
           >
-            <Plus className="h-3.5 w-3.5" /> New Registration
-          </button>
-        </div>
+            <Plus className="h-4 w-4" /> New Registration
+          </Button>
+        )}
       </div>
 
       {/* List Tab */}
       {tab === "list" && (
         <Card>
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4">
             <div>
               <h2 className="text-base font-semibold text-slate-800">
                 {todayFilter ? "Today's Registrations" : "Master Patient Registry"}
               </h2>
-              {todayFilter && (
+              {todayFilter ? (
                 <p className="text-xs text-amber-600 mt-0.5">
                   Showing patients registered today · Count matches dashboard
                 </p>
+              ) : (
+                <p className="text-xs text-slate-450 mt-0.5">
+                  Real-time registry of all outpatients and inpatients.
+                </p>
               )}
             </div>
+
+            {/* In-table Search Bar */}
+            <div className="flex-1 max-w-sm relative">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by UHID, phone, name, or code..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-slate-50 pl-9 pr-4 py-2 text-xs outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500 transition-colors"
+              />
+            </div>
+
             <div className="flex items-center gap-2">
               {todayFilter && !todayLoading && (
                 <span className="rounded-full bg-navy-50 text-navy-700 border border-navy-200 text-xs font-semibold px-2.5 py-0.5">
                   {todayData?.total ?? 0} registered today
                 </span>
               )}
-              <Button onClick={() => window.print()} variant="secondary" className="px-3 py-1.5 text-xs">
-                Print Registry
+              <Button onClick={() => window.print()} variant="secondary" className="px-3 py-1.5 text-xs flex items-center gap-1.5">
+                <Printer className="h-3.5 w-3.5" /> Print Registry
               </Button>
             </div>
           </div>
@@ -1991,32 +1990,113 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
               </div>
             )
           )}
-        </Card>
-      )}
 
-      {/* Search Tab */}
-      {tab === "search" && (
-        <div className="space-y-4">
-          <Card>
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search patient by UHID, phone number, name, or code..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 pl-10 pr-4 py-2 text-sm outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
-              />
+          {/* Hidden Printable Master Patient Registry Container (triggers on window.print() via @media print) */}
+          <div id="patient-registry-print" className="hidden print:block p-6 bg-white text-slate-900 font-sans">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-4">
+              <div className="flex items-center gap-3">
+                {hospitalData?.logoUrl ? (
+                  <img src={hospitalData.logoUrl} alt={hospitalData.name || "Hospital"} className="h-10 w-10 object-contain rounded" />
+                ) : (
+                  <div className="h-10 w-10 rounded-xl bg-navy-900 text-white flex items-center justify-center font-black text-lg">
+                    {hospitalData?.name ? hospitalData.name.charAt(0).toUpperCase() : "H"}
+                  </div>
+                )}
+                <div>
+                  <h1 className="text-xl font-black text-slate-900 tracking-tight">{hospitalData?.name || "Speshway Hospitals"}</h1>
+                  <p className="text-xs text-slate-500 font-semibold">{(hospitalData as any)?.tagline || "Hospital Management System - Patient Directory"}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <h2 className="text-sm font-black uppercase text-navy-900 tracking-wider">
+                  {todayFilter ? "Today's Registration Registry" : "Master Patient Registry"}
+                </h2>
+                <p className="text-[11px] text-slate-600 font-mono mt-0.5">
+                  Generated: {new Date().toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })}
+                </p>
+              </div>
             </div>
-          </Card>
 
-          {searchResults && (
-            <Card>
-              <h2 className="mb-3 text-sm font-semibold text-slate-700">Search Results ({searchResults.length})</h2>
-              <DataTable columns={columns} rows={searchResults} rowKey={(row) => row._id} />
-            </Card>
-          )}
-        </div>
+            {/* Registry Meta Stats Bar */}
+            <div className="flex items-center justify-between bg-slate-100 px-4 py-2 rounded-lg mb-4 text-xs font-bold text-slate-700">
+              <div>
+                <span>Filter View: </span>
+                <span className="text-slate-900 font-extrabold">{todayFilter ? "Today's Registrations" : searchQuery ? `Search "${searchQuery}"` : "All Registered Patients"}</span>
+              </div>
+              <div>
+                <span>Total Records Printed: </span>
+                <span className="text-navy-900 font-extrabold">{((todayFilter ? todayData?.patients : listData?.data) || []).length} Patients</span>
+              </div>
+            </div>
+
+            {/* Registry Table */}
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b-2 border-slate-400 bg-slate-100 text-slate-900 uppercase text-[10px] tracking-wider">
+                  <th className="py-2.5 px-2 font-black">#</th>
+                  <th className="py-2.5 px-2 font-black">UHID</th>
+                  <th className="py-2.5 px-2 font-black">Patient Code</th>
+                  <th className="py-2.5 px-2 font-black">Patient Name</th>
+                  <th className="py-2.5 px-2 font-black">Age / Gender</th>
+                  <th className="py-2.5 px-2 font-black">Phone Number</th>
+                  <th className="py-2.5 px-2 font-black">Registered On</th>
+                  <th className="py-2.5 px-2 font-black text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {((todayFilter ? todayData?.patients : listData?.data) || []).map((p: any, idx: number) => {
+                  const statusStr = (p.status || "").toLowerCase();
+                  const isIP = statusStr.includes("inpatient") || statusStr === "ip" || p.status === "admitted";
+                  return (
+                    <tr key={p._id || idx} className="border-b border-slate-100">
+                      <td className="py-2 px-2 font-mono text-slate-400 text-[11px]">{idx + 1}</td>
+                      <td className="py-2 px-2 font-mono font-bold text-slate-900">{p.uhid || "N/A"}</td>
+                      <td className="py-2 px-2 font-mono text-slate-600">{p.patientCode || "N/A"}</td>
+                      <td className="py-2 px-2 font-bold text-slate-900">{p.name || "N/A"}</td>
+                      <td className="py-2 px-2 text-slate-700">{p.age != null ? `${p.age} yrs` : "N/A"} / {p.gender || "N/A"}</td>
+                      <td className="py-2 px-2 font-mono text-slate-700">{p.phone || "N/A"}</td>
+                      <td className="py-2 px-2 text-slate-600">
+                        {p.createdAt ? new Date(p.createdAt).toLocaleString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: true
+                        }) : "N/A"}
+                      </td>
+                      <td className="py-2 px-2 text-right">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${isIP ? "bg-purple-100 text-purple-800" : "bg-emerald-100 text-emerald-800"}`}>
+                          {isIP ? "INPATIENT (IP)" : "OUTPATIENT (OP)"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {((todayFilter ? todayData?.patients : listData?.data) || []).length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center text-slate-400 font-semibold italic">
+                      No patient registry records found to print.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+
+            {/* Footer / Signoff */}
+            <div className="mt-10 pt-4 border-t border-slate-300 flex items-end justify-between text-xs text-slate-500">
+              <div>
+                <p className="font-bold text-slate-700">Hospital Patient Management Registry</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Confidential Medical Record Directory · Official Printout</p>
+              </div>
+              <div className="text-right space-y-6">
+                <div className="border-b border-slate-400 w-44 ml-auto"></div>
+                <p className="font-bold text-slate-800 text-[11px]">Authorized Receptionist Signature</p>
+              </div>
+            </div>
+          </div>
+        </Card>
       )}
 
       {/* New Registration Form */}
@@ -2042,7 +2122,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                 <InputField label="Email Address" {...register("email")} hint={errors.email?.message as any} />
                 <InputField label="Phone Number" required {...register("phone")} hint={errors.phone?.message as any} />
                 <div className="grid grid-cols-2 gap-4">
-                  <InputField label="Age" type="number" required {...register("age", { valueAsNumber: true })} hint={errors.age?.message as any} />
+                  <InputField label="Age" type="number" required min={0} max={150} {...register("age", { valueAsNumber: true })} hint={errors.age?.message as any} />
                   <SelectField label="Gender" required {...register("gender")} hint={errors.gender?.message as any}>
                     <option value="">Select</option>
                     <option value="Male">Male</option>
@@ -2082,9 +2162,6 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                   <div className="flex gap-2 justify-center border-t border-slate-100 pt-2.5">
                     <Button type="button" onClick={startCamera} variant="secondary" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
                       <Camera className="h-3.5 w-3.5" /> Start Webcam
-                    </Button>
-                    <Button type="button" onClick={triggerWebcamSimulation} variant="secondary" className="text-[10px] px-2 py-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 border border-slate-200">
-                      Simulate
                     </Button>
                   </div>
                 </div>
@@ -2203,131 +2280,213 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
 
       {/* Success Dialog Modal */}
       {showSuccessModal && registeredPatient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-lg w-full overflow-hidden animate-in fade-in zoom-in duration-200">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 p-6 text-white text-center space-y-2">
-              <div className="mx-auto h-14 w-14 bg-white/20 rounded-full flex items-center justify-center">
-                <CheckCircle2 className="h-8 w-8 text-white animate-pulse" />
-              </div>
-              <h3 className="text-lg font-bold">Registration Successful</h3>
-              <p className="text-emerald-100 text-xs">Patient Registered Successfully</p>
+        <>
+          {/* Hidden Printable Patient Card Container (bypasses screen styling and prints cleanly via @media print) */}
+          <div id="patient-card-print" className="hidden print:block p-8 bg-white max-w-xl mx-auto border-2 border-slate-900 rounded-2xl font-sans">
+            <div className="text-center border-b-2 border-slate-900 pb-4 mb-4">
+              <h2 className="text-2xl font-black uppercase text-slate-900 tracking-wider">Hospital Management System</h2>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest mt-1">Official Patient Registration Card</p>
             </div>
 
-            <div className="p-6 space-y-6">
-              {/* Large UHID Card */}
-              <div className="bg-slate-50 rounded-xl p-5 border border-slate-150 relative overflow-hidden flex justify-between items-center">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">Universal Health ID (UHID)</span>
-                  <div className="text-xl font-black text-navy-800 tracking-wide font-mono">
-                    {registeredPatient.uhid}
+            <div className="bg-slate-100 p-4 rounded-xl border border-slate-300 text-center mb-6">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Universal Health ID (UHID)</span>
+              <span className="text-3xl font-black font-mono text-slate-900 tracking-widest">{registeredPatient.uhid}</span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 mb-6 text-sm">
+              <div className="col-span-2 space-y-2.5">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Patient Name</span>
+                  <span className="text-base font-bold text-slate-900">{registeredPatient.name}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Patient Code</span>
+                    <span className="font-mono font-semibold text-slate-800 text-xs">{registeredPatient.patientCode || registeredPatient._id}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Age / Gender</span>
+                    <span className="font-semibold text-slate-800 text-xs">{registeredPatient.age ? `${registeredPatient.age} yrs` : "—"} / {registeredPatient.gender || "—"}</span>
                   </div>
                 </div>
-                <div className="flex gap-1">
-                  <button
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Phone Number</span>
+                    <span className="font-semibold text-slate-800 text-xs">{registeredPatient.phone || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Blood Group</span>
+                    <span className="font-semibold text-slate-800 text-xs">{registeredPatient.bloodGroup || "—"}</span>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Registration Date &amp; Time</span>
+                  <span className="font-semibold text-slate-800 text-xs">
+                    {new Date(registeredPatient.createdAt || Date.now()).toLocaleString("en-US", {
+                      year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true
+                    })}
+                  </span>
+                </div>
+              </div>
+              <div className="flex flex-col items-center justify-center border-l border-slate-200 pl-4">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(
+                    `HMS|${registeredPatient.uhid}|${registeredPatient.name}`
+                  )}`}
+                  alt="QR Code"
+                  className="h-28 w-28 object-contain"
+                />
+                <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">Scan for Verification</span>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-300 pt-3 text-center text-[11px] text-slate-500 font-medium">
+              Please present this card at all hospital desks for instant verification and appointment booking.
+            </div>
+          </div>
+
+          {/* On-Screen Success Modal (Clean popup with zero dark backdrop screen) */}
+          <div
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowSuccessModal(false);
+            }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4 overflow-y-auto print:hidden animate-in fade-in duration-150"
+          >
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150 relative">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-4 text-white text-center space-y-1 relative">
+                <button
+                  type="button"
+                  onClick={() => setShowSuccessModal(false)}
+                  className="absolute top-3 right-3 text-white/80 hover:text-white hover:bg-white/20 p-1.5 rounded-full transition-colors flex items-center justify-center"
+                  title="Close"
+                >
+                  <X className="h-4.5 w-4.5" />
+                </button>
+                <div className="mx-auto h-11 w-11 bg-white/20 rounded-full flex items-center justify-center">
+                  <CheckCircle2 className="h-6 w-6 text-white" />
+                </div>
+                <h3 className="text-base font-bold">Registration Successful</h3>
+                <p className="text-emerald-100 text-[11px]">Patient Registered Successfully</p>
+              </div>
+
+              <div className="p-4 sm:p-5 space-y-4">
+                {/* Compact UHID Card */}
+                <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 flex justify-between items-center">
+                  <div className="space-y-0.5">
+                    <span className="text-[9px] font-bold tracking-wider text-slate-400 uppercase">Universal Health ID (UHID)</span>
+                    <div className="text-lg font-black text-navy-800 tracking-wide font-mono">
+                      {registeredPatient.uhid}
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(registeredPatient.uhid);
+                        toast.success("UHID copied to clipboard!");
+                      }}
+                      title="Copy UHID"
+                      className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-500 hover:text-slate-700 transition-colors"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => window.print()}
+                      title="Print Registration Card"
+                      className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-500 hover:text-slate-700 transition-colors"
+                    >
+                      <Printer className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Patient Details & QR Code */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+                  <div className="sm:col-span-2 space-y-2 text-xs text-slate-600">
+                    <div>
+                      <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Patient Name</span>
+                      <span className="font-semibold text-slate-800 text-xs">{registeredPatient.name}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Patient Code</span>
+                      <span className="font-mono text-slate-700 text-[11px]">{registeredPatient.patientCode || registeredPatient._id}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block uppercase tracking-wider text-[9px] font-bold">Registration Date &amp; Time</span>
+                      <span className="font-semibold text-slate-700 text-[11px]">
+                        {new Date(registeredPatient.createdAt || Date.now()).toLocaleString("en-US", {
+                          year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center justify-center p-2 bg-white border border-slate-100 rounded-xl shadow-xs">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(
+                        `HMS|${registeredPatient.uhid}|${registeredPatient.name}`
+                      )}`}
+                      alt="QR Code"
+                      className="h-16 w-16 object-contain"
+                    />
+                    <span className="text-[8px] text-slate-400 font-semibold mt-1">Scan verification</span>
+                  </div>
+                </div>
+
+                {/* Action Choice Buttons */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <Button
+                    type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText(registeredPatient.uhid);
-                      toast.success("UHID copied to clipboard!");
+                      toast.success("Printing Patient Card...");
+                      window.print();
                     }}
-                    title="Copy UHID"
-                    className="p-2 hover:bg-slate-250 rounded-lg text-slate-500 hover:text-slate-700 transition-colors"
+                    variant="secondary"
+                    className="flex items-center justify-center gap-1.5 text-xs py-1.5 font-bold"
                   >
-                    <Copy className="h-4.5 w-4.5" />
-                  </button>
-                  <button
-                    onClick={() => window.print()}
-                    title="Print UHID"
-                    className="p-2 hover:bg-slate-250 rounded-lg text-slate-500 hover:text-slate-700 transition-colors"
+                    <Printer className="h-3.5 w-3.5" /> Print Registration Card
+                  </Button>
+
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setShowSuccessModal(false);
+                      navigate(`/receptionist/appointments/new?patientId=${registeredPatient._id}`);
+                    }}
+                    className="flex items-center justify-center gap-1.5 text-xs py-1.5 font-bold"
                   >
-                    <Printer className="h-4.5 w-4.5" />
-                  </button>
+                    <Calendar className="h-3.5 w-3.5" /> Book Appointment
+                  </Button>
+
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setShowSuccessModal(false);
+                      navigate(`/receptionist/patients/${registeredPatient._id}`);
+                    }}
+                    variant="secondary"
+                    className="flex items-center justify-center gap-1.5 text-xs py-1.5 font-bold"
+                  >
+                    <User className="h-3.5 w-3.5" /> Go To Patient Profile
+                  </Button>
+
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setShowSuccessModal(false);
+                      setTab("new");
+                    }}
+                    variant="ghost"
+                    className="flex items-center justify-center gap-1.5 text-xs py-1.5 font-bold border border-slate-200 hover:bg-slate-50 text-slate-600"
+                  >
+                    Register Another Patient
+                  </Button>
                 </div>
-              </div>
-
-              {/* Patient Details & QR Code */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
-                <div className="sm:col-span-2 space-y-3 text-xs text-slate-600">
-                  <div>
-                    <span className="text-slate-400 block uppercase tracking-wider text-[10px] font-bold">Patient Name</span>
-                    <span className="font-semibold text-slate-805 text-sm">{registeredPatient.name}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-450 block uppercase tracking-wider text-[10px] font-bold">Patient Code</span>
-                    <span className="font-mono text-slate-700">{registeredPatient.patientCode}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-455 block uppercase tracking-wider text-[10px] font-bold">Registration Date &amp; Time</span>
-                    <span className="font-semibold text-slate-700">
-                      {new Date(registeredPatient.createdAt || Date.now()).toLocaleString("en-US", {
-                        year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true
-                      })}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex flex-col items-center justify-center p-2 bg-white border border-slate-100 rounded-xl shadow-sm">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(
-                      `HMS|${registeredPatient.uhid}|${registeredPatient.name}`
-                    )}`}
-                    alt="QR Code"
-                    className="h-20 w-20 object-contain"
-                  />
-                  <span className="text-[9px] text-slate-400 font-semibold mt-1">Scan verification</span>
-                </div>
-              </div>
-
-              {/* Action Choice Buttons */}
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                <Button
-                  type="button"
-                  onClick={() => {
-                    toast.success("Printing Patient Card...");
-                    window.print();
-                  }}
-                  variant="secondary"
-                  className="flex items-center justify-center gap-1.5 text-xs py-2 font-bold"
-                >
-                  <Printer className="h-4 w-4" /> Print Registration Card
-                </Button>
-
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setShowSuccessModal(false);
-                    navigate(`/receptionist/appointments/new?patientId=${registeredPatient._id}`);
-                  }}
-                  className="flex items-center justify-center gap-1.5 text-xs py-2 font-bold"
-                >
-                  <Calendar className="h-4 w-4" /> Book Appointment
-                </Button>
-
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setShowSuccessModal(false);
-                    navigate(`/receptionist/patients/${registeredPatient._id}`);
-                  }}
-                  variant="secondary"
-                  className="flex items-center justify-center gap-1.5 text-xs py-2 font-bold"
-                >
-                  <User className="h-4 w-4" /> Go To Patient Profile
-                </Button>
-
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setShowSuccessModal(false);
-                    setTab("new");
-                  }}
-                  variant="ghost"
-                  className="flex items-center justify-center gap-1.5 text-xs py-2 font-bold border border-slate-200 hover:bg-slate-50"
-                >
-                  Register Another Patient
-                </Button>
               </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

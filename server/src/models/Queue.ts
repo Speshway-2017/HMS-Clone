@@ -3,6 +3,7 @@ import { Schema, model, InferSchemaType, Types } from "mongoose";
 const queueSchema = new Schema(
   {
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
+    branch: { type: Schema.Types.ObjectId, ref: "Branch", default: null },
     tokenNumber: { type: String, required: true },
     type: { type: String, enum: ["regular", "priority", "emergency"], default: "regular" },
     status: { type: String, enum: ["waiting", "called", "completed", "skipped"], default: "waiting" },

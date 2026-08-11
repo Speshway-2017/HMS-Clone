@@ -9,27 +9,69 @@ import { catchAsync } from "../utils/catchAsync";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/token";
 import { logAudit } from "../utils/auditLogger";
 import { Hospital } from "../models/Hospital";
+import { Doctor } from "../models/Doctor";
+import { Patient } from "../models/Patient";
+import { Staff } from "../models/Staff";
 import { sendEmail } from "../services/emailService";
+import { handleAutoAttendanceOnLogin, handleAutoCheckoutOnLogout } from "../services/attendanceAutoService";
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  identifier: z.string().optional(),
+  email: z.string().optional(),
+  password: z.string().min(1, "Password is required"),
 });
 
 const registerSchema = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
-  password: z.string().min(6),
-  phone: z.string().optional().default(""),
+  // Section 1: Account & Security (Mandatory)
+  name: z.string().min(2, "Full Name is required"),
+  email: z.string().email("Valid email is required"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+
+  // Section 2: Demographics & Contact (Mandatory)
+  phone: z.string().min(5, "Phone Number is required"),
+  age: z.coerce.number({ invalid_type_error: "Age is required" }).min(0, "Age must be valid").max(120, "Age must be valid"),
+  gender: z.string().min(1, "Gender is required"),
+  bloodGroup: z.string().min(1, "Blood Group is required"),
+  address: z.string().min(3, "Residential Address is required"),
+
+  // Section 3: Emergency Contact (Mandatory)
+  emergencyContact: z.object({
+    name: z.string().min(1, "Emergency Contact Name is required"),
+    phone: z.string().min(1, "Emergency Contact Phone is required"),
+    relation: z.string().min(1, "Emergency Contact Relationship is required"),
+  }),
+
+  // Section 4: Allergies & Insurance Details (Optional)
+  allergies: z.string().optional().default(""),
+  insuranceProvider: z.string().optional().default(""),
+  insurancePolicyNumber: z.string().optional().default(""),
 });
 
-function sanitizeUser(user: UserDocument) {
+async function sanitizeUser(user: UserDocument) {
+  let name = user.name;
+
+  if (user.role === "doctor") {
+    const doc = await Doctor.findOne({ email: user.email.toLowerCase() });
+    if (doc?.name) name = doc.name;
+  } else if (user.role === "patient") {
+    const pat = await Patient.findOne({ user: user._id });
+    if (pat?.name) name = pat.name;
+  } else if (user.role !== "super_admin") {
+    const st = await Staff.findOne({ email: user.email.toLowerCase() });
+    if (st?.name) name = st.name;
+  }
+
+  if (name && name !== user.name) {
+    await User.updateOne({ _id: user._id }, { name });
+  }
+
   return {
     id: user._id,
-    name: user.name,
+    name: name || user.name,
     email: user.email,
     role: user.role,
     hospital: user.hospital,
+    branch: user.branch,
     avatarUrl: user.avatarUrl,
     status: user.status,
     lastLogin: user.lastLogin,
@@ -41,22 +83,124 @@ function hashToken(token: string): string {
 }
 
 export const register = catchAsync(async (req: Request, res: Response) => {
-  const { name, email, password, phone } = registerSchema.parse(req.body);
-
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    throw new AppError("Email is already registered.", 400);
-  }
-
-  const passwordHash = await bcrypt.hash(password, 10);
-  const user = await User.create({
+  const {
     name,
     email,
-    passwordHash,
-    role: "patient",
-    status: "active",
+    password,
     phone,
-  });
+    age,
+    gender,
+    bloodGroup,
+    address,
+    allergies,
+    insuranceProvider,
+    insurancePolicyNumber,
+    emergencyContact,
+  } = registerSchema.parse(req.body);
+
+  const emailClean = (email || "").trim().toLowerCase();
+  const phoneClean = (phone || "").replace(/\D/g, "").slice(-10);
+
+  // Check if a user account already exists by email or phone
+  const userConds: any[] = [];
+  if (emailClean) userConds.push({ email: { $regex: `^${emailClean.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+  if (phoneClean && phoneClean.length >= 7) userConds.push({ phone: { $regex: `${phoneClean}$` } });
+
+  let user = await User.findOne({ $or: userConds.length > 0 ? userConds : [{ email: emailClean }] });
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  if (user) {
+    if (user.role !== "patient") {
+      throw new AppError("An administrative user account already exists with this email or phone number.", 400);
+    }
+    // Patient account exists (e.g. created by receptionist or previous draft): update password and profile details
+    user.passwordHash = passwordHash;
+    if (name) user.name = name;
+    if (emailClean) user.email = emailClean;
+    if (phone) user.phone = phone;
+    await user.save();
+  } else {
+    // Find the first active/existing hospital in the database
+    const hospital = await Hospital.findOne();
+    const hospitalId = hospital ? hospital._id : null;
+
+    user = await User.create({
+      name,
+      email: emailClean,
+      passwordHash,
+      role: "patient",
+      status: "active",
+      phone,
+      hospital: hospitalId,
+    });
+  }
+
+  // Find hospital ID if user has no assigned hospital
+  const hospital = await Hospital.findOne();
+  const hospitalId = user.hospital || (hospital ? hospital._id : null);
+
+  let createdPatient = null;
+  if (hospitalId) {
+    const existingPatientConds: any[] = [];
+    if (emailClean) existingPatientConds.push({ email: { $regex: `^${emailClean.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+    if (phoneClean && phoneClean.length >= 7) existingPatientConds.push({ phone: { $regex: `${phoneClean}$` } });
+    if (name) existingPatientConds.push({ name: { $regex: `^${name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+    if (user._id) existingPatientConds.push({ user: user._id });
+
+    let existingPatientDoc = await Patient.findOne({ $or: existingPatientConds });
+
+    if (existingPatientDoc) {
+      // Reuse existing patient record registered by receptionist — DO NOT create a duplicate Patient document!
+      existingPatientDoc.user = user._id;
+      if (name) existingPatientDoc.name = name;
+      if (emailClean) existingPatientDoc.email = emailClean;
+      if (phone) existingPatientDoc.phone = phone;
+      if (age) existingPatientDoc.age = age;
+      if (gender) existingPatientDoc.gender = gender;
+      if (bloodGroup) existingPatientDoc.bloodGroup = bloodGroup;
+      if (address) existingPatientDoc.address = address;
+      if (allergies) existingPatientDoc.allergies = allergies;
+      if (insuranceProvider) existingPatientDoc.insuranceProvider = insuranceProvider;
+      if (insurancePolicyNumber) existingPatientDoc.insurancePolicyNumber = insurancePolicyNumber;
+      if (emergencyContact) existingPatientDoc.emergencyContact = emergencyContact;
+      await existingPatientDoc.save();
+      createdPatient = existingPatientDoc;
+    } else {
+      // Create new Patient record only if no existing record was found in MongoDB
+      const generateDigits = (length: number): string => {
+        let result = "";
+        const characters = "0123456789";
+        for (let i = 0; i < length; i++) {
+          result += characters.charAt(Math.floor(Math.random() * characters.length));
+        }
+        return result;
+      };
+      const uhid = `UHID-${generateDigits(10)}`;
+      const patientCode = `PAT-${generateDigits(6)}`;
+      const qrCode = `HMS|${uhid}|${name}|${phone}`;
+
+      createdPatient = await Patient.create({
+        user: user._id,
+        hospital: hospitalId,
+        uhid,
+        patientCode,
+        qrCode,
+        name,
+        email: emailClean,
+        phone,
+        age: age || undefined,
+        gender: gender || "",
+        bloodGroup: bloodGroup || "",
+        address: address || "",
+        allergies: allergies || "",
+        insuranceProvider: insuranceProvider || "",
+        insurancePolicyNumber: insurancePolicyNumber || "",
+        emergencyContact: emergencyContact || { name: "", phone: "", relation: "" },
+        status: "opd",
+        isActive: true,
+      });
+    }
+  }
 
   const accessToken = signAccessToken({ id: user._id.toString(), role: user.role });
   const refreshToken = signRefreshToken({ id: user._id.toString(), role: user.role });
@@ -85,26 +229,111 @@ export const register = catchAsync(async (req: Request, res: Response) => {
   res.status(201).json({
     status: "success",
     data: {
-      user: sanitizeUser(user),
+      user: await sanitizeUser(user),
+      patient: createdPatient,
       token: accessToken,
       refreshToken: refreshToken,
     },
   });
 });
 
-export const login = catchAsync(async (req: Request, res: Response) => {
-  const { email, password } = loginSchema.parse(req.body);
+export const checkPhone = catchAsync(async (req: Request, res: Response) => {
+  const phone = req.query.phone;
+  if (!phone || typeof phone !== "string") {
+    throw new AppError("Phone number is required.", 400);
+  }
 
-  const user = await User.findOne({ email }).select("+passwordHash");
+  const phoneClean = phone.replace(/\D/g, "").slice(-10);
+  if (phoneClean.length < 7) {
+    return res.json({
+      status: "success",
+      exists: false,
+    });
+  }
+
+  // Find a patient with this phone number
+  const patient = await Patient.findOne({
+    phone: { $regex: `${phoneClean}$` }
+  });
+
+  if (!patient) {
+    return res.json({
+      status: "success",
+      exists: false,
+    });
+  }
+
+  // Check if they already have a user account
+  let hasPassword = false;
+  if (patient.user) {
+    const user = await User.findById(patient.user);
+    if (user && user.passwordHash) {
+      hasPassword = true;
+    }
+  }
+
+  res.json({
+    status: "success",
+    exists: true,
+    hasPassword,
+    patient: {
+      name: patient.name,
+      email: patient.email,
+      age: patient.age,
+      gender: patient.gender,
+      bloodGroup: patient.bloodGroup,
+      address: patient.address,
+      allergies: patient.allergies,
+      insuranceProvider: patient.insuranceProvider,
+      insurancePolicyNumber: patient.insurancePolicyNumber,
+      emergencyName: patient.emergencyContact?.name || "",
+      emergencyPhone: patient.emergencyContact?.phone || "",
+      emergencyRelation: patient.emergencyContact?.relation || "",
+    }
+  });
+});
+
+export const login = catchAsync(async (req: Request, res: Response) => {
+  const body = loginSchema.parse(req.body);
+  const input = (body.identifier || body.email || "").trim();
+  const password = body.password;
+
+  if (!input) {
+    throw new AppError("Please enter your email address or phone number.", 400);
+  }
+
+  const cleanPhone = input.replace(/\D/g, "").slice(-10);
+  const isEmail = input.includes("@");
+
+  let query: any = {};
+  if (isEmail) {
+    query = { email: { $regex: `^${input.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } };
+  } else if (cleanPhone && cleanPhone.length >= 7) {
+    query = {
+      $or: [
+        { phone: { $regex: `${cleanPhone}$` } },
+        { email: input.toLowerCase() }
+      ]
+    };
+  } else {
+    query = {
+      $or: [
+        { email: { $regex: `^${input.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } },
+        { phone: input }
+      ]
+    };
+  }
+
+  const user = await User.findOne(query).select("+passwordHash");
   if (!user || !(await user.comparePassword(password))) {
     await logAudit({
       req,
-      userEmail: email,
+      userEmail: input,
       action: "LOGIN_FAILED",
       entity: "User",
       details: { reason: "Invalid credentials" },
     });
-    throw new AppError("Incorrect email or password.", 401);
+    throw new AppError("Incorrect email/phone number or password.", 401);
   }
   if (user.status !== "active") {
     await logAudit({
@@ -147,10 +376,13 @@ export const login = catchAsync(async (req: Request, res: Response) => {
     entityId: user._id.toString(),
   });
 
+  // Auto-attendance on login disabled per system design (Manual Admin Attendance only)
+  // await handleAutoAttendanceOnLogin(user);
+
   res.status(200).json({
     status: "success",
     data: {
-      user: sanitizeUser(user),
+      user: await sanitizeUser(user),
       token: accessToken,
       refreshToken: refreshToken,
     },
@@ -221,6 +453,9 @@ export const logout = catchAsync(async (req: Request, res: Response) => {
   }
 
   if (req.user) {
+    // Automatically record checkout time and calculate working hours
+    await handleAutoCheckoutOnLogout(req.user);
+
     await RefreshToken.updateMany({ user: req.user._id }, { isRevoked: true });
     await logAudit({
       req,
@@ -234,7 +469,7 @@ export const logout = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const getMe = catchAsync(async (req: Request, res: Response) => {
-  res.status(200).json({ status: "success", data: { user: sanitizeUser(req.user!) } });
+  res.status(200).json({ status: "success", data: { user: await sanitizeUser(req.user!) } });
 });
 
 const changePasswordSchema = z.object({
@@ -448,6 +683,7 @@ export const resetPassword = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+
 const updateProfileSchema = z.object({
   name: z.string().min(2).optional(),
   phone: z.string().optional(),
@@ -479,6 +715,6 @@ export const updateProfile = catchAsync(async (req: Request, res: Response) => {
 
   res.status(200).json({
     status: "success",
-    data: { user: sanitizeUser(user) },
+    data: { user: sanitizeUser(user) }
   });
 });

@@ -90,8 +90,8 @@ export function DepartmentFormPage() {
         await createDepartment.mutateAsync(payload);
       }
       navigate(`${basePath}/departments`);
-    } catch {
-      setError("Could not save department. Check the form and try again.");
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || "Could not save department. Check the form and try again.");
     }
   }
 

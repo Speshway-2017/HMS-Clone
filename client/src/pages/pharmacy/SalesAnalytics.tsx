@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
-import { BarChart3, TrendingUp, TrendingDown, ArrowDownRight, ArrowUpRight, DollarSign, Pill, Award, Clipboard, Download, Calendar } from "lucide-react";
-import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { BarChart3, TrendingUp, TrendingDown, ArrowDownRight, ArrowUpRight, DollarSign, Pill, Award, Clipboard, Download, Calendar, Upload } from "lucide-react";
+import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Card } from "../../components/ui/Card";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { ChartCard } from "../../components/ui/ChartCard";
 import { Button } from "../../components/ui/Button";
 import { useInvoices } from "../../features/invoices";
+import { exportToExcel, exportToPDFReport } from "../../lib/excelUtils";
+import { ImportExcelModal } from "../../components/ui/ImportExcelModal";
+import toast from "react-hot-toast";
 
 interface MedicineSales {
   name: string;
@@ -28,6 +31,7 @@ export function PharmacySalesAnalytics() {
   const [monthlySales, setMonthlySales] = useState<any[]>([]);
   const [topMeds, setTopMeds] = useState<MedicineSales[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   useEffect(() => {
     // Generate analytics data dynamically based on invoices, dispensing records, and POs
@@ -44,16 +48,8 @@ export function PharmacySalesAnalytics() {
       status: inv.status === "paid" ? "Paid" : "Pending",
     }));
 
-    const savedDispensing = localStorage.getItem("hms_pharmacy_dispensing");
-    const dispensing = savedDispensing ? JSON.parse(savedDispensing) : [];
-
-    const savedPOs = localStorage.getItem("hms_pharmacy_purchase_orders");
-    const purchaseOrders = (savedPOs ? JSON.parse(savedPOs) : []).filter(
-      (po: any) =>
-        po.supplierName !== "Global Pharma Distributors" &&
-        po.supplierName !== "Acme Healthcare Corp" &&
-        po.supplierName !== "Apex MediSupplies"
-    );
+    const dispensing: any[] = [];
+    const purchaseOrders: any[] = [];
 
     // 1. Calculate Daily Sales (last 7 days)
     const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -155,8 +151,20 @@ export function PharmacySalesAnalytics() {
     );
   }
 
-  const handleExport = (type: "pdf" | "excel") => {
-    alert(`Simulation: Exporting Sales Report as ${type.toUpperCase()}. Downloading file...`);
+  const handleExportExcel = () => {
+    const headers = ["Medicine Name", "Category", "Quantity Sold", "Revenue (INR)"];
+    const rows = topMeds.map((m) => [m.name, m.category, m.qtySold, m.revenue]);
+    exportToExcel("Pharmacy_Sales_Analytics_2026", headers, rows);
+  };
+
+  const handleExportPDF = () => {
+    const headers = ["Medicine Name", "Category", "Quantity Sold", "Revenue (INR)"];
+    const rows = topMeds.map((m) => [m.name, m.category, m.qtySold, `₹${m.revenue.toLocaleString("en-IN")}`]);
+    exportToPDFReport("Pharmacy Sales & Stock Movement Report", headers, rows);
+  };
+
+  const handleImportSales = (importedRecords: Record<string, string>[]) => {
+    toast.success(`Successfully imported ${importedRecords.length} pharmacy sales logs!`);
   };
 
   return (
@@ -168,10 +176,10 @@ export function PharmacySalesAnalytics() {
           <p className="text-sm text-slate-500">Analyze daily sales, top-selling formulations, and stock movement logs.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => handleExport("excel")} className="flex items-center gap-1.5 text-xs py-1.5">
-            <Download className="h-3.5 w-3.5" /> Export Excel
+          <Button variant="secondary" onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-1.5 text-xs py-1.5 bg-white border border-slate-200 hover:bg-slate-50">
+            <Upload className="h-3.5 w-3.5 text-emerald-600" /> Import Excel
           </Button>
-          <Button onClick={() => handleExport("pdf")} className="flex items-center gap-1.5 text-xs py-1.5">
+          <Button onClick={handleExportPDF} className="flex items-center gap-1.5 text-xs py-1.5 bg-navy-700 hover:bg-navy-800 text-white">
             <Download className="h-3.5 w-3.5" /> Export PDF
           </Button>
         </div>
@@ -285,6 +293,91 @@ export function PharmacySalesAnalytics() {
         </ChartCard>
       </div>
 
+      {/* Visual top selling & invoice status split */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Top Selling Medicine Quantities sold (Bar Chart) */}
+        <ChartCard 
+          title="Medicine Volume Distribution" 
+          subtitle="Top 5 formulations by total quantity sold."
+        >
+          <div className="h-[300px]">
+            {topMeds.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-slate-450 text-xs font-medium">No sales data recorded.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topMeds} layout="vertical" margin={{ top: 10, right: 10, left: 30, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: "#64748B" }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "#64748B" }} width={80} />
+                  <Tooltip />
+                  <Bar dataKey="qtySold" name="Qty Sold" fill="#8b5cf6" radius={[0, 4, 4, 0]} maxBarSize={20} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </ChartCard>
+
+        {/* Pharmacy Invoice Payment Split (Pie/Donut Chart) */}
+        <ChartCard 
+          title="Invoices Clearance Split" 
+          subtitle="Proportion of paid vs pending pharmacy invoices (volume & count)."
+        >
+          <div className="h-[300px]">
+            {(() => {
+              const invoicesList = dbInvoiceData?.data || [];
+              let paidCount = 0;
+              let pendingCount = 0;
+              let paidAmt = 0;
+              let pendingAmt = 0;
+              invoicesList.forEach((inv: any) => {
+                const amt = inv.totals?.total || inv.total || 0;
+                if (inv.status === "paid") {
+                  paidCount++;
+                  paidAmt += amt;
+                } else {
+                  pendingCount++;
+                  pendingAmt += amt;
+                }
+              });
+
+              const billingStatsData = [
+                { name: "Paid collections", value: paidAmt, count: paidCount, color: "#10b981" },
+                { name: "Outstanding bills", value: pendingAmt, count: pendingCount, color: "#f59e0b" }
+              ].filter(d => d.value > 0);
+
+              if (billingStatsData.length === 0) {
+                return <div className="h-full flex items-center justify-center text-slate-450 text-xs font-medium">No invoices logged.</div>;
+              }
+
+              return (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={billingStatsData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={90}
+                      paddingAngle={3}
+                    >
+                      {billingStatsData.map((entry, idx) => (
+                        <Cell key={`cell-${idx}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v: number) => [`₹${v.toLocaleString("en-IN")}`]} />
+                    <Legend
+                      formatter={(value) => <span className="text-[11px] text-slate-650 font-medium">{value}</span>}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              );
+            })()}
+          </div>
+        </ChartCard>
+      </div>
+
       {/* Top Selling & Stock Movement Grid lists */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Top Selling Medicines */}
@@ -356,6 +449,19 @@ export function PharmacySalesAnalytics() {
           </div>
         </Card>
       </div>
+
+      <ImportExcelModal
+        isOpen={isImportModalOpen}
+        title="Import Pharmacy Sales / Stock Logs"
+        sampleFilename="Pharmacy_Sales_Import_Template.csv"
+        sampleHeaders={["Medicine Name", "Category", "Quantity Sold", "Revenue"]}
+        sampleRows={[
+          ["Dolo 650mg", "Analgesic", 150, 450],
+          ["Augmentin 625mg", "Antibiotic", 40, 1800],
+        ]}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleImportSales}
+      />
     </div>
   );
 }

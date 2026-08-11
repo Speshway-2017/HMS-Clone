@@ -13,7 +13,7 @@ interface InventoryListResponse extends Paginated<InventoryItem> {
   counts: { total: number; critical: number; totalValue: number };
 }
 
-export function useInventory(params: InventoryListParams) {
+export function useInventory(params?: InventoryListParams) {
   return useQuery({
     queryKey: ["inventory", params],
     queryFn: async () => {

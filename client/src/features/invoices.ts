@@ -32,10 +32,11 @@ interface InvoiceListResponse extends Paginated<Invoice> {
   };
 }
 
-export function useInvoices(params: InvoiceListParams) {
+export function useInvoices(params: InvoiceListParams, options?: { enabled?: boolean }) {
   const qKey = params.billingType ? params.billingType.toUpperCase() : "ALL";
   return useQuery({
     queryKey: ["invoices", qKey, params],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<InvoiceListResponse>("/invoices", { params });
       return res.data;
@@ -73,5 +74,60 @@ export function useUpdateInvoice(id: string) {
       return res.data.data.invoice as Invoice;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["invoices"] }),
+  });
+}
+
+export interface PendingOverdueParams {
+  page?: number;
+  limit?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  department?: string;
+  doctor?: string;
+  billingType?: string;
+  status?: string;
+  branch?: string;
+  search?: string;
+  uhid?: string;
+}
+
+export interface PendingOverdueItem {
+  _id: string;
+  invoiceNo: string;
+  patient: { _id: string; name: string; uhid: string; phone: string; age: number; gender: string };
+  doctor: { _id: string; name: string; specialization: string } | null;
+  department: { _id: string; name: string } | null;
+  billingType: string;
+  issuedAt: string;
+  dueDate: string | null;
+  daysOverdue: number;
+  status: "pending" | "partially_paid" | "overdue";
+  totals: { subtotal: number; total: number; patientBalance: number; insuranceCovered: number; taxAmount: number };
+  amountPaid: number;
+  pendingAmount: number;
+  paymentMode: string;
+}
+
+export interface PendingOverdueResponse {
+  status: string;
+  data: PendingOverdueItem[];
+  pagination: { total: number; page: number; limit: number; totalPages: number };
+  summary: {
+    pendingPatients: number;
+    totalPendingAmount: number;
+    overdueAmount: number;
+    todayCollection: number;
+    monthCollection: number;
+  };
+}
+
+export function usePendingOverdue(params: PendingOverdueParams) {
+  return useQuery({
+    queryKey: ["invoices", "pending-overdue", params],
+    queryFn: async () => {
+      const res = await api.get<PendingOverdueResponse>("/invoices/pending-overdue", { params });
+      return res.data;
+    },
+    staleTime: 30_000,
   });
 }

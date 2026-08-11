@@ -36,6 +36,7 @@ import {
   updateConsultationDraft,
   completeConsultationSession,
   cancelConsultationSession,
+  getConsultationHistory,
   // Doctor-scoped laboratory endpoints
   getMyLabOrders,
   getMyLabOrderById,
@@ -49,6 +50,7 @@ import {
   addInpatientMedication,
   updateInpatientMedication,
   saveInpatientVitals,
+  getAnalytics,
 } from "../controllers/doctorDashboardController";
 
 const router = Router();
@@ -57,6 +59,7 @@ const router = Router();
 router.use(protect, restrictTo("doctor"), scopeToHospital);
 
 router.get("/metrics", getMetrics);
+router.get("/analytics", getAnalytics);
 router.get("/appointments/today", getTodayAppointments);
 
 router.get("/queue", getQueue);
@@ -108,6 +111,7 @@ router.get("/consultations/:appointmentId/draft", getConsultationDraft);
 router.put("/consultations/:consultationId/draft", updateConsultationDraft);
 router.post("/consultations/:consultationId/complete", completeConsultationSession);
 router.post("/consultations/:consultationId/cancel", cancelConsultationSession);
+router.get("/consultations/:id/history", getConsultationHistory);
 
 // ── Doctor-scoped lab order records (security-enforced, audit-logged) ─────────
 router.get("/my-lab-orders", getMyLabOrders);

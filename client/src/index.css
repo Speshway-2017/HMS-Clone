@@ -3,7 +3,8 @@
 @tailwind utilities;
 
 body {
-  @apply bg-slate-50 text-slate-900;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  @apply bg-slate-50 text-slate-900 antialiased;
 }
 
 /* Hide scrollbars everywhere while keeping content scrollable. */
@@ -18,12 +19,22 @@ body {
 
 /* --- Premium Print Mode Styles --- */
 @media print {
-  /* Hide all generic page content, navbars, sidebars, modal backdrops, and action buttons */
+  html, body {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide all generic page content, navbars, sidebars, modal backdrops */
   body * {
     visibility: hidden !important;
   }
 
-  /* Force display only targeted print blocks and their descendants */
+  /* Force display target print blocks and all their descendant elements */
+  #payslip-print-area,
+  #payslip-print-area *,
   #pharmacy-invoice-print,
   #pharmacy-invoice-print *,
   #invoice-print-area,
@@ -36,40 +47,1297 @@ body {
   #opd-receipt-print *,
   #patient-card-print,
   #patient-card-print *,
+  #patient-registry-print,
+  #patient-registry-print *,
   #consolidated-patient-statement-print,
-  #consolidated-patient-statement-print * {
+  #consolidated-patient-statement-print *,
+  #consultation-print-area,
+  #consultation-print-area *,
+  .printable-area,
+  .printable-area * {
     visibility: visible !important;
   }
 
-  /* Force patient card print to display block (bypassing tailwind hidden print:block conflict) */
-  #patient-card-print {
+  #invoice-print-area,
+  #payslip-print-area,
+  #pharmacy-invoice-print,
+  #receipt-print-area,
+  #admission-slip-print,
+  #opd-receipt-print,
+  #patient-card-print,
+  #patient-registry-print,
+  #consolidated-patient-statement-print,
+  #consultation-print-area,
+  .printable-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 24px !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Force patient card & registry print to display block */
+  #patient-card-print,
+  #patient-registry-print,
+  #consultation-print-area,
+  #consolidated-patient-statement-print,
+  .printable-area {
     display: block !important;
   }
 
-  /* Make print-area span full sheet width and height, aligned to the top-left corner */
+  /* Exclude action buttons, footer controls, and print-hidden elements from print output */
+  .print\:hidden,
+  .print-hidden,
+  .no-print,
+  button,
+  [role="button"] {
+    visibility: hidden !important;
+    display: none !important;
+  }
+
+  /* Format print targets as full width documents shifted down from page top */
+  #payslip-print-area,
   #pharmacy-invoice-print,
   #invoice-print-area,
   #receipt-print-area,
   #admission-slip-print,
   #opd-receipt-print,
   #patient-card-print,
-  #consolidated-patient-statement-print {
+  #patient-registry-print,
+  #consolidated-patient-statement-print,
+  #consultation-print-area,
+  .printable-area {
     position: absolute !important;
     left: 0 !important;
-    top: 0 !important;
+    top: 20px !important; /* Shifts printed document down from the top edge */
     width: 100% !important;
     max-width: 100% !important;
     height: auto !important;
     border: none !important;
     box-shadow: none !important;
-    padding: 0 !important;
+    padding: 10px 20px !important;
     margin: 0 !important;
-    background: white !important;
-    color: black !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
   }
 
-  /* Optional: standard print margin tuning */
+  /* Standard print margin tuning */
   @page {
-    margin: 15mm;
+    margin: 10mm 15mm 15mm 15mm;
   }
 }
+
+/* --- Gooey Blob Button Styling --- */
+.blob-btn {
+  z-index: 1;
+  position: relative;
+  padding: 16px 36px;
+  text-align: center;
+  text-transform: uppercase;
+  color: #0505A9;
+  font-size: 16px;
+  font-weight: bold;
+  background-color: transparent;
+  outline: none;
+  border: none;
+  transition: color 0.5s;
+  cursor: pointer;
+  border-radius: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.blob-btn:before {
+  content: "";
+  z-index: 1;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  border: 2px solid #0505A9;
+  border-radius: 30px;
+}
+
+/* Small variant for Navbars & compact layouts */
+.blob-btn--sm {
+  padding: 8px 18px;
+  font-size: 12px;
+  border-radius: 20px;
+  letter-spacing: 0.02em;
+}
+
+.blob-btn--sm:before,
+.blob-btn--sm:after,
+.blob-btn--sm .blob-btn__inner {
+  border-radius: 20px;
+}
+
+.blob-btn:after {
+  content: "";
+  z-index: -2;
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 100%;
+  height: 100%;
+  transition: all 0.3s 0.2s;
+  border-radius: 30px;
+}
+
+.blob-btn:hover {
+  color: #FFFFFF;
+  border-radius: 30px;
+}
+
+.blob-btn:hover:after {
+  transition: all 0.3s;
+  left: 0;
+  top: 0;
+  border-radius: 30px;
+}
+
+.blob-btn__inner {
+  z-index: -1;
+  overflow: hidden;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 30px;
+  background: #ffffff;
+}
+
+.blob-btn__blobs {
+  position: relative;
+  display: block;
+  height: 100%;
+  filter: url('#goo');
+}
+
+.blob-btn__blob {
+  position: absolute;
+  top: 2px;
+  width: 25%;
+  height: 100%;
+  background: #0505A9;
+  border-radius: 100%;
+  transform: translate3d(0, 150%, 0) scale(1.7);
+  transition: transform 0.45s;
+}
+
+@supports (filter: url('#goo')) {
+  .blob-btn__blob {
+    transform: translate3d(0, 150%, 0) scale(1.4);
+  }
+}
+
+.blob-btn__blob:nth-child(1) {
+  left: 0%;
+  transition-delay: 0s;
+}
+
+.blob-btn__blob:nth-child(2) {
+  left: 30%;
+  transition-delay: 0.08s;
+}
+
+.blob-btn__blob:nth-child(3) {
+  left: 60%;
+  transition-delay: 0.16s;
+}
+
+.blob-btn__blob:nth-child(4) {
+  left: 90%;
+  transition-delay: 0.24s;
+}
+
+.blob-btn:hover .blob-btn__blob {
+  transform: translateZ(0) scale(1.7);
+}
+
+@supports (filter: url('#goo')) {
+  .blob-btn:hover .blob-btn__blob {
+    transform: translateZ(0) scale(1.4);
+  }
+}
+
+/* --- Reverse Blob Button Variant (Blue initial, White on hover) --- */
+.blob-btn--reverse {
+  color: #ffffff;
+  box-shadow: 0 10px 25px -5px rgba(5, 5, 169, 0.4);
+  transition: color 0.5s, box-shadow 0.3s;
+}
+
+.blob-btn--reverse:before {
+  border-color: #0505A9;
+}
+
+.blob-btn--reverse .blob-btn__inner {
+  background: #0505A9;
+}
+
+.blob-btn--reverse .blob-btn__blob {
+  background: #ffffff;
+}
+
+.blob-btn--reverse:hover {
+  color: #0505A9;
+  box-shadow: 0 12px 30px -5px rgba(5, 5, 169, 0.25);
+}
+
+
+/* --- Green Bubbly Button Styling --- */
+.bubbly-button {
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  padding: 0.9rem 2.2rem;
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: #10b981;
+  color: #ffffff;
+  border-radius: 30px;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  transition: transform ease-in 0.1s, box-shadow ease-in 0.25s, background-color 0.3s;
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.45);
+}
+
+.bubbly-button:focus {
+  outline: 0;
+}
+
+.bubbly-button:hover {
+  background-color: #059669;
+  box-shadow: 0 6px 25px rgba(16, 185, 129, 0.55);
+}
+
+.bubbly-button:before,
+.bubbly-button:after {
+  position: absolute;
+  content: '';
+  display: block;
+  width: 140%;
+  height: 100%;
+  left: -20%;
+  z-index: -1000;
+  transition: all ease-in-out 0.5s;
+  background-repeat: no-repeat;
+}
+
+.bubbly-button:before {
+  display: none;
+  top: -75%;
+  background-image:
+    radial-gradient(circle, #10b981 20%, transparent 20%),
+    radial-gradient(circle, transparent 20%, #10b981 20%, transparent 30%),
+    radial-gradient(circle, #10b981 20%, transparent 20%),
+    radial-gradient(circle, #10b981 20%, transparent 20%),
+    radial-gradient(circle, transparent 10%, #10b981 15%, transparent 20%),
+    radial-gradient(circle, #10b981 20%, transparent 20%),
+    radial-gradient(circle, #10b981 20%, transparent 20%),
+    radial-gradient(circle, #10b981 20%, transparent 20%),
+    radial-gradient(circle, #10b981 20%, transparent 20%);
+  background-size: 10% 10%, 20% 20%, 15% 15%, 20% 20%, 18% 18%, 10% 10%, 15% 15%, 10% 10%, 18% 18%;
+}
+
+.bubbly-button:after {
+  display: none;
+  bottom: -75%;
+  background-image:
+    radial-gradient(circle, #10b981 20%, transparent 20%),
+    radial-gradient(circle, #10b981 20%, transparent 20%),
+    radial-gradient(circle, transparent 10%, #10b981 15%, transparent 20%),
+    radial-gradient(circle, #10b981 20%, transparent 20%),
+    radial-gradient(circle, #10b981 20%, transparent 20%),
+    radial-gradient(circle, #10b981 20%, transparent 20%),
+    radial-gradient(circle, #10b981 20%, transparent 20%);
+  background-size: 15% 15%, 20% 20%, 18% 18%, 20% 20%, 15% 15%, 10% 10%, 20% 20%;
+}
+
+.bubbly-button:active {
+  transform: scale(0.95);
+  background-color: #047857;
+  box-shadow: 0 2px 25px rgba(16, 185, 129, 0.3);
+}
+
+.bubbly-button:hover:before,
+.bubbly-button.animate:before {
+  display: block;
+  animation: topBubbles ease-in-out 0.75s forwards;
+}
+
+.bubbly-button:hover:after,
+.bubbly-button.animate:after {
+  display: block;
+  animation: bottomBubbles ease-in-out 0.75s forwards;
+}
+
+@keyframes topBubbles {
+  0% {
+    background-position: 5% 90%, 10% 90%, 10% 90%, 15% 90%, 25% 90%, 25% 90%, 40% 90%, 55% 90%, 70% 90%;
+  }
+  50% {
+    background-position: 0% 80%, 0% 20%, 10% 40%, 20% 0%, 30% 30%, 22% 50%, 50% 50%, 65% 20%, 90% 30%;
+  }
+  100% {
+    background-position: 0% 70%, 0% 10%, 10% 30%, 20% -10%, 30% 20%, 22% 40%, 50% 40%, 65% 10%, 90% 20%;
+    background-size: 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%;
+  }
+}
+
+@keyframes bottomBubbles {
+  0% {
+    background-position: 10% -10%, 30% 10%, 55% -10%, 70% -10%, 85% -10%, 70% -10%, 70% 0%;
+  }
+  50% {
+    background-position: 0% 80%, 20% 80%, 45% 60%, 60% 100%, 75% 70%, 95% 60%, 105% 0%;
+  }
+  100% {
+    background-position: 0% 90%, 20% 90%, 45% 70%, 60% 110%, 75% 80%, 95% 70%, 110% 10%;
+    background-size: 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%;
+  }
+}
+
+/* --- Smooth Mild Doctor Card Styling --- */
+.holographic-card,
+.doctor-card-smooth {
+  position: relative;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease;
+  will-change: transform, box-shadow;
+}
+
+.holographic-card:hover,
+.doctor-card-smooth:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px -6px rgba(5, 5, 169, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+  border-color: rgba(5, 5, 169, 0.28);
+}
+
+
+/* --- Department Split-Slide Card Hover Effect (CodePen Style) --- */
+.dept-slide-card {
+  position: relative;
+  width: 100%;
+  height: 380px;
+  margin: 0 auto;
+  cursor: pointer;
+}
+
+/* Common Slide Styling */
+.dept-slide-card .slide {
+  width: 100%;
+  height: 190px;
+  border-radius: 20px;
+  transition: transform 0.7s cubic-bezier(0.165, 0.84, 0.44, 1), box-shadow 0.7s ease, border-color 0.4s ease;
+  box-sizing: border-box;
+}
+
+/* Slide 1: Header / Icon / Category & Name (Sits in middle initially) */
+.dept-slide-card .slide.slide1 {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  transform: translateY(95px);
+  background: linear-gradient(135deg, #1e3a8a 0%, #0505a9 100%);
+  color: #ffffff;
+  box-shadow: 0 10px 30px rgba(5, 5, 169, 0.35);
+  padding: 20px;
+}
+
+.dept-slide-card:hover .slide.slide1 {
+  transform: translateY(0px);
+  box-shadow: 0 15px 35px rgba(5, 5, 169, 0.45);
+}
+
+.dept-slide-card .slide.slide1 .content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+}
+
+/* Slide 2: Bottom Details (Tucked behind Slide 1 initially) */
+.dept-slide-card .slide.slide2 {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 24px 20px 24px 20px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  z-index: 1;
+  transform: translateY(-95px);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+}
+
+.dept-slide-card:hover .slide.slide2 {
+  transform: translateY(0px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  border-color: #cbd5e1;
+}
+
+/* Bottom Blue Accent Line */
+.dept-slide-card .slide.slide2::after {
+  content: "";
+  position: absolute;
+  width: 44px;
+  height: 4px;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0505a9;
+  border-radius: 4px;
+}
+
+.dept-slide-card .slide.slide2 .content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* --- Navbar Link Dual Line Hover Effect (Blue Theme) --- */
+.nav-hover-underline {
+  position: relative;
+  display: inline-block;
+  transition: color 0.3s ease;
+}
+
+.nav-hover-underline::before,
+.nav-hover-underline::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(to right, #0505a9, #2563eb);
+  left: 0;
+  transform: scaleX(0);
+  transition: transform 0.4s ease-out;
+}
+
+.nav-hover-underline::before {
+  top: -4px;
+  transform-origin: left;
+}
+
+.nav-hover-underline::after {
+  bottom: -4px;
+  transform-origin: right;
+}
+
+.nav-hover-underline:hover::before,
+.nav-hover-underline:hover::after,
+.nav-hover-underline.active::before,
+.nav-hover-underline.active::after {
+  transform: scaleX(1);
+}
+
+/* --- Depth Parallax Word Animation --- */
+@keyframes depthParallaxReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) translateZ(-60px) scale(0.88);
+    filter: blur(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) translateZ(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+.animate-depth-word {
+  display: inline-block;
+  opacity: 0;
+  animation: depthParallaxReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity, filter;
+}
+
+/* --- Animated Tile Grid & Line Card Hover Effect (Blue Theme) --- */
+.tile-grid-card {
+  --card-border-color: rgba(5, 5, 169, 0.12);
+  --card-box-shadow-1: rgba(5, 5, 169, 0.04);
+  --card-box-shadow-2: rgba(5, 5, 169, 0.08);
+  --card-shine-opacity: 0.25;
+  --card-shine-gradient: conic-gradient(from 225deg at 50% 50%, rgba(5, 5, 169, 0) 0deg, #0505a9 25deg, #2563eb 285deg, #60a5fa 345deg, rgba(5, 5, 169, 0) 360deg);
+  --card-line-color: rgba(5, 5, 169, 0.25);
+  --card-tile-color: rgba(5, 5, 169, 0.08);
+
+  --card-hover-border-color: rgba(5, 5, 169, 0.4);
+  --card-hover-box-shadow-1: rgba(5, 5, 169, 0.08);
+  --card-hover-box-shadow-2: rgba(5, 5, 169, 0.18);
+
+  background-color: #ffffff;
+  box-shadow: 0px 3px 6px var(--card-box-shadow-1), 0px 8px 15px var(--card-box-shadow-2), 0 0 0 1px var(--card-border-color);
+  padding: 20px 22px;
+  border-radius: 16px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  min-height: 95px;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+}
+
+.tile-grid-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0px 5px 12px var(--card-hover-box-shadow-1), 0px 15px 30px var(--card-hover-box-shadow-2), 0 0 0 1px var(--card-hover-border-color);
+}
+
+/* Conic Shine Layer */
+.tile-grid-card .shine {
+  border-radius: inherit;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+
+.tile-grid-card .shine::before {
+  content: '';
+  width: 150%;
+  padding-bottom: 150%;
+  border-radius: 50%;
+  position: absolute;
+  left: 50%;
+  bottom: 55%;
+  filter: blur(35px);
+  opacity: var(--card-shine-opacity);
+  transform: translateX(-50%);
+  background-image: var(--card-shine-gradient);
+}
+
+.tile-grid-card:hover .shine {
+  opacity: 1;
+}
+
+/* Background Tiles & Lines */
+.tile-grid-card .background {
+  border-radius: inherit;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  mask-image: radial-gradient(circle at 60% 5%, black 0%, black 15%, transparent 60%);
+  -webkit-mask-image: radial-gradient(circle at 60% 5%, black 0%, black 15%, transparent 60%);
+  pointer-events: none;
+}
+
+.tile-grid-card .background .tiles {
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.tile-grid-card:hover .background .tiles {
+  opacity: 1;
+  transition-delay: 0.15s;
+}
+
+.tile-grid-card .background .tiles .tile {
+  position: absolute;
+  background-color: var(--card-tile-color);
+  animation-duration: 7s;
+  animation-iteration-count: infinite;
+  opacity: 0;
+  border-radius: 2px;
+}
+
+.tile-grid-card:hover .background .tiles .tile {
+  animation-name: tilePulse;
+}
+
+@keyframes tilePulse {
+  0%, 12.5%, 100% { opacity: 1; }
+  25%, 82.5% { opacity: 0; }
+}
+
+.tile-grid-card .background .tiles .tile.tile-1 { top: 0; left: 0; height: 12%; width: 22.5%; }
+.tile-grid-card .background .tiles .tile.tile-2 { top: 0; left: 22.5%; height: 12%; width: 27.5%; animation-delay: -6s; }
+.tile-grid-card .background .tiles .tile.tile-3 { top: 0; left: 50%; height: 12%; width: 27.5%; animation-delay: -4s; }
+.tile-grid-card .background .tiles .tile.tile-4 { top: 0; left: 77.5%; height: 12%; width: 22.5%; animation-delay: -2s; }
+
+.tile-grid-card .background .tiles .tile.tile-5 { top: 12%; left: 0; height: 24%; width: 22.5%; animation-delay: -4s; }
+.tile-grid-card .background .tiles .tile.tile-6 { top: 12%; left: 22.5%; height: 24%; width: 27.5%; animation-delay: -2s; }
+.tile-grid-card .background .tiles .tile.tile-7 { top: 12%; left: 50%; height: 24%; width: 27.5%; }
+.tile-grid-card .background .tiles .tile.tile-8 { top: 12%; left: 77.5%; height: 24%; width: 22.5%; animation-delay: -4s; }
+
+.tile-grid-card .background .tiles .tile.tile-9 { top: 36%; left: 50%; height: 24%; width: 27.5%; animation-delay: -6s; }
+.tile-grid-card .background .tiles .tile.tile-10 { top: 36%; left: 77.5%; height: 24%; width: 22.5%; animation-delay: -2s; }
+
+/* Grid Lines */
+.tile-grid-card .background .line {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.tile-grid-card:hover .background .line {
+  opacity: 1;
+}
+
+.tile-grid-card .background .line::before,
+.tile-grid-card .background .line::after {
+  content: '';
+  position: absolute;
+  background-color: var(--card-line-color);
+  transition: transform 0.35s ease;
+}
+
+.tile-grid-card .background .line::before {
+  left: 0; right: 0; height: 1px;
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+}
+
+.tile-grid-card .background .line::after {
+  top: 0; bottom: 0; width: 1px;
+  transform-origin: 50% 0;
+  transform: scaleY(0);
+}
+
+.tile-grid-card:hover .background .line::before { transform: scaleX(1); }
+.tile-grid-card:hover .background .line::after { transform: scaleY(1); }
+
+.tile-grid-card .background .line.line-1::before { top: 12%; }
+.tile-grid-card .background .line.line-1::after { left: 22.5%; }
+.tile-grid-card .background .line.line-2::before { top: 36%; }
+.tile-grid-card .background .line.line-2::after { left: 50%; }
+.tile-grid-card .background .line.line-3::before { top: 60%; }
+.tile-grid-card .background .line.line-3::after { right: 22.5%; }
+
+/* --- Ultra-Smooth Animated FAQ Dropdown --- */
+.faq-answer-dropdown {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+  opacity: 0;
+}
+
+.faq-answer-dropdown.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.faq-answer-inner {
+  overflow: hidden;
+}
+
+/* --- Animated Green SVG Dash Border Button (CTA Section) --- */
+.animated-green-dash-btn {
+  background: #ffffff;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  color: #059669;
+  font-size: 14px;
+  font-weight: 800;
+  border-radius: 9999px;
+  padding: 0 36px;
+  height: 56px;
+  cursor: pointer;
+  overflow: visible;
+  transition: transform 300ms ease, background-color 300ms ease, box-shadow 300ms ease, color 300ms ease;
+  box-shadow: 0 4px 24px rgba(16, 185, 129, 0.35);
+}
+
+.animated-green-dash-btn:hover,
+.animated-green-dash-btn:focus {
+  transform: scale(1.05);
+  background-color: #ffffff;
+  color: #047857;
+  box-shadow: 0 6px 32px rgba(16, 185, 129, 0.5);
+}
+
+.animated-green-dash-btn:hover .svg-btn-line {
+  animation-play-state: paused;
+}
+
+.animated-green-dash-svg {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: calc(100% + 8px);
+  height: calc(100% + 8px);
+  pointer-events: none;
+  overflow: visible;
+}
+
+@keyframes outer-dashoffset-green {
+  0% {
+    stroke-dashoffset: 0;
+    stroke-dasharray: 336px 336px;
+  }
+  50% {
+    stroke-dasharray: 224px 448px;
+  }
+  100% {
+    stroke-dashoffset: 672px;
+    stroke-dasharray: 336px 336px;
+  }
+}
+
+.svg-btn-line--outer {
+  stroke-dasharray: 336px 336px;
+  stroke-dashoffset: 0;
+  animation: outer-dashoffset-green 6s linear infinite;
+}
+
+@keyframes inner-dashoffset-green {
+  0% {
+    stroke-dashoffset: 0;
+    stroke-dasharray: 336px 336px;
+  }
+  50% {
+    stroke-dasharray: 224px 448px;
+  }
+  100% {
+    stroke-dashoffset: -672px;
+    stroke-dasharray: 336px 336px;
+  }
+}
+
+.svg-btn-line--inner {
+  stroke-dashoffset: 0;
+  stroke-dasharray: 336px 336px;
+  animation: inner-dashoffset-green 5s linear infinite;
+}
+
+/* --- Morphing Spin-to-Checkmark Submit Button --- */
+.morph-submit-btn {
+  position: relative;
+  width: 100%;
+  height: 52px;
+  background-color: #0505a9;
+  border: 3px solid #0505a9;
+  border-radius: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 800;
+  overflow: hidden;
+  margin: 0 auto;
+  transition: all 400ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.morph-submit-btn:hover {
+  background-color: #1e3a8a;
+  border-color: #1e3a8a;
+  box-shadow: 0 6px 20px rgba(5, 5, 169, 0.25);
+}
+
+.morph-submit-btn .btn-text,
+.morph-submit-btn .btn-check-svg {
+  position: absolute;
+  transition: all 300ms ease;
+}
+
+.morph-submit-btn .btn-check-svg {
+  fill: transparent;
+  opacity: 0;
+  width: 24px;
+  height: 24px;
+}
+
+/* Submitting state: Morph into circle & Spin */
+.morph-submit-btn.is-submitting {
+  width: 52px;
+  border-radius: 50px;
+  background: transparent;
+  border: 4px solid rgba(5, 5, 169, 0.15);
+  border-left: 4px solid #0505a9;
+  border-bottom: 4px solid #0505a9;
+  animation: morphSpin 1.8s 200ms forwards;
+}
+
+.morph-submit-btn.is-submitting .btn-text {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+.morph-submit-btn.is-submitting .btn-check-svg {
+  animation: morphCheck 400ms 1.6s forwards;
+}
+
+/* Submitted state: Green Checkmark */
+.morph-submit-btn.is-submitted {
+  width: 52px;
+  border-radius: 50px;
+  background: #ffffff;
+  border: 3px solid #17b978;
+  box-shadow: 0 0 15px rgba(23, 185, 120, 0.3);
+}
+
+.morph-submit-btn.is-submitted .btn-text {
+  opacity: 0;
+}
+
+.morph-submit-btn.is-submitted .btn-check-svg {
+  opacity: 1;
+  fill: #17b978;
+}
+
+@keyframes morphSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  80% {
+    border: 4px solid rgba(5, 5, 169, 0.15);
+    border-left: 4px solid #0505a9;
+    border-bottom: 4px solid #0505a9;
+  }
+  100% {
+    transform: rotate(1080deg);
+    border: 4px solid #17b978;
+  }
+}
+
+@keyframes morphCheck {
+  0% {
+    opacity: 0;
+    fill: transparent;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    fill: #17b978;
+    transform: scale(1);
+  }
+}
+
+/* Permanent Toast Container Transparency (Removes any black/dark backdrop behind toasts) */
+div[aria-live="polite"],
+div[aria-live="assertive"],
+[data-toaster],
+.toaster-container,
+#toast-container {
+  background: transparent !important;
+  background-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* --- Social Media Dynamic Icon Hover Effect (3D Rotate & Background Fill) --- */
+ul.social-hover-list {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex-wrap: nowrap;
+}
+
+ul.social-hover-list li {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+ul.social-hover-list li a {
+  width: 44px;
+  height: 44px;
+  background-color: #ffffff;
+  text-align: center;
+  line-height: 44px;
+  font-size: 19px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  position: relative;
+  overflow: hidden;
+  border: 2px solid #ffffff;
+  z-index: 1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
+  text-decoration: none;
+}
+
+ul.social-hover-list li a .icon {
+  position: relative;
+  color: #262626;
+  transition: transform 0.5s ease, color 0.5s ease;
+  z-index: 3;
+  display: inline-block;
+}
+
+ul.social-hover-list li a:hover .icon {
+  color: #ffffff;
+  transform: rotateY(360deg);
+}
+
+ul.social-hover-list li a:before {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #f00;
+  transition: top 0.5s ease;
+  z-index: 2;
+}
+
+ul.social-hover-list li a:hover:before {
+  top: 0;
+}
+
+ul.social-hover-list li:nth-child(1) a:before,
+ul.social-hover-list li.facebook-item a:before {
+  background: #3b5999;
+}
+
+ul.social-hover-list li:nth-child(2) a:before,
+ul.social-hover-list li.twitter-item a:before {
+  background: #55acee;
+}
+
+ul.social-hover-list li:nth-child(3) a:before,
+ul.social-hover-list li.linkedin-item a:before {
+  background: #0077b5;
+}
+
+ul.social-hover-list li:nth-child(4) a:before,
+ul.social-hover-list li.youtube-item a:before {
+  background: #ff0000;
+}
+
+ul.social-hover-list li:nth-child(5) a:before,
+ul.social-hover-list li.instagram-item a:before {
+  background: #e4405f;
+}
+
+/* --- Ultra-Smooth About Us Hover Card Effects --- */
+.smooth-about-card {
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.5s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease;
+  background-color: #ffffff;
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0px 10px 25px -5px rgba(15, 23, 42, 0.05);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  will-change: transform, box-shadow;
+}
+
+.smooth-about-card:hover {
+  box-shadow: 0px 25px 40px -10px rgba(5, 5, 169, 0.15);
+  transform: translateY(-6px) scale(1.03);
+  border-color: rgba(37, 99, 235, 0.4);
+}
+
+.smooth-about-card .card__img-wrapper {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  overflow: hidden;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  background-color: #f1f5f9;
+}
+
+.smooth-about-card .card__img--hover {
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+.smooth-about-card:hover .card__img--hover {
+  transform: scale(1.08);
+  opacity: 0.95;
+}
+
+.smooth-about-card .card__info-hover {
+  position: absolute;
+  padding: 16px 20px;
+  width: 100%;
+  opacity: 0;
+  top: 0;
+  left: 0;
+  z-index: 10;
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateY(-8px);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.smooth-about-card:hover .card__info-hover {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.smooth-about-card .card__info {
+  z-index: 2;
+  position: relative;
+  background-color: #ffffff;
+  border-bottom-left-radius: 20px;
+  border-bottom-right-radius: 20px;
+  padding: 20px 24px 24px 24px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.smooth-about-card .card__category {
+  font-family: inherit;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+  color: #0505a9;
+}
+
+.smooth-about-card .card__title {
+  margin-top: 4px;
+  margin-bottom: 8px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+/* --- Neon Blue Animated Border Button for Doctors Book Appointment --- */
+.neon-blue-border-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 20px;
+  background: #ffffff; /* Starting white background */
+  color: #0505a9; /* Blue text */
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.4s ease;
+  border: 1.5px solid rgba(37, 99, 235, 0.35);
+  box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.12);
+}
+
+.neon-blue-border-btn:hover {
+  background: #0505a9; /* Blue background on hover */
+  color: #ffffff; /* White text on hover */
+  border-color: #2563eb;
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.5), 0 0 28px rgba(37, 99, 235, 0.3);
+}
+
+.neon-blue-border-btn span.neon-line {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+}
+
+.neon-blue-border-btn span.neon-line:nth-child(1) {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #60a5fa);
+  animation: neon-animate1 1s linear infinite;
+}
+
+@keyframes neon-animate1 {
+  0% {
+    left: -100%;
+  }
+  50%, 100% {
+    left: 100%;
+  }
+}
+
+.neon-blue-border-btn span.neon-line:nth-child(2) {
+  top: -100%;
+  right: 0;
+  width: 2px;
+  height: 100%;
+  background: linear-gradient(180deg, transparent, #60a5fa);
+  animation: neon-animate2 1s linear infinite;
+  animation-delay: 0.25s;
+}
+
+@keyframes neon-animate2 {
+  0% {
+    top: -100%;
+  }
+  50%, 100% {
+    top: 100%;
+  }
+}
+
+.neon-blue-border-btn span.neon-line:nth-child(3) {
+  bottom: 0;
+  right: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(270deg, transparent, #60a5fa);
+  animation: neon-animate3 1s linear infinite;
+  animation-delay: 0.5s;
+}
+
+@keyframes neon-animate3 {
+  0% {
+    right: -100%;
+  }
+  50%, 100% {
+    right: 100%;
+  }
+}
+
+.neon-blue-border-btn span.neon-line:nth-child(4) {
+  bottom: -100%;
+  left: 0;
+  width: 2px;
+  height: 100%;
+  background: linear-gradient(360deg, transparent, #60a5fa);
+  animation: neon-animate4 1s linear infinite;
+  animation-delay: 0.75s;
+}
+
+/* --- Rounded Chevron Animated CTA Button for Book Appointment --- */
+.skew-cta-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 20px;
+  text-decoration: none;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  color: #ffffff;
+  background: #0505a9;
+  transition: all 0.35s ease;
+  box-shadow: 0 4px 14px -2px rgba(5, 5, 169, 0.3);
+  border-radius: 9999px;
+  border: 1.5px solid #0505a9;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.skew-cta-btn:focus {
+  outline: none;
+}
+
+.skew-cta-btn:hover {
+  transition: 0.35s ease;
+  background: #1d4ed8;
+  box-shadow: 0 6px 20px -2px rgba(29, 78, 216, 0.5);
+  border-color: #38bdf8;
+  transform: translateY(-2px);
+}
+
+.skew-cta-btn span.cta-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.skew-cta-btn span.cta-arrow {
+  margin-left: 10px;
+  display: flex;
+  align-items: center;
+  transition: margin-right 0.35s ease;
+  position: relative;
+}
+
+.skew-cta-btn:hover span.cta-arrow {
+  transition: 0.35s ease;
+  margin-right: 4px;
+}
+
+/* SVG Chevron Path Animations */
+.skew-cta-btn path.one {
+  transition: 0.4s;
+  transform: translateX(-60%);
+  fill: #ffffff;
+}
+
+.skew-cta-btn path.two {
+  transition: 0.5s;
+  transform: translateX(-30%);
+  fill: #ffffff;
+}
+
+.skew-cta-btn path.three {
+  transition: 0.4s;
+  fill: #ffffff;
+}
+
+.skew-cta-btn:hover path.three {
+  animation: cta_color_anim 1s infinite 0.2s;
+}
+
+.skew-cta-btn:hover path.one {
+  transform: translateX(0%);
+  animation: cta_color_anim 1s infinite 0.6s;
+}
+
+.skew-cta-btn:hover path.two {
+  transform: translateX(0%);
+  animation: cta_color_anim 1s infinite 0.4s;
+}
+
+@keyframes cta_color_anim {
+  0% {
+    fill: #ffffff;
+  }
+  50% {
+    fill: #38bdf8;
+  }
+  100% {
+    fill: #ffffff;
+  }
+}
+
+@keyframes neon-animate4 {
+  0% {
+    bottom: -100%;
+  }
+  50%, 100% {
+    bottom: 100%;
+  }
+}
+

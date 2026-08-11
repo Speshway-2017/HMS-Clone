@@ -13,7 +13,7 @@ import {
   ArrowRight,
   TrendingDown
 } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, BarChart, Bar, ComposedChart, Line, Treemap } from "recharts";
 import { Card } from "../../components/ui/Card";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { Button } from "../../components/ui/Button";
@@ -91,21 +91,41 @@ export function PharmacyDashboard() {
   const todaySalesCount = todayInvs.length;
   const todayRevenue = todayInvs.reduce((acc: number, curr: any) => acc + (curr.totals?.total || curr.total || 0), 0);
 
-  // 3. Recharts sales trend
+  // 3. Recharts sales trend & billing status trends
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - i);
     return d.toISOString().split("T")[0];
   }).reverse();
-  const sales: Sale[] = last7Days.map(date => {
-    const amount = invoices
-      .filter((inv: any) => {
-        const invDate = new Date(inv.issuedAt || inv.createdAt).toISOString().split("T")[0];
-        return invDate === date && inv.status === "paid";
-      })
+  const sales = last7Days.map(date => {
+    const dayInvoices = invoices.filter((inv: any) => {
+      const invDate = new Date(inv.issuedAt || inv.createdAt).toISOString().split("T")[0];
+      return invDate === date;
+    });
+    const amount = dayInvoices
+      .filter((inv: any) => inv.status === "paid")
+      .reduce((sum: number, inv: any) => sum + (inv.totals?.total || inv.total || 0), 0);
+    const rxCount = (realPrescriptions || []).filter((rx: any) => {
+      const rxDate = new Date(rx.createdAt).toISOString().split("T")[0];
+      return rxDate === date;
+    }).length;
+    const displayDate = new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return { date: displayDate, amount, prescriptions: rxCount };
+  });
+
+  const dailyBillingTrend = last7Days.map(date => {
+    const dayInvoices = invoices.filter((inv: any) => {
+      const invDate = new Date(inv.issuedAt || inv.createdAt).toISOString().split("T")[0];
+      return invDate === date;
+    });
+    const paid = dayInvoices
+      .filter((inv: any) => inv.status === "paid")
+      .reduce((sum: number, inv: any) => sum + (inv.totals?.total || inv.total || 0), 0);
+    const pending = dayInvoices
+      .filter((inv: any) => inv.status !== "paid")
       .reduce((sum: number, inv: any) => sum + (inv.totals?.total || inv.total || 0), 0);
     const displayDate = new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    return { date: displayDate, amount };
+    return { date: displayDate, Paid: paid, Pending: pending };
   });
 
   // 4. Prescriptions mapping
@@ -133,6 +153,53 @@ export function PharmacyDashboard() {
   const lowStockMedicinesList = medicines
     .filter(med => med.stockQty <= med.reorderLevel)
     .slice(0, 4);
+
+  // 1. Medicine Category Share (Top 5)
+  const categoryCounts: Record<string, number> = {};
+  medicines.forEach(med => {
+    const cat = med.category || "General";
+    categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+  });
+  const categoryData = Object.entries(categoryCounts)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5);
+
+  const treemapData = categoryData.map(c => ({
+    name: c.name,
+    size: c.value
+  }));
+
+  // 2. Stock Health Status breakdown
+  let optimal = 0;
+  let nearReorder = 0;
+  let critical = 0;
+  let outOfStock = 0;
+  medicines.forEach(m => {
+    if (m.stockQty === 0) outOfStock++;
+    else if (m.stockQty <= m.reorderLevel) critical++;
+    else if (m.stockQty <= m.reorderLevel * 2) nearReorder++;
+    else optimal++;
+  });
+  const stockHealthData = [
+    { name: "Optimal Stock", value: optimal, color: "#10b981" },
+    { name: "Near Reorder", value: nearReorder, color: "#f59e0b" },
+    { name: "Critical Low", value: critical, color: "#ef4444" },
+    { name: "Out of Stock", value: outOfStock, color: "#6b7280" }
+  ].filter(item => item.value > 0);
+
+  // 3. Prescription Status clearance rate
+  const rxCounts: Record<string, number> = {};
+  prescriptions.forEach(p => {
+    const status = p.status || "Pending";
+    rxCounts[status] = (rxCounts[status] || 0) + 1;
+  });
+  const rxClearanceData = Object.entries(rxCounts).map(([name, value]) => ({
+    name,
+    value
+  }));
+
+  const COLORS = ["#1e3a8a", "#10b981", "#3b82f6", "#f59e0b", "#ec4899", "#8b5cf6"];
 
   return (
     <div className="space-y-6">
@@ -203,12 +270,12 @@ export function PharmacyDashboard() {
 
       {/* Analytics Chart and Quick Actions */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Sales Area Chart */}
+        {/* Sales & Prescription Growth Chart */}
         <Card className="lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h3 className="text-base font-semibold text-slate-800">Sales Analytics</h3>
-              <p className="text-xs text-slate-500">Weekly tracking of sales volume and billing revenue.</p>
+              <h3 className="text-base font-semibold text-slate-800">Sales Growth & Volume</h3>
+              <p className="text-xs text-slate-500">Weekly tracking of sales revenue (line) vs prescription clearance (bar).</p>
             </div>
             <Link to="/pharmacy/analytics" className="text-xs font-semibold text-navy-700 hover:text-navy-800 flex items-center gap-1">
               View Analytics <ArrowRight className="h-3 w-3" />
@@ -216,22 +283,18 @@ export function PharmacyDashboard() {
           </div>
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={sales} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#1E40AF" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#1E40AF" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
+              <ComposedChart data={sales} margin={{ top: 10, right: -10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                 <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: "#64748B", fontSize: 11 }} />
-                <YAxis tickLine={false} axisLine={false} tick={{ fill: "#64748B", fontSize: 11 }} />
+                <YAxis yAxisId="left" tickLine={false} axisLine={false} tick={{ fill: "#64748B", fontSize: 11 }} />
+                <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} tick={{ fill: "#64748B", fontSize: 11 }} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: "#FFFFFF", borderRadius: "8px", border: "1px solid #CBD5E1" }}
-                  formatter={(val: number) => [`₹${val.toLocaleString("en-IN")}`, "Revenue"]}
                 />
-                <Area type="monotone" dataKey="amount" stroke="#1E40AF" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" />
-              </AreaChart>
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+                <Bar yAxisId="right" dataKey="prescriptions" name="Prescriptions Handled" fill="#3b82f6" opacity={0.7} radius={[4, 4, 0, 0]} maxBarSize={20} />
+                <Line yAxisId="left" type="monotone" dataKey="amount" name="Revenue (₹)" stroke="#1e3a8a" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </Card>
@@ -291,6 +354,94 @@ export function PharmacyDashboard() {
                 <div className="text-xs text-slate-500">Add medicines, track batches/expiry</div>
               </div>
             </button>
+          </div>
+        </Card>
+      </div>
+
+      {/* Pharmacy Operational Analytics Row */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* 1. Medicine Category Share Treemap */}
+        <Card>
+          <h3 className="text-sm font-bold text-slate-800 mb-1">Medicine Categories (Tree Layout)</h3>
+          <p className="text-xs text-slate-400 mb-4">Hierarchical proportion of categories in stock</p>
+          <div className="h-56">
+            {treemapData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-slate-400 text-xs">No stock data.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <Treemap
+                  data={treemapData}
+                  dataKey="size"
+                  stroke="#fff"
+                  fill="#1e3a8a"
+                >
+                  <Tooltip formatter={(v: number) => [`${v} Medicines`]} />
+                </Treemap>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </Card>
+
+        {/* 2. Billing Analytics Trend */}
+        <Card>
+          <h3 className="text-sm font-bold text-slate-800 mb-1">Billing Analytics Trend</h3>
+          <p className="text-xs text-slate-400 mb-4">Paid vs pending collections over the last 7 days</p>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={dailyBillingTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorPaid" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorPending" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#64748B" }} />
+                <YAxis tick={{ fontSize: 10, fill: "#64748B" }} />
+                <Tooltip formatter={(val: number) => [`₹${val.toLocaleString("en-IN")}`]} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 10 }} />
+                <Area type="monotone" dataKey="Paid" stackId="1" stroke="#10b981" fillOpacity={1} fill="url(#colorPaid)" />
+                <Area type="monotone" dataKey="Pending" stackId="1" stroke="#f59e0b" fillOpacity={1} fill="url(#colorPending)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        {/* 3. Prescription Clearance Funnel */}
+        <Card>
+          <h3 className="text-sm font-bold text-slate-800 mb-1">Prescription Clearance</h3>
+          <p className="text-xs text-slate-400 mb-4">Volume of prescriptions by status</p>
+          <div className="h-56">
+            {rxClearanceData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-slate-400 text-xs">No prescription data.</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={rxClearanceData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: "#64748B" }} />
+                  <YAxis tick={{ fontSize: 10, fill: "#64748B" }} />
+                  <Tooltip formatter={(v: number) => [`${v} Prescriptions`]} />
+                  <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={28}>
+                    {rxClearanceData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={
+                          entry.name === "Pending"
+                            ? "#f59e0b"
+                            : entry.name === "Dispensed" || entry.name === "Completed" || entry.name === "Approved"
+                            ? "#10b981"
+                            : "#ef4444"
+                        }
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </Card>
       </div>

@@ -6,40 +6,69 @@ import { LabOrder } from "../models/LabOrder";
 import { RadiologyOrder } from "../models/RadiologyOrder";
 import { DiagnosticReport } from "../models/DiagnosticReport";
 import { DbNotification } from "../models/DbNotification";
+import { Patient } from "../models/Patient";
+import { Invoice } from "../models/Invoice";
 import { emitToDoctor, emitToHospital } from "../config/socket";
 import { logAudit } from "../utils/auditLogger";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
+import { notifyAssignedDoctorForPatient } from "../utils/autoNotifyAssignedDoctor";
 
-async function findOrder(requestId: string) {
-  let order: any = await LabOrder.findById(requestId).populate("patient").populate("doctor");
+import { buildBranchQuery } from "../utils/branchQueryHelper";
+
+async function findOrder(requestId: string, hospitalId?: string | Types.ObjectId) {
+  const query: any = { _id: requestId };
+  if (hospitalId) query.hospital = hospitalId;
+  let order: any = await LabOrder.findOne(query).populate("patient").populate("doctor");
   let type: "Laboratory" | "Radiology" = "Laboratory";
   if (!order) {
-    order = await RadiologyOrder.findById(requestId).populate("patient").populate("doctor");
+    order = await RadiologyOrder.findOne(query).populate("patient").populate("doctor");
     type = "Radiology";
   }
   return { order, type };
 }
 
 export const getRequests = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
+  const filter = buildBranchQuery(req.hospitalFilter);
 
-  const [labOrders, radOrders] = await Promise.all([
-    LabOrder.find({ hospital: hospitalId })
+  const [labOrders, radOrders, invoices] = await Promise.all([
+    LabOrder.find(filter)
       .populate("patient", "name uhid age gender phone")
       .populate("doctor", "name")
       .populate("appointment", "referenceId chiefComplaint diagnosis clinicalNotes advice vitals")
       .sort({ createdAt: -1 }),
-    RadiologyOrder.find({ hospital: hospitalId })
+    RadiologyOrder.find(filter)
       .populate("patient", "name uhid age gender phone")
       .populate("doctor", "name")
       .populate("appointment", "referenceId chiefComplaint diagnosis clinicalNotes advice vitals")
-      .sort({ createdAt: -1 })
+      .sort({ createdAt: -1 }),
+    Invoice.find({ ...filter, billingType: { $in: ["LAB", "RADIOLOGY"] } })
   ]);
 
-  // ─── Single map keyed by appointment ID ───────────────────────────────────
-  // Both LabOrder and RadiologyOrder from the same appointment are MERGED into
-  // ONE request entry so the lab dashboard shows a single row per consultation.
+  const paidApptSet = new Set<string>();
+  const paidPatientSet = new Set<string>();
+  const unpaidApptSet = new Set<string>();
+
+  invoices.forEach((inv: any) => {
+    const isPaid = inv.status === "paid" || inv.totals?.patientBalance === 0;
+    if (inv.appointment) {
+      if (isPaid) paidApptSet.add(inv.appointment.toString());
+      else unpaidApptSet.add(inv.appointment.toString());
+    }
+    if (inv.patient) {
+      if (isPaid) paidPatientSet.add(inv.patient.toString());
+    }
+  });
+
+  const checkPaymentStatus = (o: any): "PAID" | "PAYMENT_PENDING" => {
+    if (o.appointment) {
+      const apptId = (o.appointment._id || o.appointment).toString();
+      if (unpaidApptSet.has(apptId)) return "PAYMENT_PENDING";
+      if (paidApptSet.has(apptId)) return "PAID";
+    }
+    return "PAID";
+  };
+
   const apptGroupMap = new Map<string, any>();
   const standaloneOrders: any[] = [];
 
@@ -50,23 +79,19 @@ export const getRequests = catchAsync(async (req: Request, res: Response) => {
   };
 
   const mergeIntoGroup = (group: any, tests: string[], priority: string, status: string, sampleStatus: string, rejectionReason: string, type: "Laboratory" | "Radiology") => {
-    // Merge tests
     tests.forEach((t: string) => { if (!group.tests.includes(t)) group.tests.push(t); });
-    // Elevate priority
     if ((priorityOrder[priority] || 1) > (priorityOrder[group.priority] || 1)) group.priority = priority;
-    // Lowest status wins
     if ((statusOrder[status] || 1) < (statusOrder[group.status] || 1)) {
       group.status = status;
       group.sampleStatus = sampleStatus;
       group.rejectionReason = rejectionReason;
     }
-    // Track which types are present
     if (!group._types) group._types = new Set<string>();
     group._types.add(type);
   };
 
-  // ── Process Lab orders ──
   labOrders.forEach(o => {
+    const paymentStatus = checkPaymentStatus(o);
     if (o.appointment) {
       const apptId = (o.appointment as any)._id.toString();
       if (!apptGroupMap.has(apptId)) {
@@ -83,6 +108,7 @@ export const getRequests = catchAsync(async (req: Request, res: Response) => {
           priority: o.priority,
           date: o.date,
           status: o.status,
+          paymentStatus,
           rejectionReason: o.rejectionReason,
           sampleStatus: o.sampleStatus,
           appointment: o.appointment,
@@ -108,6 +134,7 @@ export const getRequests = catchAsync(async (req: Request, res: Response) => {
         priority: o.priority,
         date: o.date,
         status: o.status,
+        paymentStatus,
         requestType: "Laboratory",
         rejectionReason: o.rejectionReason,
         sampleStatus: o.sampleStatus,
@@ -116,8 +143,8 @@ export const getRequests = catchAsync(async (req: Request, res: Response) => {
     }
   });
 
-  // ── Process Radiology orders — merged into the SAME appointment group ──
   radOrders.forEach(o => {
+    const paymentStatus = checkPaymentStatus(o);
     if (o.appointment) {
       const apptId = (o.appointment as any)._id.toString();
       if (!apptGroupMap.has(apptId)) {
@@ -134,6 +161,7 @@ export const getRequests = catchAsync(async (req: Request, res: Response) => {
           priority: o.priority,
           date: o.date,
           status: o.status,
+          paymentStatus,
           rejectionReason: "",
           sampleStatus: "",
           appointment: o.appointment,
@@ -159,6 +187,7 @@ export const getRequests = catchAsync(async (req: Request, res: Response) => {
         priority: o.priority,
         date: o.date,
         status: o.status,
+        paymentStatus,
         requestType: "Radiology",
         rejectionReason: "",
         sampleStatus: "",
@@ -167,7 +196,6 @@ export const getRequests = catchAsync(async (req: Request, res: Response) => {
     }
   });
 
-  // ── Finalise requestType label per group ──
   const groupedRows = Array.from(apptGroupMap.values()).map(group => {
     const types: Set<string> = group._types;
     let requestType = "Laboratory";
@@ -185,7 +213,7 @@ export const getRequests = catchAsync(async (req: Request, res: Response) => {
 export const acceptRequest = catchAsync(async (req: Request, res: Response) => {
   const { requestId } = req.params;
   const hospitalId = req.hospitalFilter!.hospital;
-  const { order, type } = await findOrder(requestId);
+  const { order, type } = await findOrder(requestId, hospitalId);
   if (!order) throw new AppError("Request not found", 404);
 
   if (order.appointment) {
@@ -225,7 +253,7 @@ export const rejectRequest = catchAsync(async (req: Request, res: Response) => {
   const { requestId } = req.params;
   const hospitalId = req.hospitalFilter!.hospital;
   const { rejectionReason } = req.body;
-  const { order, type } = await findOrder(requestId);
+  const { order, type } = await findOrder(requestId, hospitalId);
   if (!order) throw new AppError("Request not found", 404);
 
   if (order.appointment) {
@@ -264,7 +292,7 @@ export const rejectRequest = catchAsync(async (req: Request, res: Response) => {
 export const startProcessing = catchAsync(async (req: Request, res: Response) => {
   const { requestId } = req.params;
   const hospitalId = req.hospitalFilter!.hospital;
-  const { order, type } = await findOrder(requestId);
+  const { order, type } = await findOrder(requestId, hospitalId);
   if (!order) throw new AppError("Request not found", 404);
 
   if (order.appointment) {
@@ -301,9 +329,10 @@ export const startProcessing = catchAsync(async (req: Request, res: Response) =>
 
 export const uploadReport = catchAsync(async (req: Request, res: Response) => {
   const { requestId } = req.params;
+  const hospitalId = req.hospitalFilter!.hospital;
   const files = req.files as Express.Multer.File[];
 
-  const { order, type } = await findOrder(requestId);
+  const { order, type } = await findOrder(requestId, hospitalId);
   if (!order) throw new AppError("Request not found", 404);
 
   const session = await mongoose.startSession();
@@ -353,29 +382,63 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
         }
 
         // Determine if it is Lab or Radiology
-        const isRadiology = radTests.includes(rep.testName);
+        const isRadiology = type === "Radiology" || radTests.includes(rep.testName) || /mri|x-ray|xray|ct|ultrasound|scan|mammogram|pet|echo|ecg|radiology|usg/i.test(rep.testName);
         const requestType = isRadiology ? "Radiology" : "Laboratory";
 
-        const report = await DiagnosticReport.create(
-          [
-            {
-              hospital: order.hospital,
-              patient: order.patient._id,
-              doctor: order.doctor._id,
-              appointment: order.appointment || new mongoose.Types.ObjectId(),
-              requestType,
-              requestId: order._id,
-              testName: rep.testName,
-              observations: rep.observations || "",
-              remarks: rep.remarks || "",
-              files: uploadedFiles,
-              uploadedBy: req.user!._id,
-              status: "report_uploaded"
-            }
-          ],
-          { session }
-        );
-        createdReports.push(report[0]);
+        // Prevent duplicate: check if a DiagnosticReport already exists for this requestId + testName
+        const existingReport = await DiagnosticReport.findOne({
+          requestId: order._id,
+          testName: rep.testName
+        }).session(session);
+
+        let report;
+        if (existingReport) {
+          // Archive current content as a version before overwriting
+          const versionEntry = {
+            version: existingReport.version || 1,
+            observations: existingReport.observations || "",
+            remarks: existingReport.remarks || "",
+            files: existingReport.files || [],
+            editedBy: req.user!._id,
+            editedAt: new Date()
+          };
+          existingReport.versions = existingReport.versions || [];
+          existingReport.versions.push(versionEntry as any);
+          existingReport.version = (existingReport.version || 1) + 1;
+          existingReport.observations = rep.observations || existingReport.observations;
+          existingReport.remarks = rep.remarks || existingReport.remarks;
+          if (uploadedFiles.length > 0) existingReport.files = uploadedFiles as any;
+          existingReport.status = "report_uploaded";
+          existingReport.uploadedBy = req.user!._id as any;
+          existingReport.uploadedAt = new Date();
+          await existingReport.save({ session });
+          report = existingReport;
+        } else {
+          const created = await DiagnosticReport.create(
+            [
+              {
+                hospital: order.hospital,
+                branch: order.branch || req.hospitalFilter?.branch || (req.user as any)?.branch || null,
+                patient: order.patient._id,
+                doctor: order.doctor._id,
+                appointment: order.appointment || new mongoose.Types.ObjectId(),
+                requestType,
+                requestId: order._id,
+                testName: rep.testName,
+                observations: rep.observations || "",
+                remarks: rep.remarks || "",
+                files: uploadedFiles,
+                uploadedBy: req.user!._id,
+                status: "report_uploaded",
+                version: 1,
+                versions: []
+              }
+            ],
+            { session }
+          );
+          report = created[0];
+        }
+        createdReports.push(report);
       }
 
       if (order.appointment) {
@@ -401,6 +464,25 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
 
       if (order.hospital) {
         emitToHospital(order.hospital, "lab_report_uploaded", { requestId: order._id });
+      }
+
+      if (order.patient) {
+        const ptName = (order.patient as any).name || "Patient";
+        const ptUhid = (order.patient as any).uhid || "";
+        await notifyAssignedDoctorForPatient({
+          hospitalId: order.hospital,
+          patientId: (order.patient as any)._id || order.patient,
+          patientName: ptName,
+          uhid: ptUhid,
+          nurseName: (req.user as any)?.name || "Nurse",
+          title: "New Patient Report Uploaded",
+          message: `A new report has been uploaded for Patient ${ptName}.`,
+          severity: "info",
+          extraData: {
+            type: "patient_report",
+            reportType: type || "Clinical Report"
+          }
+        });
       }
 
       await logAudit({
@@ -464,6 +546,7 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
         [
           {
             hospital: order.hospital,
+            branch: order.branch || req.hospitalFilter?.branch || (req.user as any)?.branch || null,
             patient: order.patient._id,
             doctor: order.doctor._id,
             appointment: order.appointment || new mongoose.Types.ObjectId(),
@@ -524,7 +607,8 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
 
 export const verifyReport = catchAsync(async (req: Request, res: Response) => {
   const { requestId } = req.params;
-  const { order, type } = await findOrder(requestId);
+  const hospitalId = req.hospitalFilter!.hospital;
+  const { order, type } = await findOrder(requestId, hospitalId);
   if (!order) throw new AppError("Request not found", 404);
 
   const session = await mongoose.startSession();
@@ -568,7 +652,8 @@ export const verifyReport = catchAsync(async (req: Request, res: Response) => {
 
 export const publishReport = catchAsync(async (req: Request, res: Response) => {
   const { requestId } = req.params;
-  const { order, type } = await findOrder(requestId);
+  const hospitalId = req.hospitalFilter!.hospital;
+  const { order, type } = await findOrder(requestId, hospitalId);
   if (!order) throw new AppError("Request not found", 404);
 
   const session = await mongoose.startSession();
@@ -694,7 +779,10 @@ export const getConsultationReports = catchAsync(async (req: Request, res: Respo
 
 export const getReportById = catchAsync(async (req: Request, res: Response) => {
   const { reportId } = req.params;
-  const report = await DiagnosticReport.findById(reportId)
+  const hospitalId = req.hospitalFilter?.hospital;
+  const query: any = { _id: reportId };
+  if (hospitalId) query.hospital = hospitalId;
+  const report = await DiagnosticReport.findOne(query)
     .populate("patient")
     .populate("doctor")
     .populate("uploadedBy", "name");
@@ -712,7 +800,10 @@ export const getReportById = catchAsync(async (req: Request, res: Response) => {
 
 export const downloadReport = catchAsync(async (req: Request, res: Response) => {
   const { reportId } = req.params;
-  const report = await DiagnosticReport.findById(reportId);
+  const hospitalId = req.hospitalFilter?.hospital;
+  const query: any = { _id: reportId };
+  if (hospitalId) query.hospital = hospitalId;
+  const report = await DiagnosticReport.findOne(query);
   if (!report) throw new AppError("Report not found", 404);
 
   if (req.user!.role === "doctor") {
@@ -731,15 +822,25 @@ export const downloadReport = catchAsync(async (req: Request, res: Response) => 
 
 export const getPatientReports = catchAsync(async (req: Request, res: Response) => {
   const { patientId } = req.query;
+  let resolvedPatientId = patientId;
   const hospitalId = req.hospitalFilter!.hospital;
 
-  if (!patientId) {
+  if (req.user!.role === "patient") {
+    const patientDoc = await Patient.findOne({ email: req.user!.email });
+    if (patientDoc) {
+      resolvedPatientId = patientDoc._id.toString();
+    } else {
+      return res.json({ status: "success", data: [] });
+    }
+  }
+
+  if (!resolvedPatientId) {
     throw new AppError("Patient ID is required.", 400);
   }
 
   const reports = await DiagnosticReport.find({
     hospital: hospitalId,
-    patient: patientId,
+    patient: resolvedPatientId,
     status: { $in: ["report_uploaded", "verified", "completed"] }
   })
     .sort({ uploadedAt: -1 })
@@ -761,4 +862,166 @@ export const getPatientReports = catchAsync(async (req: Request, res: Response) 
   }
 
   res.json({ status: "success", data: reports });
+});
+
+export const collectSample = catchAsync(async (req: Request, res: Response) => {
+  const { requestId } = req.params;
+  const hospitalId = req.hospitalFilter!.hospital;
+  const { sampleId, sampleType, collectedBy } = req.body;
+
+  const { order } = await findOrder(requestId, hospitalId);
+  if (!order) throw new AppError("Request not found", 404);
+
+  const sampleDetails = {
+    sampleId: sampleId || `SMP-${Date.now().toString().slice(-6)}`,
+    sampleType: sampleType || "Blood",
+    collectedBy: collectedBy || (req.user as any)?.name || "Lab Technician",
+    collectedAt: new Date(),
+  };
+
+  if (order.appointment) {
+    await LabOrder.updateMany(
+      { appointment: order.appointment, hospital: hospitalId },
+      { status: "Sample Collection", sampleStatus: "Collected", sampleDetails }
+    );
+  } else {
+    order.status = "Sample Collection";
+    order.sampleStatus = "Collected";
+    order.sampleDetails = sampleDetails;
+    await order.save();
+  }
+
+  if (hospitalId) {
+    emitToHospital(hospitalId, "lab_order_updated", { requestId, status: "Sample Collection", sampleStatus: "Collected" });
+  }
+
+  res.json({ status: "success", data: order });
+});
+
+export const submitResults = catchAsync(async (req: Request, res: Response) => {
+  const { requestId } = req.params;
+  const hospitalId = req.hospitalFilter!.hospital;
+  const { results } = req.body;
+
+  const { order } = await findOrder(requestId, hospitalId);
+  if (!order) throw new AppError("Request not found", 404);
+
+  if (order.appointment) {
+    await LabOrder.updateMany(
+      { appointment: order.appointment, hospital: hospitalId },
+      { status: "Quality Check", sampleStatus: "Processing", results: results || [] }
+    );
+  } else {
+    order.status = "Quality Check";
+    order.sampleStatus = "Processing";
+    if (results) order.results = results;
+    await order.save();
+  }
+
+  if (hospitalId) {
+    emitToHospital(hospitalId, "lab_order_updated", { requestId, status: "Quality Check" });
+  }
+
+  res.json({ status: "success", data: order });
+});
+
+export const getCompletedReports = catchAsync(async (req: Request, res: Response) => {
+  const filter = {
+    ...buildBranchQuery(req.hospitalFilter),
+    status: { $in: ["completed", "report_uploaded", "verified"] }
+  };
+
+  const reports = await DiagnosticReport.find(filter)
+    .sort({ updatedAt: -1, createdAt: -1 })
+    .populate("patient", "name uhid age gender phone")
+    .populate("doctor", "name specialization")
+    .populate("uploadedBy", "name email role")
+    .populate("appointment", "referenceId date time chiefComplaint diagnosis");
+
+  res.json({ status: "success", data: reports });
+});
+
+export const editReport = catchAsync(async (req: Request, res: Response) => {
+  const { reportId } = req.params;
+  const files = req.files as Express.Multer.File[];
+
+  const report = await DiagnosticReport.findById(reportId);
+  if (!report) throw new AppError("Diagnostic report not found", 404);
+
+  const { observations, remarks } = req.body;
+
+  const currentVersionData = {
+    version: report.version || 1,
+    observations: report.observations || "",
+    remarks: report.remarks || "",
+    files: report.files || [],
+    editedBy: req.user!._id,
+    editedAt: new Date()
+  };
+
+  report.versions = report.versions || [];
+  report.versions.push(currentVersionData as any);
+  report.version = (report.version || 1) + 1;
+
+  if (observations !== undefined) report.observations = observations;
+  if (remarks !== undefined) report.remarks = remarks;
+
+  if (files && files.length > 0) {
+    const uploadedFiles = [];
+    for (const file of files) {
+      const uploadResult = await new Promise<{ secure_url: string; public_id: string; resource_type: string }>((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: `hms/diagnostic-reports`, resource_type: "auto" },
+          (error, uploadResult) => {
+            if (error || !uploadResult) {
+              reject(error ?? new Error("Cloudinary upload failed."));
+              return;
+            }
+            resolve(uploadResult);
+          }
+        );
+        stream.end(file.buffer);
+      });
+
+      uploadedFiles.push({
+        public_id: uploadResult.public_id,
+        secure_url: uploadResult.secure_url,
+        original_filename: file.originalname,
+        mime_type: file.mimetype,
+        file_size: file.size
+      });
+    }
+    report.files = uploadedFiles as any;
+  }
+
+  await report.save();
+
+  if (report.patient) {
+    const ptName = (report.patient as any).name || "Patient";
+    const ptUhid = (report.patient as any).uhid || "";
+    await notifyAssignedDoctorForPatient({
+      hospitalId: report.hospital,
+      patientId: (report.patient as any)._id || report.patient,
+      patientName: ptName,
+      uhid: ptUhid,
+      nurseName: (req.user as any)?.name || "Lab Staff",
+      title: `Lab Report Updated (v${report.version})`,
+      message: `Diagnostic report for ${report.testName} (Patient ${ptName}) has been updated to Version ${report.version}.`,
+      severity: "info",
+      extraData: {
+        type: "patient_report_updated",
+        reportId: report._id
+      }
+    });
+  }
+
+  await logAudit({
+    req,
+    action: "EDIT_LAB_REPORT",
+    entity: "DiagnosticReport",
+    entityId: report._id.toString(),
+    details: { version: report.version }
+  });
+
+  res.json({ status: "success", data: report });
 });

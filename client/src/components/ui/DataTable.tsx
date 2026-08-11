@@ -19,7 +19,7 @@ export function DataTable<T>({ columns, rows, rowKey, emptyMessage = "No records
   const headerPaddingClass = dense ? "px-3 py-2" : "px-4 py-3";
 
   return (
-    <div className="overflow-x-auto">
+    <div className="w-full min-w-0 overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">

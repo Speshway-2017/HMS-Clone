@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 import { api } from "../lib/api";
 import { Doctor, Paginated } from "../types/domain";
 import { useAuth } from "../context/AuthContext";
 
 interface DoctorListParams {
   page?: number;
+  limit?: number;
   department?: string;
   status?: string;
   search?: string;
@@ -40,14 +42,39 @@ export function useDoctor(id: string | undefined) {
   });
 }
 
-export function useDoctorPerformance(id: string | undefined) {
+export interface DoctorPerformanceData {
+  doctor: Doctor;
+  metrics: {
+    completedTotal: number;
+    upcomingTotal: number;
+    totalBookings: number;
+    monthlyVolume: number;
+    patientSatisfaction: number;
+    avgRating: number;
+    totalReviews: number;
+    ratingDistribution: Record<number, number>;
+    monthlyTrends: { month: string; consultations: number }[];
+  };
+  feedback: {
+    _id: string;
+    patientName: string;
+    patientUhid?: string;
+    rating: number;
+    comment: string;
+    createdAt: string;
+  }[];
+}
+
+export function useDoctorPerformance(id?: string) {
   return useQuery({
-    queryKey: ["doctors", "performance", id],
+    queryKey: ["doctors", id, "performance"],
     enabled: !!id,
     queryFn: async () => {
       const res = await api.get(`/doctors/${id}/performance`);
-      return res.data.data as { doctor: Doctor; metrics: { monthlyVolume: number; completedTotal: number; patientSatisfaction: number } };
+      return res.data.data as DoctorPerformanceData;
     },
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 }
 
@@ -79,7 +106,14 @@ export function useDeleteDoctor() {
     mutationFn: async (id: string) => {
       await api.delete(`/doctors/${id}`);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["doctors"] }),
+    onSuccess: () => {
+      toast.success("Doctor deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["doctors"] });
+      queryClient.invalidateQueries({ queryKey: ["public", "doctors"] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || "Failed to delete doctor.");
+    }
   });
 }
 

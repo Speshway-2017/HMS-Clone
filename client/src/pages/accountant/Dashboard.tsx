@@ -10,6 +10,7 @@ import {
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  ComposedChart,
 } from "recharts";
 import { useAccountantDashboard } from "../../features/accountantDashboard";
 import { socket } from "../../lib/socket";
@@ -122,7 +123,7 @@ function CollCell({
   label, value, highlight = false, warn = false,
 }: { label: string; value: number; highlight?: boolean; warn?: boolean }) {
   return (
-    <div className={`p-3 rounded-lg border ${warn ? "bg-amber-50 border-amber-200" : highlight ? "bg-navy-55 border-navy-200 text-white" : "bg-white border-slate-200"}`}>
+    <div className={`p-3 rounded-lg border ${warn ? "bg-amber-50 border-amber-200" : highlight ? "bg-navy-700 border-navy-700 text-white shadow-sm" : "bg-white border-slate-200"}`}>
       <span className={`block uppercase text-[9px] leading-tight mb-1 tracking-wide font-semibold ${highlight ? "text-navy-200" : "text-slate-400"}`}>{label}</span>
       <span className={`text-sm font-bold font-mono ${warn ? "text-amber-700" : highlight ? "text-white" : "text-slate-800"}`}>
         ₹{fmt(value)}
@@ -269,8 +270,10 @@ export function AccountantDashboard() {
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pending Claims</span>
                 <ShieldAlert className="h-5 w-5 text-sky-500" />
               </div>
-              <p className="text-2xl font-bold text-slate-900">{kpi?.pendingClaimsCount ?? 0} Claims</p>
-              <p className="text-xs text-sky-600">Est: ₹{kpi?.pendingClaimsValue?.toLocaleString("en-IN") ?? "0.00"}</p>
+              <p className="text-2xl font-bold text-slate-900">₹{fmt(kpi?.pendingClaimsValue ?? 0)}</p>
+              <p className="text-xs text-sky-600">
+                {kpi?.pendingClaimsCount ?? 0} claim{(kpi?.pendingClaimsCount ?? 0) !== 1 ? "s" : ""} pending verification
+              </p>
             </Link>
 
             {/* 4. Monthly Expenses */}
@@ -429,7 +432,48 @@ export function AccountantDashboard() {
       </div>
 
       {/* ── Second Row of Charts ── */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+
+        {/* Doctor Revenue Contribution */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5">
+          <h3 className="text-sm font-bold text-slate-800 mb-1">Doctor Revenue Share</h3>
+          <p className="text-xs text-slate-400 mb-4">Total fees collected per attending doctor</p>
+          {isLoading ? (
+            <Skeleton className="h-60" />
+          ) : (charts?.doctorRevenueDistribution?.length ?? 0) === 0 ? (
+            <div className="h-60 flex items-center justify-center text-slate-400 text-sm">
+              No consultation payments logged.
+            </div>
+          ) : (
+            <div className="h-60">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={charts?.doctorRevenueDistribution}
+                    dataKey="amount"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={45}
+                    outerRadius={75}
+                    paddingAngle={2}
+                  >
+                    {charts?.doctorRevenueDistribution?.map((entry: any, i: number) => (
+                      <Cell
+                        key={entry.name}
+                        fill={PIE_COLORS[i % PIE_COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v: number) => [`₹${fmt(v)}`]} />
+                  <Legend
+                    formatter={(value) => <span className="text-[10px] text-slate-650 font-medium truncate max-w-[100px] inline-block">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
 
         {/* Insurance Claims Status Distribution */}
         <div className="bg-white border border-slate-200 rounded-xl p-5">
@@ -497,10 +541,10 @@ export function AccountantDashboard() {
 
       </div>
 
-      {/* Monthly Revenue Trend */}
+      {/* Monthly Revenue & Profitability Trend */}
       <div className="bg-white border border-slate-200 rounded-xl p-5">
-        <h3 className="text-sm font-bold text-slate-800 mb-1">Monthly Revenue — Last 7 Months</h3>
-        <p className="text-xs text-slate-400 mb-4">Aggregated collections by month</p>
+        <h3 className="text-sm font-bold text-slate-800 mb-1">Monthly Profitability Trend</h3>
+        <p className="text-xs text-slate-400 mb-4">Comparison of monthly revenues, operational expenses, and net profit margins</p>
         {isLoading ? (
           <Skeleton className="h-64" />
         ) : (charts?.monthly?.length ?? 0) === 0 ? (
@@ -510,20 +554,27 @@ export function AccountantDashboard() {
         ) : (
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={charts?.monthly} margin={{ top: 4, right: 16, left: -10, bottom: 0 }}>
+              <ComposedChart data={charts?.monthly} margin={{ top: 4, right: 16, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748b" }} />
                 <YAxis tick={{ fontSize: 10, fill: "#64748b" }} tickFormatter={fmtShort} />
-                <Tooltip formatter={(v: number) => [`₹${fmt(v)}`, "Revenue"]} />
+                <Tooltip
+                  formatter={(v: number, name: string) => [`₹${fmt(v)}`, name]}
+                  labelStyle={{ fontWeight: 600 }}
+                />
+                <Legend formatter={(value) => <span className="text-xs text-slate-650 font-semibold">{value}</span>} />
+                <Bar dataKey="revenue" name="Revenue" fill="#1e3a8a" radius={[3, 3, 0, 0]} maxBarSize={30} />
+                <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[3, 3, 0, 0]} maxBarSize={30} />
                 <Line
                   type="monotone"
-                  dataKey="revenue"
-                  stroke="#1e3a8a"
+                  dataKey="profit"
+                  name="Net Profit"
+                  stroke="#10b981"
                   strokeWidth={3}
-                  dot={{ r: 4, fill: "#1e3a8a" }}
+                  dot={{ r: 4, fill: "#10b981" }}
                   activeDot={{ r: 6 }}
                 />
-              </LineChart>
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         )}

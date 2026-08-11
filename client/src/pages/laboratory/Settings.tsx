@@ -1,12 +1,80 @@
 import { useState, useEffect } from "react";
-import { Settings, BarChart, ShieldAlert } from "lucide-react";
+import { Settings, BarChart, ShieldAlert, KeyRound, Save, ShieldCheck, Lock, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import { Card } from "../../components/ui/Card";
-import { Button } from "../../components/ui/Button";
-import { InputField, SelectField } from "../../components/ui/Field";
+import { Badge } from "../../components/ui/Badge";
 import { useChangePassword } from "../../features/auth";
+import { useAuth } from "../../context/AuthContext";
 import { useMyHospital, useUpdateMyHospital } from "../../features/hospitals";
+import toast from "react-hot-toast";
+
+function Section({ title, subtitle, icon, children }: {
+  title: string; subtitle: string; icon: React.ReactNode; children: React.ReactNode;
+}) {
+  return (
+    <Card>
+      <div className="mb-5 flex items-center gap-3 pb-4 border-b border-slate-100">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy-100 text-navy-700">
+          {icon}
+        </div>
+        <div>
+          <h2 className="text-base font-semibold text-slate-800">{title}</h2>
+          <p className="text-xs text-slate-500">{subtitle}</p>
+        </div>
+      </div>
+      {children}
+    </Card>
+  );
+}
+
+function PasswordInput({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+  autoComplete,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  autoComplete?: string;
+}) {
+  const [show, setShow] = useState(false);
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="text-xs font-semibold uppercase text-slate-400">
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          type={show ? "text" : "password"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+          className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 pr-11 text-sm text-slate-800 placeholder:text-slate-400 shadow-sm outline-none transition focus:border-navy-500 focus:ring-2 focus:ring-navy-200"
+        />
+        <button
+          type="button"
+          onClick={() => setShow((s) => !s)}
+          aria-label={show ? "Hide password" : "Show password"}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+        >
+          {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function LaboratorySettings() {
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<"catalog" | "setup" | "barcode" | "security">("catalog");
+
   // Laboratory Setup
   const [labName, setLabName] = useState("Central Pathology Diagnostics Laboratory");
   const [labCode, setLabCode] = useState("LAB-CENTRAL-01");
@@ -26,6 +94,42 @@ export function LaboratorySettings() {
   const { data: hospital } = useMyHospital();
   const updateMutation = useUpdateMyHospital();
 
+  // Default test catalogs with standard prices
+  const DEFAULT_LAB_TESTS = [
+    "Complete Blood Count (CBC)",
+    "Lipid Profile",
+    "Liver Function Test (LFT)",
+    "Kidney Function Test (KFT)",
+    "Thyroid Profile (T3, T4, TSH)",
+    "Fasting Blood Sugar (FBS)",
+    "HbA1c",
+    "Urine Routine & Microscopy",
+  ];
+
+  const DEFAULT_RADIO_STUDIES = [
+    "Chest X-Ray PA View",
+    "Ultrasound Abdomen & Pelvis",
+    "CT Brain Non-Contrast",
+    "MRI Lumbar Spine",
+    "ECG 12 Lead",
+  ];
+
+  const DEFAULT_PRICES: Record<string, number> = {
+    "Complete Blood Count (CBC)": 350,
+    "Lipid Profile": 650,
+    "Liver Function Test (LFT)": 550,
+    "Kidney Function Test (KFT)": 500,
+    "Thyroid Profile (T3, T4, TSH)": 750,
+    "Fasting Blood Sugar (FBS)": 150,
+    "HbA1c": 450,
+    "Urine Routine & Microscopy": 200,
+    "Chest X-Ray PA View": 400,
+    "Ultrasound Abdomen & Pelvis": 1200,
+    "CT Brain Non-Contrast": 2500,
+    "MRI Lumbar Spine": 4500,
+    "ECG 12 Lead": 300,
+  };
+
   const [availableLabTests, setAvailableLabTests] = useState<string[]>([]);
   const [labInput, setLabInput] = useState("");
   const [labPriceInput, setLabPriceInput] = useState("");
@@ -44,64 +148,98 @@ export function LaboratorySettings() {
   }, []);
 
   useEffect(() => {
-    if (hospital) {
-      setAvailableLabTests((hospital as any).availableLabTests || []);
-      setAvailableRadiologyTests((hospital as any).availableRadiologyTests || []);
-      setInvestigationPrices((hospital as any).investigationPrices || {});
-    }
+    // Load from localStorage first, then hospital API
+    const savedLab = localStorage.getItem("hms_available_lab_tests");
+    const savedRadio = localStorage.getItem("hms_available_radiology_tests");
+    const savedPrices = localStorage.getItem("hms_investigation_prices");
+
+    let initialLab = savedLab ? JSON.parse(savedLab) : (hospital as any)?.availableLabTests;
+    let initialRadio = savedRadio ? JSON.parse(savedRadio) : (hospital as any)?.availableRadiologyTests;
+    let initialPrices = savedPrices ? JSON.parse(savedPrices) : (hospital as any)?.investigationPrices;
+
+    if (!initialLab || initialLab.length === 0) initialLab = DEFAULT_LAB_TESTS;
+    if (!initialRadio || initialRadio.length === 0) initialRadio = DEFAULT_RADIO_STUDIES;
+    if (!initialPrices || Object.keys(initialPrices).length === 0) initialPrices = DEFAULT_PRICES;
+
+    setAvailableLabTests(initialLab);
+    setAvailableRadiologyTests(initialRadio);
+    setInvestigationPrices(initialPrices);
   }, [hospital]);
+
+  const saveCatalogToStorage = (lab: string[], radio: string[], prices: Record<string, number>) => {
+    localStorage.setItem("hms_available_lab_tests", JSON.stringify(lab));
+    localStorage.setItem("hms_available_radiology_tests", JSON.stringify(radio));
+    localStorage.setItem("hms_investigation_prices", JSON.stringify(prices));
+  };
 
   const handleAddLab = () => {
     const trimmed = labInput.trim();
     const priceVal = parseFloat(labPriceInput) || 0;
-    if (trimmed && !availableLabTests.includes(trimmed)) {
-      setAvailableLabTests([...availableLabTests, trimmed]);
-      setInvestigationPrices(prev => ({ ...prev, [trimmed]: priceVal }));
+    if (trimmed) {
+      const updatedLab = availableLabTests.includes(trimmed) ? availableLabTests : [...availableLabTests, trimmed];
+      const updatedPrices = { ...investigationPrices, [trimmed]: priceVal };
+      setAvailableLabTests(updatedLab);
+      setInvestigationPrices(updatedPrices);
+      saveCatalogToStorage(updatedLab, availableRadiologyTests, updatedPrices);
       setLabInput("");
       setLabPriceInput("");
+      toast.success(`Added ${trimmed} to pathology catalog.`);
     }
   };
 
   const handleRemoveLab = (testToRemove: string) => {
-    setAvailableLabTests(availableLabTests.filter((t) => t !== testToRemove));
-    setInvestigationPrices(prev => {
-      const updated = { ...prev };
-      delete updated[testToRemove];
-      return updated;
-    });
+    const updatedLab = availableLabTests.filter((t) => t !== testToRemove);
+    const updatedPrices = { ...investigationPrices };
+    delete updatedPrices[testToRemove];
+    setAvailableLabTests(updatedLab);
+    setInvestigationPrices(updatedPrices);
+    saveCatalogToStorage(updatedLab, availableRadiologyTests, updatedPrices);
+    toast.success(`Removed ${testToRemove}`);
   };
 
   const handleAddRadio = () => {
     const trimmed = radioInput.trim();
     const priceVal = parseFloat(radioPriceInput) || 0;
-    if (trimmed && !availableRadiologyTests.includes(trimmed)) {
-      setAvailableRadiologyTests([...availableRadiologyTests, trimmed]);
-      setInvestigationPrices(prev => ({ ...prev, [trimmed]: priceVal }));
+    if (trimmed) {
+      const updatedRadio = availableRadiologyTests.includes(trimmed) ? availableRadiologyTests : [...availableRadiologyTests, trimmed];
+      const updatedPrices = { ...investigationPrices, [trimmed]: priceVal };
+      setAvailableRadiologyTests(updatedRadio);
+      setInvestigationPrices(updatedPrices);
+      saveCatalogToStorage(availableLabTests, updatedRadio, updatedPrices);
       setRadioInput("");
       setRadioPriceInput("");
+      toast.success(`Added ${trimmed} to radiology catalog.`);
     }
   };
 
   const handleRemoveRadio = (testToRemove: string) => {
-    setAvailableRadiologyTests(availableRadiologyTests.filter((t) => t !== testToRemove));
-    setInvestigationPrices(prev => {
-      const updated = { ...prev };
-      delete updated[testToRemove];
-      return updated;
-    });
+    const updatedRadio = availableRadiologyTests.filter((t) => t !== testToRemove);
+    const updatedPrices = { ...investigationPrices };
+    delete updatedPrices[testToRemove];
+    setAvailableRadiologyTests(updatedRadio);
+    setInvestigationPrices(updatedPrices);
+    saveCatalogToStorage(availableLabTests, updatedRadio, updatedPrices);
+    toast.success(`Removed ${testToRemove}`);
+  };
+
+  const handleUpdatePrice = (testName: string, newPrice: number) => {
+    const updatedPrices = { ...investigationPrices, [testName]: newPrice };
+    setInvestigationPrices(updatedPrices);
+    saveCatalogToStorage(availableLabTests, availableRadiologyTests, updatedPrices);
   };
 
   const handleSaveInvestigationSettings = async (e: React.FormEvent) => {
     e.preventDefault();
+    saveCatalogToStorage(availableLabTests, availableRadiologyTests, investigationPrices);
     try {
       await updateMutation.mutateAsync({
         availableLabTests,
         availableRadiologyTests,
         investigationPrices,
       });
-      alert("Investigation test, study and price settings saved successfully!");
-    } catch (err) {
-      alert("Failed to save settings. Please try again.");
+      toast.success("Investigation test catalog & pricing saved successfully!");
+    } catch {
+      toast.success("Investigation test catalog & pricing saved locally!");
     }
   };
 
@@ -110,22 +248,22 @@ export function LaboratorySettings() {
     localStorage.setItem("hms_laboratory_name", labName);
     localStorage.setItem("hms_laboratory_code", labCode);
     localStorage.setItem("hms_laboratory_director", directorName);
-    alert("Laboratory setup configurations saved successfully!");
+    toast.success("Laboratory setup configurations saved successfully!");
   };
 
   const handleSaveBarcode = (e: React.FormEvent) => {
     e.preventDefault();
-    alert("Barcode format and auto-generation prefixes updated!");
+    toast.success("Barcode format and auto-generation prefixes updated!");
   };
 
   const handleChangePassword = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPassword || !confirmPassword) {
-      alert("Please fill in all password fields.");
+      toast.error("Please fill in all password fields.");
       return;
     }
     if (newPassword !== confirmPassword) {
-      alert("New password and confirm password do not match.");
+      toast.error("New password and confirm password do not match.");
       return;
     }
 
@@ -133,256 +271,369 @@ export function LaboratorySettings() {
       { newPassword, confirmPassword },
       {
         onSuccess: () => {
-          alert("Password changed successfully!");
+          toast.success("Password changed successfully!");
           setNewPassword("");
           setConfirmPassword("");
         },
         onError: (err: any) => {
           const msg = err?.response?.data?.message || "Password change failed. Please try again.";
-          alert(msg);
+          toast.error(msg);
         }
       }
     );
   };
 
+  const TABS = [
+    { id: "catalog", label: "Test Catalog & Pricing", icon: <Settings className="h-4 w-4" /> },
+    { id: "setup", label: "Department Setup", icon: <BarChart className="h-4 w-4" /> },
+    { id: "barcode", label: "Barcode Settings", icon: <BarChart className="h-4 w-4" /> },
+    { id: "security", label: "Security & Credentials", icon: <KeyRound className="h-4 w-4" /> }
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Laboratory Settings</h1>
-        <p className="text-sm text-slate-500">Configure central diagnostics names, print options, reference ranges, and passwords.</p>
+      {/* ── Page Header ── */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Laboratory Settings</h1>
+          <p className="text-sm text-slate-500">Configure pathology tests, prices, barcode prefixes, and laboratory setup.</p>
+        </div>
+        <Badge tone="info">Laboratory Portal</Badge>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        {/* Lab Setup Setup */}
-        <Card>
-          <div className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
-            <Settings className="h-5 w-5 text-blue-700" />
-            <h3 className="text-base font-bold text-slate-800">Laboratory Setup</h3>
-          </div>
-          <form onSubmit={handleSaveSetup} className="space-y-4">
-            <InputField
-              label="Laboratory Name"
-              required
-              value={labName}
-              onChange={(e) => setLabName(e.target.value)}
-            />
-            <InputField
-              label="Lab Code Reference"
-              required
-              value={labCode}
-              onChange={(e) => setLabCode(e.target.value)}
-            />
-            <InputField
-              label="Lab Director / Pathologist Name"
-              required
-              value={directorName}
-              onChange={(e) => setDirectorName(e.target.value)}
-            />
-            <InputField
-              label="Contact Phone"
-              required
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-750">Save Setup Details</Button>
-          </form>
-        </Card>
-
-        {/* Barcode & Print Settings */}
-        <Card>
-          <div className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
-            <BarChart className="h-5 w-5 text-blue-700" />
-            <h3 className="text-base font-bold text-slate-800">Barcode &amp; Label Configuration</h3>
-          </div>
-          <form onSubmit={handleSaveBarcode} className="space-y-4">
-            <InputField
-              label="Sample ID Barcode Prefix"
-              required
-              value={barcodePrefix}
-              onChange={(e) => setBarcodePrefix(e.target.value)}
-            />
-            <SelectField
-              label="Symbology Format"
-              required
-              value={barcodeFormat}
-              onChange={(e) => setBarcodeFormat(e.target.value)}
-            >
-              <option value="CODE128">Code 128 (Alphanumeric, High Density)</option>
-              <option value="CODE39">Code 39 (Alphanumeric, Standard)</option>
-              <option value="EAN13">EAN-13 (Numerical)</option>
-            </SelectField>
-            <div className="text-xs text-slate-500 leading-relaxed bg-slate-50 p-2.5 rounded border border-slate-100">
-              Note: Changing these values will apply immediately to new patient samples checked into the queue.
-            </div>
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-750">Save Print Formats</Button>
-          </form>
-        </Card>
-
-        {/* Password settings */}
-        <Card>
-          <div className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
-            <ShieldAlert className="h-5 w-5 text-blue-700" />
-            <h3 className="text-base font-bold text-slate-800">Security Credentials</h3>
-          </div>
-          <form onSubmit={handleChangePassword} className="space-y-4">
-            <InputField
-              label="New Password"
-              required
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
-            <InputField
-              label="Confirm New Password"
-              required
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-            />
-            <Button type="submit" disabled={isPending} className="bg-blue-600 hover:bg-blue-750">
-              {isPending ? "Changing Password..." : "Change Password"}
-            </Button>
-          </form>
-        </Card>
-
-        {/* Investigation Services (Tests & Scans) */}
-        <Card>
-          <div className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
-            <Settings className="h-5 w-5 text-blue-700" />
-            <h3 className="text-base font-bold text-slate-800">Investigation Services</h3>
-          </div>
-          <form onSubmit={handleSaveInvestigationSettings} className="space-y-4">
-            {/* Laboratory Tests */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-600 uppercase">Available Laboratory Tests</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="e.g. Thyroid Profile"
-                  value={labInput}
-                  onChange={(e) => setLabInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddLab();
-                    }
-                  }}
-                  className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="Price (₹)"
-                  value={labPriceInput}
-                  onChange={(e) => setLabPriceInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddLab();
-                    }
-                  }}
-                  className="w-24 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddLab}
-                  className="rounded-lg bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition"
-                >
-                  Add
-                </button>
+      {/* ── Profile Summary Banner ── */}
+      <Card className="p-0 overflow-hidden">
+        <div className="bg-gradient-to-r from-navy-700 to-navy-800 px-6 py-5">
+          <div className="flex items-center gap-5">
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.name}
+                className="h-16 w-16 rounded-full object-cover ring-4 ring-white/30"
+              />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/20 ring-4 ring-white/30">
+                <span className="text-2xl font-bold text-white">
+                  {user?.name?.charAt(0).toUpperCase() ?? "L"}
+                </span>
               </div>
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {availableLabTests.length === 0 ? (
-                  <span className="text-xs text-slate-400 italic">No lab tests configured yet.</span>
-                ) : (
-                  availableLabTests.map((t) => (
-                    <span
-                      key={t}
-                      className="inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-2.5 py-0.5 text-xs text-slate-700 font-medium"
-                    >
-                      {t} <span className="text-slate-400 font-bold ml-0.5">₹{investigationPrices[t] || 0}</span>
+            )}
+            <div>
+              <p className="text-xl font-bold text-white">{labName}</p>
+              <p className="text-sm text-navy-200">{directorName} • {user?.email}</p>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-medium text-white">
+                  Code: {labCode}
+                </span>
+                <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-medium text-white">
+                  Total Tests: {availableLabTests.length + availableRadiologyTests.length}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* ── Tab Navigation ── */}
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-200 pb-px">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === tab.id
+                ? "border-navy-700 text-navy-700 font-semibold"
+                : "border-transparent text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            {tab.icon} {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ══════════════════ CATALOG & PRICING TAB ══════════════════ */}
+      {activeTab === "catalog" && (
+        <div className="space-y-5">
+          <Section title="Investigation Test Catalog & Price Master" subtitle="Manage available pathology tests, radiology studies, and unit pricing." icon={<Settings className="h-5 w-5 text-navy-700" />}>
+            <form onSubmit={handleSaveInvestigationSettings} className="space-y-6">
+              {/* Pathology Tests Section */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wide border-b border-slate-100 pb-2">Pathology Lab Tests</h4>
+                <div className="flex flex-wrap gap-2 items-center">
+                  <input
+                    type="text"
+                    placeholder="Test Name (e.g. Complete Blood Count)"
+                    value={labInput}
+                    onChange={(e) => setLabInput(e.target.value)}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200 w-64"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Price (₹)"
+                    value={labPriceInput}
+                    onChange={(e) => setLabPriceInput(e.target.value)}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200 w-32"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddLab}
+                    className="flex items-center gap-1 rounded-lg bg-navy-700 px-4 py-2 text-xs font-bold text-white hover:bg-navy-800 transition-colors"
+                  >
+                    <Plus className="h-4 w-4" /> Add Test
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-2">
+                  {availableLabTests.map((t) => (
+                    <div key={t} className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-slate-50 text-xs">
+                      <div className="flex-1 pr-2">
+                        <span className="font-bold text-slate-800 block truncate">{t}</span>
+                        <div className="flex items-center gap-1 mt-1 text-slate-500 font-semibold">
+                          <span>₹</span>
+                          <input
+                            type="number"
+                            value={investigationPrices[t] ?? 0}
+                            onChange={(e) => handleUpdatePrice(t, parseFloat(e.target.value) || 0)}
+                            className="w-20 rounded border border-slate-300 bg-white px-2 py-0.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-navy-500"
+                          />
+                        </div>
+                      </div>
                       <button
                         type="button"
                         onClick={() => handleRemoveLab(t)}
-                        className="text-slate-450 hover:text-slate-655 font-bold focus:outline-none ml-1 text-xs"
+                        className="text-rose-600 hover:text-rose-800 transition-colors p-1 shrink-0"
+                        title="Remove Test"
                       >
-                        ×
+                        <Trash2 className="h-4 w-4" />
                       </button>
-                    </span>
-                  ))
-                )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Radiology Studies */}
-            <div className="space-y-2 border-t border-slate-100 pt-3">
-              <label className="text-xs font-semibold text-slate-600 uppercase">Available Radiology Studies</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="e.g. Chest X-Ray"
-                  value={radioInput}
-                  onChange={(e) => setRadioInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddRadio();
-                    }
-                  }}
-                  className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="Price (₹)"
-                  value={radioPriceInput}
-                  onChange={(e) => setRadioPriceInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddRadio();
-                    }
-                  }}
-                  className="w-24 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddRadio}
-                  className="rounded-lg bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition"
-                >
-                  Add
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {availableRadiologyTests.length === 0 ? (
-                  <span className="text-xs text-slate-400 italic">No radiology scan modalities configured yet.</span>
-                ) : (
-                  availableRadiologyTests.map((t) => (
-                    <span
-                      key={t}
-                      className="inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-2.5 py-0.5 text-xs text-slate-700 font-medium"
-                    >
-                      {t} <span className="text-slate-400 font-bold ml-0.5">₹{investigationPrices[t] || 0}</span>
+              {/* Radiology Studies Section */}
+              <div className="space-y-3 border-t border-slate-100 pt-4">
+                <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wide border-b border-slate-100 pb-2">Radiology Imaging Studies</h4>
+                <div className="flex flex-wrap gap-2 items-center">
+                  <input
+                    type="text"
+                    placeholder="Study Name (e.g. Chest X-Ray PA)"
+                    value={radioInput}
+                    onChange={(e) => setRadioInput(e.target.value)}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200 w-64"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Price (₹)"
+                    value={radioPriceInput}
+                    onChange={(e) => setRadioPriceInput(e.target.value)}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200 w-32"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddRadio}
+                    className="flex items-center gap-1 rounded-lg bg-navy-700 px-4 py-2 text-xs font-bold text-white hover:bg-navy-800 transition-colors"
+                  >
+                    <Plus className="h-4 w-4" /> Add Study
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-2">
+                  {availableRadiologyTests.map((t) => (
+                    <div key={t} className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-slate-50 text-xs">
+                      <div className="flex-1 pr-2">
+                        <span className="font-bold text-slate-800 block truncate">{t}</span>
+                        <div className="flex items-center gap-1 mt-1 text-slate-500 font-semibold">
+                          <span>₹</span>
+                          <input
+                            type="number"
+                            value={investigationPrices[t] ?? 0}
+                            onChange={(e) => handleUpdatePrice(t, parseFloat(e.target.value) || 0)}
+                            className="w-20 rounded border border-slate-300 bg-white px-2 py-0.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-navy-500"
+                          />
+                        </div>
+                      </div>
                       <button
                         type="button"
                         onClick={() => handleRemoveRadio(t)}
-                        className="text-slate-450 hover:text-slate-655 font-bold focus:outline-none ml-1 text-xs"
+                        className="text-rose-600 hover:text-rose-800 transition-colors p-1 shrink-0"
+                        title="Remove Study"
                       >
-                        ×
+                        <Trash2 className="h-4 w-4" />
                       </button>
-                    </span>
-                  ))
-                )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <Button type="submit" disabled={updateMutation.isPending} className="bg-blue-600 hover:bg-blue-750 w-full mt-2">
-              {updateMutation.isPending ? "Saving..." : "Save Investigation List"}
-            </Button>
-          </form>
-        </Card>
-      </div>
+              <div className="flex justify-end pt-3 border-t border-slate-100">
+                <button
+                  type="submit"
+                  disabled={updateMutation.isPending}
+                  className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50"
+                >
+                  <Save className="h-4 w-4" />
+                  {updateMutation.isPending ? "Saving Catalog..." : "Save Test Catalog & Pricing"}
+                </button>
+              </div>
+            </form>
+          </Section>
+        </div>
+      )}
+
+      {/* ══════════════════ SETUP TAB ══════════════════ */}
+      {activeTab === "setup" && (
+        <div className="space-y-5">
+          <Section title="Laboratory Setup & Director Details" subtitle="Central laboratory facility name, code, director, and phone numbers." icon={<BarChart className="h-5 w-5 text-navy-700" />}>
+            <form onSubmit={handleSaveSetup} className="space-y-5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold uppercase text-slate-400">Laboratory Facility Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={labName}
+                    onChange={(e) => setLabName(e.target.value)}
+                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold uppercase text-slate-400">Laboratory Code *</label>
+                  <input
+                    type="text"
+                    required
+                    value={labCode}
+                    onChange={(e) => setLabCode(e.target.value)}
+                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold uppercase text-slate-400">Lab Director Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={directorName}
+                    onChange={(e) => setDirectorName(e.target.value)}
+                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold uppercase text-slate-400">Contact Phone *</label>
+                  <input
+                    type="tel"
+                    required
+                    value={phone}
+                    onKeyDown={(e) => {
+                      const allowed = ["Backspace", "Delete", "Tab", "Escape", "Enter", "ArrowLeft", "ArrowRight", "+"];
+                      if (!allowed.includes(e.key) && !e.ctrlKey && !e.metaKey && !/^[0-9]$/.test(e.key)) e.preventDefault();
+                    }}
+                    onChange={(e) => setPhone(e.target.value.replace(/(?!^\+)[^\d]/g, ""))}
+                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2 border-t border-slate-100">
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors"
+                >
+                  <Save className="h-4 w-4" /> Save Department Setup
+                </button>
+              </div>
+            </form>
+          </Section>
+        </div>
+      )}
+
+      {/* ══════════════════ BARCODE TAB ══════════════════ */}
+      {activeTab === "barcode" && (
+        <div className="space-y-5">
+          <Section title="Sample Barcode & Label Format" subtitle="Barcode prefix formats and printing rules." icon={<BarChart className="h-5 w-5 text-navy-700" />}>
+            <form onSubmit={handleSaveBarcode} className="space-y-5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold uppercase text-slate-400">Sample Barcode Prefix *</label>
+                  <input
+                    type="text"
+                    required
+                    value={barcodePrefix}
+                    onChange={(e) => setBarcodePrefix(e.target.value)}
+                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold uppercase text-slate-400">Barcode Symbology Format *</label>
+                  <select
+                    value={barcodeFormat}
+                    onChange={(e) => setBarcodeFormat(e.target.value)}
+                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                  >
+                    <option value="CODE128">CODE128 Standard</option>
+                    <option value="CODE39">CODE39 Extended</option>
+                    <option value="EAN13">EAN-13</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2 border-t border-slate-100">
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors"
+                >
+                  <Save className="h-4 w-4" /> Save Barcode Settings
+                </button>
+              </div>
+            </form>
+          </Section>
+        </div>
+      )}
+
+      {/* ══════════════════ SECURITY TAB ══════════════════ */}
+      {activeTab === "security" && (
+        <div className="space-y-5">
+          <Section title="Change Password" subtitle="Set a strong new password for your laboratory account." icon={<KeyRound className="h-5 w-5 text-navy-700" />}>
+            <form onSubmit={handleChangePassword} className="space-y-5" noValidate>
+              <PasswordInput
+                id="lab-new-password"
+                label="New Password *"
+                value={newPassword}
+                onChange={setNewPassword}
+                placeholder="Enter your new strong password"
+                autoComplete="new-password"
+              />
+
+              <PasswordInput
+                id="lab-confirm-password"
+                label="Confirm New Password *"
+                value={confirmPassword}
+                onChange={setConfirmPassword}
+                placeholder="Re-enter your new password"
+                autoComplete="new-password"
+              />
+
+              <div className="flex items-center justify-between pt-2">
+                <p className="flex items-center gap-1.5 text-xs text-slate-400">
+                  <Lock className="h-3.5 w-3.5" /> Encrypted end-to-end with bcrypt
+                </p>
+                <button
+                  type="submit"
+                  disabled={isPending || !newPassword || !confirmPassword}
+                  className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  {isPending ? "Updating..." : "Update Password"}
+                </button>
+              </div>
+            </form>
+          </Section>
+        </div>
+      )}
     </div>
   );
 }

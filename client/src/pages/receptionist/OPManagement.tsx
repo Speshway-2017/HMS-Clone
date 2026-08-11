@@ -1,14 +1,18 @@
 import { useState, useEffect } from "react";
+import { toast } from "react-hot-toast";
 import { Search, Plus, List, ClipboardList, CheckCircle, Filter } from "lucide-react";
 import {
   usePatientsSearch,
   useDoctorsAvailability,
   useBookAppointment,
   useReceptionQueue,
-  useOPHistory
+  useOPHistory,
+  useBookedSlots
 } from "../../features/receptionist";
 import { useDepartments } from "../../features/departments";
-import { SelectField, TextareaField } from "../../components/ui/Field";
+import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
+import { generateTimeSlots, isSlotBooked, formatSlot12Hour } from "../../lib/slotUtils";
+import { Clock } from "lucide-react";
 import { formatINR } from "../../lib/currency";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -39,48 +43,58 @@ export function OPManagementPage({ activeTab = "queue" }: Props) {
   const [selectedPatientId, setSelectedPatientId] = useState("");
   const [selectedDeptId, setSelectedDeptId] = useState("");
   const [selectedDocId, setSelectedDocId] = useState("");
+  const [visitDate, setVisitDate] = useState(new Date().toISOString().split("T")[0]);
+  const [visitType, setVisitType] = useState<"Walk-in" | "Appointment" | "Emergency">("Walk-in");
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState("");
   const [notes, setNotes] = useState("");
   const [historyPage, setHistoryPage] = useState(1);
   const navigate = useNavigate();
 
-  // Queries
   const { data: searchPatients } = usePatientsSearch(patientQuery);
   const { data: doctors } = useDoctorsAvailability();
   const { data: departmentsResponse } = useDepartments();
   const { data: queueTokens, isLoading: queueLoading } = useReceptionQueue();
   const { data: historyData, isLoading: historyLoading } = useOPHistory({ page: historyPage, limit: 10 });
+  const { data: bookedSlotsData } = useBookedSlots(selectedDocId, visitDate);
   const bookMutation = useBookAppointment();
 
   const departments = departmentsResponse || [];
+  const bookedSlots: string[] = Array.isArray(bookedSlotsData) ? bookedSlotsData : [];
+  const selectedDoctorObj = doctors?.find((d: any) => d._id === selectedDocId);
+  const availableTimeSlots = selectedDocId ? generateTimeSlots(selectedDoctorObj, visitDate) : [];
 
   const handleCreateOPVisit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPatientId || !selectedDocId || !selectedDeptId) {
-      alert("Please fill all required fields");
+      toast.error("Please fill all required fields");
       return;
     }
 
     try {
+      const timeToUse = selectedTimeSlot || new Date().toLocaleTimeString("en-US", { hour12: false }).substring(0, 5);
       // Booking a Walk-in appointment automatically generates the OP visit and invoice!
       const result = await bookMutation.mutateAsync({
         patientId: selectedPatientId,
         doctorId: selectedDocId,
         departmentId: selectedDeptId,
-        date: new Date().toISOString().split("T")[0],
-        time: new Date().toLocaleTimeString("en-US", { hour12: false }).substring(0, 5),
-        type: "Walk-in",
+        date: visitDate,
+        time: timeToUse,
+        type: visitType,
         notes
       });
-      alert(`Walk-In OP Visit Registered!\nInvoice Generated: ${formatINR(result.invoice.totals.total)}`);
+      toast.success(`Walk-In OP Visit Registered! Invoice Generated: ${formatINR(result.invoice.totals.total)}`);
       setSelectedPatientId("");
       setSelectedDeptId("");
       setSelectedDocId("");
       setPatientQuery("");
       setNotes("");
+      setSelectedTimeSlot("");
+      setVisitDate(new Date().toISOString().split("T")[0]);
+      setVisitType("Walk-in");
       // Redirect to billing Consultation
       navigate(`/receptionist/billing/consultation?invoiceId=${result.invoice._id}`);
     } catch (err: any) {
-      alert(err.message || "Failed to create OP visit");
+      toast.error(err.message || "Failed to create OP visit");
     }
   };
 
@@ -169,39 +183,37 @@ export function OPManagementPage({ activeTab = "queue" }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Outpatient (OP) Desk</h1>
-          <p className="text-sm text-slate-500">Register new outpatient consultations and browse consultation queues.</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Outpatient (OP) Desk</h1>
+        <p className="text-sm text-slate-500">Register new outpatient consultations and browse consultation queues.</p>
+      </div>
 
-        {/* Tab triggers */}
-        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-1">
-          <button
-            onClick={() => setTab("queue")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "queue" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            <List className="h-3.5 w-3.5" /> Active Queue
-          </button>
-          <button
-            onClick={() => setTab("new")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "new" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            <Plus className="h-3.5 w-3.5" /> Register OP Visit
-          </button>
-          <button
-            onClick={() => setTab("history")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "history" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            <ClipboardList className="h-3.5 w-3.5" /> OP Visit History
-          </button>
-        </div>
+      {/* Tabs Navigation Row */}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 max-w-max">
+        <button
+          onClick={() => setTab("queue")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+            tab === "queue" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          <List className="h-3.5 w-3.5" /> Active Queue
+        </button>
+        <button
+          onClick={() => setTab("new")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+            tab === "new" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          <Plus className="h-3.5 w-3.5" /> Register OP Visit
+        </button>
+        <button
+          onClick={() => setTab("history")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+            tab === "history" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          <ClipboardList className="h-3.5 w-3.5" /> OP Visit History
+        </button>
       </div>
 
       {/* Active Queue Tab */}
@@ -346,7 +358,11 @@ export function OPManagementPage({ activeTab = "queue" }: Props) {
                 label="Department Name *"
                 required
                 value={selectedDeptId}
-                onChange={(e) => setSelectedDeptId(e.target.value)}
+                onChange={(e) => {
+                  setSelectedDeptId(e.target.value);
+                  setSelectedDocId("");
+                  setSelectedTimeSlot("");
+                }}
               >
                 <option value="">Select Department</option>
                 {departments.map((dept: any) => (
@@ -358,7 +374,10 @@ export function OPManagementPage({ activeTab = "queue" }: Props) {
                 label="Attending Doctor *"
                 required
                 value={selectedDocId}
-                onChange={(e) => setSelectedDocId(e.target.value)}
+                onChange={(e) => {
+                  setSelectedDocId(e.target.value);
+                  setSelectedTimeSlot("");
+                }}
               >
                 <option value="">Select Doctor</option>
                 {doctors
@@ -370,9 +389,83 @@ export function OPManagementPage({ activeTab = "queue" }: Props) {
                   ))}
               </SelectField>
             </div>
+          </Card>
+
+          {/* Schedule Slot Details Card */}
+          <Card className="space-y-4">
+            <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <Clock className="h-4.5 w-4.5 text-navy-600" /> Schedule slot details
+            </h3>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <InputField
+                label="Appointment Date *"
+                type="date"
+                required
+                min={new Date().toISOString().split("T")[0]}
+                value={visitDate}
+                onChange={(e) => {
+                  setVisitDate(e.target.value);
+                  setSelectedTimeSlot("");
+                }}
+              />
+
+              <SelectField
+                label="Appointment Type *"
+                required
+                value={visitType}
+                onChange={(e: any) => setVisitType(e.target.value)}
+              >
+                <option value="Walk-in">Walk-in</option>
+                <option value="Appointment">Appointment</option>
+                <option value="Emergency">Emergency</option>
+              </SelectField>
+            </div>
+
+            {/* Available Time Slots Grid */}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Available Time Slots *
+              </label>
+              {!selectedDocId ? (
+                <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-xs text-slate-400">
+                  Please select a doctor to load available times.
+                </div>
+              ) : availableTimeSlots.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-xs text-slate-400">
+                  No slots available for this doctor on the selected date.
+                </div>
+              ) : (
+                <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
+                  {availableTimeSlots.map((slot) => {
+                    const booked = isSlotBooked(slot, bookedSlots);
+                    const isSelected = selectedTimeSlot === slot;
+                    return (
+                      <button
+                        key={slot}
+                        type="button"
+                        disabled={booked}
+                        onClick={() => setSelectedTimeSlot(slot)}
+                        className={`flex flex-col items-center justify-center rounded-lg border py-2 text-xs font-semibold shadow-xs transition-all focus:outline-none ${
+                          booked
+                            ? "border-rose-100 bg-rose-50 text-rose-450 line-through cursor-not-allowed opacity-60"
+                            : isSelected
+                            ? "border-navy-600 bg-navy-600 text-white ring-2 ring-navy-100"
+                            : "border-emerald-200 bg-emerald-50/50 text-emerald-700 hover:border-emerald-400 hover:bg-emerald-100 active:scale-95"
+                        }`}
+                      >
+                        <span>{formatSlot12Hour(slot)}</span>
+                        {booked && <span className="text-[8px] font-bold tracking-tight mt-0.5 opacity-80">Booked</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             <TextareaField
-              label="Reason for Visit / Complaint"
+              label="Reason for Visit / Chief Complaints"
+              placeholder="e.g. Fever, Headache, Routine Checkup..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
