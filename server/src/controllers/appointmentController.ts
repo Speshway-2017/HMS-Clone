@@ -57,11 +57,13 @@ const appointmentSchema = z.object({
   paymentMethod: z.string().optional(),
 });
 
+import { buildBranchQuery } from "../utils/branchQueryHelper";
+
 export const listAppointments = catchAsync(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req, 50);
   const { status, doctor, from, to, dateMode } = req.query as Record<string, string | undefined>;
 
-  const filter: Record<string, any> = { ...req.hospitalFilter };
+  const filter: Record<string, any> = buildBranchQuery(req.hospitalFilter);
   if (status) filter.status = status;
   if (doctor) filter.doctor = doctor;
 

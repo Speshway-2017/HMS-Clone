@@ -157,20 +157,50 @@ export class ReceptionService {
   // ── Patient Registration ──
   static async registerPatient(filterOrId: any, patientData: any, userId: Types.ObjectId) {
     const { targetHospital, targetBranch } = parseHospitalAndBranch(filterOrId);
+
+    // Duplicate Check 1: Check by phone and name within the same hospital
+    const cleanPhone = (patientData.phone || "").replace(/\D/g, "").slice(-10);
+    const cleanEmail = (patientData.email || "").trim();
+    const cleanName = (patientData.name || "").trim();
+
+    if (cleanPhone && cleanPhone.length >= 7) {
+      const existingByPhone = await Patient.findOne({
+        hospital: targetHospital,
+        phone: { $regex: `${cleanPhone}$` },
+        name: { $regex: `^${cleanName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" }
+      });
+      if (existingByPhone) {
+        throw new AppError(
+          `Patient "${existingByPhone.name}" is already registered at this hospital (UHID: ${existingByPhone.uhid}, Phone: ${existingByPhone.phone}). Please search for UHID or select existing record.`,
+          409
+        );
+      }
+    }
+
+    // Duplicate Check 2: Insurance policy number uniqueness within the same hospital
+    if (patientData.insurancePolicyNumber && patientData.insurancePolicyNumber.trim()) {
+      const existingPolicy = await Patient.findOne({
+        hospital: targetHospital,
+        insurancePolicyNumber: patientData.insurancePolicyNumber.trim()
+      });
+      if (existingPolicy) {
+        throw new AppError(
+          `Insurance Policy Number "${patientData.insurancePolicyNumber.trim()}" is already registered to patient ${existingPolicy.name} (UHID: ${existingPolicy.uhid}).`,
+          409
+        );
+      }
+    }
+
     const uhid = `UHID-${generateDigits(10)}`;
     const patientCode = `PAT-${generateDigits(6)}`;
     const qrCode = `HMS|${uhid}|${patientData.name}|${patientData.phone}`;
 
     let linkedUserId = patientData.user;
     if (!linkedUserId) {
-      const email = (patientData.email || "").trim();
-      const phone = (patientData.phone || "").replace(/\D/g, "").slice(-10);
-      const name = (patientData.name || "").trim();
-
       const userConds: any[] = [];
-      if (email) userConds.push({ email: { $regex: `^${email.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
-      if (phone && phone.length >= 7) userConds.push({ phone: { $regex: `${phone}$` } });
-      if (name) userConds.push({ name: { $regex: `^${name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+      if (cleanEmail) userConds.push({ email: { $regex: `^${cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
+      if (cleanPhone && cleanPhone.length >= 7) userConds.push({ phone: { $regex: `${cleanPhone}$` } });
+      if (cleanName) userConds.push({ name: { $regex: `^${cleanName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } });
 
       if (userConds.length > 0) {
         const existingUser = await User.findOne({ role: "patient", $or: userConds });

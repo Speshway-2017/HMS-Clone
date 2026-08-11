@@ -14,31 +14,35 @@ import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { notifyAssignedDoctorForPatient } from "../utils/autoNotifyAssignedDoctor";
 
-async function findOrder(requestId: string) {
-  let order: any = await LabOrder.findById(requestId).populate("patient").populate("doctor");
+import { buildBranchQuery } from "../utils/branchQueryHelper";
+
+async function findOrder(requestId: string, hospitalId?: string | Types.ObjectId) {
+  const query: any = { _id: requestId };
+  if (hospitalId) query.hospital = hospitalId;
+  let order: any = await LabOrder.findOne(query).populate("patient").populate("doctor");
   let type: "Laboratory" | "Radiology" = "Laboratory";
   if (!order) {
-    order = await RadiologyOrder.findById(requestId).populate("patient").populate("doctor");
+    order = await RadiologyOrder.findOne(query).populate("patient").populate("doctor");
     type = "Radiology";
   }
   return { order, type };
 }
 
 export const getRequests = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
+  const filter = buildBranchQuery(req.hospitalFilter);
 
   const [labOrders, radOrders, invoices] = await Promise.all([
-    LabOrder.find({ hospital: hospitalId })
+    LabOrder.find(filter)
       .populate("patient", "name uhid age gender phone")
       .populate("doctor", "name")
       .populate("appointment", "referenceId chiefComplaint diagnosis clinicalNotes advice vitals")
       .sort({ createdAt: -1 }),
-    RadiologyOrder.find({ hospital: hospitalId })
+    RadiologyOrder.find(filter)
       .populate("patient", "name uhid age gender phone")
       .populate("doctor", "name")
       .populate("appointment", "referenceId chiefComplaint diagnosis clinicalNotes advice vitals")
       .sort({ createdAt: -1 }),
-    Invoice.find({ hospital: hospitalId })
+    Invoice.find({ ...filter, billingType: { $in: ["LAB", "RADIOLOGY"] } })
   ]);
 
   const paidApptSet = new Set<string>();
@@ -209,7 +213,7 @@ export const getRequests = catchAsync(async (req: Request, res: Response) => {
 export const acceptRequest = catchAsync(async (req: Request, res: Response) => {
   const { requestId } = req.params;
   const hospitalId = req.hospitalFilter!.hospital;
-  const { order, type } = await findOrder(requestId);
+  const { order, type } = await findOrder(requestId, hospitalId);
   if (!order) throw new AppError("Request not found", 404);
 
   if (order.appointment) {
@@ -249,7 +253,7 @@ export const rejectRequest = catchAsync(async (req: Request, res: Response) => {
   const { requestId } = req.params;
   const hospitalId = req.hospitalFilter!.hospital;
   const { rejectionReason } = req.body;
-  const { order, type } = await findOrder(requestId);
+  const { order, type } = await findOrder(requestId, hospitalId);
   if (!order) throw new AppError("Request not found", 404);
 
   if (order.appointment) {
@@ -288,7 +292,7 @@ export const rejectRequest = catchAsync(async (req: Request, res: Response) => {
 export const startProcessing = catchAsync(async (req: Request, res: Response) => {
   const { requestId } = req.params;
   const hospitalId = req.hospitalFilter!.hospital;
-  const { order, type } = await findOrder(requestId);
+  const { order, type } = await findOrder(requestId, hospitalId);
   if (!order) throw new AppError("Request not found", 404);
 
   if (order.appointment) {
@@ -325,9 +329,10 @@ export const startProcessing = catchAsync(async (req: Request, res: Response) =>
 
 export const uploadReport = catchAsync(async (req: Request, res: Response) => {
   const { requestId } = req.params;
+  const hospitalId = req.hospitalFilter!.hospital;
   const files = req.files as Express.Multer.File[];
 
-  const { order, type } = await findOrder(requestId);
+  const { order, type } = await findOrder(requestId, hospitalId);
   if (!order) throw new AppError("Request not found", 404);
 
   const session = await mongoose.startSession();
@@ -413,6 +418,7 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
             [
               {
                 hospital: order.hospital,
+                branch: order.branch || req.hospitalFilter?.branch || (req.user as any)?.branch || null,
                 patient: order.patient._id,
                 doctor: order.doctor._id,
                 appointment: order.appointment || new mongoose.Types.ObjectId(),
@@ -540,6 +546,7 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
         [
           {
             hospital: order.hospital,
+            branch: order.branch || req.hospitalFilter?.branch || (req.user as any)?.branch || null,
             patient: order.patient._id,
             doctor: order.doctor._id,
             appointment: order.appointment || new mongoose.Types.ObjectId(),
@@ -600,7 +607,8 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
 
 export const verifyReport = catchAsync(async (req: Request, res: Response) => {
   const { requestId } = req.params;
-  const { order, type } = await findOrder(requestId);
+  const hospitalId = req.hospitalFilter!.hospital;
+  const { order, type } = await findOrder(requestId, hospitalId);
   if (!order) throw new AppError("Request not found", 404);
 
   const session = await mongoose.startSession();
@@ -644,7 +652,8 @@ export const verifyReport = catchAsync(async (req: Request, res: Response) => {
 
 export const publishReport = catchAsync(async (req: Request, res: Response) => {
   const { requestId } = req.params;
-  const { order, type } = await findOrder(requestId);
+  const hospitalId = req.hospitalFilter!.hospital;
+  const { order, type } = await findOrder(requestId, hospitalId);
   if (!order) throw new AppError("Request not found", 404);
 
   const session = await mongoose.startSession();
@@ -770,7 +779,10 @@ export const getConsultationReports = catchAsync(async (req: Request, res: Respo
 
 export const getReportById = catchAsync(async (req: Request, res: Response) => {
   const { reportId } = req.params;
-  const report = await DiagnosticReport.findById(reportId)
+  const hospitalId = req.hospitalFilter?.hospital;
+  const query: any = { _id: reportId };
+  if (hospitalId) query.hospital = hospitalId;
+  const report = await DiagnosticReport.findOne(query)
     .populate("patient")
     .populate("doctor")
     .populate("uploadedBy", "name");
@@ -788,7 +800,10 @@ export const getReportById = catchAsync(async (req: Request, res: Response) => {
 
 export const downloadReport = catchAsync(async (req: Request, res: Response) => {
   const { reportId } = req.params;
-  const report = await DiagnosticReport.findById(reportId);
+  const hospitalId = req.hospitalFilter?.hospital;
+  const query: any = { _id: reportId };
+  if (hospitalId) query.hospital = hospitalId;
+  const report = await DiagnosticReport.findOne(query);
   if (!report) throw new AppError("Report not found", 404);
 
   if (req.user!.role === "doctor") {
@@ -854,7 +869,7 @@ export const collectSample = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital;
   const { sampleId, sampleType, collectedBy } = req.body;
 
-  const { order } = await findOrder(requestId);
+  const { order } = await findOrder(requestId, hospitalId);
   if (!order) throw new AppError("Request not found", 404);
 
   const sampleDetails = {
@@ -888,7 +903,7 @@ export const submitResults = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital;
   const { results } = req.body;
 
-  const { order } = await findOrder(requestId);
+  const { order } = await findOrder(requestId, hospitalId);
   if (!order) throw new AppError("Request not found", 404);
 
   if (order.appointment) {
@@ -911,12 +926,12 @@ export const submitResults = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const getCompletedReports = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital;
-
-  const reports = await DiagnosticReport.find({
-    hospital: hospitalId,
+  const filter = {
+    ...buildBranchQuery(req.hospitalFilter),
     status: { $in: ["completed", "report_uploaded", "verified"] }
-  })
+  };
+
+  const reports = await DiagnosticReport.find(filter)
     .sort({ updatedAt: -1, createdAt: -1 })
     .populate("patient", "name uhid age gender phone")
     .populate("doctor", "name specialization")
