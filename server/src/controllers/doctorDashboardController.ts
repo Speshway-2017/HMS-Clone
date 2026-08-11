@@ -517,6 +517,14 @@ export const createLabOrder = catchAsync(async (req: Request, res: Response) => 
   const isApptIdValid = appointmentId && mongoose.Types.ObjectId.isValid(appointmentId);
   const apptId = isApptIdValid ? appointmentId : null;
 
+  let targetBranch = doctor.branch || req.hospitalFilter?.branch || (req.user as any)?.branch || null;
+  if (apptId) {
+    const apptDoc = await Appointment.findById(apptId);
+    if (apptDoc && apptDoc.branch) {
+      targetBranch = apptDoc.branch as any;
+    }
+  }
+
   let labOrder = await LabOrder.findOne({
     hospital: hospitalId,
     patient: patientId,
@@ -526,6 +534,9 @@ export const createLabOrder = catchAsync(async (req: Request, res: Response) => 
   });
 
   if (labOrder) {
+    if (!labOrder.branch && targetBranch) {
+      labOrder.branch = targetBranch;
+    }
     labOrder.tests = Array.from(new Set([...labOrder.tests, ...tests]));
     if (priority === "STAT" || (priority === "Urgent" && labOrder.priority !== "STAT")) {
       labOrder.priority = priority;
@@ -534,6 +545,7 @@ export const createLabOrder = catchAsync(async (req: Request, res: Response) => 
   } else {
     labOrder = await LabOrder.create({
       hospital: hospitalId,
+      branch: targetBranch,
       patient: patientId,
       doctor: doctor._id,
       appointment: apptId,
@@ -789,9 +801,9 @@ export const getWorkspace = catchAsync(async (req: Request, res: Response) => {
 
   const [queueItem, prescriptions, labOrders, radiologyOrders, admissions, admissionRequests] = await Promise.all([
     Queue.findOne({ appointment: appointmentId, hospital: hospitalId }),
-    Prescription.find({ $or: [{ appointment: appointmentId }, { patient: patientId, hospital: hospitalId }] }).sort({ createdAt: -1 }),
-    LabOrder.find({ $or: [{ appointment: appointmentId }, { patient: patientId, hospital: hospitalId }] }).sort({ createdAt: -1 }),
-    RadiologyOrder.find({ $or: [{ appointment: appointmentId }, { patient: patientId, hospital: hospitalId }] }).sort({ createdAt: -1 }),
+    Prescription.find({ hospital: hospitalId, $or: [{ appointment: appointmentId }, { patient: patientId }] }).sort({ createdAt: -1 }),
+    LabOrder.find({ hospital: hospitalId, $or: [{ appointment: appointmentId }, { patient: patientId }] }).sort({ createdAt: -1 }),
+    RadiologyOrder.find({ hospital: hospitalId, $or: [{ appointment: appointmentId }, { patient: patientId }] }).sort({ createdAt: -1 }),
     Admission.find({ patient: patientId, hospital: hospitalId }),
     AdmissionRequest.find({ patient: patientId, hospital: hospitalId }).sort({ createdAt: -1 }),
   ]);
@@ -1032,6 +1044,14 @@ export const createRadiologyOrder = catchAsync(async (req: Request, res: Respons
   const isApptIdValid = appointmentId && mongoose.Types.ObjectId.isValid(appointmentId);
   const apptId = isApptIdValid ? appointmentId : null;
 
+  let targetBranch = doctor.branch || req.hospitalFilter?.branch || (req.user as any)?.branch || null;
+  if (apptId) {
+    const apptDoc = await Appointment.findById(apptId);
+    if (apptDoc && apptDoc.branch) {
+      targetBranch = apptDoc.branch as any;
+    }
+  }
+
   let order = await RadiologyOrder.findOne({
     hospital: hospitalId,
     patient: patientId,
@@ -1041,6 +1061,9 @@ export const createRadiologyOrder = catchAsync(async (req: Request, res: Respons
   });
 
   if (order) {
+    if (!order.branch && targetBranch) {
+      order.branch = targetBranch;
+    }
     const scansList = order.scans || [];
     if (type && !scansList.includes(type)) {
       scansList.push(type);
@@ -1057,6 +1080,7 @@ export const createRadiologyOrder = catchAsync(async (req: Request, res: Respons
   } else {
     order = await RadiologyOrder.create({
       hospital: hospitalId,
+      branch: targetBranch,
       patient: patientId,
       doctor: doctor._id,
       appointment: apptId,
@@ -1945,10 +1969,12 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
 
     // 5. Create final LabOrders if present
     if (draft.labOrders && draft.labOrders.length > 0) {
+      const apptBranch = appointment.branch || doctor.branch || req.hospitalFilter?.branch || null;
       await LabOrder.create(
         [
           {
             hospital: hospitalId,
+            branch: apptBranch,
             patient: appointment.patient._id,
             doctor: doctor._id,
             appointment: appointment._id,
@@ -1989,12 +2015,14 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
     // 6. Create final RadiologyOrders if present
     if (draft.radiologyOrders && draft.radiologyOrders.length > 0) {
       const radItems: { type: string; priority: string; notes: string }[] = [];
+      const apptBranch = appointment.branch || doctor.branch || req.hospitalFilter?.branch || null;
 
       for (const rad of draft.radiologyOrders) {
         await RadiologyOrder.create(
           [
             {
               hospital: hospitalId,
+              branch: apptBranch,
               patient: appointment.patient._id,
               doctor: doctor._id,
               appointment: appointment._id,

@@ -13,12 +13,10 @@ import { DbNotification } from "../models/DbNotification";
 import { Types } from "mongoose";
 import { AppointmentSlotService } from "../services/appointmentSlotService";
 
+import { buildBranchQuery } from "../utils/branchQueryHelper";
+
 function toFilter(filterOrId: any): any {
-  if (!filterOrId) return {};
-  if (typeof filterOrId === "object" && (filterOrId.hospital || "branch" in filterOrId)) {
-    return filterOrId;
-  }
-  return { hospital: filterOrId };
+  return buildBranchQuery(filterOrId);
 }
 
 export class ReceptionRepository {
@@ -385,7 +383,7 @@ export class ReceptionRepository {
       };
     }
 
-    return await Admission.find({ hospital: hospitalId, status: statusFilter })
+    return await Admission.find({ ...toFilter(hospitalId), status: statusFilter })
       .populate("patient", "name uhid phone age gender bloodGroup")
       .populate("room")
       .populate("bed")
@@ -548,7 +546,7 @@ export class ReceptionRepository {
     endOfDay.setHours(23, 59, 59, 999);
 
     const appointments = await Appointment.find({
-      hospital: hospitalId,
+      ...toFilter(hospitalId),
       date: { $gte: startOfDay, $lte: endOfDay },
       status: { $nin: ["completed", "cancelled", "no_show"] }
     })
@@ -560,7 +558,7 @@ export class ReceptionRepository {
     const enrichedAppointments = await Promise.all(
       appointments.map(async (appt) => {
         const queueObj = await Queue.findOne({
-          hospital: hospitalId,
+          ...toFilter(hospitalId),
           appointment: appt._id
         });
 
@@ -585,7 +583,7 @@ export class ReceptionRepository {
     endOfDay.setHours(23, 59, 59, 999);
 
     return await Queue.find({
-      hospital: hospitalId,
+      ...toFilter(hospitalId),
       doctor: doctorId,
       createdAt: { $gte: startOfDay, $lte: endOfDay }
     })
@@ -608,7 +606,7 @@ export class ReceptionRepository {
     endOfDay.setHours(23, 59, 59, 999);
 
     return await Queue.findOne({
-      hospital: hospitalId,
+      ...toFilter(hospitalId),
       doctor: doctorId,
       status: "waiting",
       createdAt: { $gte: startOfDay, $lte: endOfDay }
@@ -621,7 +619,7 @@ export class ReceptionRepository {
   }
 
   static async getNotificationsByRole(hospitalId: Types.ObjectId, role: string) {
-    return await DbNotification.find({ hospital: hospitalId, recipientRole: role })
+    return await DbNotification.find({ ...toFilter(hospitalId), recipientRole: role })
       .sort({ createdAt: -1 })
       .limit(50);
   }
@@ -636,7 +634,7 @@ export class ReceptionRepository {
   }
 
   static async getAuditLogs(hospitalId: Types.ObjectId) {
-    return await AuditLog.find({ hospital: hospitalId })
+    return await AuditLog.find(toFilter(hospitalId))
       .populate("user", "name role")
       .sort({ createdAt: -1 })
       .limit(100);

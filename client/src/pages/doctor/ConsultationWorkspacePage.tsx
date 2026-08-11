@@ -636,61 +636,6 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
         consultationId: workspaceData.draftSession._id,
         followUpDate: (appointment as any).followUpDate || null,
       });
-
-      // 3. Propagate completed lab orders to lab dashboard
-      if (selectedLabTests.length > 0) {
-        try {
-          const savedRequests = localStorage.getItem("hms_laboratory_requests") || "[]";
-          const requests = JSON.parse(savedRequests);
-          const newRequest = {
-            _id: `LAB-${patient._id.slice(-4)}-${Date.now().toString().slice(-4)}`,
-            patientId: patient._id,
-            patientName: patient.name,
-            patientAge: patient.age || 30,
-            patientGender: patient.gender || "Male",
-            orderedBy: (appointment.doctor as any)?.name || "Dr. Attending Physician",
-            tests: selectedLabTests,
-            priority: labPriority,
-            date: new Date().toISOString().split("T")[0],
-            status: "Pending Request",
-            sampleId: "",
-            sampleType: "Blood",
-            results: []
-          };
-          requests.unshift(newRequest);
-          localStorage.setItem("hms_laboratory_requests", JSON.stringify(requests));
-        } catch (storageErr) {
-          console.error("Failed to sync lab request to local storage", storageErr);
-        }
-      }
-
-      // 4. Propagate completed radiology orders to radiology/lab dashboard
-      if (selectedRadiologyStudies.length > 0) {
-        try {
-          const savedRequests = localStorage.getItem("hms_laboratory_requests") || "[]";
-          const requests = JSON.parse(savedRequests);
-          const newRequest = {
-            _id: `RAD-${patient._id.slice(-4)}-${Date.now().toString().slice(-4)}`,
-            patientId: patient._id,
-            patientName: patient.name,
-            patientAge: patient.age || 30,
-            patientGender: patient.gender || "Male",
-            orderedBy: (appointment.doctor as any)?.name || "Dr. Attending Physician",
-            tests: selectedRadiologyStudies,
-            priority: radioPriority,
-            date: new Date().toISOString().split("T")[0],
-            status: "Pending Request",
-            sampleId: "",
-            sampleType: "Imaging",
-            results: []
-          };
-          requests.unshift(newRequest);
-          localStorage.setItem("hms_laboratory_requests", JSON.stringify(requests));
-        } catch (storageErr) {
-          console.error("Failed to sync radiology request to local storage", storageErr);
-        }
-      }
-
       const rx = res.prescription as any;
       setSuccessInfo({
         show: true,

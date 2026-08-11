@@ -66,5 +66,9 @@ const prescriptionSchema = new Schema(
   { timestamps: true }
 );
 
+prescriptionSchema.index({ hospital: 1, branch: 1, status: 1 });
+prescriptionSchema.index({ hospital: 1, branch: 1, createdAt: -1 });
+prescriptionSchema.index({ hospital: 1, patient: 1 });
+
 export type Prescription = InferSchemaType<typeof prescriptionSchema> & { _id: Types.ObjectId };
 export const Prescription = model("Prescription", prescriptionSchema);
