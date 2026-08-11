@@ -150,6 +150,9 @@ import { AlertDetailPage } from "./pages/nurse/AlertDetailPage";
 import NurseNotificationsPage from "./pages/nurse/NotificationsPage";
 import { PatientDashboard } from "./pages/patient/Dashboard";
 
+// Nurse module
+import { NurseDashboard } from "./pages/nurse/Dashboard";
+import { AssignTaskPage } from "./pages/nurse/AssignTaskPage";
 export const router = createBrowserRouter([
   {
     element: <PublicLayout />,
@@ -412,6 +415,9 @@ export const router = createBrowserRouter([
         element: <DashboardLayout />,
         children: [
           { index: true, element: <NurseDashboardPage /> },
+
+          { path: "dashboard", element: <NurseDashboardPage /> },
+          { path: "assign-task", element: <AssignTaskPage /> },
           { path: "patients", element: <AssignedPatientsPage /> },
           { path: "inpatients", element: <AssignedPatientsPage /> },
           { path: "medications", element: <MedicationAdminPage /> },

@@ -1302,3 +1302,25 @@ export const sendNoteToAssignedDoctor = catchAsync(async (req: Request, res: Res
     notification: notif
   });
 });
+
+
+// Aliases for backwards compatibility with mobile and web routes
+export const getNursesInpatients = getNurseInpatients;
+export const getInpatientDetailsForNurse = getNurseInpatientDetails;
+export const saveVitalsForNurse = saveNurseInpatientVitals;
+export const administerMedication = administerNurseInpatientMed;
+export const logFluid = saveNurseInpatientBedsideChecks;
+export const getNurses = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const nurses = await User.find({
+    hospital: hospitalId,
+    role: "nurse",
+    status: "active"
+  }).select("name email employeeId avatarUrl");
+
+  res.json({
+    status: "success",
+    data: nurses
+  });
+});
+

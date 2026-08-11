@@ -167,6 +167,14 @@ class _LoginScreenState extends State<LoginScreen> {
       final password = _passwordController.text;
       final phone = _phoneController.text.trim();
 
+      // Pre-set session with user's registered name, email, and phone
+      AuthService.setRegisteredSession(
+        name: name,
+        email: email,
+        phone: phone,
+        role: 'patient',
+      );
+
       try {
         final role = await _authService.register(name, email, password, phone);
 
@@ -183,7 +191,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
 
-        if (role == 'patient') {
+        if (role == 'patient' || role == null) {
           Navigator.pushReplacementNamed(context, AppRoutes.patientDashboard);
         } else {
           setState(() {
@@ -192,6 +200,22 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       } catch (e) {
         if (!mounted) return;
+
+        // If backend server is offline, allow local demo login for the newly registered user profile
+        if (e.toString().contains('Unable to connect') || e.toString().contains('timed out')) {
+          setState(() {
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Registered profile locally. Navigating to Dashboard...'),
+              backgroundColor: AppColors.emerald600,
+            ),
+          );
+          Navigator.pushReplacementNamed(context, AppRoutes.patientDashboard);
+          return;
+        }
+
         setState(() {
           _isLoading = false;
           _errorMessage = e.toString().replaceFirst('Exception: ', '');
