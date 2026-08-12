@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { AppError } from "../utils/AppError";
 import { Branch } from "../models/Branch";
+import { User } from "../models/User";
 import { Types } from "mongoose";
 
 /**
@@ -50,9 +51,32 @@ export async function scopeToHospital(req: Request, _res: Response, next: NextFu
 
     const baseFilter: any = { hospital: req.user.hospital };
 
-    // Locked branch on User account (e.g. staff/doctor assigned to specific branch)
-    if ((req.user as any).branch) {
-      baseFilter.branch = (req.user as any).branch;
+    let userBranch = (req.user as any).branch;
+
+    // If branch is not directly set on User account, resolve from Staff or Doctor profile
+    if (!userBranch && (req.user.role as string) !== "hospital_admin") {
+      const { Staff } = await import("../models/Staff");
+      const { Doctor } = await import("../models/Doctor");
+
+      const staff = await Staff.findOne({ user: req.user._id }) || await Staff.findOne({ email: req.user.email });
+      if (staff && staff.branch) {
+        userBranch = staff.branch;
+      } else {
+        const doctor = await Doctor.findOne({ user: req.user._id }) || await Doctor.findOne({ email: req.user.email });
+        if (doctor && doctor.branch) {
+          userBranch = doctor.branch;
+        }
+      }
+
+      if (userBranch) {
+        (req.user as any).branch = userBranch;
+        await User.updateOne({ _id: req.user._id }, { branch: userBranch }).catch(() => {});
+      }
+    }
+
+    // Locked branch on User/Staff/Doctor account
+    if (userBranch) {
+      baseFilter.branch = userBranch;
     } else if (branchHeader === "all") {
       // "all" explicitly requested by admin
       delete baseFilter.branch;

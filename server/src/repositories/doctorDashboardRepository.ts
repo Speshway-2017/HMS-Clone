@@ -6,6 +6,7 @@ import { LabOrder } from "../models/LabOrder";
 import { Certificate } from "../models/Certificate";
 import { DbNotification } from "../models/DbNotification";
 import { Types } from "mongoose";
+import { buildBranchQuery } from "../utils/branchQueryHelper";
 
 export class DoctorDashboardRepository {
   // Utility to convert string or ObjectId doctor inputs to valid ObjectIds
@@ -38,11 +39,12 @@ export class DoctorDashboardRepository {
   }
 
   // 1. Today's Appointments
-  static async getTodayAppointments(hospitalId: Types.ObjectId, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+  static async getTodayAppointments(filterOrId: any, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+    const filter = buildBranchQuery(filterOrId);
     const { start, end } = this.getTodayRange();
     const docIds = this.normalizeDocIds(doctorId);
     return await Appointment.find({
-      hospital: hospitalId,
+      ...filter,
       doctor: { $in: docIds },
       date: { $gte: start, $lte: end },
       status: { $nin: ["cancelled", "no_show"] },
@@ -53,11 +55,12 @@ export class DoctorDashboardRepository {
       .sort({ time: 1 });
   }
 
-  static async getWaitingPatients(hospitalId: Types.ObjectId, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+  static async getWaitingPatients(filterOrId: any, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+    const filter = buildBranchQuery(filterOrId);
     const { start, end } = this.getTodayRange();
     const docIds = this.normalizeDocIds(doctorId);
     return await Queue.find({
-      hospital: hospitalId,
+      ...filter,
       doctor: { $in: docIds },
       status: { $in: ["waiting", "called"] },
       createdAt: { $gte: start, $lte: end },
@@ -70,10 +73,11 @@ export class DoctorDashboardRepository {
   }
 
   // 3. Current Inpatients
-  static async getCurrentInpatients(hospitalId: Types.ObjectId, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+  static async getCurrentInpatients(filterOrId: any, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+    const filter = buildBranchQuery(filterOrId);
     const docIds = this.normalizeDocIds(doctorId);
     return await Admission.find({
-      hospital: hospitalId,
+      ...filter,
       admittingDoctor: { $in: docIds },
       status: "admitted",
     })
@@ -85,11 +89,12 @@ export class DoctorDashboardRepository {
   }
 
   // 4. Completed Consultations Today
-  static async getCompletedConsultations(hospitalId: Types.ObjectId, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+  static async getCompletedConsultations(filterOrId: any, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+    const filter = buildBranchQuery(filterOrId);
     const { start, end } = this.getTodayRange();
     const docIds = this.normalizeDocIds(doctorId);
     return await Appointment.find({
-      hospital: hospitalId,
+      ...filter,
       doctor: { $in: docIds },
       status: "completed",
       date: { $gte: start, $lte: end },
@@ -101,10 +106,11 @@ export class DoctorDashboardRepository {
   }
 
   // 5. Pending Prescriptions
-  static async getPendingPrescriptions(hospitalId: Types.ObjectId, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+  static async getPendingPrescriptions(filterOrId: any, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+    const filter = buildBranchQuery(filterOrId);
     const docIds = this.normalizeDocIds(doctorId);
     return await Prescription.find({
-      hospital: hospitalId,
+      ...filter,
       doctor: { $in: docIds },
       status: { $in: ["pending", "Pending"] },
     })
@@ -114,10 +120,11 @@ export class DoctorDashboardRepository {
   }
 
   // 6. Pending Lab Orders
-  static async getPendingLabOrders(hospitalId: Types.ObjectId, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+  static async getPendingLabOrders(filterOrId: any, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+    const filter = buildBranchQuery(filterOrId);
     const docIds = this.normalizeDocIds(doctorId);
     return await LabOrder.find({
-      hospital: hospitalId,
+      ...filter,
       doctor: { $in: docIds },
       status: "pending",
     })
@@ -127,11 +134,12 @@ export class DoctorDashboardRepository {
   }
 
   // 7. Follow-up Patients (Upcoming appointments after today)
-  static async getFollowupPatients(hospitalId: Types.ObjectId, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+  static async getFollowupPatients(filterOrId: any, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+    const filter = buildBranchQuery(filterOrId);
     const { end } = this.getTodayRange();
     const docIds = this.normalizeDocIds(doctorId);
     return await Appointment.find({
-      hospital: hospitalId,
+      ...filter,
       doctor: { $in: docIds },
       date: { $gt: end },
       status: { $in: ["scheduled", "checked_in"] },
@@ -143,11 +151,12 @@ export class DoctorDashboardRepository {
   }
 
   // 8. Today's Surgeries
-  static async getTodaySurgeries(hospitalId: Types.ObjectId, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+  static async getTodaySurgeries(filterOrId: any, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+    const filter = buildBranchQuery(filterOrId);
     const { start, end } = this.getTodayRange();
     const docIds = this.normalizeDocIds(doctorId);
     return await Appointment.find({
-      hospital: hospitalId,
+      ...filter,
       doctor: { $in: docIds },
       type: "Surgery",
       date: { $gte: start, $lte: end },
@@ -160,19 +169,21 @@ export class DoctorDashboardRepository {
   }
 
   // 9. Notifications for Doctor
-  static async getNotifications(hospitalId: Types.ObjectId, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+  static async getNotifications(filterOrId: any, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+    const filter = buildBranchQuery(filterOrId);
     const docIds = this.normalizeDocIds(doctorId);
     return await DbNotification.find({
-      hospital: hospitalId,
+      ...filter,
       recipientDoctor: { $in: docIds },
     }).sort({ createdAt: -1 });
   }
 
   // 10. Calendar Schedule (Daily, Weekly, Monthly)
-  static async getCalendarAppointments(hospitalId: Types.ObjectId, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+  static async getCalendarAppointments(filterOrId: any, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+    const filter = buildBranchQuery(filterOrId);
     const docIds = this.normalizeDocIds(doctorId);
     return await Appointment.find({
-      hospital: hospitalId,
+      ...filter,
       doctor: { $in: docIds },
       status: { $nin: ["cancelled", "no_show"] },
     })
@@ -183,10 +194,11 @@ export class DoctorDashboardRepository {
   }
 
   // 11. Certificates List
-  static async getCertificates(hospitalId: Types.ObjectId, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+  static async getCertificates(filterOrId: any, doctorId: string | Types.ObjectId | (string | Types.ObjectId)[]) {
+    const filter = buildBranchQuery(filterOrId);
     const docIds = this.normalizeDocIds(doctorId);
     return await Certificate.find({
-      hospital: hospitalId,
+      ...filter,
       doctor: { $in: docIds },
     })
       .populate("patient", "name uhid age gender phone")

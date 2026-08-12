@@ -37,3 +37,14 @@ export function buildBranchQuery(hospitalFilter: any): Record<string, unknown> {
 
   return query;
 }
+
+export function parseHospitalAndBranch(filterOrId: any): { targetHospital: any; targetBranch: any } {
+  if (!filterOrId) return { targetHospital: null, targetBranch: null };
+  if (typeof filterOrId === "object" && filterOrId.hospital) {
+    return {
+      targetHospital: filterOrId.hospital,
+      targetBranch: "branch" in filterOrId ? filterOrId.branch : null,
+    };
+  }
+  return { targetHospital: filterOrId, targetBranch: null };
+}
