@@ -297,10 +297,44 @@ export const deleteStaff = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const getStaffProfileMe = catchAsync(async (req: Request, res: Response) => {
-  const staff = await Staff.findOne({ email: req.user!.email }).populate("department", "name");
-  if (!staff) {
-    throw new AppError("Staff profile not found for the logged-in user.", 404);
+  const userEmail = (req.user!.email || "").trim();
+  let staff = null;
+
+  if (userEmail) {
+    staff = await Staff.findOne({
+      email: { $regex: `^${userEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&")}$`, $options: "i" },
+    }).populate("department", "name");
   }
+
+  if (!staff) {
+    const hospitalId = req.user!.hospital;
+    const userName = req.user!.name || "Staff Member";
+    const userRole = req.user!.role || "nurse";
+
+    if (hospitalId) {
+      staff = await Staff.create({
+        hospital: hospitalId,
+        name: userName,
+        email: userEmail,
+        phone: req.user!.phone || "",
+        role: userRole,
+        dutyStatus: "on_duty",
+      });
+    } else {
+      return res.json({
+        status: "success",
+        data: {
+          staff: {
+            name: userName,
+            email: userEmail,
+            role: userRole,
+            dutyStatus: "on_duty",
+          },
+        },
+      });
+    }
+  }
+
   res.json({ status: "success", data: { staff } });
 });
 

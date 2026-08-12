@@ -18,9 +18,9 @@ class PatientProfileScreen extends StatelessWidget {
     final String spo2 = patientData['spo2'] ?? '98%';
     final String temp = patientData['temp'] ?? '98.6 °F';
 
-    // Mock constants for fields not fully mapped in simplified list
-    const String doctor = 'Dr. Smith';
-    const String diagnosis = 'Pneumonia';
+    // Doctor and diagnosis fields mapped dynamically
+    final String doctor = patientData['doctor'] ?? 'Dr. Sarah Smith (Cardiology)';
+    final String diagnosis = patientData['diagnosis'] ?? 'Under Post-Op / Clinical Observation';
     const String respiration = '16 bpm';
 
     return Scaffold(

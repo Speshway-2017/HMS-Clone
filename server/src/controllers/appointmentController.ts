@@ -36,7 +36,18 @@ async function generateReferenceId(hospitalId: string, bookingDate: Date): Promi
 }
 
 async function getLoggedDoctor(req: Request) {
-  const doctor = await Doctor.findOne({ email: req.user!.email, isActive: { $ne: false } });
+  if (!req.user) {
+    throw new AppError("User is not authenticated.", 401);
+  }
+  let doctor = await Doctor.findOne({ user: req.user._id, isActive: { $ne: false } });
+  if (!doctor && req.user.email) {
+    const emailRegex = new RegExp(`^${req.user.email.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+    doctor = await Doctor.findOne({ email: emailRegex, isActive: { $ne: false } });
+  }
+  if (!doctor && req.user.name && req.user.hospital) {
+    const nameRegex = new RegExp(`^${req.user.name.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+    doctor = await Doctor.findOne({ hospital: req.user.hospital, name: nameRegex, isActive: { $ne: false } });
+  }
   if (!doctor) {
     throw new AppError("Doctor profile not found for the logged-in user.", 404);
   }
@@ -70,9 +81,10 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
   if (status) filter.status = status;
   if (doctor) filter.doctor = doctor;
 
-  // Enforce doctor data isolation for appointment listing
+  // Enforce doctor data isolation for appointment listing: doctors see all their appointments across branches
   if (req.user!.role === "doctor") {
     const loggedDoctor = await getLoggedDoctor(req);
+    delete filter.branch;
     filter.doctor = loggedDoctor._id;
   }
 
@@ -221,11 +233,6 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
         isActive: true,
       });
       body.patient = newPat._id.toString();
-  // If patient field is missing or logged in as patient role, auto-find patient document
-  if (!body.patient || req.user!.role === "patient") {
-    const patientDoc = await Patient.findOne({ email: req.user!.email });
-    if (patientDoc) {
-      body.patient = patientDoc._id.toString();
     }
   }
 

@@ -23,11 +23,11 @@ import {
   markAllNurseNotificationsRead,
   snoozeNurseNotification,
   dismissNurseNotification,
-  sendNoteToAssignedDoctor
   sendNoteToAssignedDoctor,
+  sendEmergencyAlertToDoctor,
   getNurses,
   administerMedication,
-  logFluid
+  logFluid,
 } from "../controllers/nurseController";
 import { getStaffProfileMe } from "../controllers/staffController";
 
@@ -51,6 +51,7 @@ router.get("/inpatients", getNurseInpatients);
 router.route("/inpatients/:id").get(getNurseInpatientDetails);
 router.get("/inpatients/:id/details", getNurseInpatientDetails);
 router.post("/notes/send-to-doctor", sendNoteToAssignedDoctor);
+router.post("/emergency-alert", sendEmergencyAlertToDoctor);
 router.post("/inpatients/:id/vitals", saveNurseInpatientVitals);
 router.post("/inpatients/:id/notes", addNurseInpatientNotes);
 router.post("/inpatients/:id/medications/administer", administerNurseInpatientMed);
