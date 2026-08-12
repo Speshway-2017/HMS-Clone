@@ -7,10 +7,10 @@ import '../features/nurse/screens/nurse_dashboard.dart';
 import '../features/nurse/screens/assign_task_screen.dart';
 import '../features/nurse/screens/shift_handover_screen.dart';
 import '../features/nurse/screens/nursing_notes_screen.dart';
-import '../features/nurse/screens/patient_profile_screen.dart';
+import '../features/nurse/screens/patient_profile_screen.dart' as nurse_profile;
 import '../features/nurse/screens/patient_vitals_screen.dart';
 import '../features/patient/screens/patient_dashboard.dart';
-import '../features/patient/screens/patient_profile_screen.dart';
+import '../features/patient/screens/patient_profile_screen.dart' as patient_profile;
 
 class AppRoutes {
   static const String splash = '/';
@@ -120,7 +120,7 @@ class AppRoutes {
       case nursePatientProfile:
         final args = settings.arguments as Map<String, dynamic>;
         return PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => PatientProfileScreen(patientData: args),
+          pageBuilder: (context, animation, secondaryAnimation) => nurse_profile.PatientProfileScreen(patientData: args),
           settings: settings,
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(
@@ -157,7 +157,7 @@ class AppRoutes {
         );
       case patientProfile:
         return PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => const PatientProfileScreen(),
+          pageBuilder: (context, animation, secondaryAnimation) => const patient_profile.PatientProfileScreen(),
           settings: settings,
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(

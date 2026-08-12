@@ -72,25 +72,20 @@ class AuthService {
 
           if (user != null && user['role'] != null) {
             if (token != null) {
+              authToken = token;
               await UserSession.saveSession(
                 token: token,
                 user: user,
                 patient: patient,
               );
             }
-          final token = data['token'];
-          
-          if (token != null) {
-            authToken = token.toString();
-          }
 
-          if (user != null && user['role'] != null) {
             currentUser = Map<String, dynamic>.from(user);
-            if (token != null) currentUser!['token'] = token.toString();
+            if (token != null) currentUser!['token'] = token;
 
             try {
               final prefs = await SharedPreferences.getInstance();
-              if (token != null) await prefs.setString('auth_token', token.toString());
+              if (token != null) await prefs.setString('auth_token', token);
               await prefs.setString('user_role', user['role'].toString());
               if (user['name'] != null) await prefs.setString('user_name', user['name'].toString());
               if (user['email'] != null) await prefs.setString('user_email', user['email'].toString());
@@ -154,18 +149,13 @@ class AuthService {
 
           if (user != null && user['role'] != null) {
             if (token != null) {
+              authToken = token;
               await UserSession.saveSession(
                 token: token,
                 user: user,
                 patient: patient,
               );
             }
-          final user = decoded['data']['user'];
-          final token = decoded['data']['token']?.toString();
-          if (token != null) {
-            authToken = token;
-          }
-          if (user != null && user['role'] != null) {
             currentUser = Map<String, dynamic>.from(user);
             if (token != null) currentUser!['token'] = token;
             return user['role'].toString();
