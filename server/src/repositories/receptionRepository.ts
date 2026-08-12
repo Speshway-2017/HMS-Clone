@@ -28,24 +28,20 @@ export class ReceptionRepository {
   }
 
   static async findPatientById(hospitalId: any, id: string) {
-    return await Patient.findOne({ _id: id, ...toFilter(hospitalId) }).populate("assignedDoctor", "name");
+    const targetHospital = typeof hospitalId === "object" ? (hospitalId.hospital || hospitalId) : hospitalId;
+    return await Patient.findOne({ _id: id, hospital: targetHospital }).populate("assignedDoctor", "name");
   }
 
   static async searchPatients(hospitalId: any, queryStr: string) {
-    const filter: any = { ...toFilter(hospitalId) };
+    const targetHospital = typeof hospitalId === "object" ? (hospitalId.hospital || hospitalId) : hospitalId;
+    const baseFilter = { hospital: targetHospital };
     let patientIds: any[] = [];
-    if (queryStr) {
-      const regex = new RegExp(queryStr, "i");
-      filter.$or = [
-        { name: regex },
-        { phone: regex },
-        { uhid: regex },
-        { patientCode: regex }
-      ];
+    if (queryStr && queryStr.trim()) {
+      const regex = new RegExp(queryStr.trim(), "i");
 
       // Find any appointments matching referenceId
       const matchedAppts = await Appointment.find({
-        ...toFilter(hospitalId),
+        ...baseFilter,
         referenceId: regex
       }).select("patient");
       if (matchedAppts.length > 0) {
@@ -54,28 +50,37 @@ export class ReceptionRepository {
 
       // Find any queue tokens matching tokenNumber
       const matchedTokens = await Queue.find({
-        ...toFilter(hospitalId),
+        ...baseFilter,
         tokenNumber: regex
       }).select("patient");
       if (matchedTokens.length > 0) {
         patientIds = patientIds.concat(matchedTokens.map(q => q.patient));
       }
-    }
-    
-    if (patientIds.length > 0) {
-      if (!filter.$or) {
-        filter.$or = [];
+
+      const matchConditions: any[] = [
+        { name: regex },
+        { phone: regex },
+        { uhid: regex },
+        { patientCode: regex }
+      ];
+      if (patientIds.length > 0) {
+        matchConditions.push({ _id: { $in: patientIds } });
       }
-      filter.$or.push({ _id: { $in: patientIds } });
+
+      return await Patient.find({
+        ...baseFilter,
+        $or: matchConditions
+      }).sort({ name: 1 }).limit(50);
     }
 
-    return await Patient.find(filter).sort({ name: 1 }).limit(50);
+    return await Patient.find(baseFilter).sort({ name: 1 }).limit(50);
   }
 
   static async listPatients(hospitalId: any, page: number, limit: number, search?: string) {
-    const filter: any = { ...toFilter(hospitalId) };
-    if (search) {
-      const regex = new RegExp(search, "i");
+    const baseFilter = toFilter(hospitalId);
+    const filter: any = { ...baseFilter };
+    if (search && search.trim()) {
+      const regex = new RegExp(search.trim(), "i");
       filter.$or = [
         { name: regex },
         { phone: regex },
@@ -143,11 +148,12 @@ export class ReceptionRepository {
   }
 
   static async getOPHistory(hospitalId: any, page: number, limit: number, search?: string) {
+    const targetHospital = typeof hospitalId === "object" ? (hospitalId.hospital || hospitalId) : hospitalId;
     const filter: any = { ...toFilter(hospitalId) };
     if (search) {
       const regex = new RegExp(search, "i");
       // Search on populated patient fields would require aggregation, but we can search patient IDs
-      const patients = await Patient.find({ ...toFilter(hospitalId), name: regex }).select("_id");
+      const patients = await Patient.find({ hospital: targetHospital, name: regex }).select("_id");
       filter.patient = { $in: patients.map(p => p._id) };
     }
     const skip = (page - 1) * limit;

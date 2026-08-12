@@ -158,7 +158,7 @@ export const getOPHistory = catchAsync(async (req: Request, res: Response) => {
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
   const search = (req.query.search as string) || "";
-  const result = await ReceptionRepository.getOPHistory(req.hospitalFilter!.hospital as any, page, limit, search);
+  const result = await ReceptionRepository.getOPHistory(req.hospitalFilter as any, page, limit, search);
   res.json({
     status: "success",
     data: result.data,
@@ -188,7 +188,7 @@ export const checkDuplicateAppointment = catchAsync(async (req: Request, res: Re
     throw new AppError("patientId, doctorId and date are required query parameters.", 400);
   }
   const result = await ReceptionService.checkDuplicateAppointment(
-    req.hospitalFilter!.hospital as any,
+    req.hospitalFilter as any,
     patientId,
     doctorId,
     date
@@ -198,8 +198,9 @@ export const checkDuplicateAppointment = catchAsync(async (req: Request, res: Re
 
 export const processBillingPayment = catchAsync(async (req: Request, res: Response) => {
   const paymentData = paymentSchema.parse(req.body);
+  const hospitalId = req.hospitalFilter?.hospital || req.user?.hospital;
   
-  const invoice = await Invoice.findOne({ _id: paymentData.invoiceId, hospital: req.hospitalFilter!.hospital });
+  const invoice = await Invoice.findOne({ _id: paymentData.invoiceId, hospital: hospitalId });
   if (!invoice) {
     throw new AppError("Invoice not found.", 404);
   }
@@ -215,7 +216,7 @@ export const processBillingPayment = catchAsync(async (req: Request, res: Respon
   }
 
   const result = await ReceptionService.processPayment(
-    req.hospitalFilter!.hospital as any,
+    req.hospitalFilter as any,
     paymentData,
     req.user!._id
   );
@@ -418,15 +419,16 @@ export const markNotificationRead = catchAsync(async (req: Request, res: Respons
 export const exportReports = catchAsync(async (req: Request, res: Response) => {
   const today = new Date();
   const dateStr = today.toLocaleDateString();
+  const filter = buildBranchQuery(req.hospitalFilter);
 
   const mockReport = {
     title: `Reception Summary Report - ${dateStr}`,
     exportedAt: today.toISOString(),
     metrics: {
-      totalPatientsRegistered: await Patient.countDocuments({ hospital: req.hospitalFilter!.hospital as any }),
-      totalTokensIssuedToday: await Queue.countDocuments({ hospital: req.hospitalFilter!.hospital as any, createdAt: { $gte: new Date(today.setHours(0, 0, 0, 0)) } }),
+      totalPatientsRegistered: await Patient.countDocuments(filter),
+      totalTokensIssuedToday: await Queue.countDocuments({ ...filter, createdAt: { $gte: new Date(today.setHours(0, 0, 0, 0)) } }),
       totalRevenueCollected: await Payment.aggregate([
-        { $match: { hospital: req.hospitalFilter!.hospital as any } },
+        { $match: filter },
         { $group: { _id: null, total: { $sum: "$amount" } } }
       ]).then((arr: any[]) => arr[0]?.total || 0)
     }

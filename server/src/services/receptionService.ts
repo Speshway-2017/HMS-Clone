@@ -26,6 +26,7 @@ import { IPBillPayment } from "../models/IPBillPayment";
 import { RoomTariff } from "../models/RoomTariff";
 import { User } from "../models/User";
 import { validateAppointmentTimeRestriction } from "../utils/appointmentTimeValidation";
+import { buildBranchQuery } from "../utils/branchQueryHelper";
 
 
 function generateDigits(length: number): string {
@@ -203,12 +204,13 @@ export class ReceptionService {
   }
 
   // ── Patient Search ──
-  static async searchPatients(hospitalId: Types.ObjectId, query: string) {
-    return await ReceptionRepository.searchPatients(hospitalId, query);
+  static async searchPatients(filterOrId: any, query: string) {
+    return await ReceptionRepository.searchPatients(filterOrId, query);
   }
 
-  static async getPatientDetail(hospitalId: Types.ObjectId, patientId: string) {
-    const patient = await Patient.findOne({ _id: patientId, hospital: hospitalId }).populate("assignedDoctor", "name");
+  static async getPatientDetail(filterOrId: any, patientId: string) {
+    const { targetHospital } = parseHospitalAndBranch(filterOrId);
+    const patient = await Patient.findOne({ _id: patientId, hospital: targetHospital }).populate("assignedDoctor", "name");
     if (!patient) {
       throw new AppError("Patient not found", 404);
     }
@@ -216,14 +218,14 @@ export class ReceptionService {
     // Find all patient document IDs associated with this patient (by patientId or linked user account)
     let allPatientIds: any[] = [patientId];
     if (patient.user) {
-      const relatedDocs = await Patient.find({ hospital: hospitalId, user: patient.user }).select("_id");
+      const relatedDocs = await Patient.find({ hospital: targetHospital, user: patient.user }).select("_id");
       if (relatedDocs.length > 0) {
         allPatientIds = relatedDocs.map(p => p._id);
       }
     }
 
     const recentAppointmentsList = await Appointment.find({
-      hospital: hospitalId,
+      hospital: targetHospital,
       patient: { $in: allPatientIds },
       status: { $nin: ["cancelled", "no_show"] }
     }).sort({ date: -1, createdAt: -1 }).limit(20).populate("doctor department");
@@ -231,7 +233,7 @@ export class ReceptionService {
     const lastAppointment = recentAppointmentsList.length > 0 ? recentAppointmentsList[0] : null;
 
     const activeAdmission = await Admission.findOne({
-      hospital: hospitalId,
+      hospital: targetHospital,
       patient: { $in: allPatientIds },
       status: {
         $in: [
@@ -338,7 +340,8 @@ export class ReceptionService {
     };
   }
 
-  static async bookAppointment(hospitalId: Types.ObjectId, appointmentData: any, userId: Types.ObjectId) {
+  static async bookAppointment(filterOrId: any, appointmentData: any, userId: Types.ObjectId) {
+    const { targetHospital: hospitalId, targetBranch } = parseHospitalAndBranch(filterOrId);
     // Map old type values to new ones for backward compatibility
     const mapOldType = (oldType: string | undefined) => {
       if (!oldType) return "Appointment";
@@ -567,6 +570,7 @@ export class ReceptionService {
     // Create provisional invoice
     const newInvoice = await ReceptionRepository.createInvoice({
       hospital: hospitalId,
+      branch: targetBranch,
       referenceId,
       patient: patientId,
       appointment: null, // We'll link this after payment
@@ -614,6 +618,7 @@ export class ReceptionService {
 
     const appointmentPayload: Record<string, unknown> = {
       hospital: hospitalId,
+      branch: targetBranch,
       referenceId,
       patient: patientId,
       doctor: doctorId,
@@ -687,6 +692,7 @@ export class ReceptionService {
 
       queueRecord = await ReceptionRepository.createQueueToken({
         hospital: hospitalId,
+        branch: targetBranch,
         tokenNumber,
         type: type === "Emergency" ? "emergency" : "regular",
         status: "waiting",
@@ -756,7 +762,8 @@ export class ReceptionService {
     };
   }
 
-  static async processPayment(hospitalId: Types.ObjectId, paymentData: any, userId: Types.ObjectId) {
+  static async processPayment(filterOrId: any, paymentData: any, userId: Types.ObjectId) {
+    const { targetHospital: hospitalId, targetBranch } = parseHospitalAndBranch(filterOrId);
     const { invoiceId, amount, paymentMethod, mixedDetails } = paymentData;
 
     const session = await mongoose.startSession();
@@ -946,6 +953,7 @@ export class ReceptionService {
             // Create appointment payload
             const appointmentPayload: Record<string, any> = {
               hospital: hospitalId,
+              branch: invoice.branch || targetBranch,
               referenceId,
               patient: invoice.patient._id,
               doctor: provisionalData.doctorId,
@@ -992,6 +1000,7 @@ export class ReceptionService {
 
           queueRecord = await ReceptionRepository.createQueueToken({
             hospital: hospitalId,
+            branch: invoice.branch || targetBranch,
             tokenNumber,
             type: provisionalData.type === "Emergency" ? "emergency" : "regular",
             status: "waiting",
@@ -1307,9 +1316,10 @@ export class ReceptionService {
   }
 
   // ── Inpatient (IP) Admissions ──
-  static async getAdmissionRequests(hospitalId: Types.ObjectId) {
+  static async getAdmissionRequests(filterOrId: any) {
+    const filter = buildBranchQuery(filterOrId);
     return await AdmissionRequest.find({
-      hospital: hospitalId,
+      ...filter,
       status: { $in: ["Pending", "pending", "Admission Requested", "AdmissionRequested"] }
     })
       .populate("patient")

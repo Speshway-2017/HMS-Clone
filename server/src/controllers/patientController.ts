@@ -84,11 +84,11 @@ export const listPatients = catchAsync(async (req: Request, res: Response) => {
   if (req.user!.role === "doctor") {
     const doctor = await getLoggedDoctor(req);
     const [apptPatients, admissionPatients, labPatients, radioPatients, assignedPatients] = await Promise.all([
-      Appointment.distinct("patient", { hospital: filter.hospital, doctor: doctor._id }),
-      Admission.distinct("patient", { hospital: filter.hospital, admittingDoctor: doctor._id }),
-      LabOrder.distinct("patient", { hospital: filter.hospital, doctor: doctor._id }),
-      RadiologyOrder.distinct("patient", { hospital: filter.hospital, doctor: doctor._id }),
-      Patient.distinct("_id", { hospital: filter.hospital, assignedDoctor: doctor._id }),
+      Appointment.distinct("patient", { ...filter, doctor: doctor._id }),
+      Admission.distinct("patient", { ...filter, admittingDoctor: doctor._id }),
+      LabOrder.distinct("patient", { ...filter, doctor: doctor._id }),
+      RadiologyOrder.distinct("patient", { ...filter, doctor: doctor._id }),
+      Patient.distinct("_id", { ...filter, assignedDoctor: doctor._id }),
     ]);
     const patientIdSet = new Set<string>([
       ...apptPatients.map((id: any) => id.toString()),
@@ -172,7 +172,8 @@ export const createPatient = catchAsync(async (req: Request, res: Response) => {
 
 export const getPatient = catchAsync(async (req: Request, res: Response) => {
   await checkPatientDoctorAccess(req, req.params.id);
-  const patient = await Patient.findOne({ _id: req.params.id, ...req.hospitalFilter }).populate("assignedDoctor", "name");
+  const hospitalId = req.hospitalFilter?.hospital || req.user?.hospital;
+  const patient = await Patient.findOne({ _id: req.params.id, hospital: hospitalId }).populate("assignedDoctor", "name");
   if (!patient) {
     throw new AppError("Patient not found.", 404);
   }

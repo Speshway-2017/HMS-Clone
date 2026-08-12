@@ -58,11 +58,19 @@ async function getLoggedDoctor(req: Request) {
   return doctor;
 }
 
+function getDoctorScopeFilter(req: Request, doctor: any) {
+  if (req.user?.role === "doctor") {
+    return { hospital: doctor.hospital || req.hospitalFilter?.hospital };
+  }
+  return req.hospitalFilter;
+}
+
 // 1. Dashboard Metrics (counts)
 export const getMetrics = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
   const doctorId = doctor._id.toString();
+  const filter = getDoctorScopeFilter(req, doctor);
 
   const [
     todayAppts,
@@ -76,16 +84,16 @@ export const getMetrics = catchAsync(async (req: Request, res: Response) => {
     notifications,
     calendar,
   ] = await Promise.all([
-    DoctorDashboardRepository.getTodayAppointments(hospitalId, doctorId),
-    DoctorDashboardRepository.getWaitingPatients(hospitalId, doctorId),
-    DoctorDashboardRepository.getCurrentInpatients(hospitalId, doctorId),
-    DoctorDashboardRepository.getCompletedConsultations(hospitalId, doctorId),
-    DoctorDashboardRepository.getPendingPrescriptions(hospitalId, doctorId),
-    DoctorDashboardRepository.getPendingLabOrders(hospitalId, doctorId),
-    DoctorDashboardRepository.getFollowupPatients(hospitalId, doctorId),
-    DoctorDashboardRepository.getTodaySurgeries(hospitalId, doctorId),
-    DoctorDashboardRepository.getNotifications(hospitalId, doctorId),
-    DoctorDashboardRepository.getCalendarAppointments(hospitalId, doctorId),
+    DoctorDashboardRepository.getTodayAppointments(filter, doctorId),
+    DoctorDashboardRepository.getWaitingPatients(filter, doctorId),
+    DoctorDashboardRepository.getCurrentInpatients(filter, doctorId),
+    DoctorDashboardRepository.getCompletedConsultations(filter, doctorId),
+    DoctorDashboardRepository.getPendingPrescriptions(filter, doctorId),
+    DoctorDashboardRepository.getPendingLabOrders(filter, doctorId),
+    DoctorDashboardRepository.getFollowupPatients(filter, doctorId),
+    DoctorDashboardRepository.getTodaySurgeries(filter, doctorId),
+    DoctorDashboardRepository.getNotifications(filter, doctorId),
+    DoctorDashboardRepository.getCalendarAppointments(filter, doctorId),
   ]);
 
   res.json({
@@ -107,9 +115,9 @@ export const getMetrics = catchAsync(async (req: Request, res: Response) => {
 
 // 2. Today's Appointments List
 export const getTodayAppointments = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
-  const data = await DoctorDashboardRepository.getTodayAppointments(hospitalId, doctor._id.toString());
+  const filter = getDoctorScopeFilter(req, doctor);
+  const data = await DoctorDashboardRepository.getTodayAppointments(filter, doctor._id.toString());
   res.json({ status: "success", data });
 });
 
@@ -162,9 +170,9 @@ function compareQueueItems(a: any, b: any) {
 
 // 3. Waiting Queue List & Actions
 export const getQueue = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
-  const rawQueue = await DoctorDashboardRepository.getWaitingPatients(hospitalId, doctor._id.toString());
+  const filter = getDoctorScopeFilter(req, doctor);
+  const rawQueue = await DoctorDashboardRepository.getWaitingPatients(filter, doctor._id.toString());
   
   const sortedQueue = rawQueue.sort(compareQueueItems);
   const data = sortedQueue.map((item: any, index: number) => {
@@ -248,9 +256,9 @@ export const markNoShow = catchAsync(async (req: Request, res: Response) => {
 
 // 4. Current Inpatients List & Actions
 export const getInpatients = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
-  const data = await DoctorDashboardRepository.getCurrentInpatients(hospitalId, doctor._id.toString());
+  const filter = getDoctorScopeFilter(req, doctor);
+  const data = await DoctorDashboardRepository.getCurrentInpatients(filter, doctor._id.toString());
   res.json({ status: "success", data });
 });
 
@@ -373,17 +381,17 @@ export const addInpatientNotes = catchAsync(async (req: Request, res: Response) 
 
 // 5. Completed Consultations List
 export const getCompletedConsultations = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
-  const data = await DoctorDashboardRepository.getCompletedConsultations(hospitalId, doctor._id.toString());
+  const filter = getDoctorScopeFilter(req, doctor);
+  const data = await DoctorDashboardRepository.getCompletedConsultations(filter, doctor._id.toString());
   res.json({ status: "success", data });
 });
 
 // 6. Pending Prescriptions & Actions
 export const getPrescriptions = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
-  const data = await DoctorDashboardRepository.getPendingPrescriptions(hospitalId, doctor._id.toString());
+  const filter = getDoctorScopeFilter(req, doctor);
+  const data = await DoctorDashboardRepository.getPendingPrescriptions(filter, doctor._id.toString());
   res.json({ status: "success", data });
 });
 
@@ -504,9 +512,9 @@ export const completePrescription = catchAsync(async (req: Request, res: Respons
 
 // 7. Pending Lab Orders & Actions
 export const getLabOrders = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
-  const data = await DoctorDashboardRepository.getPendingLabOrders(hospitalId, doctor._id.toString());
+  const filter = getDoctorScopeFilter(req, doctor);
+  const data = await DoctorDashboardRepository.getPendingLabOrders(filter, doctor._id.toString());
   res.json({ status: "success", data });
 });
 
@@ -602,25 +610,25 @@ export const createLabOrder = catchAsync(async (req: Request, res: Response) => 
 
 // 8. Follow-up Patients
 export const getFollowups = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
-  const data = await DoctorDashboardRepository.getFollowupPatients(hospitalId, doctor._id.toString());
+  const filter = getDoctorScopeFilter(req, doctor);
+  const data = await DoctorDashboardRepository.getFollowupPatients(filter, doctor._id.toString());
   res.json({ status: "success", data });
 });
 
 // 9. Today's Surgeries
 export const getSurgeries = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
-  const data = await DoctorDashboardRepository.getTodaySurgeries(hospitalId, doctor._id.toString());
+  const filter = getDoctorScopeFilter(req, doctor);
+  const data = await DoctorDashboardRepository.getTodaySurgeries(filter, doctor._id.toString());
   res.json({ status: "success", data });
 });
 
 // 10. Notifications
 export const getNotifications = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
-  const data = await DoctorDashboardRepository.getNotifications(hospitalId, doctor._id.toString());
+  const filter = getDoctorScopeFilter(req, doctor);
+  const data = await DoctorDashboardRepository.getNotifications(filter, doctor._id.toString());
 
   // Log delivery of notifications
   if (req.user && data.length > 0) {
@@ -628,7 +636,7 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
     await Promise.all(
       data.map((notif) =>
         AuditLog.create({
-          hospital: hospitalId,
+          hospital: (req.hospitalFilter!.hospital as Types.ObjectId),
           user: req.user!._id,
           action: "doctor_notification_delivered",
           details: `Notification "${notif.title}" delivered to Dr. ${doctor.name}.`,
@@ -692,17 +700,17 @@ export const markNotificationRead = catchAsync(async (req: Request, res: Respons
 
 // 11. Calendar Schedule
 export const getCalendar = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
-  const data = await DoctorDashboardRepository.getCalendarAppointments(hospitalId, doctor._id.toString());
+  const filter = getDoctorScopeFilter(req, doctor);
+  const data = await DoctorDashboardRepository.getCalendarAppointments(filter, doctor._id.toString());
   res.json({ status: "success", data });
 });
 
 // 12. Certificates & Actions
 export const getCertificates = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
-  const data = await DoctorDashboardRepository.getCertificates(hospitalId, doctor._id.toString());
+  const filter = getDoctorScopeFilter(req, doctor);
+  const data = await DoctorDashboardRepository.getCertificates(filter, doctor._id.toString());
   res.json({ status: "success", data });
 });
 
@@ -968,8 +976,10 @@ export const recommendAdmission = catchAsync(async (req: Request, res: Response)
   const requestNumber = `${prefix}${String(nextSerial).padStart(6, "0")}`;
 
   // 5. Create AdmissionRequest
+  const branchId = doctor.branch || req.hospitalFilter?.branch || (req.user as any)?.branch || null;
   const admissionReq = await AdmissionRequest.create({
     hospital: hospitalId,
+    branch: branchId,
     requestNumber,
     patient: patient._id,
     doctor: doctor._id,
@@ -2091,10 +2101,12 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
           const diagVal = rec.primaryDiagnosis || draft.diagnosis || "Admission Required";
           const notesVal = rec.clinicalNotes || draft.clinicalNotes || "";
 
+          const branchId = doctor.branch || req.hospitalFilter?.branch || (req.user as any)?.branch || null;
           const [newAdmissionReq] = await AdmissionRequest.create(
             [
               {
                 hospital: hospitalId,
+                branch: branchId,
                 requestNumber,
                 patient: patient._id,
                 doctor: doctor._id,

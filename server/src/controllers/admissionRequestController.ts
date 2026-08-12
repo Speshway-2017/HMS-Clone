@@ -10,6 +10,7 @@ import { DbNotification } from "../models/DbNotification";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { emitToHospital } from "../config/socket";
+import { buildBranchQuery } from "../utils/branchQueryHelper";
 
 // Helper to resolve the logged-in doctor profile
 async function getLoggedDoctor(req: Request) {
@@ -123,8 +124,10 @@ export const createAdmissionRequest = catchAsync(async (req: Request, res: Respo
     const requestNumber = `${prefix}${String(nextSerial).padStart(6, "0")}`;
 
     // Create request
+    const branchId = doctor.branch || req.hospitalFilter?.branch || (req.user as any)?.branch || null;
     const [admissionReq] = await AdmissionRequest.create([{
       hospital: hospitalId,
+      branch: branchId,
       requestNumber,
       patient: patient._id,
       doctor: doctor._id,
@@ -180,10 +183,9 @@ export const createAdmissionRequest = catchAsync(async (req: Request, res: Respo
 });
 
 export const getAdmissionRequests = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const statusParam = req.query.status as string;
 
-  const filter: any = { hospital: hospitalId };
+  const filter: any = buildBranchQuery(req.hospitalFilter);
   if (!statusParam || ["Pending", "pending", "Admission Requested"].includes(statusParam)) {
     filter.status = { $in: ["Pending", "pending", "Admission Requested", "AdmissionRequested"] };
   } else {
@@ -192,6 +194,7 @@ export const getAdmissionRequests = catchAsync(async (req: Request, res: Respons
 
   if (req.user!.role === "doctor") {
     const doctor = await getLoggedDoctor(req);
+    delete filter.branch;
     const docIds = [doctor._id, (doctor as any).user, req.user?._id].filter(Boolean);
     filter.$or = [{ doctor: { $in: docIds } }, { requestedBy: { $in: docIds } }];
   }
