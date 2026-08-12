@@ -221,11 +221,6 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
         isActive: true,
       });
       body.patient = newPat._id.toString();
-  // If patient field is missing or logged in as patient role, auto-find patient document
-  if (!body.patient || req.user!.role === "patient") {
-    const patientDoc = await Patient.findOne({ email: req.user!.email });
-    if (patientDoc) {
-      body.patient = patientDoc._id.toString();
     }
   }
 

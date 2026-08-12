@@ -23,11 +23,10 @@ import {
   markAllNurseNotificationsRead,
   snoozeNurseNotification,
   dismissNurseNotification,
-  sendNoteToAssignedDoctor
   sendNoteToAssignedDoctor,
   getNurses,
   administerMedication,
-  logFluid
+  logFluid,
 } from "../controllers/nurseController";
 import { getStaffProfileMe } from "../controllers/staffController";
 
