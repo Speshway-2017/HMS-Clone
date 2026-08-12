@@ -12,7 +12,6 @@ import { AuditLog } from "../models/AuditLog";
 import { DbNotification } from "../models/DbNotification";
 import { Types } from "mongoose";
 import { AppointmentSlotService } from "../services/appointmentSlotService";
-
 import { buildBranchQuery } from "../utils/branchQueryHelper";
 
 function toFilter(filterOrId: any): any {
@@ -26,13 +25,11 @@ export class ReceptionRepository {
   }
 
   static async findPatientById(hospitalId: any, id: string) {
-    const targetHospital = typeof hospitalId === "object" ? (hospitalId.hospital || hospitalId) : hospitalId;
-    return await Patient.findOne({ _id: id, hospital: targetHospital }).populate("assignedDoctor", "name");
+    return await Patient.findOne({ _id: id, ...toFilter(hospitalId) }).populate("assignedDoctor", "name");
   }
 
   static async searchPatients(hospitalId: any, queryStr: string) {
-    const targetHospital = typeof hospitalId === "object" ? (hospitalId.hospital || hospitalId) : hospitalId;
-    const baseFilter = { hospital: targetHospital };
+    const baseFilter = toFilter(hospitalId);
     let patientIds: any[] = [];
     if (queryStr && queryStr.trim()) {
       const regex = new RegExp(queryStr.trim(), "i");

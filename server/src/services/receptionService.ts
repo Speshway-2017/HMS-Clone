@@ -196,6 +196,25 @@ export class ReceptionService {
     const patientCode = `PAT-${generateDigits(6)}`;
     const qrCode = `HMS|${uhid}|${patientData.name}|${patientData.phone}`;
 
+    let resolvedBranch = targetBranch || patientData.branch || null;
+    if (!resolvedBranch && userId) {
+      const user = await User.findById(userId);
+      if (user?.branch) {
+        resolvedBranch = user.branch;
+      } else {
+        const staff = await Staff.findOne({ user: userId }) || (user?.email ? await Staff.findOne({ email: user.email }) : null);
+        if (staff?.branch) {
+          resolvedBranch = staff.branch;
+        }
+      }
+    }
+    if (!resolvedBranch && patientData.assignedDoctor) {
+      const doctor = await Doctor.findById(patientData.assignedDoctor);
+      if (doctor?.branch) {
+        resolvedBranch = doctor.branch;
+      }
+    }
+
     let linkedUserId = patientData.user;
     if (!linkedUserId) {
       const userConds: any[] = [];
@@ -215,7 +234,7 @@ export class ReceptionService {
       ...patientData,
       ...(linkedUserId ? { user: linkedUserId } : {}),
       hospital: targetHospital,
-      branch: targetBranch || patientData.branch || null,
+      branch: resolvedBranch,
       uhid,
       patientCode,
       qrCode,
@@ -224,7 +243,7 @@ export class ReceptionService {
 
     await ReceptionRepository.createAuditLog({
       hospital: targetHospital,
-      branch: targetBranch,
+      branch: resolvedBranch,
       user: userId,
       action: "PATIENT_REGISTER",
       details: `Registered patient ${newPatient.name} with UHID ${uhid}`
@@ -239,8 +258,8 @@ export class ReceptionService {
   }
 
   static async getPatientDetail(filterOrId: any, patientId: string) {
-    const { targetHospital } = parseHospitalAndBranch(filterOrId);
-    const patient = await Patient.findOne({ _id: patientId, hospital: targetHospital }).populate("assignedDoctor", "name");
+    const branchFilter = buildBranchQuery(filterOrId);
+    const patient = await Patient.findOne({ _id: patientId, ...branchFilter }).populate("assignedDoctor", "name");
     if (!patient) {
       throw new AppError("Patient not found", 404);
     }
@@ -248,14 +267,14 @@ export class ReceptionService {
     // Find all patient document IDs associated with this patient (by patientId or linked user account)
     let allPatientIds: any[] = [patientId];
     if (patient.user) {
-      const relatedDocs = await Patient.find({ hospital: targetHospital, user: patient.user }).select("_id");
+      const relatedDocs = await Patient.find({ ...branchFilter, user: patient.user }).select("_id");
       if (relatedDocs.length > 0) {
         allPatientIds = relatedDocs.map(p => p._id);
       }
     }
 
     const recentAppointmentsList = await Appointment.find({
-      hospital: targetHospital,
+      ...branchFilter,
       patient: { $in: allPatientIds },
       status: { $nin: ["cancelled", "no_show"] }
     }).sort({ date: -1, createdAt: -1 }).limit(20).populate("doctor department");
@@ -263,7 +282,7 @@ export class ReceptionService {
     const lastAppointment = recentAppointmentsList.length > 0 ? recentAppointmentsList[0] : null;
 
     const activeAdmission = await Admission.findOne({
-      hospital: targetHospital,
+      ...branchFilter,
       patient: { $in: allPatientIds },
       status: {
         $in: [
@@ -833,9 +852,11 @@ export class ReceptionService {
 
       const roundedAmount = roundCurrency(amount);
       const transactionId = `TXN-${generateDigits(10)}`;
+      const paymentBranch = targetBranch || (invoice as any).branch || null;
 
       const newPayment = await ReceptionRepository.createPayment({
         hospital: hospitalId,
+        branch: paymentBranch,
         invoice: invoiceId,
         patient: invoice.patient._id,
         amount: roundedAmount,

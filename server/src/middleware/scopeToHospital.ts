@@ -58,11 +58,12 @@ export async function scopeToHospital(req: Request, _res: Response, next: NextFu
       const { Staff } = await import("../models/Staff");
       const { Doctor } = await import("../models/Doctor");
 
-      const staff = await Staff.findOne({ user: req.user._id }) || await Staff.findOne({ email: req.user.email });
+      const emailRegex = req.user.email ? new RegExp(`^${req.user.email.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") : null;
+      const staff = await Staff.findOne({ user: req.user._id }) || (emailRegex ? await Staff.findOne({ email: emailRegex }) : null);
       if (staff && staff.branch) {
         userBranch = staff.branch;
       } else {
-        const doctor = await Doctor.findOne({ user: req.user._id }) || await Doctor.findOne({ email: req.user.email });
+        const doctor = await Doctor.findOne({ user: req.user._id }) || (emailRegex ? await Doctor.findOne({ email: emailRegex }) : null);
         if (doctor && doctor.branch) {
           userBranch = doctor.branch;
         }
