@@ -30,6 +30,7 @@ import { useAppointments } from "../../features/appointments";
 import { api } from "../../lib/api";
 import toast from "react-hot-toast";
 import { isTodayDate, isFutureDate, isPastDate, formatDisplayDate } from "../../lib/appointmentDateUtils";
+import { isDoctorInDepartment } from "../../lib/doctorUtils";
 
 // Validation schema for booking form
 const appointmentSchema = z.object({
@@ -1015,8 +1016,8 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                 </SelectField>
                 <SelectField label="Consultant Doctor" required {...register("doctorId")} hint={errors.doctorId?.message as any}>
                   <option value="">Select Doctor</option>
-                  {doctors?.filter((d: any) => !selectedDeptId || d.department?._id === selectedDeptId || d.department === selectedDeptId)
-                    .map((doc: any) => <option key={doc._id} value={doc._id}>{doc.name} ({doc.specialization})</option>)}
+                  {doctors?.filter((d: any) => isDoctorInDepartment(d, selectedDeptId, departments))
+                    .map((doc: any) => <option key={doc._id} value={doc._id}>{doc.name} ({doc.specialization || "General Medicine"})</option>)}
                 </SelectField>
               </div>
 
