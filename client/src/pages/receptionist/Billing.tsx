@@ -23,6 +23,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
 import {
   usePayBilling,
@@ -121,6 +122,7 @@ const groupIPItems = (items: any[]) => {
 };
 
 export function BillingPage({ activeTab = "consultation" }: Props) {
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState<"consultation" | "pending" | "completed" | "collections" | "ip">(activeTab as any);
   const location = useLocation();
   const navigate = useNavigate();
@@ -163,8 +165,8 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
   // Data-consistent hooks (OPD)
   const payMutation = usePayBilling();
   const { data: pendingData, isLoading: pendingLoading, refetch: refetchPending } = usePendingInvoices();
-  const { data: completedData, isLoading: completedLoading } = useCompletedInvoices();
-  const { data: collectionsData, isLoading: collectionsLoading } = usePaymentHistory("today");
+  const { data: completedData, isLoading: completedLoading, refetch: refetchCompleted } = useCompletedInvoices();
+  const { data: collectionsData, isLoading: collectionsLoading, refetch: refetchHistory } = usePaymentHistory("today");
 
   const pendingInvoices = (pendingData?.invoices ?? []).filter((inv: any) => inv.billingType !== "PHARMACY");
   const completedInvoices = (completedData?.invoices ?? []).filter((inv: any) => inv.billingType !== "PHARMACY");
@@ -379,7 +381,17 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
       const result = await payMutation.mutateAsync(payload);
       setReceiptData(result);
       setInvoice(null);
-      refetchPending();
+      
+      queryClient.invalidateQueries({ queryKey: ["reception"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      
+      Promise.all([
+        refetchPending(),
+        refetchCompleted(),
+        refetchHistory()
+      ]).catch(() => {});
+
       toast.success("Payment processed successfully!");
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || "Failed to process payment");

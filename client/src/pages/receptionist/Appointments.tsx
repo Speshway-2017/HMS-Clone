@@ -30,6 +30,7 @@ import { useAppointments } from "../../features/appointments";
 import { api } from "../../lib/api";
 import toast from "react-hot-toast";
 import { isTodayDate, isFutureDate, isPastDate, formatDisplayDate } from "../../lib/appointmentDateUtils";
+import { isDoctorInDepartment } from "../../lib/doctorUtils";
 
 // Validation schema for booking form
 const appointmentSchema = z.object({
@@ -169,7 +170,11 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
     return acc;
   }, {});
 
-  const departments = departmentsResponse || [];
+  // Deduplicate departments by normalized name so each department appears once in the select dropdown
+  const rawDepartments = departmentsResponse || [];
+  const departments = Array.from(
+    new Map(rawDepartments.map((d: any) => [d.name?.trim().toLowerCase(), d])).values()
+  );
 
   // ── Follow-up Booking State ──
   const [isFollowUp, setIsFollowUp] = useState(false);
@@ -1015,8 +1020,16 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                 </SelectField>
                 <SelectField label="Consultant Doctor" required {...register("doctorId")} hint={errors.doctorId?.message as any}>
                   <option value="">Select Doctor</option>
-                  {doctors?.filter((d: any) => !selectedDeptId || d.department?._id === selectedDeptId || d.department === selectedDeptId)
-                    .map((doc: any) => <option key={doc._id} value={doc._id}>{doc.name} ({doc.specialization})</option>)}
+                  {doctors?.filter((d: any) => {
+                    if (!selectedDeptId) return true;
+                    const selectedDeptObj = departments?.find((dept: any) => dept._id === selectedDeptId);
+                    const selectedDeptName = selectedDeptObj?.name?.trim().toLowerCase();
+                    const docDeptId = d.department?._id || d.department;
+                    const docDeptName = d.department?.name || d.specialization;
+                    if (docDeptId === selectedDeptId) return true;
+                    if (selectedDeptName && docDeptName && String(docDeptName).trim().toLowerCase() === selectedDeptName) return true;
+                    return false;
+                  }).map((doc: any) => <option key={doc._id} value={doc._id}>{doc.name} ({doc.specialization})</option>)}
                 </SelectField>
               </div>
 

@@ -58,11 +58,12 @@ export async function scopeToHospital(req: Request, _res: Response, next: NextFu
       const { Staff } = await import("../models/Staff");
       const { Doctor } = await import("../models/Doctor");
 
-      const staff = await Staff.findOne({ user: req.user._id }) || await Staff.findOne({ email: req.user.email });
+      const emailRegex = req.user.email ? new RegExp(`^${req.user.email.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") : null;
+      const staff = await Staff.findOne({ user: req.user._id }) || (emailRegex ? await Staff.findOne({ email: emailRegex }) : null);
       if (staff && staff.branch) {
         userBranch = staff.branch;
       } else {
-        const doctor = await Doctor.findOne({ user: req.user._id }) || await Doctor.findOne({ email: req.user.email });
+        const doctor = await Doctor.findOne({ user: req.user._id }) || (emailRegex ? await Doctor.findOne({ email: emailRegex }) : null);
         if (doctor && doctor.branch) {
           userBranch = doctor.branch;
         }
@@ -77,7 +78,7 @@ export async function scopeToHospital(req: Request, _res: Response, next: NextFu
     // Locked branch on User/Staff/Doctor account
     if (userBranch) {
       baseFilter.branch = userBranch;
-    } else if (branchHeader === "all") {
+    } else if ((req.user.role as string) === "hospital_admin" && branchHeader === "all") {
       // "all" explicitly requested by admin
       delete baseFilter.branch;
     } else if (branchHeader && branchHeader !== "main" && Types.ObjectId.isValid(branchHeader)) {
