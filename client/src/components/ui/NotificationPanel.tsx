@@ -571,7 +571,7 @@ export function NotificationPanel() {
 
       {/* Popover Card */}
       {open && (
-        <div className="fixed top-14 left-3 right-3 sm:absolute sm:top-11 sm:left-auto sm:right-0 sm:w-96 z-[100] w-auto rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="fixed top-16 left-2 right-2 sm:absolute sm:top-11 sm:left-auto sm:right-0 sm:w-96 z-[100] w-auto rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 bg-white">
             <div className="flex items-center gap-2">
@@ -604,7 +604,7 @@ export function NotificationPanel() {
           </div>
 
           {/* Body with Pinned List Layout Group Animation */}
-          <div className="max-h-[28rem] overflow-y-auto">
+          <div className="max-h-[65vh] sm:max-h-[28rem] overflow-y-auto">
             {isLoading ? (
               <>
                 <NotificationSkeleton />

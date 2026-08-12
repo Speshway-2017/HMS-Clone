@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { buildBranchQuery } from "../utils/branchQueryHelper";
 import mongoose, { Types } from "mongoose";
 import jwt from "jsonwebtoken";
 import path from "path";
@@ -136,8 +137,10 @@ export async function createOrUpdatePrescriptionCore(
     const currentYear = new Date().getFullYear();
     const rxNumber = `RX-${currentYear}-${sequence}`;
 
+    const targetBranch = appointment.branch || doctor.branch || null;
     const [newRx] = await Prescription.create([{
       hospital: hospitalId,
+      branch: targetBranch,
       patient: patient._id,
       appointment: appointmentId,
       consultation: appointmentId,
@@ -400,12 +403,15 @@ export const savePrescription = catchAsync(async (req: Request, res: Response) =
  * Controller endpoint: List all prescriptions (scoped to hospital, for doctor/pharmacist)
  */
 export const listPrescriptions = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const { status, patient } = req.query;
   
-  const query: any = { hospital: hospitalId };
+  const query: any = buildBranchQuery(req.hospitalFilter);
   if (status) {
-    query.status = status;
+    if (typeof status === "string") {
+      query.status = new RegExp(`^${status}$`, "i");
+    } else {
+      query.status = status;
+    }
   }
   if (patient) {
     query.patient = patient;
@@ -699,7 +705,7 @@ export const dispensePrescription = catchAsync(async (req: Request, res: Respons
   try {
     const prescription = await Prescription.findOne({
       _id: prescriptionId,
-      hospital: hospitalId
+      ...buildBranchQuery(req.hospitalFilter)
     }).populate("patient doctor department").session(session);
 
     if (!prescription) {
@@ -744,11 +750,19 @@ export const dispensePrescription = catchAsync(async (req: Request, res: Respons
       if (item.quantity <= 0) {
         throw new AppError(`Cannot dispense zero or negative quantity for medicine: ${item.name}`, 400);
       }
-      const invItem = await InventoryItem.findOne({
-        hospital: hospitalId,
+      let invItem = await InventoryItem.findOne({
+        ...req.hospitalFilter,
         name: new RegExp(`^${item.name.trim()}$`, "i"),
         category: "medicines"
       }).session(session);
+
+      if (!invItem) {
+        invItem = await InventoryItem.findOne({
+          hospital: hospitalId,
+          name: new RegExp(`^${item.name.trim()}$`, "i"),
+          category: "medicines"
+        }).session(session);
+      }
 
       if (!invItem) {
         throw new AppError(`Medicine ${item.name} not found in inventory.`, 404);
@@ -821,6 +835,7 @@ export const dispensePrescription = catchAsync(async (req: Request, res: Respons
 
     const newInvoiceDoc = new Invoice({
       hospital: hospitalId,
+      branch: prescription.branch || req.hospitalFilter?.branch || (req.user as any)?.branch || null,
       patient: prescription.patient._id,
       appointment: prescription.appointment,
       prescription: prescription._id,

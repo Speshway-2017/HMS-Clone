@@ -50,11 +50,13 @@ function computeTotals(
   return { subtotal, taxAmount, total, insuranceCovered, patientBalance };
 }
 
+import { buildBranchQuery } from "../utils/branchQueryHelper";
+
 export const listInvoices = catchAsync(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req, 20);
   const { status, patient, billingType } = req.query as Record<string, string | undefined>;
 
-  const filter: Record<string, any> = { ...req.hospitalFilter };
+  const filter: Record<string, any> = buildBranchQuery(req.hospitalFilter);
   // "pending" in business logic = any invoice with outstanding balance (pending + partially_paid + overdue)
   if (status) {
     if (status === "pending") {
@@ -67,7 +69,7 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
   if (billingType) filter.billingType = billingType;
 
   // Determine IP Bill filters
-  const ipFilter: any = { ...req.hospitalFilter };
+  const ipFilter: any = buildBranchQuery(req.hospitalFilter);
   if (patient) ipFilter.patient = patient;
 
   // Enforce patient data isolation for invoices listing

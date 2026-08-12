@@ -20,6 +20,7 @@ import uploadRoutes from "./routes/uploadRoutes";
 import doctorRoutes from "./routes/doctorRoutes";
 import staffRoutes from "./routes/staffRoutes";
 import patientRoutes from "./routes/patientRoutes";
+import nurseRoutes from "./routes/nurseRoutes";
 import appointmentRoutes from "./routes/appointmentRoutes";
 import inventoryRoutes from "./routes/inventoryRoutes";
 import invoiceRoutes from "./routes/invoiceRoutes";
@@ -38,7 +39,7 @@ import accountantRoutes from "./routes/accountantRoutes";
 import laboratoryRoutes from "./routes/laboratoryRoutes";
 import consultationRoutes from "./routes/consultationRoutes";
 import diagnosticReportRoutes from "./routes/diagnosticReportRoutes";
-import nurseRoutes from "./routes/nurseRoutes";
+
 import blogRoutes from "./routes/blogRoutes";
 import attendanceRoutes from "./routes/attendanceRoutes";
 import leaveRoutes from "./routes/leaveRoutes";

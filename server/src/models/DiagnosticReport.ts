@@ -42,6 +42,7 @@ const diagnosticReportSchema = new Schema(
 diagnosticReportSchema.index({ hospital: 1, appointment: 1 });
 diagnosticReportSchema.index({ hospital: 1, patient: 1 });
 diagnosticReportSchema.index({ hospital: 1, requestId: 1 });
+diagnosticReportSchema.index({ hospital: 1, branch: 1, status: 1 });
 
 export type DiagnosticReport = InferSchemaType<typeof diagnosticReportSchema> & { _id: Types.ObjectId };
 export const DiagnosticReport = model("DiagnosticReport", diagnosticReportSchema);

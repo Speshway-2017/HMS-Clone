@@ -39,16 +39,15 @@ export function ConfirmDeleteModal({
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-transparent animate-in fade-in duration-200"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !isLoading) {
-          onClose();
-        }
-      }}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
       <div
-        className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-150 flex flex-col space-y-4"
+        className="fixed inset-0 bg-transparent transition-opacity"
+        onClick={() => {
+          if (!isLoading) onClose();
+        }}
+      />
+      <div
+        className="relative z-10 w-full max-w-md rounded-2xl bg-white p-4 sm:p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-150 flex flex-col space-y-4 max-h-[90vh] overflow-y-auto"
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-delete-title"

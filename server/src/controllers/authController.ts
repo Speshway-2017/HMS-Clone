@@ -683,22 +683,42 @@ export const resetPassword = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const updateProfileSchema = z.object({
+  name: z.string().min(2).optional(),
+  phone: z.string().optional(),
+  email: z.string().email().optional(),
+  avatarUrl: z.string().optional(),
+});
+
 export const updateProfile = catchAsync(async (req: Request, res: Response) => {
-  const { name, avatarUrl } = req.body;
+  const data = updateProfileSchema.parse(req.body);
   const user = await User.findById(req.user!._id);
   if (!user) throw new AppError("User not found.", 404);
 
-  if (name) user.name = name;
-  if (avatarUrl !== undefined) user.avatarUrl = avatarUrl;
+  if (data.name) user.name = data.name;
+  if (data.phone) user.phone = data.phone;
+  if (data.email) user.email = data.email;
+  if (data.avatarUrl !== undefined) user.avatarUrl = data.avatarUrl;
+
   await user.save();
 
   // If this user is staff, sync the avatar to their staff photoUrl / name
   const staff = await Staff.findOne({ email: user.email });
   if (staff) {
-    if (name) staff.name = name;
-    if (avatarUrl !== undefined) staff.photoUrl = avatarUrl;
+    if (data.name) staff.name = data.name;
+    if (data.avatarUrl !== undefined) staff.photoUrl = data.avatarUrl;
     await staff.save();
   }
+
+  await logAudit({
+    req,
+    userId: user._id.toString(),
+    userEmail: user.email,
+    userRole: user.role,
+    action: "PROFILE_UPDATED",
+    entity: "User",
+    entityId: user._id.toString(),
+  });
 
   res.status(200).json({
     status: "success",

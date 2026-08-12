@@ -24,11 +24,14 @@ export function buildBranchQuery(hospitalFilter: any): Record<string, unknown> {
     hospital: hospitalFilter.hospital,
   };
 
-  if ("branch" in hospitalFilter && hospitalFilter.branch !== undefined) {
-    if (hospitalFilter.branch === null) {
-      query.$or = [{ branch: null }, { branch: { $exists: false } }];
-    } else {
+  if ("branch" in hospitalFilter) {
+    if (hospitalFilter.branch !== null && hospitalFilter.branch !== undefined) {
       query.branch = hospitalFilter.branch;
+    } else {
+      query.$or = [
+        { branch: null },
+        { branch: { $exists: false } },
+      ];
     }
   }
 

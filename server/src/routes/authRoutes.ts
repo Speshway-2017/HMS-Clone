@@ -13,6 +13,7 @@ router.post("/logout", logout);
 router.get("/me", protect, getMe);
 router.patch("/change-password", protect, authLimiter, changePassword);
 router.patch("/update-profile", protect, updateProfile);
+router.patch("/profile", protect, updateProfile);
 router.post("/forgot-password", forgotPasswordLimiter, forgotPassword);
 router.post("/reset-password", resetPassword);
 
