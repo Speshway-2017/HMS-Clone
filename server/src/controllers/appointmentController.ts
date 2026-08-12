@@ -297,7 +297,7 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
   }
 
   const referenceId = await generateReferenceId(hospitalId.toString(), new Date(body.date));
-  const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
+  const branchId = req.hospitalFilter?.branch || (req.body as any).branch || doctor.branch || null;
   const appointment = await Appointment.create({
     ...body,
     hospital: hospitalId,
@@ -318,6 +318,7 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
 
     const invoice = await Invoice.create({
       hospital: hospitalId,
+      branch: branchId,
       patient: body.patient,
       appointment: appointment._id,
       billingType: "OP",
@@ -359,6 +360,7 @@ export const createAppointment = catchAsync(async (req: Request, res: Response) 
 
     await Payment.create({
       hospital: hospitalId,
+      branch: branchId,
       invoice: invoice._id,
       patient: body.patient,
       amount: consultationFee,

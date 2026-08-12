@@ -16,6 +16,7 @@ import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 import { emitToHospital } from "../config/socket";
 import { logAudit } from "../utils/auditLogger";
+import { buildBranchQuery } from "../utils/branchQueryHelper";
 
 const invoiceItemSchema = z.object({
   description: z.string().min(1),
@@ -50,13 +51,12 @@ function computeTotals(
   return { subtotal, taxAmount, total, insuranceCovered, patientBalance };
 }
 
-import { buildBranchQuery } from "../utils/branchQueryHelper";
-
 export const listInvoices = catchAsync(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req, 20);
   const { status, patient, billingType } = req.query as Record<string, string | undefined>;
 
-  const filter: Record<string, any> = buildBranchQuery(req.hospitalFilter);
+  const branchQuery = buildBranchQuery(req.hospitalFilter);
+  const filter: Record<string, any> = { ...branchQuery };
   // "pending" in business logic = any invoice with outstanding balance (pending + partially_paid + overdue)
   if (status) {
     if (status === "pending") {
@@ -69,7 +69,7 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
   if (billingType) filter.billingType = billingType;
 
   // Determine IP Bill filters
-  const ipFilter: any = buildBranchQuery(req.hospitalFilter);
+  const ipFilter: any = { ...branchQuery };
   if (patient) ipFilter.patient = patient;
 
   // Enforce patient data isolation for invoices listing
@@ -122,13 +122,13 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
   ] = await Promise.all([
     opInvoicesPromise,
     ipBillsPromise,
-    Invoice.find(req.hospitalFilter as Record<string, unknown>),
-    IPBill.find(req.hospitalFilter as Record<string, unknown>),
-    Invoice.countDocuments({ ...req.hospitalFilter, billingType: "OP" }),
-    Invoice.countDocuments({ ...req.hospitalFilter, billingType: "PHARMACY" }),
-    Invoice.countDocuments({ ...req.hospitalFilter, billingType: "LAB" }),
-    Payment.find(req.hospitalFilter as Record<string, unknown>),
-    IPBillPayment.find(req.hospitalFilter as Record<string, unknown>)
+    Invoice.find(branchQuery),
+    IPBill.find(branchQuery),
+    Invoice.countDocuments({ ...branchQuery, billingType: "OP" }),
+    Invoice.countDocuments({ ...branchQuery, billingType: "PHARMACY" }),
+    Invoice.countDocuments({ ...branchQuery, billingType: "LAB" }),
+    Payment.find(branchQuery),
+    IPBillPayment.find(branchQuery)
   ]);
 
   // Map IP bills to conformed invoice structure
@@ -236,18 +236,18 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
         sum + computeTotals(inv, paymentsMap[inv._id.toString()] || 0).total,
       0
     ) +
-      allIPBillsForHospital.reduce(
-        (sum: number, bill: any) => sum + (bill.grandTotal || 0),
-        0
-      )
+    allIPBillsForHospital.reduce(
+      (sum: number, bill: any) => sum + (bill.grandTotal || 0),
+      0
+    )
   );
 
   const netRevenue = r2(
     allPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) +
-      allIPPaymentsForHospital.reduce(
-        (sum: number, p: any) => sum + (p.amount || 0),
-        0
-      )
+    allIPPaymentsForHospital.reduce(
+      (sum: number, p: any) => sum + (p.amount || 0),
+      0
+    )
   );
 
   // ── Date helpers ──────────────────────────────────────────────────────────
@@ -267,7 +267,7 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
 
   const todayCollection = r2(
     todayPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) +
-      todayIPPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+    todayIPPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
   );
 
   // ── Pharmacy revenue today ────────────────────────────────────────────────
@@ -324,12 +324,12 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
           return pd >= monthStart && pd <= monthEnd;
         })
         .reduce((sum: number, p: any) => sum + (p.amount || 0), 0) +
-        allIPPaymentsForHospital
-          .filter((p: any) => {
-            const pd = new Date(p.paidAt || p.createdAt);
-            return pd >= monthStart && pd <= monthEnd;
-          })
-          .reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+      allIPPaymentsForHospital
+        .filter((p: any) => {
+          const pd = new Date(p.paidAt || p.createdAt);
+          return pd >= monthStart && pd <= monthEnd;
+        })
+        .reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
     );
 
     monthlySeries.push({ month: label, revenue: monthRevenue, payments: monthRevenue });
@@ -378,12 +378,14 @@ export const createInvoice = catchAsync(async (req: Request, res: Response) => {
     computedTotals.patientBalance = Number(req.body.totals.patientBalance);
   }
 
+  const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
   const invoice = await Invoice.create({
     ...body,
     totals: computedTotals,
-    hospital: hospitalId
+    hospital: hospitalId,
+    branch: branchId
   });
-  
+
   emitToHospital(hospitalId.toString(), "dashboard_update", {
     type: "NEW_INVOICE",
     invoiceId: invoice._id,
