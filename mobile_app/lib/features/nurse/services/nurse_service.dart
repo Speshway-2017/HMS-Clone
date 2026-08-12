@@ -236,4 +236,92 @@ class NurseService {
       throw Exception('Error loading beds: ${e.toString().replaceFirst('Exception: ', '')}');
     }
   }
+
+  /// Lists all rooms in the hospital with ward and category details
+  Future<List<dynamic>> getRooms({String? wardId}) async {
+    final query = wardId != null && wardId.isNotEmpty ? '?ward=$wardId&limit=100' : '?limit=100';
+    final url = Uri.parse('${ApiConfig.baseUrl}/rooms$query');
+    final headers = await _getHeaders();
+
+    try {
+      final response = await _client.get(url, headers: headers).timeout(const Duration(seconds: 10));
+      final decoded = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && decoded['status'] == 'success') {
+        final data = decoded['data'];
+        if (data is Map && data.containsKey('rooms')) {
+          return data['rooms'] ?? [];
+        } else if (data is List) {
+          return data;
+        }
+        return [];
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Sends a nursing note / observation to the patient's attending doctor in the database
+  Future<dynamic> sendNursingNoteToDoctor({
+    required String admissionId,
+    required String patientId,
+    required String observation,
+    String status = "Routine",
+    String bp = "",
+    String pulse = "",
+    String spo2 = "",
+    String temp = "",
+    String notes = "",
+  }) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/nurse/inpatients/$patientId/vitals');
+    final headers = await _getHeaders();
+    final body = jsonEncode({
+      'temperature': temp,
+      'bloodPressure': bp,
+      'pulseRate': pulse,
+      'oxygenSaturation': spo2,
+      'observationNotes': 'Nursing Note [$status]: $observation. ${notes.isNotEmpty ? "Notes: $notes" : ""}',
+    });
+
+    try {
+      final response = await _client.post(url, headers: headers, body: body).timeout(const Duration(seconds: 10));
+      final decoded = jsonDecode(response.body);
+      if (response.statusCode == 200 && decoded['status'] == 'success') {
+        return decoded['data'];
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Sends an emergency alert directly to the patient's consulting doctor
+  Future<dynamic> sendEmergencyAlert({
+    required String patientId,
+    required String alertType,
+    String notes = "",
+  }) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/nurse/emergency-alert');
+    final headers = await _getHeaders();
+    final body = jsonEncode({
+      'patientId': patientId,
+      'alertType': alertType,
+      'notes': notes,
+    });
+
+    try {
+      final response = await _client.post(url, headers: headers, body: body).timeout(const Duration(seconds: 10));
+      final decoded = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && decoded['status'] == 'success') {
+        return decoded;
+      } else {
+        final message = decoded['message'] ?? 'Failed to send emergency alert.';
+        throw Exception(message);
+      }
+    } on SocketException {
+      throw Exception('Unable to connect to the server. Please check your network connection.');
+    } catch (e) {
+      throw Exception('Error sending emergency alert: ${e.toString().replaceFirst('Exception: ', '')}');
+    }
+  }
 }

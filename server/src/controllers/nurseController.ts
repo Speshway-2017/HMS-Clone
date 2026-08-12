@@ -18,7 +18,7 @@ export const getNurseInpatients = catchAsync(async (req: Request, res: Response)
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const inpatients = await Admission.find({
     hospital: hospitalId,
-    status: { $in: ["admitted", "Admitted", "Under Observation", "Under Treatment", "In Ward", "ICU", "Bed Allocated"] }
+    status: { $nin: ["discharged", "Discharged", "Cancelled", "Transferred Out (Final)", "DISCHARGED"] }
   })
     .populate("patient", "name uhid age gender phone bloodGroup allergies insuranceProvider")
     .populate("room", "roomNumber category")
@@ -1300,6 +1300,79 @@ export const sendNoteToAssignedDoctor = catchAsync(async (req: Request, res: Res
     message: `Nursing note sent to ${doctorName} successfully!`,
     doctorName,
     notification: notif
+  });
+});
+
+export const sendEmergencyAlertToDoctor = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const { patientId, alertType, notes } = req.body;
+
+  if (!patientId || !alertType) {
+    throw new AppError("Patient ID and Alert Type are required.", 400);
+  }
+
+  const staff = await Staff.findOne({ email: req.user!.email });
+  const recordedByName = staff?.name || req.user!.name || "Nurse";
+
+  // Find active admission details
+  const activeAdmission = await Admission.findOne({
+    hospital: hospitalId,
+    patient: patientId,
+    status: { $nin: ["discharged", "Discharged", "Cancelled", "Transferred Out (Final)", "DISCHARGED"] }
+  }).populate("patient", "name uhid").populate("admittingDoctor", "name specialization");
+
+  let ptName = "Inpatient";
+  let ptUhid = "";
+  let doctorName = "Assigned Doctor";
+
+  if (activeAdmission) {
+    ptName = (activeAdmission.patient as any)?.name || ptName;
+    ptUhid = (activeAdmission.patient as any)?.uhid || ptUhid;
+    if (activeAdmission.admittingDoctor) {
+      doctorName = (activeAdmission.admittingDoctor as any)?.name || doctorName;
+    }
+  } else {
+    const pt = await Patient.findById(patientId);
+    if (pt) {
+      ptName = pt.name || ptName;
+      ptUhid = pt.uhid || ptUhid || "N/A";
+    }
+  }
+
+  // Trigger real-time critical notification to patient's consulting doctor
+  const notif = await notifyAssignedDoctorForPatient({
+    hospitalId,
+    patientId,
+    patientName: ptName,
+    uhid: ptUhid,
+    nurseName: recordedByName,
+    title: `EMERGENCY ALERT: ${alertType.toUpperCase()}`,
+    message: `CRITICAL EMERGENCY ALERT: Nurse ${recordedByName} broadcasted ${alertType} for Patient ${ptName} (${ptUhid}). Notes: ${notes || "Immediate doctor assistance required."}`,
+    severity: "critical",
+    type: "general",
+    extraData: {
+      type: "emergency_alert",
+      alertType,
+      notes: notes || "Immediate medical attention needed."
+    }
+  });
+
+  // Log emergency event to admission timeline if active admission exists
+  if (activeAdmission) {
+    activeAdmission.timeline.push({
+      eventType: "emergency_alert",
+      description: `[CRITICAL EMERGENCY] ${alertType} triggered by Nurse ${recordedByName}. Notes: ${notes || "None"}`,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      userName: recordedByName
+    } as any);
+    await activeAdmission.save();
+  }
+
+  res.json({
+    status: "success",
+    message: `Emergency Alert broadcasted to Dr. ${doctorName} successfully!`,
+    doctorName,
+    patientName: ptName
   });
 });
 

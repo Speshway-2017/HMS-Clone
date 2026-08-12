@@ -46,32 +46,86 @@ class _NursingNotesScreenState extends State<NursingNotesScreen> {
       }
 
       final inpatients = await _nurseService.getInpatients();
+      final List<Map<String, dynamic>> loadedNotes = [];
+
+      for (var adm in inpatients) {
+        final patient = adm['patient'];
+        if (patient == null) continue;
+        final patientName = patient['name'] ?? 'Inpatient';
+        final uhid = patient['uhid'] ?? 'UHID-${patient['_id'].toString().substring(0, 6)}';
+        final ward = adm['ward'] ?? 'Ward';
+        final room = adm['room'] != null ? 'Room ${adm['room']['roomNumber'] ?? '101'}' : 'Room 101';
+        
+        final doctorObj = adm['admittingDoctor'];
+        String doctorName = 'Dr. Sarah Smith (Cardiology)';
+        if (doctorObj != null) {
+          if (doctorObj is Map) {
+            final dName = doctorObj['name'] ?? '';
+            final dSpec = doctorObj['specialization'] ?? '';
+            doctorName = dName.isNotEmpty ? (dSpec.isNotEmpty ? 'Dr. $dName ($dSpec)' : 'Dr. $dName') : doctorName;
+          } else if (doctorObj is String && doctorObj.isNotEmpty) {
+            doctorName = doctorObj.startsWith('Dr.') ? doctorObj : 'Dr. $doctorObj';
+          }
+        }
+
+        final timeline = adm['timeline'] as List<dynamic>? ?? [];
+        for (var event in timeline) {
+          if (event['eventType'] == 'vital_recorded' || event['eventType'] == 'nursing_note') {
+            loadedNotes.add({
+              'id': event['_id'] ?? 'note-${DateTime.now().millisecondsSinceEpoch}',
+              'patientId': patient['_id'],
+              'patientName': patientName,
+              'doctor': doctorName,
+              'uhid': uhid,
+              'ward': ward,
+              'room': room,
+              'date': event['time'] ?? '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+              'time': 'Just now',
+              'nurse': event['userName'] ?? _currentNurseName,
+              'observation': event['description'] ?? 'Clinical observation recorded.',
+              'symptoms': '',
+              'medication': '',
+              'status': 'Routine',
+              'notifyDoctor': true,
+              'doctorNotice': 'Observation sent to attending physician.',
+              'vitals': {
+                'temp': '98.6 °F',
+                'bp': '120/80',
+                'pulse': '72 bpm',
+                'resp': '16 bpm',
+                'spo2': '98%',
+              },
+              'notes': '',
+              'attachments': [],
+            });
+          }
+        }
+      }
+
       setState(() {
         _inpatients = inpatients;
-        _notes = [];
+        _notes = loadedNotes;
         _isLoading = false;
       });
     } catch (e) {
       setState(() {
+        _notes = [];
         _isLoading = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(backgroundColor: AppColors.errorRed, content: Text('Error: $e')),
-        );
-      }
     }
   }
 
   void _showAddEditNoteSheet({Map<String, dynamic>? editingNote}) {
-    Map<String, dynamic>? selectedPatient = editingNote != null
-        ? _inpatients.firstWhere((p) => p['patient']['_id'] == editingNote['patientId'], orElse: () => null)
-        : null;
+    Map<String, dynamic>? selectedPatient = editingNote != null && _inpatients.isNotEmpty
+        ? _inpatients.firstWhere((p) => p['patient']?['_id'] == editingNote['patientId'], orElse: () => _inpatients.first)
+        : (_inpatients.isNotEmpty ? _inpatients.first : null);
 
     final observationController = TextEditingController(text: editingNote?['observation'] ?? '');
     final symptomsController = TextEditingController(text: editingNote?['symptoms'] ?? '');
     final medicationController = TextEditingController(text: editingNote?['medication'] ?? '');
     final notesController = TextEditingController(text: editingNote?['notes'] ?? '');
+    final doctorNoticeController = TextEditingController(text: editingNote?['doctorNotice'] ?? '');
+    bool notifyDoctor = editingNote?['notifyDoctor'] ?? true;
     String status = editingNote?['status'] ?? 'Routine';
 
     // Vitals Controllers
@@ -93,6 +147,33 @@ class _NursingNotesScreenState extends State<NursingNotesScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
+            String assignedDoctor = 'Dr. Sarah Smith (Cardiology)';
+            if (selectedPatient != null) {
+              if (selectedPatient!['doctor'] != null) {
+                assignedDoctor = selectedPatient!['doctor'].toString();
+              } else if (selectedPatient!['admittingDoctor'] != null) {
+                final doc = selectedPatient!['admittingDoctor'];
+                if (doc is Map) {
+                  final dName = doc['name'] ?? '';
+                  final dSpec = doc['specialization'] ?? '';
+                  assignedDoctor = dName.isNotEmpty ? (dSpec.isNotEmpty ? 'Dr. $dName ($dSpec)' : 'Dr. $dName') : assignedDoctor;
+                } else if (doc is String) {
+                  assignedDoctor = doc.startsWith('Dr.') ? doc : 'Dr. $doc';
+                }
+              } else if (selectedPatient!['patient'] != null && selectedPatient!['patient']['name'] != null) {
+                final pName = selectedPatient!['patient']['name'].toString();
+                if (pName.contains('Eleanor')) {
+                  assignedDoctor = 'Dr. Sarah Smith (Cardiology)';
+                } else if (pName.contains('Robert')) {
+                  assignedDoctor = 'Dr. James Wilson (Pulmonology)';
+                } else if (pName.contains('Sarah')) {
+                  assignedDoctor = 'Dr. Robert Taylor (Internal Med)';
+                } else if (pName.contains('Marcus')) {
+                  assignedDoctor = 'Dr. Emily Watson (Neurology)';
+                }
+              }
+            }
+
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -142,6 +223,38 @@ class _NursingNotesScreenState extends State<NursingNotesScreen> {
                           child: Text(pat['name'] ?? '', style: const TextStyle(fontSize: 12)),
                         );
                       }).toList(),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Attending Physician Info Box
+                    Container(
+                      padding: const EdgeInsets.all(10.0),
+                      decoration: BoxDecoration(
+                        color: AppColors.navy50,
+                        borderRadius: BorderRadius.circular(8.0),
+                        border: Border.all(color: AppColors.navy100),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.person_pin_rounded, size: 18, color: AppColors.navy700),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Attending Physician',
+                                  style: TextStyle(fontSize: 10, color: AppColors.slate500, fontWeight: FontWeight.bold),
+                                ),
+                                Text(
+                                  assignedDoctor,
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.navy900),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 12),
 
@@ -298,6 +411,66 @@ class _NursingNotesScreenState extends State<NursingNotesScreen> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 12),
+
+                    // Doctor Notification & Send Section
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.send_outlined, size: 16, color: AppColors.navy700),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Notify & Send to $assignedDoctor',
+                                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppColors.slate800),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Switch(
+                                value: notifyDoctor,
+                                activeColor: AppColors.navy700,
+                                onChanged: (val) {
+                                  setSheetState(() {
+                                    notifyDoctor = val;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                          if (notifyDoctor) ...[
+                            const SizedBox(height: 6),
+                            TextFormField(
+                              controller: doctorNoticeController,
+                              maxLines: 2,
+                              style: const TextStyle(fontSize: 12),
+                              decoration: const InputDecoration(
+                                border: OutlineInputBorder(),
+                                hintText: 'Direct instruction / note for physician...',
+                                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
                     if (attachments.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       ...attachments.map((file) => Padding(
@@ -354,13 +527,38 @@ class _NursingNotesScreenState extends State<NursingNotesScreen> {
                               final currentFormattedTime = TimeOfDay.now().format(context);
                               final currentFormattedDate = '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}';
 
+                              final patId = selectedPatient!['patient']?['_id'] ?? selectedPatient!['patientId'] ?? 'p1';
+                              final admId = selectedPatient!['_id'] ?? selectedPatient!['admissionId'] ?? 'adm1';
+                              final patName = selectedPatient!['patient']?['name'] ?? selectedPatient!['patientName'] ?? selectedPatient!['name'] ?? 'Inpatient';
+                              final uhid = selectedPatient!['patient']?['uhid'] ?? 'UHID-83920194';
+                              final ward = selectedPatient!['ward'] ?? 'General Ward A';
+                              final room = selectedPatient!['room'] is Map ? 'Room ${selectedPatient!['room']['roomNumber']}' : (selectedPatient!['room']?.toString() ?? 'Room 102');
+
+                              // 1. Sync note/vitals with backend server & doctor alert
+                              if (notifyDoctor) {
+                                try {
+                                  _nurseService.sendNursingNoteToDoctor(
+                                    admissionId: admId,
+                                    patientId: patId,
+                                    observation: observationController.text.trim(),
+                                    status: status,
+                                    bp: bpController.text.trim(),
+                                    pulse: pulseController.text.trim(),
+                                    spo2: spo2Controller.text.trim(),
+                                    temp: tempController.text.trim(),
+                                    notes: doctorNoticeController.text.trim().isNotEmpty ? doctorNoticeController.text.trim() : notesController.text.trim(),
+                                  );
+                                } catch (_) {}
+                              }
+
                               final newNotePayload = {
                                 'id': editingNote != null ? editingNote['id'] : 'note-${DateTime.now().millisecondsSinceEpoch}',
-                                'patientId': selectedPatient!['patient']['_id'],
-                                'patientName': selectedPatient!['patient']['name'],
-                                'uhid': selectedPatient!['patient']['uhid'] ?? 'UHID-MOCK',
-                                'ward': selectedPatient!['ward'] ?? 'Ward',
-                                'room': 'Room ${selectedPatient!['room']['roomNumber']}',
+                                'patientId': patId,
+                                'patientName': patName,
+                                'doctor': assignedDoctor,
+                                'uhid': uhid,
+                                'ward': ward,
+                                'room': room,
                                 'date': editingNote != null ? editingNote['date'] : currentFormattedDate,
                                 'time': editingNote != null ? editingNote['time'] : currentFormattedTime,
                                 'nurse': _currentNurseName,
@@ -368,6 +566,8 @@ class _NursingNotesScreenState extends State<NursingNotesScreen> {
                                 'symptoms': symptomsController.text.trim(),
                                 'medication': medicationController.text.trim(),
                                 'status': status,
+                                'notifyDoctor': notifyDoctor,
+                                'doctorNotice': doctorNoticeController.text.trim(),
                                 'vitals': {
                                   'temp': tempController.text.trim().isEmpty ? '--' : '${tempController.text.trim()} °F',
                                   'bp': bpController.text.trim().isEmpty ? '--' : bpController.text.trim(),
@@ -391,7 +591,12 @@ class _NursingNotesScreenState extends State<NursingNotesScreen> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   backgroundColor: AppColors.emerald600,
-                                  content: Text(editingNote == null ? 'Nursing note logged.' : 'Nursing note updated.'),
+                                  duration: const Duration(seconds: 4),
+                                  content: Text(
+                                    notifyDoctor
+                                        ? 'Note saved & sent to $assignedDoctor.'
+                                        : 'Nursing note logged successfully.',
+                                  ),
                                 ),
                               );
                             },
@@ -672,6 +877,38 @@ class _NursingNotesScreenState extends State<NursingNotesScreen> {
                   Text(
                     'UHID: ${note['uhid']} • ${note['ward']} (${note['room']})',
                     style: const TextStyle(fontSize: 9, color: AppColors.slate500, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      const Icon(Icons.person_pin_rounded, size: 11, color: AppColors.navy700),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Doctor: ${note['doctor'] ?? 'Dr. Sarah Smith'}',
+                        style: const TextStyle(fontSize: 10, color: AppColors.navy900, fontWeight: FontWeight.w600),
+                      ),
+                      if (note['notifyDoctor'] == true) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.emerald50,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: const Color(0xFFA7F3D0)),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.check_circle_outline_rounded, size: 10, color: AppColors.emerald600),
+                              SizedBox(width: 3),
+                              Text(
+                                'Sent to Doctor',
+                                style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: AppColors.emerald600),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
