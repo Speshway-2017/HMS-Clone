@@ -11,7 +11,7 @@ class UploadService {
   static Future<String> uploadImageToCloudinary(File imageFile) async {
     // Strategy 1: Upload via backend MERN server endpoint (which streams file to Cloudinary)
     try {
-      final uri = Uri.parse('${ApiConfig.baseUrl}/upload');
+      final uri = Uri.parse('${ApiConfig.baseUrl}/uploads');
       final request = http.MultipartRequest('POST', uri);
       
       final activeToken = AuthService.authToken ?? AuthService.currentUser?['token']?.toString();

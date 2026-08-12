@@ -11,6 +11,7 @@ import '../features/nurse/screens/patient_profile_screen.dart' as nurse_profile;
 import '../features/nurse/screens/patient_vitals_screen.dart';
 import '../features/patient/screens/patient_dashboard.dart';
 import '../features/patient/screens/patient_profile_screen.dart' as patient_profile;
+import '../features/patient/screens/report_detail_screen.dart';
 
 class AppRoutes {
   static const String splash = '/';
@@ -25,6 +26,7 @@ class AppRoutes {
   static const String nursePatientVitals = '/nurse/patient-vitals';
   static const String patientDashboard = '/patient/dashboard';
   static const String patientProfile = '/patient/profile';
+  static const String patientReportDetail = '/patient/report-detail';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -158,6 +160,19 @@ class AppRoutes {
       case patientProfile:
         return PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) => const patient_profile.PatientProfileScreen(),
+          settings: settings,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: animation,
+              child: child,
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 300),
+        );
+      case patientReportDetail:
+        final args = settings.arguments as Map<String, dynamic>;
+        return PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => ReportDetailScreen(reportData: args),
           settings: settings,
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(

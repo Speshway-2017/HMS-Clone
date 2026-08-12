@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/config/user_session.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../routes/app_routes.dart';
+import '../../authentication/services/auth_service.dart';
 import '../services/patient_api_service.dart';
 
 class PatientProfileScreen extends StatefulWidget {
@@ -178,11 +179,26 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     });
 
     if (updatedProfile != null) {
+      final currentUser = Map<String, dynamic>.from(UserSession.user ?? {});
+      if (_avatarUrlController.text.trim().isNotEmpty) {
+        currentUser['avatarUrl'] = _avatarUrlController.text.trim();
+      }
+      if (_nameController.text.trim().isNotEmpty) {
+        currentUser['name'] = _nameController.text.trim();
+      }
+      if (_emailController.text.trim().isNotEmpty) {
+        currentUser['email'] = _emailController.text.trim();
+      }
+
       await UserSession.saveSession(
         token: UserSession.token ?? '',
-        user: UserSession.user ?? {},
+        user: currentUser,
         patient: updatedProfile,
       );
+
+      if (_avatarUrlController.text.trim().isNotEmpty) {
+        await AuthService().updateProfilePicture(_avatarUrlController.text.trim());
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -248,6 +264,38 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     }
   }
 
+  Future<void> _updatePhotoAndSession(String photoUrl) async {
+    final cleanUrl = photoUrl.trim();
+    if (cleanUrl.isEmpty) return;
+
+    setState(() {
+      _avatarUrlController.text = cleanUrl;
+    });
+
+    final updatePayload = {
+      'photoUrl': cleanUrl,
+      'avatarUrl': cleanUrl,
+    };
+
+    final updatedProfile = await _apiService.updatePatientProfile(updatePayload);
+    await AuthService().updateProfilePicture(cleanUrl);
+
+    final currentUser = Map<String, dynamic>.from(UserSession.user ?? {});
+    currentUser['avatarUrl'] = cleanUrl;
+
+    await UserSession.saveSession(
+      token: UserSession.token ?? '',
+      user: currentUser,
+      patient: updatedProfile ?? UserSession.patient,
+    );
+
+    if (mounted && updatedProfile != null) {
+      setState(() {
+        _patientProfile = updatedProfile;
+      });
+    }
+  }
+
   // --- CAMERA / GALLERY PHOTO PICKER & CLOUDINARY UPLOAD ---
   Future<void> _pickAndUploadPhoto(ImageSource source) async {
     try {
@@ -276,12 +324,11 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       });
 
       if (cloudinaryUrl != null && cloudinaryUrl.isNotEmpty) {
-        setState(() {
-          _avatarUrlController.text = cloudinaryUrl;
-        });
+        await _updatePhotoAndSession(cloudinaryUrl);
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Photo uploaded to Cloudinary successfully!'),
+            content: Text('Profile photo uploaded and updated successfully!'),
             backgroundColor: Color(0xFF059669),
           ),
         );
@@ -452,9 +499,10 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: () {
-                    setState(() {
-                      _avatarUrlController.text = urlController.text.trim();
-                    });
+                    final customUrl = urlController.text.trim();
+                    if (customUrl.isNotEmpty) {
+                      _updatePhotoAndSession(customUrl);
+                    }
                     Navigator.pop(ctx);
                   },
                   child: const Text('Apply Custom URL', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -795,40 +843,41 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       ),
       child: Column(
         children: [
-          Stack(
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF2563EB), width: 3),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF2563EB).withOpacity(0.2),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+          InkWell(
+            onTap: _showAvatarPickerModal,
+            borderRadius: BorderRadius.circular(50),
+            child: Stack(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFF2563EB), width: 3),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF2563EB).withOpacity(0.2),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: CircleAvatar(
+                    radius: 44,
+                    backgroundColor: const Color(0xFFDBE4F6),
+                    backgroundImage: hasCustomPhoto ? NetworkImage(_avatarUrlController.text.trim()) : null,
+                    child: _isUploadingPhoto
+                        ? const CircularProgressIndicator(color: Color(0xFF2563EB), strokeWidth: 2.5)
+                        : (!hasCustomPhoto
+                            ? Icon(
+                                _avatarIcons[_selectedAvatarIndex],
+                                color: AppColors.navy700,
+                                size: 52,
+                              )
+                            : null),
+                  ),
                 ),
-                child: CircleAvatar(
-                  radius: 44,
-                  backgroundColor: const Color(0xFFDBE4F6),
-                  backgroundImage: hasCustomPhoto ? NetworkImage(_avatarUrlController.text.trim()) : null,
-                  child: _isUploadingPhoto
-                      ? const CircularProgressIndicator(color: Color(0xFF2563EB), strokeWidth: 2.5)
-                      : (!hasCustomPhoto
-                          ? Icon(
-                              _avatarIcons[_selectedAvatarIndex],
-                              color: AppColors.navy700,
-                              size: 52,
-                            )
-                          : null),
-                ),
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: InkWell(
-                  onTap: _showAvatarPickerModal,
+                Positioned(
+                  bottom: 0,
+                  right: 0,
                   child: Container(
                     padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
@@ -843,8 +892,8 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           Text(

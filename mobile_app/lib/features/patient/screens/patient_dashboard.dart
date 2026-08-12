@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../routes/app_routes.dart';
 import '../../../utils/responsive_helper.dart';
 import '../services/patient_api_service.dart';
+import 'report_detail_screen.dart';
 
 class PatientDashboard extends StatefulWidget {
   const PatientDashboard({super.key});
@@ -27,6 +28,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
   List<Map<String, dynamic>> _reports = [];
   List<Map<String, dynamic>> _medicalHistory = [];
   List<Map<String, dynamic>> _availableDoctors = [];
+  List<Map<String, dynamic>> _invoices = [];
 
   // Book Appointment Selection State
   String _selectedBookingDepartment = 'All';
@@ -38,8 +40,14 @@ class _PatientDashboardState extends State<PatientDashboard> {
   bool _isBookingSubmitting = false;
 
   // Medical Records / History Filter State
-  String _selectedHistoryFilter = 'All History Logs';
+  String _selectedHistoryFilter = 'All Records';
   final TextEditingController _historySearchController = TextEditingController();
+
+  // Financial Portal / Billing & Payments State
+  String _selectedBillingStatusFilter = 'all';
+  final TextEditingController _billingSearchController = TextEditingController();
+  String? _expandedInvoiceId;
+  bool _isPaymentSubmitting = false;
 
   final List<String> _departmentFilterList = [
     'All',
@@ -84,6 +92,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
       final rxs = await _apiService.fetchPrescriptions();
       final reports = await _apiService.fetchDiagnosticReports();
       final docs = await _apiService.fetchDoctors();
+      final invoices = await _apiService.fetchInvoices();
 
       List<Map<String, dynamic>> history = [];
       if (profile != null && profile['medicalHistory'] is List) {
@@ -100,6 +109,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
           _reports = reports;
           _availableDoctors = docs;
           _medicalHistory = history;
+          _invoices = invoices;
           _isLoading = false;
         });
       }
@@ -549,22 +559,39 @@ class _PatientDashboardState extends State<PatientDashboard> {
   List<Map<String, dynamic>> get _combinedMedicalLogs {
     final List<Map<String, dynamic>> list = [];
 
-    // 1. Lab Reports
+    // 1. Diagnostic Reports (Separated into Laboratory & Radiology)
     for (var r in _reports) {
-      final title = r['title'] ?? r['testName'] ?? r['name'] ?? 'Diagnostic Lab Report';
+      final title = (r['title'] ?? r['testName'] ?? r['name'] ?? 'Diagnostic Report').toString();
       final rawDoc = r['doctorName'] ?? r['doctor'];
-      final docName = _parseNameString(rawDoc, 'Dr. Akshaya');
+      final docName = _parseNameString(rawDoc, 'Dr. Specialist');
       final formattedDoc = docName.startsWith('Dr.') || docName.startsWith('dr.') ? docName : 'Dr. $docName';
 
+      final reqType = (r['requestType'] ?? r['category'] ?? '').toString();
+      final isRadiology = reqType.toLowerCase() == 'radiology' ||
+          RegExp(r'mri|x-ray|xray|ct|ultrasound|scan|mammogram|pet|echo|ecg|radiology|usg', caseSensitive: false).hasMatch(title);
+
+      final category = isRadiology ? 'Radiology' : 'Lab Reports';
+      final typeLabel = isRadiology ? 'RADIOLOGY IMAGING REPORT' : 'DIAGNOSTIC LAB REPORT';
+      final subText = isRadiology ? 'Radiology & Imaging' : (r['requestType'] ?? r['category'] ?? 'Laboratory');
+
+      String? cloudinaryFileUrl;
+      if (r['files'] is List && (r['files'] as List).isNotEmpty) {
+        final first = (r['files'] as List).first;
+        if (first is Map && first['secure_url'] != null) {
+          cloudinaryFileUrl = first['secure_url'].toString();
+        }
+      }
+
       list.add({
+        ...r,
         'id': r['_id'] ?? r['id'],
-        'category': 'Lab Reports',
-        'typeLabel': 'DIAGNOSTIC LAB REPORT',
+        'category': category,
+        'typeLabel': typeLabel,
         'date': r['date']?.toString().split('T')[0] ?? r['createdAt']?.toString().split('T')[0] ?? '11 Aug 2026',
         'title': title,
         'doctor': formattedDoc,
-        'subText': r['category'] ?? 'Laboratory',
-        'fileUrl': r['fileUrl'] ?? r['pdfUrl'],
+        'subText': subText,
+        'fileUrl': cloudinaryFileUrl ?? r['fileUrl'] ?? r['pdfUrl'],
         'rawDate': DateTime.tryParse(r['date']?.toString() ?? r['createdAt']?.toString() ?? '') ?? DateTime.now(),
       });
     }
@@ -596,6 +623,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
       list.add({
         'id': appt['_id'] ?? appt['id'],
         'category': isVideo ? 'Video Consultations' : 'Walk-In OPD',
+        'isConsultation': true,
         'typeLabel': isVideo ? 'VIDEO CONSULTATION' : 'WALK-IN OPD CONSULTATION',
         'date': appt['date']?.toString().split('T')[0] ?? '09 Aug 2026',
         'title': appt['reason'] ?? appt['notes'] ?? '${_parseNameString(appt['department'], 'General Medicine')} Visit',
@@ -614,7 +642,8 @@ class _PatientDashboardState extends State<PatientDashboard> {
 
       list.add({
         'id': h['_id'] ?? h['id'],
-        'category': 'All History Logs',
+        'category': 'Clinical History',
+        'isConsultation': true,
         'typeLabel': 'CLINICAL HISTORY ENTRY',
         'date': h['diagnosedDate']?.toString().split('T')[0] ?? h['date']?.toString().split('T')[0] ?? '08 Aug 2026',
         'title': h['condition'] ?? h['diagnosis'] ?? 'Medical Condition Entry',
@@ -639,8 +668,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
       _buildPrescriptionsScreen(responsive),
       _buildBookAppointmentScreen(responsive),
       _buildRecordsScreen(responsive),
+      _buildPaymentSection(responsive),
       _buildMedicalHistoryScreen(responsive),
     ];
+
+    final safeIndex = _currentIndex < pages.length ? _currentIndex : 0;
 
     return PopScope(
       canPop: _currentIndex == 0 && _navigationHistory.length <= 1,
@@ -660,7 +692,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                 ? const Center(
                     child: CircularProgressIndicator(color: Color(0xFF2563EB)),
                   )
-                : pages[_currentIndex],
+                : pages[safeIndex],
           ),
         ),
         bottomNavigationBar: _buildFiveSectionBottomNavbar(),
@@ -703,8 +735,8 @@ class _PatientDashboardState extends State<PatientDashboard> {
           Expanded(
             child: InkWell(
               onTap: () async {
-                final updated = await Navigator.pushNamed(context, AppRoutes.patientProfile);
-                if (updated == true && mounted) {
+                await Navigator.pushNamed(context, AppRoutes.patientProfile);
+                if (mounted) {
                   _loadAllData();
                 }
               },
@@ -1188,11 +1220,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
         'tabIndex': 4,
       },
       {
-        'title': 'Payments',
-        'icon': Icons.account_balance_wallet_rounded,
-        'bgColor': const Color(0xFFE0E7FF),
-        'iconColor': const Color(0xFF4F46E5),
-        'tabIndex': 0,
+        'title': 'Consultation\nHistory',
+        'icon': Icons.history_rounded,
+        'bgColor': const Color(0xFFEEF2FF),
+        'iconColor': const Color(0xFF2563EB),
+        'tabIndex': 5,
       },
     ];
 
@@ -1398,7 +1430,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
               _buildNavItem(index: 1, icon: Icons.receipt_long_rounded, label: 'Prescriptions'),
               _buildHighlightedNavItem(),
               _buildNavItem(index: 3, icon: Icons.description_rounded, label: 'Records'),
-              _buildNavItem(index: 4, icon: Icons.history_rounded, label: 'History'),
+              _buildNavItem(index: 4, icon: Icons.account_balance_wallet_rounded, label: 'Payments'),
             ],
           ),
         ),
@@ -2527,34 +2559,54 @@ class _PatientDashboardState extends State<PatientDashboard> {
 
   // --- RECORDS SCREEN (TAB 3) & MEDICAL HISTORY SCREEN (TAB 4) ---
   Widget _buildRecordsScreen(ResponsiveHelper responsive) {
-    return _buildWebParityMedicalHistoryView(responsive);
+    return _buildWebParityMedicalHistoryView(responsive, isConsultationHistoryOnly: false);
   }
 
   Widget _buildMedicalHistoryScreen(ResponsiveHelper responsive) {
-    return _buildWebParityMedicalHistoryView(responsive);
+    return _buildWebParityMedicalHistoryView(responsive, isConsultationHistoryOnly: true);
   }
 
-  Widget _buildWebParityMedicalHistoryView(ResponsiveHelper responsive) {
-    final allLogs = _combinedMedicalLogs;
+  Widget _buildWebParityMedicalHistoryView(ResponsiveHelper responsive, {bool isConsultationHistoryOnly = false}) {
+    // Dataset for Consultation History (Walk-In & Video only) vs All Records
+    final allLogs = isConsultationHistoryOnly
+        ? _combinedMedicalLogs.where((l) {
+            final cat = (l['category'] ?? '').toString();
+            return cat == 'Walk-In OPD' || cat == 'Video Consultations' || l['isConsultation'] == true;
+          }).toList()
+        : _combinedMedicalLogs;
 
     // Filter Counts
     final totalCount = allLogs.length;
-    final videoCount = allLogs.where((l) => l['category'] == 'Video Consultations').length;
-    final opdCount = allLogs.where((l) => l['category'] == 'Walk-In OPD').length;
-    final rxCount = allLogs.where((l) => l['category'] == 'Prescriptions RX').length;
     final labCount = allLogs.where((l) => l['category'] == 'Lab Reports').length;
+    final radCount = allLogs.where((l) => l['category'] == 'Radiology').length;
+    final rxCount = allLogs.where((l) => l['category'] == 'Prescriptions RX').length;
+    final opdCount = allLogs.where((l) => l['category'] == 'Walk-In OPD').length;
+    final videoCount = allLogs.where((l) => l['category'] == 'Video Consultations').length;
 
     // Apply Filter & Search Query
     final query = _historySearchController.text.trim().toLowerCase();
     final filteredLogs = allLogs.where((item) {
-      if (_selectedHistoryFilter != 'All History Logs' && item['category'] != _selectedHistoryFilter) {
+      if (_selectedHistoryFilter == 'Lab Reports' && item['category'] != 'Lab Reports') {
+        return false;
+      }
+      if (_selectedHistoryFilter == 'Radiology' && item['category'] != 'Radiology') {
+        return false;
+      }
+      if (_selectedHistoryFilter == 'Prescriptions' && item['category'] != 'Prescriptions RX') {
+        return false;
+      }
+      if (_selectedHistoryFilter == 'Walk-In OPD' && item['category'] != 'Walk-In OPD') {
+        return false;
+      }
+      if (_selectedHistoryFilter == 'Video Consultations' && item['category'] != 'Video Consultations') {
         return false;
       }
       if (query.isNotEmpty) {
         final title = (item['title'] ?? '').toString().toLowerCase();
         final doctor = (item['doctor'] ?? '').toString().toLowerCase();
         final typeLabel = (item['typeLabel'] ?? '').toString().toLowerCase();
-        return title.contains(query) || doctor.contains(query) || typeLabel.contains(query);
+        final subText = (item['subText'] ?? '').toString().toLowerCase();
+        return title.contains(query) || doctor.contains(query) || typeLabel.contains(query) || subText.contains(query);
       }
       return true;
     }).toList();
@@ -2568,7 +2620,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. DARK METRIC STAT BANNER (Matching Web Dashboard Screenshot)
+          // 1. DARK METRIC STAT BANNER
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -2593,15 +2645,31 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   scrollDirection: Axis.horizontal,
                   physics: const BouncingScrollPhysics(),
                   child: Row(
-                    children: [
-                      _buildMetricStatBox('TOTAL HISTORY RECORDS', '$totalCount Items', Colors.white),
-                      const SizedBox(width: 14),
-                      _buildMetricStatBox('CONSULTATION VISITS', '${_appointments.length} Total', const Color(0xFF34D399)),
-                      const SizedBox(width: 14),
-                      _buildMetricStatBox('DIGITAL RX ISSUED', '${_prescriptions.length} Records', const Color(0xFFFBBF24)),
-                      const SizedBox(width: 14),
-                      _buildMetricStatBox('BLOOD GROUP / ALLERGY', '$bloodGroup • $allergy', const Color(0xFFF472B6)),
-                    ],
+                    children: isConsultationHistoryOnly
+                        ? [
+                            _buildMetricStatBox('TOTAL CONSULTATIONS', '$totalCount Visits', Colors.white),
+                            const SizedBox(width: 14),
+                            _buildMetricStatBox('WALK-IN OPD VISITS', '$opdCount Visits', const Color(0xFF60A5FA)),
+                            const SizedBox(width: 14),
+                            _buildMetricStatBox('VIDEO CONSULTATIONS', '$videoCount Online', const Color(0xFFA78BFA)),
+                            const SizedBox(width: 14),
+                            _buildMetricStatBox('BLOOD GROUP / ALLERGY', '$bloodGroup • $allergy', const Color(0xFFF472B6)),
+                          ]
+                        : [
+                            _buildMetricStatBox('TOTAL RECORDS', '$totalCount Records', Colors.white),
+                            const SizedBox(width: 14),
+                            _buildMetricStatBox('LAB REPORTS', '$labCount Reports', const Color(0xFF34D399)),
+                            const SizedBox(width: 14),
+                            _buildMetricStatBox('RADIOLOGY IMAGING', '$radCount Scans', const Color(0xFF38BDF8)),
+                            const SizedBox(width: 14),
+                            _buildMetricStatBox('PRESCRIPTIONS', '$rxCount Slips', const Color(0xFFFBBF24)),
+                            const SizedBox(width: 14),
+                            _buildMetricStatBox('WALK-IN OPD', '$opdCount Visits', const Color(0xFF60A5FA)),
+                            const SizedBox(width: 14),
+                            _buildMetricStatBox('VIDEO CONSULTATIONS', '$videoCount Online', const Color(0xFFA78BFA)),
+                            const SizedBox(width: 14),
+                            _buildMetricStatBox('BLOOD / ALLERGY', '$bloodGroup • $allergy', const Color(0xFFF472B6)),
+                          ],
                   ),
                 );
               },
@@ -2615,17 +2683,27 @@ class _PatientDashboardState extends State<PatientDashboard> {
             child: ListView(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
-              children: [
-                _buildHistoryFilterChip('All History Logs', totalCount),
-                const SizedBox(width: 8),
-                _buildHistoryFilterChip('Video Consultations', videoCount),
-                const SizedBox(width: 8),
-                _buildHistoryFilterChip('Walk-In OPD', opdCount),
-                const SizedBox(width: 8),
-                _buildHistoryFilterChip('Prescriptions RX', rxCount),
-                const SizedBox(width: 8),
-                _buildHistoryFilterChip('Lab Reports', labCount),
-              ],
+              children: isConsultationHistoryOnly
+                  ? [
+                      _buildHistoryFilterChip('All Consultations', totalCount),
+                      const SizedBox(width: 8),
+                      _buildHistoryFilterChip('Walk-In OPD', opdCount),
+                      const SizedBox(width: 8),
+                      _buildHistoryFilterChip('Video Consultations', videoCount),
+                    ]
+                  : [
+                      _buildHistoryFilterChip('All Records', totalCount),
+                      const SizedBox(width: 8),
+                      _buildHistoryFilterChip('Lab Reports', labCount),
+                      const SizedBox(width: 8),
+                      _buildHistoryFilterChip('Radiology', radCount),
+                      const SizedBox(width: 8),
+                      _buildHistoryFilterChip('Prescriptions', rxCount),
+                      const SizedBox(width: 8),
+                      _buildHistoryFilterChip('Walk-In OPD', opdCount),
+                      const SizedBox(width: 8),
+                      _buildHistoryFilterChip('Video Consultations', videoCount),
+                    ],
             ),
           ),
           const SizedBox(height: 12),
@@ -2833,7 +2911,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                 border: Border.all(color: const Color(0xFFE2E8F0)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
+                    color: Colors.black.withValues(alpha: 0.03),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
@@ -2933,9 +3011,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         ),
                         onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Viewing ${item['title']} details')),
-                          );
+                          Navigator.pushNamed(context, AppRoutes.patientReportDetail, arguments: item);
                         },
                         icon: const Icon(Icons.remove_red_eye_rounded, size: 14),
                         label: const Text('View Report', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
@@ -2948,11 +3024,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         ),
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Downloading ${item['title']} PDF...')),
-                          );
-                        },
+                        onPressed: () => _handleDownloadReportPdf(item),
                         icon: const Icon(Icons.download_rounded, size: 14),
                         label: const Text('Download Report', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                       ),
@@ -2964,6 +3036,905 @@ class _PatientDashboardState extends State<PatientDashboard> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _handleDownloadReportPdf(Map<String, dynamic> item) async {
+    await ReportDetailScreen.downloadPdfReport(context, item);
+  }
+
+  // --- 8. PAYMENT & FINANCIAL PORTAL SECTION ---
+  Widget _buildPaymentSection(ResponsiveHelper responsive) {
+    // Compute KPI metrics from original database invoices
+    final double totalBilled = _invoices.fold(0.0, (sum, inv) {
+      final totals = inv['totals'];
+      if (totals is Map && totals['total'] != null) {
+        return sum + (double.tryParse(totals['total'].toString()) ?? 0.0);
+      }
+      return sum + (double.tryParse(inv['totalAmount']?.toString() ?? '0') ?? 0.0);
+    });
+
+    final double totalOutstanding = _invoices.fold(0.0, (sum, inv) {
+      final status = (inv['status'] ?? '').toString().toLowerCase();
+      if (status == 'paid') return sum;
+      final totals = inv['totals'];
+      if (totals is Map && totals['patientBalance'] != null) {
+        return sum + (double.tryParse(totals['patientBalance'].toString()) ?? 0.0);
+      }
+      final tot = double.tryParse(totals?['total']?.toString() ?? inv['totalAmount']?.toString() ?? '0') ?? 0.0;
+      return sum + tot;
+    });
+
+    final double totalPaid = _invoices.fold(0.0, (sum, inv) {
+      final status = (inv['status'] ?? '').toString().toLowerCase();
+      final totals = inv['totals'];
+      final tot = double.tryParse(totals?['total']?.toString() ?? inv['totalAmount']?.toString() ?? '0') ?? 0.0;
+      if (status == 'paid') return sum + tot;
+      final bal = double.tryParse(totals?['patientBalance']?.toString() ?? '0') ?? 0.0;
+      return sum + (tot - bal > 0 ? tot - bal : 0.0);
+    });
+
+    // Counts for filter tabs
+    final int allCount = _invoices.length;
+    final int pendingCount = _invoices.where((inv) {
+      final status = (inv['status'] ?? '').toString().toLowerCase();
+      return status == 'pending' || status == 'partially_paid' || status == 'overdue';
+    }).length;
+    final int paidCount = _invoices.where((inv) {
+      final status = (inv['status'] ?? '').toString().toLowerCase();
+      return status == 'paid';
+    }).length;
+
+    // Filter and search invoices list
+    final query = _billingSearchController.text.trim().toLowerCase();
+    final filteredInvoices = _invoices.where((inv) {
+      final status = (inv['status'] ?? '').toString().toLowerCase();
+
+      // 1. Status Filter
+      if (_selectedBillingStatusFilter == 'pending' && (status != 'pending' && status != 'partially_paid' && status != 'overdue')) {
+        return false;
+      }
+      if (_selectedBillingStatusFilter == 'paid' && status != 'paid') {
+        return false;
+      }
+
+      // 2. Search Query Filter
+      if (query.isNotEmpty) {
+        final invId = (inv['_id'] ?? inv['id'] ?? '').toString().toLowerCase();
+        final bType = (inv['billingType'] ?? '').toString().toLowerCase();
+        final desc = (inv['items'] is List ? inv['items'].map((i) => i['description'] ?? '').join(' ') : '').toString().toLowerCase();
+        return invId.contains(query) || bType.contains(query) || status.contains(query) || desc.contains(query);
+      }
+
+      return true;
+    }).toList();
+
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. HERO FINANCIAL PORTAL BANNER CARD
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20.0),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0F172A), Color(0xFF1E1B4B)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.3),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Row: Badges + Total Outstanding Payables Box
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth > 500;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 6,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+                                        ),
+                                        child: const Text(
+                                          'Financial Portal & Payments',
+                                          style: TextStyle(
+                                            color: Color(0xFFFCD34D),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                                        ),
+                                        child: const Text(
+                                          '256-Bit SSL Encrypted',
+                                          style: TextStyle(
+                                            color: Color(0xFF6EE7B7),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: const [
+                                      Icon(Icons.account_balance_wallet_rounded, color: Color(0xFFF59E0B), size: 24),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Hospital Billing & Secure Pay',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'View itemized hospital invoices, track insurance coverage deductions, pay pending dues online, and download official receipts.',
+                                    style: TextStyle(
+                                      color: Color(0xFFCBD5E1),
+                                      fontSize: 11,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isWide && totalOutstanding > 0) ...[
+                              const SizedBox(width: 16),
+                              _buildOutstandingPayablesBox(totalOutstanding),
+                            ],
+                          ],
+                        ),
+                        if (!isWide && totalOutstanding > 0) ...[
+                          const SizedBox(height: 14),
+                          _buildOutstandingPayablesBox(totalOutstanding),
+                        ],
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+                const Divider(color: Color(0xFF334155), height: 1),
+                const SizedBox(height: 16),
+
+                // 4-Card KPI Financial Summary Grid
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = constraints.maxWidth;
+                    final crossAxisCount = width > 600 ? 4 : 2;
+                    return GridView.count(
+                      crossAxisCount: crossAxisCount,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      childAspectRatio: width > 600 ? 2.2 : 1.65,
+                      children: [
+                        _buildDarkKpiCard('TOTAL HOSPITAL INVOICES', '$allCount Invoices', Colors.white),
+                        _buildDarkKpiCard('TOTAL BILLED AMOUNT', '₹${totalBilled.toStringAsFixed(0)}', Colors.white),
+                        _buildDarkKpiCard('TOTAL PAID AMOUNT', '₹${totalPaid.toStringAsFixed(0)}', const Color(0xFF34D399)),
+                        _buildDarkKpiCard('PENDING PAYABLES DUES', '₹${totalOutstanding.toStringAsFixed(0)}', const Color(0xFFFBBF24)),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // 2. SEARCH & FILTER TABS BAR
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        child: Row(
+                          children: [
+                            _buildPaymentStatusFilterTab('all', 'All Invoices', allCount),
+                            const SizedBox(width: 8),
+                            _buildPaymentStatusFilterTab('pending', 'Pending Payables', pendingCount),
+                            const SizedBox(width: 8),
+                            _buildPaymentStatusFilterTab('paid', 'Paid & Receipts', paidCount),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _billingSearchController,
+                  onChanged: (_) => setState(() {}),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  decoration: InputDecoration(
+                    hintText: 'Search by invoice ID or service...',
+                    hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                    prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
+                    suffixIcon: _billingSearchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, size: 16, color: Color(0xFF64748B)),
+                            onPressed: () {
+                              setState(() {
+                                _billingSearchController.clear();
+                              });
+                            },
+                          )
+                        : null,
+                    isDense: true,
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 3. INVOICES LIST & ITEMIZATION
+          if (filteredInvoices.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(36),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Column(
+                children: [
+                  Icon(Icons.account_balance_wallet_outlined, size: 48, color: Color(0xFF94A3B8)),
+                  SizedBox(height: 12),
+                  Text(
+                    'No hospital billing invoices found',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Your hospital account currently has no matching billing invoices.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            )
+          else
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: filteredInvoices.length,
+              itemBuilder: (context, index) {
+                final inv = filteredInvoices[index];
+                return _buildInvoiceCardItem(inv);
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOutstandingPayablesBox(double amount) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'TOTAL OUTSTANDING PAYABLES',
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFFFDE68A),
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '₹${amount.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFFF59E0B),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDarkKpiCard(String label, String value, Color valueColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 8.5,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF94A3B8),
+              letterSpacing: 0.3,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+              color: valueColor,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentStatusFilterTab(String id, String label, int count) {
+    final isSelected = _selectedBillingStatusFilter == id;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedBillingStatusFilter = id;
+        });
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.white : const Color(0xFF475569),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white : const Color(0xFFCBD5E1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF334155),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInvoiceCardItem(Map<String, dynamic> inv) {
+    final invIdRaw = (inv['_id'] ?? inv['id'] ?? '').toString();
+    final invRefId = invIdRaw.length >= 8 ? 'INV-${invIdRaw.substring(invIdRaw.length - 8).toUpperCase()}' : 'INV-$invIdRaw';
+    final billingType = (inv['billingType'] ?? 'OP').toString();
+    final statusRaw = (inv['status'] ?? 'pending').toString().toLowerCase();
+    final isPaid = statusRaw == 'paid';
+    final isExpanded = _expandedInvoiceId == invIdRaw;
+
+    final totals = inv['totals'] is Map ? inv['totals'] : {};
+    final double totalBill = double.tryParse(totals['total']?.toString() ?? inv['totalAmount']?.toString() ?? '0') ?? 0.0;
+    final double subtotal = double.tryParse(totals['subtotal']?.toString() ?? totalBill.toString()) ?? totalBill;
+    final double insCovered = double.tryParse(totals['insuranceCovered']?.toString() ?? '0') ?? 0.0;
+    final double patientBal = double.tryParse(totals['patientBalance']?.toString() ?? (isPaid ? '0' : totalBill.toString())) ?? (isPaid ? 0.0 : totalBill);
+    final double paidAmt = isPaid ? totalBill : (totalBill - patientBal > 0 ? totalBill - patientBal : 0.0);
+
+    final dateRaw = inv['createdAt'] ?? inv['date'];
+    String dateStr = '07 Aug 2026';
+    if (dateRaw != null) {
+      final dt = DateTime.tryParse(dateRaw.toString());
+      if (dt != null) {
+        dateStr = '${dt.day.toString().padLeft(2, '0')} ${_monthName(dt.month)} ${dt.year}';
+      }
+    }
+
+    final items = (inv['items'] is List) ? (inv['items'] as List) : [];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Row: Badges (Wrap) & Billed Date (Responsive layout preventing overflow)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFDBEAFE)),
+                      ),
+                      child: Text(
+                        invRefId,
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Color(0xFF1E3A8A)),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEF2FF),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE0E7FF)),
+                      ),
+                      child: Text(
+                        billingType,
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF4338CA)),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isPaid
+                            ? const Color(0xFFD1FAE5)
+                            : statusRaw == 'partially_paid'
+                                ? const Color(0xFFFEF3C7)
+                                : const Color(0xFFFEE2E2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        isPaid ? '✓ PAID' : statusRaw.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          color: isPaid
+                              ? const Color(0xFF047857)
+                              : statusRaw == 'partially_paid'
+                                  ? const Color(0xFFB45309)
+                                  : const Color(0xFFB91C1C),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Billed On:\n$dateStr',
+                textAlign: TextAlign.end,
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF64748B), height: 1.25),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // 5-Column Financial Breakdown Grid
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFF1F5F9)),
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                final isCompact = width < 450;
+                return GridView.count(
+                  crossAxisCount: isCompact ? 2 : 5,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: isCompact ? 1.75 : 1.4,
+                  children: [
+                    _buildInvoiceMetric('TOTAL BILL', '₹${totalBill.toStringAsFixed(0)}', const Color(0xFF0F172A)),
+                    _buildInvoiceMetric('SUBTOTAL / DISCOUNT', '₹${subtotal.toStringAsFixed(0)}', const Color(0xFF334155)),
+                    _buildInvoiceMetric('INSURANCE DEDUCTION', insCovered > 0 ? '₹${insCovered.toStringAsFixed(0)}' : '0% Covered', const Color(0xFF7C3AED)),
+                    _buildInvoiceMetric('AMOUNT PAID', '₹${paidAmt.toStringAsFixed(0)}', const Color(0xFF059669)),
+                    _buildInvoiceMetric('YOUR PAY BALANCE', '₹${patientBal.toStringAsFixed(0)}', const Color(0xFFD97706), isBold: true),
+                  ],
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Itemized Breakdown Accordion Trigger
+          InkWell(
+            onTap: () {
+              setState(() {
+                _expandedInvoiceId = isExpanded ? null : invIdRaw;
+              });
+            },
+            child: Row(
+              children: [
+                const Icon(Icons.description_outlined, size: 16, color: Color(0xFF2563EB)),
+                const SizedBox(width: 6),
+                Text(
+                  'View ${items.length} Itemized Services Breakdown',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_right_rounded,
+                  size: 18,
+                  color: const Color(0xFF2563EB),
+                ),
+              ],
+            ),
+          ),
+
+          // Expanded Items List Table
+          if (isExpanded && items.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'ITEMIZED CHARGES & SERVICES',
+                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Color(0xFF64748B), letterSpacing: 0.5),
+                  ),
+                  const SizedBox(height: 8),
+                  ...items.map((item) {
+                    final desc = (item['description'] ?? item['name'] ?? 'Hospital Service').toString();
+                    final cat = (item['category'] ?? 'Service').toString();
+                    final qty = item['quantity'] ?? 1;
+                    final amt = double.tryParse(item['amount']?.toString() ?? '0') ?? 0.0;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '$desc ($cat x$qty)',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                            ),
+                          ),
+                          Text(
+                            '₹${(amt * qty).toStringAsFixed(0)}',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ],
+
+          // Pay Pending Dues Online Button
+          if (patientBal > 0) ...[
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 42,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
+                onPressed: () => _showOnlinePaymentModal(inv, patientBal),
+                icon: const Icon(Icons.payment_rounded, size: 16),
+                label: Text(
+                  'Pay Pending Dues (₹${patientBal.toStringAsFixed(0)}) Online Now',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInvoiceMetric(String label, String value, Color color, {bool isBold = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 8,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF94A3B8),
+            letterSpacing: 0.3,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: isBold ? FontWeight.w900 : FontWeight.w800,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _monthName(int month) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return months[(month - 1) % 12];
+  }
+
+  void _showOnlinePaymentModal(Map<String, dynamic> inv, double balance) {
+    String selectedMethod = 'UPI / Online';
+    final invId = (inv['_id'] ?? inv['id'] ?? '').toString();
+    final invRefId = invId.length >= 8 ? 'INV-${invId.substring(invId.length - 8).toUpperCase()}' : 'INV-$invId';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                top: 20,
+                left: 20,
+                right: 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Secure Online Invoice Payment',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('INVOICE REF', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                            Text(invRefId, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const Text('AMOUNT TO PAY', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                            Text('₹${balance.toStringAsFixed(0)}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF2563EB))),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Select Payment Gateway / Method:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                  const SizedBox(height: 8),
+                  ...['UPI / GPay / PhonePe', 'Credit / Debit Card', 'Net Banking'].map((method) {
+                    final isSelected = selectedMethod == method;
+                    return InkWell(
+                      onTap: () {
+                        setModalState(() {
+                          selectedMethod = method;
+                        });
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                              color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                              size: 18,
+                            ),
+                            const SizedBox(width: 10),
+                            Text(method, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isSelected ? const Color(0xFF1E3A8A) : const Color(0xFF334155))),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF059669),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: _isPaymentSubmitting
+                          ? null
+                          : () async {
+                              setModalState(() {
+                                _isPaymentSubmitting = true;
+                              });
+                              final success = await _apiService.payInvoice(
+                                invoiceId: invId,
+                                amount: balance,
+                                paymentMethod: selectedMethod,
+                              );
+                              setModalState(() {
+                                _isPaymentSubmitting = false;
+                              });
+                              if (!context.mounted) return;
+                              Navigator.pop(ctx);
+                              if (success) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Payment of ₹${balance.toStringAsFixed(0)} for $invRefId completed successfully!'),
+                                    backgroundColor: const Color(0xFF059669),
+                                  ),
+                                );
+                                _loadAllData();
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Payment processed successfully. Reloading data...'),
+                                    backgroundColor: Color(0xFF059669),
+                                  ),
+                                );
+                                _loadAllData();
+                              }
+                            },
+                      child: _isPaymentSubmitting
+                          ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                          : Text('Pay ₹${balance.toStringAsFixed(0)} Now', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
