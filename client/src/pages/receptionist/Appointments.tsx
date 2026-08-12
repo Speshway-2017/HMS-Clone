@@ -30,6 +30,7 @@ import { useAppointments } from "../../features/appointments";
 import { api } from "../../lib/api";
 import toast from "react-hot-toast";
 import { isTodayDate, isFutureDate, isPastDate, formatDisplayDate } from "../../lib/appointmentDateUtils";
+import { isDoctorInDepartment } from "../../lib/doctorUtils";
 
 // Validation schema for booking form
 const appointmentSchema = z.object({
