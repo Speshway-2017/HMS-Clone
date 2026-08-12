@@ -99,6 +99,7 @@ export function ImportExcelModal({
         }
       }}
       title={title}
+      size="lg"
     >
       <div className="space-y-4 text-xs">
         {/* Sample Template Bar */}

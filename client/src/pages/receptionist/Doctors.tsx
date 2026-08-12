@@ -41,7 +41,10 @@ export function DoctorsPage({ activeTab = "availability" }: Props) {
     },
     {
       header: "Specialization",
-      render: (row: any) => <span className="text-xs font-medium text-slate-700">{row.specialization}</span>
+      render: (row: any) => {
+        const spec = row.specialization && row.specialization.trim() !== "" ? row.specialization.trim() : "—";
+        return <span className="text-xs font-semibold text-slate-700">{spec}</span>;
+      }
     },
     {
       header: "Department",
@@ -88,14 +91,14 @@ export function DoctorsPage({ activeTab = "availability" }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Doctors Registry</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Doctors Registry</h1>
           <p className="text-sm text-slate-500">Monitor doctor duty logs, consulting status, and schedules.</p>
         </div>
 
         {/* Tab triggers */}
-        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-1">
+        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 shrink-0 self-start sm:self-auto">
           <button
             onClick={() => setTab("availability")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
@@ -115,22 +118,23 @@ export function DoctorsPage({ activeTab = "availability" }: Props) {
         </div>
       </div>
 
-      <Card className="max-w-md">
-        <SelectField
-          label="Filter by department"
-          value={selectedDeptId}
-          onChange={(e) => setSelectedDeptId(e.target.value)}
-        >
-          <option value="">All Departments</option>
-          {departments.map((dept: any) => (
-            <option key={dept._id} value={dept._id}>{dept.name}</option>
-          ))}
-        </SelectField>
-      </Card>
-
       {tab === "availability" && (
         <Card>
-          <h2 className="mb-4 text-base font-semibold text-slate-800">Doctors Availability Board</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <h2 className="text-base font-bold text-slate-800">Doctors Availability Board</h2>
+            <div className="w-full sm:w-56">
+              <select
+                value={selectedDeptId}
+                onChange={(e) => setSelectedDeptId(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer shadow-2xs"
+              >
+                <option value="">All Departments</option>
+                {departments.map((dept: any) => (
+                  <option key={dept._id} value={dept._id}>{dept.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
           {isLoading ? (
             <div className="py-8 text-center text-slate-400">Loading Doctors...</div>
           ) : (

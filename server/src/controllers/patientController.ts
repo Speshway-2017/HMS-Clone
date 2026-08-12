@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { Patient, PATIENT_STATUSES } from "../models/Patient";
 import { Doctor } from "../models/Doctor";
+import { User } from "../models/User";
 import mongoose, { Types } from "mongoose";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
@@ -84,11 +85,11 @@ export const listPatients = catchAsync(async (req: Request, res: Response) => {
   if (req.user!.role === "doctor") {
     const doctor = await getLoggedDoctor(req);
     const [apptPatients, admissionPatients, labPatients, radioPatients, assignedPatients] = await Promise.all([
-      Appointment.distinct("patient", { hospital: filter.hospital, doctor: doctor._id }),
-      Admission.distinct("patient", { hospital: filter.hospital, admittingDoctor: doctor._id }),
-      LabOrder.distinct("patient", { hospital: filter.hospital, doctor: doctor._id }),
-      RadiologyOrder.distinct("patient", { hospital: filter.hospital, doctor: doctor._id }),
-      Patient.distinct("_id", { hospital: filter.hospital, assignedDoctor: doctor._id }),
+      Appointment.distinct("patient", { ...filter, doctor: doctor._id }),
+      Admission.distinct("patient", { ...filter, admittingDoctor: doctor._id }),
+      LabOrder.distinct("patient", { ...filter, doctor: doctor._id }),
+      RadiologyOrder.distinct("patient", { ...filter, doctor: doctor._id }),
+      Patient.distinct("_id", { ...filter, assignedDoctor: doctor._id }),
     ]);
     const patientIdSet = new Set<string>([
       ...apptPatients.map((id: any) => id.toString()),
@@ -172,7 +173,8 @@ export const createPatient = catchAsync(async (req: Request, res: Response) => {
 
 export const getPatient = catchAsync(async (req: Request, res: Response) => {
   await checkPatientDoctorAccess(req, req.params.id);
-  const patient = await Patient.findOne({ _id: req.params.id, ...req.hospitalFilter }).populate("assignedDoctor", "name");
+  const hospitalId = req.hospitalFilter?.hospital || req.user?.hospital;
+  const patient = await Patient.findOne({ _id: req.params.id, hospital: hospitalId }).populate("assignedDoctor", "name");
   if (!patient) {
     throw new AppError("Patient not found.", 404);
   }
@@ -395,13 +397,30 @@ export const updatePatientProfileMe = catchAsync(async (req: Request, res: Respo
     throw new AppError("Patient profile not found for the logged-in user.", 404);
   }
 
+  const photo = typeof req.body.photoUrl === "string" && req.body.photoUrl.trim().length > 0
+      ? req.body.photoUrl.trim()
+      : (typeof req.body.avatarUrl === "string" && req.body.avatarUrl.trim().length > 0 ? req.body.avatarUrl.trim() : null);
+
+  if (photo && !req.body.photoUrl) {
+    req.body.photoUrl = photo;
+  }
+
   const body = patientSchema.partial().parse(req.body);
   delete (body as any).uhid;
+
+  if (photo && !body.photoUrl) {
+    body.photoUrl = photo;
+  }
 
   const patient = await Patient.findByIdAndUpdate(patientSelf._id, body, {
     new: true,
     runValidators: true,
   });
+
+  if (userId && photo) {
+    await User.findByIdAndUpdate(userId, { avatarUrl: photo, name: body.name || userName });
+  }
+
 
   if (patientSelf.hospital) {
     emitToHospital(patientSelf.hospital.toString(), "patient_updated", { patientId: patient!._id });

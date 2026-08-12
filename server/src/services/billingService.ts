@@ -3,6 +3,7 @@ import { Invoice } from "../models/Invoice";
 import { IPBill } from "../models/IPBill";
 import { Payment } from "../models/Payment";
 import { IPBillPayment } from "../models/IPBillPayment";
+import { buildBranchQuery } from "../utils/branchQueryHelper";
 import "../models/Patient";
 import "../models/Doctor";
 import "../models/Department";
@@ -69,8 +70,7 @@ export class BillingService {
     // ─────────────────────────────────────────────────────────────
     // 1. FETCH OP INVOICES
     // ─────────────────────────────────────────────────────────────
-    const opFilter: Record<string, any> = { hospital: hospitalId };
-    if (branch) opFilter.branch = branch;
+    const opFilter: Record<string, any> = buildBranchQuery({ hospital: hospitalId, branch });
     if (billingType && billingType.toUpperCase() !== "IP") {
       opFilter.billingType = billingType.toUpperCase();
     }
@@ -188,10 +188,9 @@ export class BillingService {
 
     if (includeIP) {
       const ipFilter: Record<string, any> = {
-        hospital: hospitalId,
+        ...buildBranchQuery({ hospital: hospitalId, branch }),
         status: { $ne: "Cancelled" }
       };
-      if (branch) ipFilter.branch = branch;
       if (dateFrom || dateTo) {
         ipFilter.billingDate = {};
         if (dateFrom) ipFilter.billingDate.$gte = new Date(dateFrom);

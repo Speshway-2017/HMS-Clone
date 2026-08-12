@@ -47,10 +47,12 @@ const labOrderSchema = new Schema(
   { timestamps: true }
 );
 
-// Performance: compound indexes for doctor-scoped and patient-scoped queries
+// Performance: compound indexes for doctor-scoped, patient-scoped, and branch-scoped queries
 labOrderSchema.index({ hospital: 1, doctor: 1, status: 1 });
 labOrderSchema.index({ hospital: 1, patient: 1 });
 labOrderSchema.index({ hospital: 1, doctor: 1, createdAt: -1 });
+labOrderSchema.index({ hospital: 1, branch: 1, status: 1 });
+labOrderSchema.index({ hospital: 1, branch: 1, createdAt: -1 });
 
 export type LabOrder = InferSchemaType<typeof labOrderSchema> & { _id: Types.ObjectId };
 export const LabOrder = model("LabOrder", labOrderSchema);

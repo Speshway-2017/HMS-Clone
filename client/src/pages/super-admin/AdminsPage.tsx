@@ -77,19 +77,19 @@ export function AdminsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">System Administrators</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">System Administrators</h1>
           <p className="text-sm text-slate-500">Manage institutional access and organizational roles across the HMS network.</p>
         </div>
-        <div className="flex gap-3">
-          <Link to="/super-admin/roles">
-            <Button variant="secondary">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
+          <Link to="/super-admin/roles" className="flex-1 sm:flex-none">
+            <Button variant="secondary" className="w-full sm:w-auto">
               <ShieldCheck className="h-4 w-4" /> Manage Roles
             </Button>
           </Link>
-          <Link to="/super-admin/admins/new">
-            <Button variant="primary">
+          <Link to="/super-admin/admins/new" className="flex-1 sm:flex-none">
+            <Button variant="primary" className="w-full sm:w-auto">
               <UserPlus className="h-4 w-4" /> Add Admin
             </Button>
           </Link>

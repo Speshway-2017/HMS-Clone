@@ -131,6 +131,8 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   ],
   nurse: [
     { label: "Dashboard", path: "/nurse", icon: LayoutDashboard },
+    { label: "Assign Task", path: "/nurse/assign-task", icon: ClipboardCheck },
+
     { label: "Assigned Patients", path: "/nurse/patients", icon: Users },
     { label: "Medication Admin", path: "/nurse/medications", icon: Pill },
     { label: "Vitals Monitoring", path: "/nurse/vitals", icon: Activity },

@@ -116,6 +116,7 @@ async function gracefulShutdown(signal: string) {
 }
 
 import { syncAllBranchDepartments } from "./utils/branchDepartmentSync";
+import { backfillLabBranchData } from "./utils/backfillBranchData";
 
 async function main() {
   console.log("Starting Hospital Management System Backend...\n");
@@ -134,7 +135,8 @@ async function main() {
     // Step 4: Run migrations & branch sync
     await migrateInvoices();
     await syncAllBranchDepartments();
-    console.log("✓ Multi-branch department inheritance synced");
+    await backfillLabBranchData();
+    console.log("✓ Multi-branch department inheritance and lab branch data synced");
 
     // Step 5: Create HTTP server & register Express routes (app already has routes)
     httpServer = createServer(app);

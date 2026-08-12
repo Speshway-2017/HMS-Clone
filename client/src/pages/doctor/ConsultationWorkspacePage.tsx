@@ -25,6 +25,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
 import { InputField, TextareaField, SelectField } from "../../components/ui/Field";
+import { SpeechToTextButton } from "../../components/ui/SpeechToTextButton";
 import {
   User,
   Heart,
@@ -635,61 +636,6 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
         consultationId: workspaceData.draftSession._id,
         followUpDate: (appointment as any).followUpDate || null,
       });
-
-      // 3. Propagate completed lab orders to lab dashboard
-      if (selectedLabTests.length > 0) {
-        try {
-          const savedRequests = localStorage.getItem("hms_laboratory_requests") || "[]";
-          const requests = JSON.parse(savedRequests);
-          const newRequest = {
-            _id: `LAB-${patient._id.slice(-4)}-${Date.now().toString().slice(-4)}`,
-            patientId: patient._id,
-            patientName: patient.name,
-            patientAge: patient.age || 30,
-            patientGender: patient.gender || "Male",
-            orderedBy: (appointment.doctor as any)?.name || "Dr. Attending Physician",
-            tests: selectedLabTests,
-            priority: labPriority,
-            date: new Date().toISOString().split("T")[0],
-            status: "Pending Request",
-            sampleId: "",
-            sampleType: "Blood",
-            results: []
-          };
-          requests.unshift(newRequest);
-          localStorage.setItem("hms_laboratory_requests", JSON.stringify(requests));
-        } catch (storageErr) {
-          console.error("Failed to sync lab request to local storage", storageErr);
-        }
-      }
-
-      // 4. Propagate completed radiology orders to radiology/lab dashboard
-      if (selectedRadiologyStudies.length > 0) {
-        try {
-          const savedRequests = localStorage.getItem("hms_laboratory_requests") || "[]";
-          const requests = JSON.parse(savedRequests);
-          const newRequest = {
-            _id: `RAD-${patient._id.slice(-4)}-${Date.now().toString().slice(-4)}`,
-            patientId: patient._id,
-            patientName: patient.name,
-            patientAge: patient.age || 30,
-            patientGender: patient.gender || "Male",
-            orderedBy: (appointment.doctor as any)?.name || "Dr. Attending Physician",
-            tests: selectedRadiologyStudies,
-            priority: radioPriority,
-            date: new Date().toISOString().split("T")[0],
-            status: "Pending Request",
-            sampleId: "",
-            sampleType: "Imaging",
-            results: []
-          };
-          requests.unshift(newRequest);
-          localStorage.setItem("hms_laboratory_requests", JSON.stringify(requests));
-        } catch (storageErr) {
-          console.error("Failed to sync radiology request to local storage", storageErr);
-        }
-      }
-
       const rx = res.prescription as any;
       setSuccessInfo({
         show: true,
@@ -1076,12 +1022,53 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                 <fieldset disabled={isCompleted} className="contents">
                   <Card className="p-6 space-y-4">
                     <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Clinical Assessment Notes</h3>
-                    <InputField label="Chief Complaint" value={chiefComplaint} onChange={(e) => setChiefComplaint(e.target.value)} placeholder="Why is the patient here?" />
-                    <InputField label="Diagnosis" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} placeholder="e.g. Essential Hypertension" required />
-                    <TextareaField label="Symptoms" value={symptoms} onChange={(e) => setSymptoms(e.target.value)} placeholder="Enter details of symptoms..." rows={2} />
-                    <TextareaField label="Clinical Notes" value={clinicalNotes} onChange={(e) => setClinicalNotes(e.target.value)} placeholder="Attending doctor notes..." rows={3} />
-                    <TextareaField label="Treatment Plan" value={treatmentPlan} onChange={(e) => setTreatmentPlan(e.target.value)} placeholder="Enter next plan..." rows={2} />
-                    <TextareaField label="Advice / Follow-up notes" value={advice} onChange={(e) => setAdvice(e.target.value)} placeholder="Enter instructions for patient..." rows={2} />
+                    <InputField
+                      label="Chief Complaint"
+                      value={chiefComplaint}
+                      onChange={(e) => setChiefComplaint(e.target.value)}
+                      placeholder="Why is the patient here?"
+                      rightElement={<SpeechToTextButton value={chiefComplaint} onChange={setChiefComplaint} disabled={isCompleted} />}
+                    />
+                    <InputField
+                      label="Diagnosis"
+                      value={diagnosis}
+                      onChange={(e) => setDiagnosis(e.target.value)}
+                      placeholder="e.g. Essential Hypertension"
+                      required
+                      rightElement={<SpeechToTextButton value={diagnosis} onChange={setDiagnosis} disabled={isCompleted} />}
+                    />
+                    <TextareaField
+                      label="Symptoms"
+                      value={symptoms}
+                      onChange={(e) => setSymptoms(e.target.value)}
+                      placeholder="Enter details of symptoms..."
+                      rows={2}
+                      rightElement={<SpeechToTextButton value={symptoms} onChange={setSymptoms} disabled={isCompleted} />}
+                    />
+                    <TextareaField
+                      label="Clinical Notes"
+                      value={clinicalNotes}
+                      onChange={(e) => setClinicalNotes(e.target.value)}
+                      placeholder="Attending doctor notes..."
+                      rows={3}
+                      rightElement={<SpeechToTextButton value={clinicalNotes} onChange={setClinicalNotes} disabled={isCompleted} />}
+                    />
+                    <TextareaField
+                      label="Treatment Plan"
+                      value={treatmentPlan}
+                      onChange={(e) => setTreatmentPlan(e.target.value)}
+                      placeholder="Enter next plan..."
+                      rows={2}
+                      rightElement={<SpeechToTextButton value={treatmentPlan} onChange={setTreatmentPlan} disabled={isCompleted} />}
+                    />
+                    <TextareaField
+                      label="Advice / Follow-up notes"
+                      value={advice}
+                      onChange={(e) => setAdvice(e.target.value)}
+                      placeholder="Enter instructions for patient..."
+                      rows={2}
+                      rightElement={<SpeechToTextButton value={advice} onChange={setAdvice} disabled={isCompleted} />}
+                    />
 
                     {!isCompleted && (
                       <div className="flex justify-end">
@@ -1710,7 +1697,14 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                       <option value="STAT">STAT / Emergency</option>
                     </SelectField>
 
-                    <TextareaField label="Clinical Notes / Indications" value={radioNotes} onChange={(e) => setRadioNotes(e.target.value)} placeholder="e.g. Suspected fracture right forearm" rows={2} />
+                    <TextareaField
+                      label="Clinical Notes / Indications"
+                      value={radioNotes}
+                      onChange={(e) => setRadioNotes(e.target.value)}
+                      placeholder="e.g. Suspected fracture right forearm"
+                      rows={2}
+                      rightElement={<SpeechToTextButton value={radioNotes} onChange={setRadioNotes} disabled={isCompleted} />}
+                    />
 
                     {!isCompleted && (
                       <Button type="submit" variant="primary" disabled={radiologyMutation.isPending || selectedRadiologyStudies.length === 0}>
@@ -1819,6 +1813,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                           onChange={(e) => setAdmitDiagnosis(e.target.value)}
                           placeholder="Enter diagnostic confirmation..."
                           required
+                          rightElement={<SpeechToTextButton value={admitDiagnosis} onChange={setAdmitDiagnosis} disabled={isCompleted} />}
                         />
                       </div>
 
@@ -1895,6 +1890,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                           value={admitReason}
                           onChange={(e) => setAdmitReason(e.target.value)}
                           placeholder="Clinical reason for ward admission"
+                          rightElement={<SpeechToTextButton value={admitReason} onChange={setAdmitReason} disabled={isCompleted} />}
                         />
                       </div>
 
@@ -1905,6 +1901,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                           onChange={(e) => setAdmitNotes(e.target.value)}
                           placeholder="Describe clinical symptoms and observations..."
                           rows={3}
+                          rightElement={<SpeechToTextButton value={admitNotes} onChange={setAdmitNotes} disabled={isCompleted} />}
                         />
                       </div>
 

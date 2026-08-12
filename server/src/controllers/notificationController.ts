@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { buildBranchQuery } from "../utils/branchQueryHelper";
 import { Types } from "mongoose";
 import { catchAsync } from "../utils/catchAsync";
 import { Appointment } from "../models/Appointment";
@@ -123,7 +124,7 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
 
     // Pending Lab Orders: Laboratory only
     isLab
-      ? LabOrder.find({ ...hospitalFilter, status: "pending" })
+      ? LabOrder.find({ ...buildBranchQuery(hospitalFilter), status: "pending" })
           .populate("patient", "name")
           .populate("doctor", "name")
           .sort({ createdAt: -1 })
@@ -133,7 +134,7 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
 
     // Pending Radiology Orders: Laboratory only
     isLab
-      ? RadiologyOrder.find({ ...hospitalFilter, status: "pending" })
+      ? RadiologyOrder.find({ ...buildBranchQuery(hospitalFilter), status: "pending" })
           .populate("patient", "name")
           .populate("doctor", "name")
           .sort({ createdAt: -1 })

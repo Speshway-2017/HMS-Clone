@@ -19,6 +19,7 @@ export function NursingNotesPage() {
     additionalNotes: "",
   });
 
+
   const { data: inpatients = [], isLoading, refetch } = useNurseInpatients();
   const { data: staffMe } = useStaffProfileMe();
   const isReadOnly = localStorage.getItem("nurse_shift_completed") === "true" || staffMe?.dutyStatus === "off_duty";

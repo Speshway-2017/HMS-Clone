@@ -224,6 +224,20 @@ export function LandingPage() {
     }
   });
 
+  const { data: branchesData = [] } = useQuery({
+    queryKey: ["public", "branches"],
+    queryFn: async () => {
+      try {
+        const res = await api.get("/hospitals/public/branches");
+        return res.data?.data?.branches || res.data?.branches || [];
+      } catch {
+        const fallbackRes = await api.get("/branches").catch(() => null);
+        return fallbackRes?.data?.data?.branches || fallbackRes?.data?.branches || fallbackRes?.data?.data || [];
+      }
+    }
+  });
+  const branches = branchesData || [];
+
   const { data: publicBlogs = [] } = useBlogs({ publishedOnly: true });
   const [selectedBlogModal, setSelectedBlogModal] = useState<BlogPost | null>(null);
 
@@ -302,6 +316,7 @@ export function LandingPage() {
   const [bookingSuccessData, setBookingSuccessData] = useState<any | null>(null);
 
   const [selectedSpecialization, setSelectedSpecialization] = useState<string>("all");
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
   const [doctorSearchQuery, setDoctorSearchQuery] = useState<string>("");
   const [selectedDoctorForProfile, setSelectedDoctorForProfile] = useState<any | null>(null);
 
@@ -317,11 +332,20 @@ export function LandingPage() {
     )
   ) as string[];
 
-  // Filter doctors based on specialization & search query
+  // Filter doctors based on branch, specialization & search query
   const catalogDoctors = doctors.filter((doc: any) => {
     const docName = String(doc.name || (typeof doc.user === "object" ? doc.user?.name : doc.user) || "").toLowerCase();
     const spec = String(doc.specialization || (typeof doc.department === "object" && doc.department ? doc.department.name : doc.department) || "").toLowerCase();
     const qual = String(doc.qualification || doc.qualifications || "").toLowerCase();
+
+    const docBranchId = doc.branch?._id || doc.branch?.id || doc.branch || "";
+    const docBranchName = typeof doc.branch === "object" && doc.branch ? (doc.branch.name || "") : "";
+
+    const branchMatch =
+      selectedBranchId === "all" ||
+      docBranchId === selectedBranchId ||
+      String(docBranchId) === String(selectedBranchId) ||
+      (docBranchName && docBranchName.toLowerCase().includes(selectedBranchId.toLowerCase()));
 
     const specMatch =
       selectedSpecialization === "all" ||
@@ -332,7 +356,8 @@ export function LandingPage() {
       docName.includes(doctorSearchQuery.toLowerCase().trim()) ||
       spec.includes(doctorSearchQuery.toLowerCase().trim()) ||
       qual.includes(doctorSearchQuery.toLowerCase().trim());
-    return specMatch && queryMatch;
+
+    return branchMatch && specMatch && queryMatch;
   });
 
   // Filter doctors based on selected department for booking form
@@ -1237,41 +1262,54 @@ export function LandingPage() {
                 </p>
               </div>
 
-              {/* Specialization & Search Filter Bar */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="relative flex-1 max-w-md">
+              {/* Search & Branch & Specialization Filter Bar */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-xs">
+                {/* Search Input */}
+                <div className="relative flex-1">
                   <input
                     type="text"
                     value={doctorSearchQuery}
                     onChange={(e) => setDoctorSearchQuery(e.target.value)}
                     placeholder="Search doctor by name or specialization..."
-                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:border-navy-600 focus:outline-none shadow-sm"
+                    className="w-full h-10 rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:border-navy-600 focus:ring-1 focus:ring-navy-600 focus:outline-none shadow-xs transition-all"
                   />
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
                 </div>
 
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
-                  <button
-                    onClick={() => setSelectedSpecialization("all")}
-                    className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${selectedSpecialization === "all"
-                      ? "bg-navy-700 text-white shadow-sm"
-                      : "bg-white text-slate-600 border border-slate-200 hover:border-navy-300"
-                      }`}
-                  >
-                    All Specializations
-                  </button>
-                  {doctorSpecializations.map((spec: string) => (
-                    <button
-                      key={spec}
-                      onClick={() => setSelectedSpecialization(spec)}
-                      className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all whitespace-nowrap capitalize ${selectedSpecialization.toLowerCase() === spec.toLowerCase()
-                        ? "bg-navy-700 text-white shadow-sm"
-                        : "bg-white text-slate-600 border border-slate-200 hover:border-navy-300"
-                        }`}
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  {/* Branch Selector Dropdown */}
+                  {branches.length > 0 && (
+                    <div className="relative w-full sm:w-56">
+                      <select
+                        value={selectedBranchId}
+                        onChange={(e) => setSelectedBranchId(e.target.value)}
+                        className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 focus:border-navy-600 focus:ring-1 focus:ring-navy-600 focus:outline-none shadow-xs cursor-pointer transition-all"
+                      >
+                        <option value="all">All Hospital Branches</option>
+                        {branches.map((b: any) => (
+                          <option key={b._id || b.id} value={b._id || b.id}>
+                            {b.name} {b.city ? `(${b.city})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Specialization Selector Dropdown */}
+                  <div className="relative w-full sm:w-56">
+                    <select
+                      value={selectedSpecialization}
+                      onChange={(e) => setSelectedSpecialization(e.target.value)}
+                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 focus:border-navy-600 focus:ring-1 focus:ring-navy-600 focus:outline-none shadow-xs cursor-pointer capitalize transition-all"
                     >
-                      {spec}
-                    </button>
-                  ))}
+                      <option value="all">All Specializations</option>
+                      {doctorSpecializations.map((spec: string) => (
+                        <option key={spec} value={spec}>
+                          {spec}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -1284,6 +1322,7 @@ export function LandingPage() {
                   const specName = doc.specialization || deptName;
                   const qualText = doc.qualifications || doc.qualification || "MD, MBBS";
                   const fee = String((doc.consultationSettings as any)?.fee || doc.consultationFee || doc.fee || 500).replace(/[^0-9]/g, "") || "500";
+                  const branchName = typeof doc.branch === "object" && doc.branch ? doc.branch.name : (doc.branch || null);
 
                   return (
                     <div key={doc._id || doc.id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between hover:border-navy-200 transition-all hover:shadow-md">
@@ -1316,6 +1355,15 @@ export function LandingPage() {
                             <span className="text-slate-400">Department:</span>
                             <span className="font-bold text-slate-700">{deptName}</span>
                           </div>
+                          {branchName && (
+                            <div className="flex justify-between">
+                              <span className="text-slate-400">Branch Location:</span>
+                              <span className="font-bold text-navy-700 flex items-center gap-1">
+                                <MapPin className="h-3 w-3 text-navy-600 shrink-0" />
+                                {branchName}
+                              </span>
+                            </div>
+                          )}
                           <div className="flex justify-between">
                             <span className="text-slate-400">OPD Consultation Fee:</span>
                             <span className="font-bold text-navy-700 text-sm">₹{fee}</span>

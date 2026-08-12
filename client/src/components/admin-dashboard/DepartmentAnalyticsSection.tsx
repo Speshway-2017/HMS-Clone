@@ -51,6 +51,11 @@ export function DepartmentAnalyticsSection({ departments, invoices, appointments
         if (app.status === "completed" || app.status === "done") {
           item.completedCount++;
         }
+        // Accumulate appointment consultation fee into department revenue
+        const fee = parseFloat(app.paidAmount || app.totalAmount || app.amount || app.fee || app.consultationFee || 500);
+        if (!isNaN(fee) && app.status !== "cancelled") {
+          item.revenue += fee;
+        }
       }
     });
 
@@ -71,7 +76,7 @@ export function DepartmentAnalyticsSection({ departments, invoices, appointments
 
       if (key && statsMap.has(key)) {
         const item = statsMap.get(key)!;
-        item.revenue += inv.totals?.total || 0;
+        item.revenue += inv.totals?.total || inv.paidAmount || inv.totalAmount || 0;
       }
     });
 

@@ -147,8 +147,14 @@ export function PharmacyDashboard() {
     return exp <= threeMonthsFromNow;
   }).length;
 
-  const pendingPrescriptionsCount = prescriptions.filter(p => p.status === "Pending").length;
-  const pendingRequestsCount = prescriptions.filter(p => p.status === "Pending" || p.status === "Partially Dispensed" || p.status === "Dispensed").length;
+  const pendingPrescriptionsCount = prescriptions.filter(p => {
+    const s = (p.status || "").toLowerCase();
+    return s === "pending" || s === "prescribed" || s === "verified";
+  }).length;
+  const pendingRequestsCount = prescriptions.filter(p => {
+    const s = (p.status || "").toLowerCase();
+    return s === "pending" || s === "prescribed" || s === "verified" || s === "partially dispensed" || s === "preparing" || s === "ready for pickup";
+  }).length;
 
   const lowStockMedicinesList = medicines
     .filter(med => med.stockQty <= med.reorderLevel)

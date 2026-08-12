@@ -50,11 +50,13 @@ function computeTotals(
   return { subtotal, taxAmount, total, insuranceCovered, patientBalance };
 }
 
+import { buildBranchQuery } from "../utils/branchQueryHelper";
+
 export const listInvoices = catchAsync(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req, 20);
   const { status, patient, billingType } = req.query as Record<string, string | undefined>;
 
-  const filter: Record<string, any> = { ...req.hospitalFilter };
+  const filter: Record<string, any> = buildBranchQuery(req.hospitalFilter);
   // "pending" in business logic = any invoice with outstanding balance (pending + partially_paid + overdue)
   if (status) {
     if (status === "pending") {
@@ -67,7 +69,7 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
   if (billingType) filter.billingType = billingType;
 
   // Determine IP Bill filters
-  const ipFilter: any = { ...req.hospitalFilter };
+  const ipFilter: any = buildBranchQuery(req.hospitalFilter);
   if (patient) ipFilter.patient = patient;
 
   // Enforce patient data isolation for invoices listing
@@ -402,7 +404,8 @@ export const createInvoice = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const getInvoice = catchAsync(async (req: Request, res: Response) => {
-  const invoice = await Invoice.findOne({ _id: req.params.id, ...req.hospitalFilter }).populate("patient");
+  const hospitalId = req.hospitalFilter?.hospital || req.user?.hospital;
+  const invoice = await Invoice.findOne({ _id: req.params.id, hospital: hospitalId }).populate("patient");
   if (!invoice) {
     throw new AppError("Invoice not found.", 404);
   }
@@ -412,13 +415,13 @@ export const getInvoice = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const updateInvoice = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.hospitalFilter!.hospital!;
+  const hospitalId = req.hospitalFilter?.hospital || req.user?.hospital;
   const body = invoiceSchema.partial().parse(req.body);
   const updatePayload: any = { ...body };
   if (body.status && body.status.toLowerCase() === "paid") {
     updatePayload["totals.patientBalance"] = 0;
   }
-  const invoice = await Invoice.findOneAndUpdate({ _id: req.params.id, ...req.hospitalFilter }, updatePayload, {
+  const invoice = await Invoice.findOneAndUpdate({ _id: req.params.id, hospital: hospitalId }, updatePayload, {
     new: true,
     runValidators: true,
   });
@@ -428,13 +431,15 @@ export const updateInvoice = catchAsync(async (req: Request, res: Response) => {
   const payments = await Payment.find({ invoice: invoice._id, hospital: hospitalId });
   const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
 
-  emitToHospital(hospitalId.toString(), "dashboard_update", {
-    type: "INVOICE_UPDATE",
-    invoiceId: invoice._id,
-    billingType: invoice.billingType,
-    status: invoice.status,
-    timestamp: new Date()
-  });
+  if (hospitalId) {
+    emitToHospital(hospitalId.toString(), "dashboard_update", {
+      type: "INVOICE_UPDATE",
+      invoiceId: invoice._id,
+      billingType: invoice.billingType,
+      status: invoice.status,
+      timestamp: new Date()
+    });
+  }
 
   await logAudit({
     req,
@@ -448,7 +453,8 @@ export const updateInvoice = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const deleteInvoice = catchAsync(async (req: Request, res: Response) => {
-  const invoice = await Invoice.findOneAndDelete({ _id: req.params.id, ...req.hospitalFilter });
+  const hospitalId = req.hospitalFilter?.hospital || req.user?.hospital;
+  const invoice = await Invoice.findOneAndDelete({ _id: req.params.id, hospital: hospitalId });
   if (!invoice) {
     throw new AppError("Invoice not found.", 404);
   }
