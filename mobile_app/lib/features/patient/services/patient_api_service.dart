@@ -141,6 +141,59 @@ class PatientApiService {
     }
   }
 
+  /// Fetches real hospital invoices for this patient from MERN backend (GET /invoices)
+  Future<List<Map<String, dynamic>>> fetchInvoices() async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/invoices');
+    try {
+      final response = await _client.get(
+        url,
+        headers: UserSession.headers,
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded['data'] != null) {
+          List items = [];
+          if (decoded['data'] is List) {
+            items = decoded['data'];
+          } else if (decoded['data']['invoices'] is List) {
+            items = decoded['data']['invoices'];
+          } else if (decoded['data']['data'] is List) {
+            items = decoded['data']['data'];
+          }
+          return items.map((item) => item as Map<String, dynamic>).toList();
+        }
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Submits payment for a patient invoice in MERN backend (POST /reception/billing/collect-payment)
+  Future<bool> payInvoice({required String invoiceId, required double amount, String paymentMethod = 'UPI / Online'}) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/reception/billing/collect-payment');
+    try {
+      final response = await _client.post(
+        url,
+        headers: UserSession.headers,
+        body: jsonEncode({
+          'invoiceId': invoiceId,
+          'amount': amount,
+          'paymentMethod': paymentMethod,
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final decoded = jsonDecode(response.body);
+        return decoded['status'] == 'success';
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Books an appointment slot with a doctor in the MERN backend database
   /// Books a new consultation appointment in MERN backend (POST /appointments)
   Future<Map<String, dynamic>> bookAppointment({
