@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { DbNotification } from "../models/DbNotification";
-import { emitToDoctor } from "../config/socket";
+import { Doctor } from "../models/Doctor";
+import { emitToDoctor, emitToHospital } from "../config/socket";
 
 export interface DoctorNotificationPayload {
   hospital: Types.ObjectId | string;
@@ -15,7 +16,7 @@ export interface DoctorNotificationPayload {
 
 /**
  * Creates a notification in the database targeted to a specific doctor
- * and emits a real-time event strictly to that doctor's socket.io room.
+ * and emits real-time events to that doctor's room and hospital rooms.
  */
 export async function createDoctorNotification(payload: DoctorNotificationPayload) {
   const notif = await DbNotification.create({
@@ -30,8 +31,19 @@ export async function createDoctorNotification(payload: DoctorNotificationPayloa
     data: payload.data || null,
   });
 
-  // Emit strictly to the authenticated doctor's room
-  emitToDoctor(payload.recipientDoctor.toString(), "notification:new", notif);
+  const docIdStr = payload.recipientDoctor.toString();
+  emitToDoctor(docIdStr, "notification:new", notif);
+  emitToHospital(payload.hospital.toString(), "notification_created", notif);
+
+  // If Doctor record links to a User record and is distinct, emit to User ID as well
+  try {
+    const docDoc = await Doctor.findById(payload.recipientDoctor);
+    if (docDoc?.user && docDoc.user.toString() !== docIdStr) {
+      emitToDoctor(docDoc.user.toString(), "notification:new", notif);
+    }
+  } catch {
+    // Ignore look-up error if docDoc missing
+  }
 
   return notif;
 }

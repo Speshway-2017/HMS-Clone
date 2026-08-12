@@ -38,6 +38,36 @@ export function buildBranchQuery(hospitalFilter: any): Record<string, unknown> {
   return query;
 }
 
+/**
+ * Safely combines a hospital/branch query with an additional query object.
+ * Prevents property overwrites when both queries contain `$or` clauses (e.g. branch filter $or vs date/search $or).
+ */
+export function combineBranchQuery(hospitalFilter: any, additionalQuery: Record<string, any> = {}): Record<string, unknown> {
+  const branchQuery = buildBranchQuery(hospitalFilter);
+
+  if (!additionalQuery || Object.keys(additionalQuery).length === 0) {
+    return branchQuery;
+  }
+
+  if (branchQuery.$or && additionalQuery.$or) {
+    const { $or: branchOr, ...branchRest } = branchQuery as any;
+    const { $or: addOr, ...addRest } = additionalQuery as any;
+    return {
+      ...branchRest,
+      ...addRest,
+      $and: [
+        { $or: branchOr },
+        { $or: addOr }
+      ]
+    };
+  }
+
+  return {
+    ...branchQuery,
+    ...additionalQuery
+  };
+}
+
 export function parseHospitalAndBranch(filterOrId: any): { targetHospital: any; targetBranch: any } {
   if (!filterOrId) return { targetHospital: null, targetBranch: null };
   if (typeof filterOrId === "object" && filterOrId.hospital) {

@@ -15,6 +15,8 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes inactivity session timeout
 
+import { socket } from "../lib/socket";
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,7 +43,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     api
       .get<{ data: { user: AuthUser } }>("/auth/me")
-      .then((res) => setUser(res.data.data.user))
+      .then((res) => {
+        const u = res.data.data.user;
+        setUser(u);
+        if (u) {
+          if (u.hospital) socket.emit("join_hospital", u.hospital);
+          if (u.role === "doctor" && u.id) socket.emit("join_doctor", u.id);
+        }
+      })
       .catch(() => {
         tokenStorage.clear();
         setUser(null);

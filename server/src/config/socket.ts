@@ -31,9 +31,13 @@ export function initSocket(server: HTTPServer, _clientUrl: string) {
         if (decoded.hospitalId) {
           socket.join(decoded.hospitalId.toString());
         }
-        if (decoded.role === "doctor" && (decoded.doctorId || decoded.userId || decoded.id)) {
-          const docId = decoded.doctorId || decoded.userId || decoded.id;
-          socket.join(`doctor:${docId}`);
+        if (decoded.role === "doctor") {
+          if (decoded.doctorId) socket.join(`doctor:${decoded.doctorId}`);
+          if (decoded.userId) socket.join(`doctor:${decoded.userId}`);
+          if (decoded.id) {
+            socket.join(`doctor:${decoded.id}`);
+            socket.join(`user:${decoded.id}`);
+          }
         }
       }
       next();
@@ -67,8 +71,10 @@ export function initSocket(server: HTTPServer, _clientUrl: string) {
     // Allow joining a doctor-specific room to enforce notification isolation
     socket.on("join_doctor", (doctorId: string) => {
       if (doctorId) {
-        socket.join(`doctor:${doctorId}`);
-        console.log(`Socket ${socket.id} joined doctor room: doctor:${doctorId}`);
+        const idStr = doctorId.toString();
+        socket.join(`doctor:${idStr}`);
+        socket.join(`user:${idStr}`);
+        console.log(`Socket ${socket.id} joined doctor rooms: doctor:${idStr}, user:${idStr}`);
       }
     });
 
@@ -241,9 +247,9 @@ export function emitToDoctor(doctorId: string | object, event: string, data: any
   if (io && doctorId) {
     const docIdStr = doctorId.toString();
     io.to(`doctor:${docIdStr}`).emit(event, data);
-    io.emit(event, data); // Fallback
-  } else if (io) {
-    io.emit(event, data);
+    io.to(`user:${docIdStr}`).emit(event, data);
+    io.to(`doctor:${docIdStr}`).emit("dashboard_update", { type: event, data });
+    io.to(`user:${docIdStr}`).emit("dashboard_update", { type: event, data });
   }
 }
 
