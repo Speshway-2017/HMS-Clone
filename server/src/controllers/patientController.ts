@@ -411,9 +411,6 @@ export const updatePatientProfileMe = catchAsync(async (req: Request, res: Respo
     body.photoUrl = photo;
   }
 
-  const body = patientSchema.partial().parse(req.body);
-  delete (body as any).uhid;
-
   const patient = await Patient.findByIdAndUpdate(patientSelf._id, body, {
     new: true,
     runValidators: true,
