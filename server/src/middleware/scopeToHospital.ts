@@ -78,7 +78,7 @@ export async function scopeToHospital(req: Request, _res: Response, next: NextFu
     // Locked branch on User/Staff/Doctor account
     if (userBranch) {
       baseFilter.branch = userBranch;
-    } else if (branchHeader === "all") {
+    } else if ((req.user.role as string) === "hospital_admin" && branchHeader === "all") {
       // "all" explicitly requested by admin
       delete baseFilter.branch;
     } else if (branchHeader && branchHeader !== "main" && Types.ObjectId.isValid(branchHeader)) {

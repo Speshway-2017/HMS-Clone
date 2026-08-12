@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { socket } from "../lib/socket";
+import toast from "react-hot-toast";
 
 /**
  * Ultra-Fast Sub-20ms Real-Time Socket Synchronization Hook
@@ -38,7 +39,7 @@ export function useSocketSync() {
       }
 
       // Fast background query refresh
-      queryClient.invalidateQueries({ queryKey: ["invoices"], refetchType: "none" });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["invoices", "pending-overdue"] });
       queryClient.invalidateQueries({ queryKey: ["reception", "billing"] });
       queryClient.invalidateQueries({ queryKey: ["finance"] });
@@ -63,10 +64,23 @@ export function useSocketSync() {
         });
       }
 
-      queryClient.invalidateQueries({ queryKey: ["appointments"], refetchType: "none" });
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
       queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
       queryClient.invalidateQueries({ queryKey: ["doctor", "dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["reception"] });
+      queryClient.invalidateQueries({ queryKey: ["queues"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    };
+
+    const handleNewPatientAssigned = (payload: any) => {
+      handleAppointmentChange(payload);
+      
+      // Only display doctor check-in toasts if active user is in doctor portal
+      const isDoctorPortal = typeof window !== "undefined" && window.location.pathname.startsWith("/doctor");
+      if (isDoctorPortal && (payload?.message || payload?.title)) {
+        const toastId = payload?._id || payload?.id || `doctor-notif-${payload?.data?.appointmentId || "notif"}`;
+        toast.success(payload?.message || payload?.title, { id: toastId });
+      }
     };
 
     // 3. Instant Inpatient & Vitals Cache Mutation
@@ -76,6 +90,7 @@ export function useSocketSync() {
       queryClient.invalidateQueries({ queryKey: ["beds"] });
       queryClient.invalidateQueries({ queryKey: ["nurse"] });
       queryClient.invalidateQueries({ queryKey: ["vitals"] });
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
     };
 
     // 4. Instant Lab & File Upload Mutation
@@ -85,6 +100,7 @@ export function useSocketSync() {
       queryClient.invalidateQueries({ queryKey: ["diagnostic-reports"] });
       queryClient.invalidateQueries({ queryKey: ["patient"] });
       queryClient.invalidateQueries({ queryKey: ["doctor"] });
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
     };
 
     // 5. Instant Pharmacy & Inventory Mutation
@@ -92,12 +108,16 @@ export function useSocketSync() {
       queryClient.invalidateQueries({ queryKey: ["prescriptions"] });
       queryClient.invalidateQueries({ queryKey: ["pharmacy"] });
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
     };
 
     // 6. Generic Dashboard & Notification Sync
     const handleGenericDashboardUpdate = () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["reception"] });
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
     };
 
     // ── Subscribe to Socket Events ──────────────────────────────────────────
@@ -107,6 +127,11 @@ export function useSocketSync() {
     socket.on("appointment_updated", handleAppointmentChange);
     socket.on("appointment_cancelled", handleAppointmentChange);
     socket.on("patient_checkin", handleAppointmentChange);
+    socket.on("new_patient_assigned", handleNewPatientAssigned);
+    socket.on("notification:new", handleNewPatientAssigned);
+    socket.on("notification_created", handleGenericDashboardUpdate);
+    socket.on("queue_updated", handleAppointmentChange);
+    socket.on("op_patient_checked_in", handleAppointmentChange);
 
     socket.on("admission_created", handleInpatientChange);
     socket.on("admission_updated", handleInpatientChange);
@@ -153,6 +178,11 @@ export function useSocketSync() {
       socket.off("appointment_updated", handleAppointmentChange);
       socket.off("appointment_cancelled", handleAppointmentChange);
       socket.off("patient_checkin", handleAppointmentChange);
+      socket.off("new_patient_assigned", handleNewPatientAssigned);
+      socket.off("notification:new", handleNewPatientAssigned);
+      socket.off("notification_created", handleGenericDashboardUpdate);
+      socket.off("queue_updated", handleAppointmentChange);
+      socket.off("op_patient_checked_in", handleAppointmentChange);
 
       socket.off("admission_created", handleInpatientChange);
       socket.off("admission_updated", handleInpatientChange);

@@ -342,11 +342,13 @@ export class ReceptionService {
    * Active statuses = everything except cancelled / no_show / completed.
    */
   static async checkDuplicateAppointment(
-    hospitalId: Types.ObjectId,
+    filterOrId: any,
     patientId: string,
     doctorId: string,
     date: string
   ) {
+    const { targetHospital: hospitalId } = parseHospitalAndBranch(filterOrId);
+    const branchFilter = buildBranchQuery(filterOrId);
     const bookingDate = new Date(date);
     const startOfDay = new Date(bookingDate);
     startOfDay.setHours(0, 0, 0, 0);
@@ -354,9 +356,9 @@ export class ReceptionService {
     endOfDay.setHours(23, 59, 59, 999);
 
     const [doctor, existing] = await Promise.all([
-      Doctor.findOne({ _id: doctorId, hospital: hospitalId, isActive: { $ne: false } }, "name"),
+      Doctor.findOne({ ...branchFilter, _id: doctorId, isActive: { $ne: false } }, "name"),
       Appointment.findOne({
-        hospital: hospitalId,
+        ...branchFilter,
         patient: patientId,
         doctor: doctorId,
         date: { $gte: startOfDay, $lte: endOfDay },
@@ -391,6 +393,27 @@ export class ReceptionService {
 
   static async bookAppointment(filterOrId: any, appointmentData: any, userId: Types.ObjectId) {
     const { targetHospital: hospitalId, targetBranch } = parseHospitalAndBranch(filterOrId);
+    let { patientId, doctorId, departmentId, date, time, type, notes, followUp, parentAppointmentId, followUpReason } = appointmentData;
+
+    let resolvedBranch = targetBranch || (appointmentData as any).branch || null;
+    if (!resolvedBranch && doctorId) {
+      const docObj = await Doctor.findById(doctorId);
+      if (docObj?.branch) {
+        resolvedBranch = docObj.branch;
+      }
+    }
+    if (!resolvedBranch && userId) {
+      const userObj = await User.findById(userId);
+      if (userObj?.branch) {
+        resolvedBranch = userObj.branch;
+      } else {
+        const staffObj = await Staff.findOne({ user: userId }) || (userObj?.email ? await Staff.findOne({ email: userObj.email }) : null);
+        if (staffObj?.branch) {
+          resolvedBranch = staffObj.branch;
+        }
+      }
+    }
+
     // Map old type values to new ones for backward compatibility
     const mapOldType = (oldType: string | undefined) => {
       if (!oldType) return "Appointment";
@@ -416,7 +439,6 @@ export class ReceptionService {
       }
     };
 
-    let { patientId, doctorId, departmentId, date, time, type, notes, followUp, parentAppointmentId, followUpReason } = appointmentData;
     type = mapOldType(type);
 
     const today = new Date();
@@ -619,7 +641,7 @@ export class ReceptionService {
     // Create provisional invoice
     const newInvoice = await ReceptionRepository.createInvoice({
       hospital: hospitalId,
-      branch: targetBranch,
+      branch: resolvedBranch,
       referenceId,
       patient: patientId,
       appointment: null, // We'll link this after payment
@@ -662,12 +684,30 @@ export class ReceptionService {
       details: `Created provisional invoice ${newInvoice._id} for patient ID ${patientId} with Dr. ${doctor.name}. Reference ID: ${referenceId}`
     });
 
+    if (!isFree) {
+      // Non-free consultation: ONLY provisional invoice is created.
+      // Appointment creation, queue token, and doctor notifications are deferred until payment is completed via processPayment.
+      emitToHospital(hospitalId.toString(), "billing_updated", { invoice: newInvoice });
+      return {
+        appointment: null,
+        invoice: newInvoice,
+        billing: {
+          registrationFee,
+          consultationFee,
+          gst,
+          discount,
+          total
+        },
+        token: null
+      };
+    }
+
     const isToday = bookingDateStr === todayStr;
-    const appointmentStatus = isFree ? (isToday ? "checked_in" : "scheduled") : "pending_payment";
+    const appointmentStatus = isToday ? "checked_in" : "scheduled";
 
     const appointmentPayload: Record<string, unknown> = {
       hospital: hospitalId,
-      branch: targetBranch,
+      branch: resolvedBranch,
       referenceId,
       patient: patientId,
       doctor: doctorId,
@@ -719,7 +759,7 @@ export class ReceptionService {
     let queueNumber = "N/A";
     let queueRecord = null;
 
-    if (isFree && isToday) {
+    if (isToday) {
       // Auto check-in and queue token generation for free consultations on today's date
       const startOfToday = new Date();
       startOfToday.setHours(0, 0, 0, 0);
@@ -741,7 +781,7 @@ export class ReceptionService {
 
       queueRecord = await ReceptionRepository.createQueueToken({
         hospital: hospitalId,
-        branch: targetBranch,
+        branch: resolvedBranch,
         tokenNumber,
         type: type === "Emergency" ? "emergency" : "regular",
         status: "waiting",
@@ -776,12 +816,12 @@ export class ReceptionService {
     await ReceptionRepository.createAuditLog({
       hospital: hospitalId,
       user: userId,
-      action: isFree ? "APPOINTMENT_BOOKED_FREE" : "APPOINTMENT_BOOKED_PROVISIONAL",
-      details: `Booked ${followUp ? "follow-up " : ""}appointment ${referenceId} for patient ID ${patientId} with Dr. ${doctor.name}.`
+      action: "APPOINTMENT_BOOKED_FREE",
+      details: `Booked ${followUp ? "follow-up " : ""}free appointment ${referenceId} for patient ID ${patientId} with Dr. ${doctor.name}.`
     });
 
     let checkInResult = null;
-    if (isFree && (type === "Walk-in" || type === "Emergency")) {
+    if (type === "Walk-in" || type === "Emergency") {
       try {
         checkInResult = await this.checkInAppointment(hospitalId, newAppointment._id.toString(), userId);
       } catch (err) {
@@ -1023,6 +1063,28 @@ export class ReceptionService {
             }
 
             appointment = await ReceptionRepository.createAppointment(appointmentPayload);
+
+            // Notify doctor of new assigned appointment upon payment completion
+            const patName = (invoice.patient as any)?.name || "Patient";
+            const docId = provisionalData.doctorId;
+            try {
+              await createDoctorNotification({
+                hospital: hospitalId,
+                title: "New Patient Assigned",
+                message: `Patient ${patName} (${referenceId}) booked an appointment with you for ${provisionalData.date} at ${provisionalData.time}.`,
+                type: "appointment",
+                severity: "info",
+                recipientDoctor: docId,
+                link: "/doctor/op-management",
+                data: {
+                  appointmentId: appointment._id.toString(),
+                  referenceId,
+                  patientName: patName,
+                }
+              });
+            } catch (err) {
+              console.error("Failed to notify doctor of new patient assigned upon payment:", err);
+            }
           }
 
           // Update invoice with appointment ID
@@ -1192,9 +1254,13 @@ export class ReceptionService {
 
       // Emit socket events to update dashboards
       try {
-        emitToHospital(hospitalId.toString(), "appointment_updated", { appointment });
-        emitToHospital(hospitalId.toString(), "queue_updated", { queueRecord });
-        emitToHospital(hospitalId.toString(), "billing_updated", { invoice: updatedInvoice });
+        const hospIdStr = hospitalId.toString();
+        emitToHospital(hospIdStr, "appointment_updated", { appointment });
+        emitToHospital(hospIdStr, "queue_updated", { queueRecord });
+        emitToHospital(hospIdStr, "billing_updated", { invoice: updatedInvoice });
+        emitToHospital(hospIdStr, "invoice_updated", { invoice: updatedInvoice });
+        emitToHospital(hospIdStr, "payment_received", { payment: newPayment, invoice: updatedInvoice });
+        emitToHospital(hospIdStr, "dashboard_update", { type: "payment_received", invoice: updatedInvoice });
       } catch (err) {
         console.error("Failed to emit socket events:", err);
       }
@@ -1230,7 +1296,8 @@ export class ReceptionService {
   }
 
   // ── Simulated Doctor Consultation workflows ──
-  static async simulateDoctorCall(hospitalId: Types.ObjectId, queueId: string, userId: Types.ObjectId) {
+  static async simulateDoctorCall(filterOrId: any, queueId: string, userId: Types.ObjectId) {
+    const { targetHospital: hospitalId } = parseHospitalAndBranch(filterOrId);
     const queueItem = await Queue.findOneAndUpdate(
       { _id: queueId, hospital: hospitalId },
       { status: "called" },
@@ -1266,7 +1333,8 @@ export class ReceptionService {
     return queueItem;
   }
 
-  static async simulateDoctorComplete(hospitalId: Types.ObjectId, data: any, userId: Types.ObjectId) {
+  static async simulateDoctorComplete(filterOrId: any, data: any, userId: Types.ObjectId) {
+    const { targetHospital: hospitalId } = parseHospitalAndBranch(filterOrId);
     const { queueId, outcome, notes, ward, roomType } = data; // outcome: 'op' or 'ip'
 
     const queueItem = await Queue.findOneAndUpdate(
@@ -2132,7 +2200,8 @@ export class ReceptionService {
     return admission;
   }
 
-  static async cancelAppointment(hospitalId: Types.ObjectId, appointmentId: string, data: any, userId: Types.ObjectId) {
+  static async cancelAppointment(filterOrId: any, appointmentId: string, data: any, userId: Types.ObjectId) {
+    const { targetHospital: hospitalId } = parseHospitalAndBranch(filterOrId);
     const { reason, remarks, refundRequired } = data;
 
     const session = await mongoose.startSession();
@@ -2484,7 +2553,8 @@ export class ReceptionService {
     }
   }
 
-  static async checkInAppointment(hospitalId: Types.ObjectId, appointmentId: string, userId: Types.ObjectId) {
+  static async checkInAppointment(filterOrId: any, appointmentId: string, userId: Types.ObjectId) {
+    const { targetHospital: hospitalId } = parseHospitalAndBranch(filterOrId);
     const session = await mongoose.startSession();
     session.startTransaction();
 
