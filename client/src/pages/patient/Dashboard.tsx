@@ -605,11 +605,24 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
 
   const targetDoc = getSelectedDoctor();
   const docObjId = targetDoc?._id || targetDoc?.id || selectedDoctorId;
+  const currentPatientId = patient?._id || (patient as any)?.id;
   // Use the shared useAvailableSlots hook (hits /appointments/available-slots)
   // which is accessible to the patient role and uses the same backend service
   // as the Receptionist Dashboard — single source of truth.
-  const { data: bookedSlotsRaw } = useAvailableSlots(docObjId, bookingDate);
+  const { data: bookedSlotsRaw } = useAvailableSlots(docObjId, bookingDate, currentPatientId);
   const bookedSlots = bookedSlotsRaw || [];
+
+  const patientActiveApptsOnDate = useMemo(() => {
+    if (!bookingDate || !appointments || !Array.isArray(appointments)) return [];
+    const targetDateStr = new Date(bookingDate).toISOString().split("T")[0];
+    return appointments.filter((a: any) => {
+      if (!a.date) return false;
+      const aDateStr = new Date(a.date).toISOString().split("T")[0];
+      const isSameDate = aDateStr === targetDateStr;
+      const isActive = !["cancelled", "no_show", "completed", "missed"].includes(String(a.status || "").toLowerCase());
+      return isSameDate && isActive;
+    });
+  }, [appointments, bookingDate]);
 
   const isCancellationAllowed = (dateVal: string | Date, timeStr?: string): boolean => {
     if (!dateVal) return false;
@@ -930,7 +943,15 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
 
     let timeToUse = bookingTime;
     if (timeToUse && bookedSlots.some((b: string) => normalizeTime(b) === normalizeTime(timeToUse))) {
-      toast.error("The selected time slot is already booked for this doctor. Please choose a different slot.");
+      const patientConflict = patientActiveApptsOnDate.find(
+        (a: any) => a.time && normalizeTime(a.time) === normalizeTime(timeToUse)
+      );
+      if (patientConflict) {
+        const conflictDocName = (typeof patientConflict.doctor === "object" ? patientConflict.doctor?.name : null) || "another doctor";
+        toast.error(`You already have an active appointment scheduled at ${timeToUse} with Dr. ${conflictDocName}. You cannot book another doctor at the exact same day and time.`);
+      } else {
+        toast.error("The selected time slot is already booked for this doctor. Please choose a different slot.");
+      }
       return;
     }
 
@@ -2030,8 +2051,8 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
             </div>
           </div>
 
-          {/* Sub-tab Navigation (Receptionist style) */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+          {/* Sub-tab Navigation (Receptionist style - Edge-to-Edge Flush Sticky Header) */}
+          <div className="sticky -top-3 sm:-top-4 md:-top-6 z-30 -mx-3 -mt-3 sm:-mx-4 sm:-mt-4 md:-mx-6 md:-mt-6 px-3 sm:px-4 md:px-6 py-3.5 bg-slate-50/95 backdrop-blur-md border-b border-slate-200/90 shadow-sm transition-all mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap gap-2">
               {[
                 { id: "scheduled", label: "Scheduled & Upcoming", count: scheduledAppointments.length, icon: Clock },
@@ -2435,41 +2456,75 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                         }
 
                         return (
-                          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5 pt-1">
-                            {slots.map((slot) => {
-                              const isBooked = bookedSlots.some(
-                                (b: string) => normalizeTime(b) === normalizeTime(slot)
-                              );
-                              const isSelected = bookingTime === slot || (!!bookingTime && !!slot && normalizeTime(bookingTime) === normalizeTime(slot));
+                          <div className="space-y-3">
+                            {patientActiveApptsOnDate.length > 0 && (
+                              <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 shadow-sm">
+                                <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-amber-600 mt-0.5" />
+                                <div>
+                                  <span className="font-bold">Schedule Conflict Guard Active:</span> You have {patientActiveApptsOnDate.length} active appointment(s) on this date ({new Date(bookingDate || new Date()).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}). Time slots matching your existing appointments are blocked and highlighted in amber.
+                                </div>
+                              </div>
+                            )}
 
-                              if (isBooked) {
+                            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5 pt-1">
+                              {slots.map((slot) => {
+                                const isBooked = bookedSlots.some(
+                                  (b: string) => normalizeTime(b) === normalizeTime(slot)
+                                );
+                                const patientConflict = patientActiveApptsOnDate.find(
+                                  (a: any) => a.time && normalizeTime(a.time) === normalizeTime(slot)
+                                );
+                                const isSelected = bookingTime === slot || (!!bookingTime && !!slot && normalizeTime(bookingTime) === normalizeTime(slot));
+
+                                if (isBooked) {
+                                  const conflictDocName = (typeof patientConflict?.doctor === "object" ? patientConflict?.doctor?.name : null) || "another doctor";
+                                  const tooltipText = patientConflict
+                                    ? `Slot Blocked: You already have an active appointment at ${slot} with Dr. ${conflictDocName}`
+                                    : `This slot is already booked for this doctor`;
+
+                                  return (
+                                    <button
+                                      key={slot}
+                                      type="button"
+                                      disabled
+                                      title={tooltipText}
+                                      onClick={() => {
+                                        if (patientConflict) {
+                                          toast.error(`Slot Blocked: You already have an active appointment scheduled at ${slot} on this day with Dr. ${conflictDocName}.`);
+                                        }
+                                      }}
+                                      className={`rounded-xl border font-bold cursor-not-allowed py-2.5 text-center text-xs relative group transition-all ${
+                                        patientConflict
+                                          ? "border-amber-400 bg-amber-100/90 text-amber-900 shadow-sm ring-1 ring-amber-300"
+                                          : "border-slate-200 bg-slate-100/80 text-slate-400 opacity-60 line-through"
+                                      }`}
+                                    >
+                                      {slot}
+                                      {patientConflict && (
+                                        <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                          <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                }
+
                                 return (
                                   <button
                                     key={slot}
                                     type="button"
-                                    disabled
-                                    title="This slot is already booked"
-                                    className="rounded-xl border border-slate-200 bg-slate-100/80 text-slate-400 font-semibold cursor-not-allowed opacity-60 line-through py-2.5 text-center text-xs"
+                                    onClick={() => setBookingTime(slot)}
+                                    className={`rounded-xl border py-2.5 text-center text-xs font-bold transition-all ${isSelected
+                                        ? "border-emerald-600 bg-emerald-400 text-slate-950 font-black ring-2 ring-emerald-400 shadow-md scale-105"
+                                        : "border-emerald-200 bg-emerald-50/50 text-emerald-800 hover:bg-emerald-100 hover:border-emerald-400"
+                                      }`}
                                   >
                                     {slot}
                                   </button>
                                 );
-                              }
-
-                              return (
-                                <button
-                                  key={slot}
-                                  type="button"
-                                  onClick={() => setBookingTime(slot)}
-                                  className={`rounded-xl border py-2.5 text-center text-xs font-bold transition-all ${isSelected
-                                      ? "border-emerald-600 bg-emerald-400 text-slate-950 font-black ring-2 ring-emerald-400 shadow-md scale-105"
-                                      : "border-emerald-200 bg-emerald-50/50 text-emerald-800 hover:bg-emerald-100 hover:border-emerald-400"
-                                    }`}
-                                >
-                                  {slot}
-                                </button>
-                              );
-                            })}
+                              })}
+                            </div>
                           </div>
                         );
                       })()}
@@ -2841,8 +2896,8 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
             </div>
           </Card>
 
-          {/* Search Bar & Category Filter Bar */}
-          <Card className="p-4 space-y-4">
+          {/* Search Bar & Category Filter Bar (Edge-to-Edge Flush Sticky Bar) */}
+          <div className="sticky -top-3 sm:-top-4 md:-top-6 z-30 -mx-3 -mt-3 sm:-mx-4 sm:-mt-4 md:-mx-6 md:-mt-6 px-3 sm:px-4 md:px-6 py-3.5 bg-slate-50/95 backdrop-blur-md border-b border-slate-200/90 shadow-md transition-all mb-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               {/* Category Filter Pills */}
               {(() => {
@@ -2909,7 +2964,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 )}
               </div>
             </div>
-          </Card>
+          </div>
 
           {/* Timeline Records Grid */}
           <div className="space-y-4">
@@ -3184,8 +3239,8 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
             </div>
           </Card>
 
-          {/* Search Bar & Filter Tabs */}
-          <Card className="p-4 space-y-4">
+          {/* Search Bar & Filter Tabs (Edge-to-Edge Flush Sticky Bar) */}
+          <div className="sticky -top-3 sm:-top-4 md:-top-6 z-30 -mx-3 -mt-3 sm:-mx-4 sm:-mt-4 md:-mx-6 md:-mt-6 px-3 sm:px-4 md:px-6 py-3.5 bg-slate-50/95 backdrop-blur-md border-b border-slate-200/90 shadow-md transition-all mb-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               {/* Status Filter Pills */}
               <div className="flex flex-wrap items-center gap-2">
@@ -3234,7 +3289,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 )}
               </div>
             </div>
-          </Card>
+          </div>
 
           {/* Prescriptions Grid */}
           <div className="space-y-4">
@@ -3594,8 +3649,8 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
             </div>
           </Card>
 
-          {/* Search Bar & Filter Tabs */}
-          <Card className="p-4 space-y-4">
+          {/* Search Bar & Filter Tabs (Edge-to-Edge Flush Sticky Bar) */}
+          <div className="sticky -top-3 sm:-top-4 md:-top-6 z-30 -mx-3 -mt-3 sm:-mx-4 sm:-mt-4 md:-mx-6 md:-mt-6 px-3 sm:px-4 md:px-6 py-3.5 bg-slate-50/95 backdrop-blur-md border-b border-slate-200/90 shadow-md transition-all mb-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               {/* Status Filter Pills */}
               <div className="flex flex-wrap items-center gap-2">
@@ -3644,7 +3699,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 )}
               </div>
             </div>
-          </Card>
+          </div>
 
           {/* Invoices List Grid & Itemized View */}
           <div className="space-y-4">
@@ -4083,8 +4138,8 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
             </div>
           </Card>
 
-          {/* Category Filter Pills Bar */}
-          <Card className="p-4 space-y-4">
+          {/* Category Filter Pills Bar (Edge-to-Edge Flush Sticky Bar) */}
+          <div className="sticky -top-3 sm:-top-4 md:-top-6 z-30 -mx-3 -mt-3 sm:-mx-4 sm:-mt-4 md:-mx-6 md:-mt-6 px-3 sm:px-4 md:px-6 py-3.5 bg-slate-50/95 backdrop-blur-md border-b border-slate-200/90 shadow-md transition-all mb-4">
             <div className="flex flex-wrap items-center gap-2">
               {[
                 { id: "all", label: "All Activity Logs", count: notifications.length },
@@ -4112,7 +4167,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 );
               })}
             </div>
-          </Card>
+          </div>
 
           {/* Notifications Feed */}
           <div className="space-y-3">
@@ -4296,16 +4351,33 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                         const isBooked = bookedSlots.some(
                           (b: string) => normalizeTime(b) === normalizeTime(slot)
                         );
+                        const patientConflict = patientActiveApptsOnDate.find(
+                          (a: any) => a.time && normalizeTime(a.time) === normalizeTime(slot)
+                        );
                         const isSelected = bookingTime === slot || (!!bookingTime && !!slot && normalizeTime(bookingTime) === normalizeTime(slot));
 
                         if (isBooked) {
+                          const conflictDocName = (typeof patientConflict?.doctor === "object" ? patientConflict?.doctor?.name : null) || "another doctor";
+                          const tooltipText = patientConflict
+                            ? `Slot Blocked: You already have an active appointment at ${slot} with Dr. ${conflictDocName}`
+                            : `This slot is already booked for this doctor`;
+
                           return (
                             <button
                               key={slot}
                               type="button"
                               disabled
-                              title="This slot is already booked"
-                              className="rounded-lg border border-slate-200 bg-slate-100/80 text-slate-400 font-semibold cursor-not-allowed opacity-60 line-through py-1.5 text-center text-xs"
+                              title={tooltipText}
+                              onClick={() => {
+                                if (patientConflict) {
+                                  toast.error(`Slot Blocked: You already have an active appointment scheduled at ${slot} on this day with Dr. ${conflictDocName}.`);
+                                }
+                              }}
+                              className={`rounded-lg border font-bold cursor-not-allowed py-1.5 text-center text-xs relative ${
+                                patientConflict
+                                  ? "border-amber-400 bg-amber-100 text-amber-900 ring-1 ring-amber-300"
+                                  : "border-slate-200 bg-slate-100/80 text-slate-400 opacity-60 line-through"
+                              }`}
                             >
                               {slot}
                             </button>
