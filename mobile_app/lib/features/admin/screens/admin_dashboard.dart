@@ -1830,27 +1830,311 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  // 12. SETTINGS SUB-VIEW
-  Widget _buildSettingsSubView() {
+  // 12. HOSPITAL RULES & SETTINGS SUB-VIEW (WEB PARITY)
+  Widget _buildHospitalRulesSubView() {
+    final hosp = _hospitalProfile ?? {};
+    final String currentLogo = hosp['logoUrl']?.toString() ?? '';
+    final String hospName = hosp['name']?.toString() ?? _hospitalName;
+    final String hospCode = hosp['code']?.toString() ?? 'MAIN-001';
+    final int opExpiry = hosp['opExpiryLimit'] is num ? (hosp['opExpiryLimit'] as num).toInt() : (int.tryParse(hosp['opExpiryLimit']?.toString() ?? '') ?? 10);
+    final String contactEmail = hosp['contactEmail']?.toString() ?? '';
+    final String contactPhone = hosp['contactPhone']?.toString() ?? '';
+    final String address = hosp['address']?.toString() ?? '';
+
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE2E8F0))),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Hospital Network Settings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-          const SizedBox(height: 12),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.edit_rounded, color: AppColors.navy700),
-            title: const Text('Edit Hospital Info', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-            subtitle: const Text('Update name, license, address, and email', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-            trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
-            onTap: _showEditHospitalModal,
+          // Header title & badge
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.gavel_rounded, color: AppColors.navy700, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Hospital Rules & Settings',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.emerald50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFA7F3D0)),
+                ),
+                child: const Text(
+                  'Web Sync Active',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.emerald600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Configure global hospital branding, identity photo, and OP consultation validity limits.',
+            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 20),
+
+          // 1. HOSPITAL PHOTO / LOGO BRANDING CRUD
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: currentLogo.isNotEmpty
+                      ? Image.network(
+                          currentLogo,
+                          width: 56,
+                          height: 56,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 56, height: 56, color: AppColors.navy100,
+                            child: const Icon(Icons.local_hospital_rounded, color: AppColors.navy700, size: 28),
+                          ),
+                        )
+                      : Container(
+                          width: 56, height: 56, color: AppColors.navy100,
+                          child: const Icon(Icons.local_hospital_rounded, color: AppColors.navy700, size: 28),
+                        ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(hospName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+                      Text('Code: $hospCode', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          InkWell(
+                            onTap: () => _updateHospitalPhoto(ImageSource.gallery),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: AppColors.navy700,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.upload_rounded, size: 12, color: Colors.white),
+                                  SizedBox(width: 4),
+                                  Text('Upload Photo', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (currentLogo.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            InkWell(
+                              onTap: _removeHospitalPhoto,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade50,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: Colors.red.shade200),
+                                ),
+                                child: const Text('Remove', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red)),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // 2. OP CONSULTATION EXPIRY LIMIT RULE
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF3C7).withOpacity(0.4),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFFDE68A)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.timer_outlined, color: Color(0xFFB45309), size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      'OP Consultation Expiry Limit (Days)',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Number of days a completed OP consultation remains valid for free patient revisits across receptionist & doctor modules.',
+                  style: TextStyle(fontSize: 11, color: Color(0xFFB45309)),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _formFeeController..text = opExpiry.toString(),
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Validity Period (Days)',
+                          suffixText: 'Days',
+                          border: OutlineInputBorder(),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 3. EDITABLE DETAILS FORM
+          TextField(
+            controller: _formNameController..text = hospName,
+            decoration: const InputDecoration(labelText: 'Hospital Official Name', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _formEmailController..text = contactEmail,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'Contact Email', border: OutlineInputBorder()),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: _formPhoneController..text = contactPhone,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(labelText: 'Contact Phone', border: OutlineInputBorder()),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _formAddressController..text = address,
+            decoration: const InputDecoration(labelText: 'Detailed Street Address', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 20),
+
+          // 4. SAVE BUTTON
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.navy700,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: _isSubmitting ? null : _saveHospitalRules,
+              icon: const Icon(Icons.save_rounded, color: Colors.white, size: 18),
+              label: const Text(
+                'Save Hospital Rules & Settings',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _updateHospitalPhoto(ImageSource source) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: source, imageQuality: 85);
+    if (picked == null) return;
+
+    setState(() => _isSubmitting = true);
+    final String? uploadedUrl = await _apiService.uploadImage(File(picked.path));
+    if (uploadedUrl != null && uploadedUrl.isNotEmpty) {
+      final bool success = await _apiService.updateHospitalProfile({'logoUrl': uploadedUrl});
+      if (success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hospital photo updated! Synced to Web.'), backgroundColor: AppColors.emerald600));
+        }
+        _loadAllAdminData();
+      }
+    }
+    if (mounted) setState(() => _isSubmitting = false);
+  }
+
+  Future<void> _removeHospitalPhoto() async {
+    setState(() => _isSubmitting = true);
+    final bool success = await _apiService.updateHospitalProfile({'logoUrl': ''});
+    if (success) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hospital photo removed.'), backgroundColor: AppColors.emerald600));
+      }
+      _loadAllAdminData();
+    }
+    if (mounted) setState(() => _isSubmitting = false);
+  }
+
+  Future<void> _saveHospitalRules() async {
+    if (_formNameController.text.isEmpty) return;
+    setState(() => _isSubmitting = true);
+
+    final int expiryDays = int.tryParse(_formFeeController.text.trim()) ?? 10;
+    final bool success = await _apiService.updateHospitalProfile({
+      'name': _formNameController.text.trim(),
+      'opExpiryLimit': expiryDays,
+      'contactEmail': _formEmailController.text.trim(),
+      'contactPhone': _formPhoneController.text.trim(),
+      'address': _formAddressController.text.trim(),
+    });
+
+    if (mounted) setState(() => _isSubmitting = false);
+    if (success) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Hospital Rules & OP Expiry Limit saved! Synced to Web.'), backgroundColor: AppColors.emerald600),
+        );
+      }
+      _loadAllAdminData();
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update Hospital Rules.'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   // --- HELPER COMPONENTS FOR OVERVIEW TAB ---
@@ -2445,1442 +2729,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ),
             ],
           ),
-        );
-      },
-    );
-  }
-
-  void _showEditHospitalModal() {
-    final hosp = _hospitalProfile ?? {};
-    _formNameController.text = hosp['name']?.toString() ?? _hospitalName;
-    _formEmailController.text = hosp['contactEmail']?.toString() ?? '';
-    _formPhoneController.text = hosp['contactPhone']?.toString() ?? '';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Edit Hospital Profile', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-              const SizedBox(height: 14),
-              TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Hospital Name')),
-              const SizedBox(height: 10),
-              TextField(controller: _formEmailController, decoration: const InputDecoration(labelText: 'Contact Email')),
-              const SizedBox(height: 10),
-              TextField(controller: _formPhoneController, decoration: const InputDecoration(labelText: 'Contact Phone')),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700),
-                  onPressed: _isSubmitting
-                      ? null
-                      : () async {
-                          setState(() => _isSubmitting = true);
-                          final success = await _apiService.updateHospitalProfile({
-                            'name': _formNameController.text.trim(),
-                            'contactEmail': _formEmailController.text.trim(),
-                            'contactPhone': _formPhoneController.text.trim(),
-                          });
-                          setState(() => _isSubmitting = false);
-                          if (!ctx.mounted) return;
-                          Navigator.pop(ctx);
-                          if (success) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hospital profile updated!'), backgroundColor: AppColors.emerald600));
-                            _loadAllAdminData();
-                          }
-                        },
-                  child: const Text('Update Profile'),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // 8. ROLES SUB-VIEW
-  Widget _buildRolesSubView() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Roles & Permissions (${_roles.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.navy700,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: _showAddRoleModal,
-              icon: const Icon(Icons.add_rounded, size: 16),
-              label: const Text('Add Role', style: TextStyle(fontSize: 12)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-
-        _roles.isEmpty
-            ? Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
-                child: const Center(child: Text('No custom roles configured.', style: TextStyle(color: Color(0xFF64748B), fontSize: 12))),
-              )
-            : ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _roles.length,
-                itemBuilder: (context, index) {
-                  final r = _roles[index];
-                  final label = r['label'] ?? r['role'] ?? 'Role';
-                  final desc = r['description'] ?? 'System Access Role';
-                  final permissions = (r['permissions'] is List) ? (r['permissions'] as List) : [];
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-                        const SizedBox(height: 4),
-                        Text(desc, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                        if (permissions.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 4,
-                            children: permissions.map((p) => Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(6)),
-                              child: Text(p.toString(), style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
-                            )).toList(),
-                          ),
-                        ],
-                      ],
-                    ),
-                  );
-                },
-              ),
-      ],
-    );
-  }
-
-  // 9. ANALYTICS SUB-VIEW
-  Widget _buildAnalyticsSubView() {
-    final a = _analytics ?? {};
-    final totalPatients = a['totalPatients'] ?? 1420;
-    final totalAppts = a['totalAppointments'] ?? 890;
-    final totalRevenue = a['totalRevenue'] ?? 450000;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Hospital Performance Analytics', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-        const SizedBox(height: 14),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 1.35,
-          children: [
-            _buildKpiCard(title: 'Total Revenue', value: '₹$totalRevenue', icon: Icons.payments_rounded, iconColor: AppColors.emerald600, bgColor: AppColors.emerald50),
-            _buildKpiCard(title: 'Total Patients', value: '$totalPatients', icon: Icons.people_alt_rounded, iconColor: AppColors.navy600, bgColor: AppColors.navy50),
-            _buildKpiCard(title: 'Appointments', value: '$totalAppts', icon: Icons.calendar_month_rounded, iconColor: Colors.purple.shade700, bgColor: Colors.purple.shade50),
-            _buildKpiCard(title: 'Active Network', value: '${_branches.length} Branches', icon: Icons.location_city_rounded, iconColor: Colors.amber.shade900, bgColor: const Color(0xFFFEF3C7)),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // 10. FINANCIAL REPORTS SUB-VIEW
-  Widget _buildFinancialReportsSubView() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Hospital Financial Reports', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE2E8F0))),
-          child: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Monthly Revenue Summary', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-              SizedBox(height: 4),
-              Text('Consolidated billing across OP, IPD, Pharmacy & Diagnostics.', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-              SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Invoiced Collections', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                  Text('₹4,50,000', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.emerald600)),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // 11. ENQUIRIES SUB-VIEW
-  Widget _buildEnquiriesSubView() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Patient Public Enquiries (${_enquiries.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-        const SizedBox(height: 14),
-
-        _enquiries.isEmpty
-            ? Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
-                child: const Center(child: Text('No public web enquiries received.', style: TextStyle(color: Color(0xFF64748B), fontSize: 12))),
-              )
-            : ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _enquiries.length,
-                itemBuilder: (context, index) {
-                  final e = _enquiries[index];
-                  final pName = e['name'] ?? 'Visitor';
-                  final phone = e['phone'] ?? '';
-                  final message = e['message'] ?? e['subject'] ?? 'Enquiry details...';
-                  final status = (e['status'] ?? 'pending').toString();
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(pName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(6)),
-                              child: Text(status.toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.amber.shade900)),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(phone, style: const TextStyle(fontSize: 11, color: AppColors.navy700, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 6),
-                        Text(message, style: const TextStyle(fontSize: 12, color: Color(0xFF334155))),
-                      ],
-                    ),
-                  );
-                },
-              ),
-      ],
-    );
-  }
-
-  // 12. HOSPITAL RULES & SETTINGS SUB-VIEW (WEB PARITY)
-  Widget _buildHospitalRulesSubView() {
-    final hosp = _hospitalProfile ?? {};
-    final String currentLogo = hosp['logoUrl']?.toString() ?? '';
-    final String hospName = hosp['name']?.toString() ?? _hospitalName;
-    final String hospCode = hosp['code']?.toString() ?? 'MAIN-001';
-    final int opExpiry = hosp['opExpiryLimit'] is num ? (hosp['opExpiryLimit'] as num).toInt() : (int.tryParse(hosp['opExpiryLimit']?.toString() ?? '') ?? 10);
-    final String contactEmail = hosp['contactEmail']?.toString() ?? '';
-    final String contactPhone = hosp['contactPhone']?.toString() ?? '';
-    final String address = hosp['address']?.toString() ?? '';
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header title & badge
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.gavel_rounded, color: AppColors.navy700, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Hospital Rules & Settings',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.emerald50,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFFA7F3D0)),
-                ),
-                child: const Text(
-                  'Web Sync Active',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.emerald600),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Configure global hospital branding, identity photo, and OP consultation validity limits.',
-            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-          ),
-          const SizedBox(height: 20),
-
-          // 1. HOSPITAL PHOTO / LOGO BRANDING CRUD
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: currentLogo.isNotEmpty
-                      ? Image.network(
-                          currentLogo,
-                          width: 56,
-                          height: 56,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            width: 56, height: 56, color: AppColors.navy100,
-                            child: const Icon(Icons.local_hospital_rounded, color: AppColors.navy700, size: 28),
-                          ),
-                        )
-                      : Container(
-                          width: 56, height: 56, color: AppColors.navy100,
-                          child: const Icon(Icons.local_hospital_rounded, color: AppColors.navy700, size: 28),
-                        ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(hospName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-                      Text('Code: $hospCode', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          InkWell(
-                            onTap: () => _updateHospitalPhoto(ImageSource.gallery),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: AppColors.navy700,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Row(
-                                children: [
-                                  Icon(Icons.upload_rounded, size: 12, color: Colors.white),
-                                  SizedBox(width: 4),
-                                  Text('Upload Photo', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
-                                ],
-                              ),
-                            ),
-                          ),
-                          if (currentLogo.isNotEmpty) ...[
-                            const SizedBox(width: 8),
-                            InkWell(
-                              onTap: _removeHospitalPhoto,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.shade50,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.red.shade200),
-                                ),
-                                child: const Text('Remove', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red)),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // 2. OP CONSULTATION EXPIRY LIMIT RULE
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFEF3C7).withOpacity(0.4),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFFDE68A)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.timer_outlined, color: Color(0xFFB45309), size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      'OP Consultation Expiry Limit (Days)',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Number of days a completed OP consultation remains valid for free patient revisits across receptionist & doctor modules.',
-                  style: TextStyle(fontSize: 11, color: Color(0xFFB45309)),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _formFeeController..text = opExpiry.toString(),
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Validity Period (Days)',
-                          suffixText: 'Days',
-                          border: OutlineInputBorder(),
-                          filled: true,
-                          fillColor: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // 3. EDITABLE DETAILS FORM
-          TextField(
-            controller: _formNameController..text = hospName,
-            decoration: const InputDecoration(labelText: 'Hospital Official Name', border: OutlineInputBorder()),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _formEmailController..text = contactEmail,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Contact Email', border: OutlineInputBorder()),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _formPhoneController..text = contactPhone,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Contact Phone', border: OutlineInputBorder()),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _formAddressController..text = address,
-            decoration: const InputDecoration(labelText: 'Detailed Street Address', border: OutlineInputBorder()),
-          ),
-          const SizedBox(height: 20),
-
-          // 4. SAVE BUTTON
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.navy700,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: _isSubmitting ? null : _saveHospitalRules,
-              icon: const Icon(Icons.save_rounded, color: Colors.white, size: 18),
-              label: const Text(
-                'Save Hospital Rules & Settings',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _updateHospitalPhoto(ImageSource source) async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: source, imageQuality: 85);
-    if (picked == null) return;
-
-    setState(() => _isSubmitting = true);
-    final String? uploadedUrl = await _apiService.uploadImage(File(picked.path));
-    if (uploadedUrl != null && uploadedUrl.isNotEmpty) {
-      final bool success = await _apiService.updateHospitalProfile({'logoUrl': uploadedUrl});
-      if (success) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hospital photo updated! Synced to Web.'), backgroundColor: AppColors.emerald600));
-        }
-        _loadAllAdminData();
-      }
-    }
-    if (mounted) setState(() => _isSubmitting = false);
-  }
-
-  Future<void> _removeHospitalPhoto() async {
-    setState(() => _isSubmitting = true);
-    final bool success = await _apiService.updateHospitalProfile({'logoUrl': ''});
-    if (success) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hospital photo removed.'), backgroundColor: AppColors.emerald600));
-      }
-      _loadAllAdminData();
-    }
-    if (mounted) setState(() => _isSubmitting = false);
-  }
-
-  Future<void> _saveHospitalRules() async {
-    if (_formNameController.text.isEmpty) return;
-    setState(() => _isSubmitting = true);
-
-    final int expiryDays = int.tryParse(_formFeeController.text.trim()) ?? 10;
-    final bool success = await _apiService.updateHospitalProfile({
-      'name': _formNameController.text.trim(),
-      'opExpiryLimit': expiryDays,
-      'contactEmail': _formEmailController.text.trim(),
-      'contactPhone': _formPhoneController.text.trim(),
-      'address': _formAddressController.text.trim(),
-    });
-
-    if (mounted) setState(() => _isSubmitting = false);
-    if (success) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Hospital Rules & OP Expiry Limit saved! Synced to Web.'), backgroundColor: AppColors.emerald600),
-        );
-      }
-      _loadAllAdminData();
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update Hospital Rules.'), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
-  // --- HELPER COMPONENTS FOR OVERVIEW TAB ---
-
-  Widget _buildWelcomeBanner(ResponsiveHelper responsive) {
-    return Container(
-      padding: const EdgeInsets.all(20.0),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.navy800, AppColors.navy950],
-        ),
-        borderRadius: BorderRadius.circular(16.0),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.navy950.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.location_on_rounded, size: 12, color: AppColors.emerald400),
-                const SizedBox(width: 4),
-                Text(
-                  'ACTIVE SCOPE: ${_activeBranchLabel.toUpperCase()}',
-                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.emerald400, letterSpacing: 0.5),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Welcome, ${UserSession.userName.isNotEmpty ? UserSession.userName : "System Admin"}',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _hospitalName,
-            style: TextStyle(fontSize: 12, color: AppColors.navy100.withOpacity(0.8), fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 16),
-          Divider(color: Colors.white.withOpacity(0.1), height: 1),
-          const SizedBox(height: 12),
-          const Row(
-            children: [
-              Icon(Icons.shield_outlined, color: AppColors.emerald400, size: 16),
-              SizedBox(width: 8),
-              Text(
-                'HIPAA compliancy is active & secure.',
-                style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildKpiGrid(ResponsiveHelper responsive, int totalBeds, int occupiedBeds, int availableBeds, int occupancyRate) {
-    return GridView.count(
-      crossAxisCount: 2,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.35,
-      children: [
-        _buildKpiCard(title: 'Branch Capacity', value: '$totalBeds Beds', icon: Icons.local_hospital_rounded, iconColor: AppColors.navy600, bgColor: AppColors.navy50),
-        _buildKpiCard(title: 'Occupancy Rate', value: '$occupancyRate%', icon: Icons.hotel_rounded, iconColor: occupancyRate > 80 ? Colors.red : AppColors.emerald600, bgColor: occupancyRate > 80 ? const Color(0xFFFEE2E2) : AppColors.emerald50),
-        _buildKpiCard(title: 'Occupied Beds', value: '$occupiedBeds', icon: Icons.king_bed_rounded, iconColor: Colors.purple.shade700, bgColor: Colors.purple.shade50),
-        _buildKpiCard(title: 'Available Beds', value: '$availableBeds', icon: Icons.event_available_rounded, iconColor: AppColors.emerald600, bgColor: AppColors.emerald50),
-      ],
-    );
-  }
-
-  Widget _buildKpiCard({required String title, required String value, required IconData icon, required Color iconColor, required Color bgColor}) {
-    return Container(
-      padding: const EdgeInsets.all(12.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(title, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(8)),
-                child: Icon(icon, color: iconColor, size: 14),
-              ),
-            ],
-          ),
-          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.slate900)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSystemStatsStrip() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildStatItem('Departments', '${_departments.length}', Icons.business_rounded),
-          _buildStatItem('Doctors', '${_doctors.length}', Icons.medical_services_rounded),
-          _buildStatItem('Branches', '${_branches.length}', Icons.location_city_rounded),
-          _buildStatItem('Roles', '${_roles.length}', Icons.admin_panel_settings_rounded),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItem(String label, String value, IconData icon) {
-    return Column(
-      children: [
-        Icon(icon, size: 18, color: AppColors.navy700),
-        const SizedBox(height: 4),
-        Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.slate900)),
-        Text(label, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
-      ],
-    );
-  }
-
-  Widget _buildQuickOperationsGrid() {
-    final ops = [
-      {'title': 'Departments', 'icon': Icons.business_rounded, 'action': () => _switchTab(1, 'Departments')},
-      {'title': 'Branches', 'icon': Icons.location_city_rounded, 'action': () => _switchTab(1, 'Branches')},
-      {'title': 'Doctors', 'icon': Icons.medical_services_rounded, 'action': () => _switchTab(3, 'All Doctors')},
-      {'title': 'Nursing Staff', 'icon': Icons.person_add_rounded, 'action': () => _switchTab(3, 'Nursing Staff')},
-      {'title': 'Roles & RBAC', 'icon': Icons.admin_panel_settings_rounded, 'action': () => _switchTab(3, 'Roles & RBAC')},
-      {'title': 'Analytics', 'icon': Icons.analytics_rounded, 'action': () => _switchTab(4, 'Analytics Metrics')},
-      {'title': 'Financials', 'icon': Icons.payments_rounded, 'action': () => _switchTab(4, 'Financial Reports')},
-      {'title': 'Enquiries', 'icon': Icons.help_outline_rounded, 'action': () => _switchTab(4, 'Enquiries')},
-      {'title': 'Settings', 'icon': Icons.settings_rounded, 'action': () => _switchTab(4, 'Hospital Settings')},
-    ];
-
-    return GridView.count(
-      crossAxisCount: 3,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
-      childAspectRatio: 1.1,
-      children: ops.map((op) {
-        return InkWell(
-          onTap: op['action'] as VoidCallback,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(op['icon'] as IconData, size: 22, color: AppColors.navy700),
-                const SizedBox(height: 6),
-                Text(op['title'] as String, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.slate800), textAlign: TextAlign.center),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildBedCardItem(Map<String, dynamic> bed) {
-    final String bedCode = bed['bedCode'] ?? 'Bed';
-    final String roomNum = bed['roomNumber'] ?? '101';
-    final String wardName = bed['wardName'] ?? 'Ward';
-    final bool isOccupied = bed['isOccupied'] == true;
-    final String patientName = bed['patientName'] ?? 'Inpatient';
-    final String doctor = bed['doctor'] ?? 'Dr. Unassigned';
-    final String bp = bed['bp'] ?? '--/--';
-    final String pulse = bed['pulse'] ?? '--';
-    final String spo2 = bed['spo2'] ?? '--';
-    final String temp = bed['temp'] ?? '--';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isOccupied ? Colors.purple.shade50 : AppColors.emerald50,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  isOccupied ? Icons.king_bed_rounded : Icons.bed_outlined,
-                  size: 20,
-                  color: isOccupied ? Colors.purple.shade700 : AppColors.emerald600,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('$bedCode • Room $roomNum', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-                    Text(wardName, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.indigo.shade700)),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: isOccupied ? Colors.purple.shade50 : AppColors.emerald50,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  isOccupied ? 'OCCUPIED' : 'AVAILABLE',
-                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: isOccupied ? Colors.purple.shade700 : AppColors.emerald600),
-                ),
-              ),
-            ],
-          ),
-          if (isOccupied) ...[
-            const Padding(padding: EdgeInsets.symmetric(vertical: 8.0), child: Divider(height: 1, color: Color(0xFFF1F5F9))),
-            Text(patientName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-            const SizedBox(height: 2),
-            Text(doctor, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildMiniVital('BP', bp),
-                _buildMiniVital('Pulse', pulse),
-                _buildMiniVital('SpO2', spo2),
-                _buildMiniVital('Temp', temp),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMiniVital(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF64748B))),
-        Text(value, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-      ],
-    );
-  }
-
-  // --- MODAL DIALOGS FOR QUICK ACTIONS ---
-
-  void _showQuickManageModal() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Admin Quick Operations', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.business_rounded, color: AppColors.navy700),
-                title: const Text('Add Department', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                onTap: () { Navigator.pop(ctx); _showAddDepartmentModal(); },
-              ),
-              ListTile(
-                leading: const Icon(Icons.location_city_rounded, color: AppColors.navy700),
-                title: const Text('Add Branch', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                onTap: () { Navigator.pop(ctx); _showAddBranchModal(); },
-              ),
-              ListTile(
-                leading: const Icon(Icons.medical_services_rounded, color: AppColors.navy700),
-                title: const Text('Add Doctor', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                onTap: () { Navigator.pop(ctx); _showAddDoctorModal(); },
-              ),
-              ListTile(
-                leading: const Icon(Icons.person_add_rounded, color: AppColors.navy700),
-                title: const Text('Add Staff Member', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                onTap: () { Navigator.pop(ctx); _showAddStaffModal(); },
-              ),
-              ListTile(
-                leading: const Icon(Icons.admin_panel_settings_rounded, color: AppColors.navy700),
-                title: const Text('Create Role & Permissions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                onTap: () { Navigator.pop(ctx); _showAddRoleModal(); },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showAddDepartmentModal() {
-    _formNameController.clear();
-    _formCodeController.clear();
-    _formDescController.clear();
-    _formFeeController.text = '500';
-    _formBedsController.text = '20';
-    bool isEmergency = false;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-                top: 20, left: 20, right: 20,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2))),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text('Add Department (Web Parity)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-                    const SizedBox(height: 4),
-                    const Text('Create a clinical department with fee structures and bed capacity.', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                    const SizedBox(height: 16),
-                    TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Department Name (e.g. Cardiology)', border: OutlineInputBorder())),
-                    const SizedBox(height: 10),
-                    TextField(controller: _formCodeController, decoration: const InputDecoration(labelText: 'Dept Code (e.g. CARD)', border: OutlineInputBorder())),
-                    const SizedBox(height: 10),
-                    TextField(controller: _formDescController, decoration: const InputDecoration(labelText: 'Medical Specialty Scope', border: OutlineInputBorder())),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: _formFeeController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Consultation Fee (₹)', border: OutlineInputBorder()))),
-                        const SizedBox(width: 10),
-                        Expanded(child: TextField(controller: _formBedsController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Total Ward Beds', border: OutlineInputBorder()))),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('24/7 Emergency Department', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                      subtitle: const Text('Enable emergency triage & continuous monitoring', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
-                      value: isEmergency,
-                      activeColor: AppColors.emerald600,
-                      onChanged: (val) => setModalState(() => isEmergency = val),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                        onPressed: _isSubmitting ? null : () async {
-                          if (_formNameController.text.isEmpty) return;
-                          setState(() => _isSubmitting = true);
-                          final success = await _apiService.createDepartment({
-                            'name': _formNameController.text.trim(),
-                            'code': _formCodeController.text.trim().toUpperCase(),
-                            'specialization': _formDescController.text.trim(),
-                            'consultationFee': double.tryParse(_formFeeController.text) ?? 500,
-                            'totalBeds': int.tryParse(_formBedsController.text) ?? 20,
-                            'isEmergency': isEmergency,
-                          });
-                          setState(() => _isSubmitting = false);
-                          if (!ctx.mounted) return;
-                          Navigator.pop(ctx);
-                          if (success) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Department created successfully!'), backgroundColor: AppColors.emerald600));
-                            _loadAllAdminData();
-                          }
-                        },
-                        child: const Text('Save Department', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showAddBranchModal() {
-    _formNameController.clear();
-    _formCodeController.clear();
-    _formLocationController.clear();
-    _formStateController.clear();
-    _formAddressController.clear();
-    _formPhoneController.clear();
-    _formEmailController.clear();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2))),
-                ),
-                const SizedBox(height: 14),
-                const Text('Add Hospital Branch (Web Parity)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-                const SizedBox(height: 4),
-                const Text('Expand network facility infrastructure with location contact details.', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                const SizedBox(height: 16),
-                TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Branch Name (e.g. City Center Campus)', border: OutlineInputBorder())),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(child: TextField(controller: _formCodeController, decoration: const InputDecoration(labelText: 'Branch ID (e.g. BR-002)', border: OutlineInputBorder()))),
-                    const SizedBox(width: 10),
-                    Expanded(child: TextField(controller: _formLocationController, decoration: const InputDecoration(labelText: 'City Location', border: OutlineInputBorder()))),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                TextField(controller: _formStateController, decoration: const InputDecoration(labelText: 'State / Province / Region', border: OutlineInputBorder())),
-                const SizedBox(height: 10),
-                TextField(controller: _formAddressController, decoration: const InputDecoration(labelText: 'Street Address & Enclave', border: OutlineInputBorder())),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(child: TextField(controller: _formPhoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Contact Phone', border: OutlineInputBorder()))),
-                    const SizedBox(width: 10),
-                    Expanded(child: TextField(controller: _formEmailController, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Branch Email', border: OutlineInputBorder()))),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                    onPressed: _isSubmitting ? null : () async {
-                      if (_formNameController.text.isEmpty) return;
-                      setState(() => _isSubmitting = true);
-                      final success = await _apiService.createBranch({
-                        'name': _formNameController.text.trim(),
-                        'branchId': _formCodeController.text.trim(),
-                        'city': _formLocationController.text.trim(),
-                        'state': _formStateController.text.trim(),
-                        'address': _formAddressController.text.trim(),
-                        'phone': _formPhoneController.text.trim(),
-                        'email': _formEmailController.text.trim(),
-                      });
-                      setState(() => _isSubmitting = false);
-                      if (!ctx.mounted) return;
-                      Navigator.pop(ctx);
-                      if (success) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Branch created successfully!'), backgroundColor: AppColors.emerald600));
-                        _loadAllAdminData();
-                      }
-                    },
-                    child: const Text('Save Hospital Branch', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showAddDoctorModal() {
-    _formNameController.clear();
-    _formDescController.clear();
-    _formEmailController.clear();
-    _formPhoneController.clear();
-    _formQualController.clear();
-    _formCodeController.clear();
-    _formBioController.clear();
-
-    String selectedDeptId = _departments.isNotEmpty ? (_departments.first['_id']?.toString() ?? '') : '';
-    String gender = 'Male';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2))),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text('Add Doctor (Web Parity)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-                    const SizedBox(height: 4),
-                    const Text('Register a doctor and auto-create secure user access credentials.', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                    const SizedBox(height: 16),
-                    TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Doctor Full Name (e.g. Dr. Sarah Jenkins)', border: OutlineInputBorder())),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: gender,
-                            decoration: const InputDecoration(labelText: 'Gender', border: OutlineInputBorder()),
-                            items: const [
-                              DropdownMenuItem(value: 'Male', child: Text('Male')),
-                              DropdownMenuItem(value: 'Female', child: Text('Female')),
-                              DropdownMenuItem(value: 'Other', child: Text('Other')),
-                            ],
-                            onChanged: (val) => setModalState(() => gender = val ?? 'Male'),
-                          ),
-                        ),
-                        if (_departments.isNotEmpty) ...[
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: selectedDeptId.isNotEmpty ? selectedDeptId : null,
-                              decoration: const InputDecoration(labelText: 'Department', border: OutlineInputBorder()),
-                              items: _departments.map((d) {
-                                return DropdownMenuItem<String>(
-                                  value: d['_id']?.toString() ?? '',
-                                  child: Text(d['name']?.toString() ?? 'Dept', overflow: TextOverflow.ellipsis),
-                                );
-                              }).toList(),
-                              onChanged: (val) => setModalState(() => selectedDeptId = val ?? ''),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: _formEmailController, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email (For Login)', border: OutlineInputBorder()))),
-                        const SizedBox(width: 10),
-                        Expanded(child: TextField(controller: _formPhoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone Number', border: OutlineInputBorder()))),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: _formDescController, decoration: const InputDecoration(labelText: 'Specialization (e.g. Cardiologist)', border: OutlineInputBorder()))),
-                        const SizedBox(width: 10),
-                        Expanded(child: TextField(controller: _formQualController, decoration: const InputDecoration(labelText: 'Qualifications (e.g. MBBS, MD)', border: OutlineInputBorder()))),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(controller: _formCodeController, decoration: const InputDecoration(labelText: 'License / Reg No (Optional - Auto generated if empty)', border: OutlineInputBorder())),
-                    const SizedBox(height: 10),
-                    TextField(controller: _formBioController, maxLines: 2, decoration: const InputDecoration(labelText: 'Short Professional Bio / Notes', border: OutlineInputBorder())),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                        onPressed: _isSubmitting ? null : () async {
-                          if (_formNameController.text.isEmpty) return;
-                          setState(() => _isSubmitting = true);
-                          final success = await _apiService.createDoctor({
-                            'name': _formNameController.text.trim(),
-                            'gender': gender,
-                            'department': selectedDeptId.isNotEmpty ? selectedDeptId : null,
-                            'email': _formEmailController.text.trim(),
-                            'phone': _formPhoneController.text.trim(),
-                            'specialization': _formDescController.text.trim(),
-                            'qualification': _formQualController.text.trim(),
-                            'licenseNo': _formCodeController.text.trim(),
-                            'bio': _formBioController.text.trim(),
-                          });
-                          setState(() => _isSubmitting = false);
-                          if (!ctx.mounted) return;
-                          Navigator.pop(ctx);
-                          if (success) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Doctor registered & credentials created!'), backgroundColor: AppColors.emerald600));
-                            _loadAllAdminData();
-                          }
-                        },
-                        child: const Text('Save Doctor Profile', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showAddStaffModal() {
-    _formNameController.clear();
-    _formEmailController.clear();
-    _formPhoneController.clear();
-    _formCodeController.clear();
-    _formQualController.clear();
-
-    String staffRole = 'nurse';
-    String gender = 'Female';
-    String dutyStatus = 'on_duty';
-    String selectedDeptId = _departments.isNotEmpty ? (_departments.first['_id']?.toString() ?? '') : '';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2))),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text('Add Staff Member (Web Parity)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-                    const SizedBox(height: 4),
-                    const Text('Add nursing, administrative, or clinical support staff.', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                    const SizedBox(height: 16),
-                    TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Staff Member Full Name', border: OutlineInputBorder())),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: staffRole,
-                            decoration: const InputDecoration(labelText: 'Staff Role', border: OutlineInputBorder()),
-                            items: const [
-                              DropdownMenuItem(value: 'nurse', child: Text('Nurse')),
-                              DropdownMenuItem(value: 'receptionist', child: Text('Receptionist')),
-                              DropdownMenuItem(value: 'pharmacist', child: Text('Pharmacist')),
-                              DropdownMenuItem(value: 'accountant', child: Text('Accountant')),
-                              DropdownMenuItem(value: 'laboratory', child: Text('Lab Tech')),
-                              DropdownMenuItem(value: 'ward_boy', child: Text('Ward Assistant')),
-                              DropdownMenuItem(value: 'admin_staff', child: Text('Admin Staff')),
-                            ],
-                            onChanged: (val) => setModalState(() => staffRole = val ?? 'nurse'),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: gender,
-                            decoration: const InputDecoration(labelText: 'Gender', border: OutlineInputBorder()),
-                            items: const [
-                              DropdownMenuItem(value: 'Female', child: Text('Female')),
-                              DropdownMenuItem(value: 'Male', child: Text('Male')),
-                              DropdownMenuItem(value: 'Other', child: Text('Other')),
-                            ],
-                            onChanged: (val) => setModalState(() => gender = val ?? 'Female'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: _formEmailController, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder()))),
-                        const SizedBox(width: 10),
-                        Expanded(child: TextField(controller: _formPhoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone Number', border: OutlineInputBorder()))),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: _formQualController, decoration: const InputDecoration(labelText: 'Qualifications', border: OutlineInputBorder()))),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: dutyStatus,
-                            decoration: const InputDecoration(labelText: 'Initial Duty Status', border: OutlineInputBorder()),
-                            items: const [
-                              DropdownMenuItem(value: 'on_duty', child: Text('On Duty')),
-                              DropdownMenuItem(value: 'off_duty', child: Text('Off Duty')),
-                              DropdownMenuItem(value: 'on_leave', child: Text('On Leave')),
-                            ],
-                            onChanged: (val) => setModalState(() => dutyStatus = val ?? 'on_duty'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(controller: _formCodeController, decoration: const InputDecoration(labelText: 'Employee ID (Optional - Auto generated if empty)', border: OutlineInputBorder())),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                        onPressed: _isSubmitting ? null : () async {
-                          if (_formNameController.text.isEmpty) return;
-                          setState(() => _isSubmitting = true);
-                          final success = await _apiService.createStaff({
-                            'name': _formNameController.text.trim(),
-                            'role': staffRole,
-                            'gender': gender,
-                            'department': selectedDeptId.isNotEmpty ? selectedDeptId : null,
-                            'email': _formEmailController.text.trim(),
-                            'phone': _formPhoneController.text.trim(),
-                            'employeeId': _formCodeController.text.trim(),
-                            'qualifications': _formQualController.text.trim(),
-                            'dutyStatus': dutyStatus,
-                          });
-                          setState(() => _isSubmitting = false);
-                          if (!ctx.mounted) return;
-                          Navigator.pop(ctx);
-                          if (success) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Staff member registered successfully!'), backgroundColor: AppColors.emerald600));
-                            _loadAllAdminData();
-                          }
-                        },
-                        child: const Text('Save Staff Member', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showAddRoleModal() {
-    _formNameController.clear();
-    _formDescController.clear();
-    final Set<String> selectedPermissions = {'hospital_view', 'billing_view'};
-
-    final Map<String, String> availablePermissions = {
-      'hospital_view': 'View Hospital Network',
-      'billing_view': 'Access Billing & Invoices',
-      'patient_manage': 'Manage Patient Records',
-      'staff_manage': 'Manage Staff & Duty Roster',
-      'doctor_manage': 'Manage Doctor Profiles',
-      'inventory_manage': 'Pharmacy & Inventory Access',
-      'reports_export': 'Export Financial Analytics',
-    };
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2))),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text('Create Custom Role & RBAC (Web Parity)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-                    const SizedBox(height: 4),
-                    const Text('Define granular access permissions for hospital staff roles.', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                    const SizedBox(height: 16),
-                    TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Role Title (e.g. Pharmacy Manager)', border: OutlineInputBorder())),
-                    const SizedBox(height: 10),
-                    TextField(controller: _formDescController, decoration: const InputDecoration(labelText: 'Role Scope Description', border: OutlineInputBorder())),
-                    const SizedBox(height: 14),
-                    const Text('Granted System Permissions:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: availablePermissions.entries.map((entry) {
-                        final permKey = entry.key;
-                        final permLabel = entry.value;
-                        final isSelected = selectedPermissions.contains(permKey);
-
-                        return FilterChip(
-                          label: Text(permLabel),
-                          selected: isSelected,
-                          selectedColor: AppColors.navy700,
-                          backgroundColor: const Color(0xFFF1F5F9),
-                          labelStyle: TextStyle(
-                            fontSize: 11,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                            color: isSelected ? Colors.white : AppColors.slate800,
-                          ),
-                          onSelected: (bool selected) {
-                            setModalState(() {
-                              if (selected) {
-                                selectedPermissions.add(permKey);
-                              } else {
-                                selectedPermissions.remove(permKey);
-                              }
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 18),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                        onPressed: _isSubmitting ? null : () async {
-                          if (_formNameController.text.isEmpty) return;
-                          setState(() => _isSubmitting = true);
-                          final success = await _apiService.createRole({
-                            'label': _formNameController.text.trim(),
-                            'description': _formDescController.text.trim(),
-                            'permissions': selectedPermissions.toList(),
-                          });
-                          setState(() => _isSubmitting = false);
-                          if (!ctx.mounted) return;
-                          Navigator.pop(ctx);
-                          if (success) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Custom role created with RBAC permissions!'), backgroundColor: AppColors.emerald600));
-                            _loadAllAdminData();
-                          }
-                        },
-                        child: const Text('Save Custom Role', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
         );
       },
     );
