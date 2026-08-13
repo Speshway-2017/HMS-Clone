@@ -8,7 +8,7 @@ export interface TenantContext {
   branchId: Types.ObjectId | null; // null if hospital-wide admin view ("all") or unassigned main hospital
   isBranchScoped: boolean;
   queryFilter: {
-    hospital: Types.ObjectId;
+    hospital?: Types.ObjectId;
     branch?: Types.ObjectId | null | { $or?: any[] };
   };
 }
