@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../../../core/config/api_config.dart';
 import '../../../core/config/user_session.dart';
@@ -7,6 +8,97 @@ class AdminApiService {
   final http.Client _client;
 
   AdminApiService({http.Client? client}) : _client = client ?? http.Client();
+
+  /// Fetch user profile (GET /auth/me) to sync profile photo and details from Web/Backend
+  Future<Map<String, dynamic>?> fetchUserProfile() async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/auth/me');
+    try {
+      final response = await _client.get(url, headers: UserSession.headers).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final user = decoded['data']?['user'] as Map<String, dynamic>?;
+        if (user != null) {
+          final avatar = user['avatarUrl']?.toString();
+          if (avatar != null && avatar.isNotEmpty) {
+            await UserSession.setProfileImagePath(avatar);
+          }
+          return user;
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Upload profile image to backend/Cloudinary (POST /uploads)
+  Future<String?> uploadImage(File file) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/uploads');
+    try {
+      final request = http.MultipartRequest('POST', url);
+      final headers = Map<String, String>.from(UserSession.headers);
+      headers.remove('Content-Type');
+      request.headers.addAll(headers);
+      request.fields['folder'] = 'admin-avatars';
+      request.files.add(await http.MultipartFile.fromPath('file', file.path));
+
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 25));
+      final response = await http.Response.fromStream(streamedResponse);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final decoded = jsonDecode(response.body);
+        return decoded['data']?['url']?.toString();
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Update user profile in backend (PATCH /auth/profile)
+  Future<bool> updateUserProfile({String? avatarUrl, String? name, String? phone}) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/auth/profile');
+    try {
+      final Map<String, dynamic> body = {};
+      if (avatarUrl != null) body['avatarUrl'] = avatarUrl;
+      if (name != null) body['name'] = name;
+      if (phone != null) body['phone'] = phone;
+
+      final response = await _client.patch(
+        url,
+        headers: UserSession.headers,
+        body: jsonEncode(body),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        if (avatarUrl != null) {
+          await UserSession.setProfileImagePath(avatarUrl);
+        }
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Change user password (PATCH /auth/change-password)
+  Future<bool> changePassword(String newPassword, String confirmPassword) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/auth/change-password');
+    try {
+      final response = await _client.patch(
+        url,
+        headers: UserSession.headers,
+        body: jsonEncode({
+          'newPassword': newPassword,
+          'confirmPassword': confirmPassword,
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// Fetch hospital profile data (GET /hospitals/me)
   Future<Map<String, dynamic>?> fetchHospitalProfile() async {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../features/authentication/screens/splash_screen.dart';
 import '../features/authentication/screens/login_screen.dart';
 import '../features/admin/screens/admin_dashboard.dart';
+import '../features/admin/screens/admin_profile_screen.dart';
 import '../features/doctor/screens/doctor_dashboard.dart';
 import '../features/nurse/screens/nurse_dashboard.dart';
 import '../features/nurse/screens/assign_task_screen.dart';
@@ -17,6 +18,7 @@ class AppRoutes {
   static const String splash = '/';
   static const String login = '/login';
   static const String adminDashboard = '/admin/dashboard';
+  static const String adminProfile = '/admin/profile';
   static const String doctorDashboard = '/doctor/dashboard';
   static const String nurseDashboard = '/nurse/dashboard';
   static const String nurseAssignTask = '/nurse/assign-task';
@@ -58,6 +60,18 @@ class AppRoutes {
             );
           },
           transitionDuration: const Duration(milliseconds: 500),
+        );
+      case adminProfile:
+        return PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => const AdminProfileScreen(),
+          settings: settings,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: animation,
+              child: child,
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 300),
         );
       case doctorDashboard:
         return PageRouteBuilder(
