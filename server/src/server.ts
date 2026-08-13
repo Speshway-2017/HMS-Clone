@@ -136,7 +136,7 @@ async function main() {
     await migrateInvoices();
     await syncAllBranchDepartments();
     await backfillLabBranchData();
-    console.log("✓ Multi-branch department inheritance and lab branch data synced");
+    console.log("✓ System-wide multi-branch data scoping and alignment complete");
 
     // Step 5: Create HTTP server & register Express routes (app already has routes)
     httpServer = createServer(app);
