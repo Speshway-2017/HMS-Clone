@@ -192,10 +192,10 @@ export function LoginPage() {
             </div>
 
             {/* Login Card */}
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-8 shadow-xl">
-              <form onSubmit={handleSubmit} className="space-y-6 text-xs font-semibold text-slate-700">
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-8 shadow-xl transition-all duration-500 ease-out hover:shadow-2xl hover:shadow-blue-500/10 hover:border-blue-200/50 hover:-translate-y-1">
+              <form onSubmit={handleSubmit} className="space-y-4 text-xs font-semibold text-slate-700">
                 {/* Email / Phone input with AnimatedInput */}
-                <div className="pt-2">
+                <div>
                   <AnimatedInput
                     id="identifier"
                     icon={<Mail className="h-4 w-4 text-blue-500" />}
@@ -208,37 +208,30 @@ export function LoginPage() {
                 </div>
 
                 {/* Password input with AnimatedInput */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-end">
-                    <Link to="/forgot-password" className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline">
-                      Forgot Password?
-                    </Link>
-                  </div>
-                  <AnimatedInput
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    icon={<Lock className="h-4 w-4 text-blue-500" />}
-                    label="Security Password"
-                    value={password}
-                    onChange={setPassword}
-                    required
-                    autoComplete="current-password"
-                    endIcon={
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="svg-button text-slate-400 hover:text-blue-600 focus:outline-none transition-colors"
-                        title={showPassword ? "Hide Password" : "Show Password"}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    }
-                  />
-                </div>
+                <AnimatedInput
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  icon={<Lock className="h-4 w-4 text-blue-500" />}
+                  label="Security Password"
+                  value={password}
+                  onChange={setPassword}
+                  required
+                  autoComplete="current-password"
+                  endIcon={
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="svg-button text-slate-400 hover:text-blue-600 focus:outline-none transition-colors"
+                      title={showPassword ? "Hide Password" : "Show Password"}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  }
+                />
 
                 {/* Error Banner */}
                 {error && (
@@ -248,17 +241,24 @@ export function LoginPage() {
                 )}
 
                 {/* Animated Submit Button */}
-                <AnimatedSubmitButton
-                  type="submit"
-                  disabled={isSubmitting || isSuccess}
-                  isSubmitting={isSubmitting}
-                  isSuccess={isSuccess}
-                  text="Secure Sign In"
-                />
+                <div className="space-y-3 pt-1">
+                  <AnimatedSubmitButton
+                    type="submit"
+                    disabled={isSubmitting || isSuccess}
+                    isSubmitting={isSubmitting}
+                    isSuccess={isSuccess}
+                    text="Secure Sign In"
+                  />
+                  <div className="text-right">
+                    <Link to="/forgot-password" className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline">
+                      Forgot Password?
+                    </Link>
+                  </div>
+                </div>
               </form>
 
               {/* Patient Register link */}
-              <div className="mt-6 border-t border-slate-100 pt-4 text-center">
+              <div className="mt-4 border-t border-slate-100 pt-4 text-center">
                 <p className="text-xs text-slate-500 font-medium">
                   New Patient?{" "}
                   <Link to="/register" className="font-bold text-blue-600 hover:text-blue-800 hover:underline">

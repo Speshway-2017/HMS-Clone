@@ -10,7 +10,7 @@ import {
   Sparkles,
   ShieldAlert,
   ArrowLeft,
-  DollarSign,
+  IndianRupee,
   BedDouble,
   Layers,
   FileText,
@@ -274,7 +274,7 @@ export function RoomFormPage() {
   const stepsList = [
     { number: 1, label: "Step 1", title: "Room Details", icon: DoorOpen },
     { number: 2, label: "Step 2", title: "Bed Capacity", icon: BedDouble },
-    { number: 3, label: "Step 3", title: "Room Tariff", icon: DollarSign },
+    { number: 3, label: "Step 3", title: "Room Tariff", icon: IndianRupee },
     { number: 4, label: "Step 4", title: "Review & Save", icon: FileText }
   ];
 
@@ -591,7 +591,7 @@ export function RoomFormPage() {
         <Card className="p-6 space-y-6">
           <div className="border-b border-slate-100 pb-3">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-navy-700" /> Step 3 — Room Tariff Configuration
+              <IndianRupee className="h-5 w-5 text-navy-700" /> Step 3 — Room Tariff Configuration
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               Room Tariff belongs to Room (NOT Bed) and automatically applies upon patient admission.

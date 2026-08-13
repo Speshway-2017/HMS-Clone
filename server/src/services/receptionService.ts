@@ -258,8 +258,9 @@ export class ReceptionService {
   }
 
   static async getPatientDetail(filterOrId: any, patientId: string) {
-    const branchFilter = buildBranchQuery(filterOrId);
-    const patient = await Patient.findOne({ _id: patientId, ...branchFilter }).populate("assignedDoctor", "name");
+    const queryScope = buildBranchQuery(filterOrId);
+    const { targetHospital } = parseHospitalAndBranch(filterOrId);
+    const patient = await Patient.findOne({ _id: patientId, hospital: targetHospital }).populate("assignedDoctor", "name");
     if (!patient) {
       throw new AppError("Patient not found", 404);
     }
@@ -267,14 +268,14 @@ export class ReceptionService {
     // Find all patient document IDs associated with this patient (by patientId or linked user account)
     let allPatientIds: any[] = [patientId];
     if (patient.user) {
-      const relatedDocs = await Patient.find({ ...branchFilter, user: patient.user }).select("_id");
+      const relatedDocs = await Patient.find({ hospital: targetHospital, user: patient.user }).select("_id");
       if (relatedDocs.length > 0) {
         allPatientIds = relatedDocs.map(p => p._id);
       }
     }
 
     const recentAppointmentsList = await Appointment.find({
-      ...branchFilter,
+      ...queryScope,
       patient: { $in: allPatientIds },
       status: { $nin: ["cancelled", "no_show"] }
     }).sort({ date: -1, createdAt: -1 }).limit(20).populate("doctor department");
@@ -282,7 +283,7 @@ export class ReceptionService {
     const lastAppointment = recentAppointmentsList.length > 0 ? recentAppointmentsList[0] : null;
 
     const activeAdmission = await Admission.findOne({
-      ...branchFilter,
+      ...queryScope,
       patient: { $in: allPatientIds },
       status: {
         $in: [
@@ -1504,7 +1505,9 @@ export class ReceptionService {
     return admissionReq;
   }
 
-  static async admitPatient(hospitalId: Types.ObjectId, admissionData: any, userId: Types.ObjectId) {
+  static async admitPatient(filterOrId: any, admissionData: any, userId: Types.ObjectId) {
+    const { targetHospital, targetBranch } = parseHospitalAndBranch(filterOrId);
+    const hospitalId = targetHospital;
     const {
       notificationId,
       requestId,
@@ -1586,12 +1589,13 @@ export class ReceptionService {
       }
 
       // 3. Verify doctor belongs to selected department
+      let docRecord: any = null;
       if (admittingDoctor) {
-        const doc = await Doctor.findOne({ _id: admittingDoctor, hospital: hospitalId }).session(session);
-        if (!doc) {
+        docRecord = await Doctor.findOne({ _id: admittingDoctor, hospital: hospitalId }).session(session);
+        if (!docRecord) {
           throw new AppError("Selected admitting doctor not found.", 404);
         }
-        if (departmentId && doc.department && doc.department.toString() !== departmentId.toString()) {
+        if (departmentId && docRecord.department && docRecord.department.toString() !== departmentId.toString()) {
           throw new AppError("Selected doctor does not belong to the selected department.", 400);
         }
       }
@@ -1662,10 +1666,22 @@ export class ReceptionService {
       }
       const admissionNumber = `${prefix}${String(nextSerial).padStart(6, "0")}`;
 
+      let derivedBranch = targetBranch || (room as any)?.branch || null;
+      if (!derivedBranch && userId) {
+        const creatorUser = await User.findById(userId).session(session);
+        if (creatorUser && creatorUser.branch) {
+          derivedBranch = creatorUser.branch;
+        }
+      }
+      if (!derivedBranch && docRecord && docRecord.branch) {
+        derivedBranch = docRecord.branch;
+      }
+
       // Allocate Bed / Mark as Occupied
       bed.isOccupied = true;
       bed.status = "Occupied";
       bed.patient = patientId as any;
+      bed.branch = derivedBranch as any;
       await bed.save({ session });
 
       // Fetch daily tariff and nursing rate for this room/ward
@@ -1693,6 +1709,7 @@ export class ReceptionService {
       // Create admission record
       const [createdAdmission] = await Admission.create([{
         hospital: hospitalId,
+        branch: derivedBranch,
         patient: patientId,
         opVisit: opVisitId || null,
         admissionNumber,
@@ -1759,6 +1776,7 @@ export class ReceptionService {
 
         const [invoice] = await Invoice.create([{
           hospital: hospitalId,
+          branch: derivedBranch,
           patient: patientId,
           billingType: "IP",
           status: "paid",
@@ -1786,6 +1804,7 @@ export class ReceptionService {
 
         const [payment] = await Payment.create([{
           hospital: hospitalId,
+          branch: derivedBranch,
           invoice: createdInvoice._id,
           patient: patientId,
           amount: Number(advanceAmount),
@@ -1875,7 +1894,9 @@ export class ReceptionService {
       }
 
       // Create audit log
-      const docRecord = admittingDoctor ? await Doctor.findById(admittingDoctor).session(session) : null;
+      if (!docRecord && admittingDoctor) {
+        docRecord = await Doctor.findById(admittingDoctor).session(session);
+      }
       const approvalTypeStr = admissionMode === "Receptionist Initiated" ? "Doctor Verbal Order" : "Doctor Request System";
       await ReceptionRepository.createAuditLog({
         hospital: hospitalId,
@@ -1883,9 +1904,6 @@ export class ReceptionService {
         action: "IP_ADMIT",
         details: `Created By: Receptionist | Admission Mode: ${admissionMode} | Approval Type: ${approvalTypeStr} | Admitting Doctor: ${docRecord ? docRecord.name : "N/A"} | Timestamp: ${new Date().toISOString()} | Remarks: ${admissionNotes || ""}`
       });
-
-      await session.commitTransaction();
-      session.endSession();
 
       // Notify doctor of receptionist-initiated IP admission
       if (admissionMode === "Receptionist Initiated" && admittingDoctor) {
@@ -1912,9 +1930,10 @@ export class ReceptionService {
       // Retrieve patient's last OP visit for slip auto-fills
       const lastOpVisit = await OPVisit.findOne({ hospital: hospitalId, patient: patientId })
         .sort({ createdAt: -1 })
-        .populate("doctor department");
+        .populate("doctor department")
+        .session(session);
 
-      const hospital = await Hospital.findById(hospitalId);
+      const hospital = await Hospital.findById(hospitalId).session(session);
       const hospitalName = hospital ? hospital.name : "HMS General Hospital";
 
       // Construct Wrist Band and Admission Slip Details
@@ -1984,6 +2003,9 @@ export class ReceptionService {
         timestamp: new Date()
       });
 
+      await session.commitTransaction();
+      session.endSession();
+
       return {
         success: true,
         admission: createdAdmission,
@@ -1994,7 +2016,9 @@ export class ReceptionService {
       };
 
     } catch (error) {
-      await session.abortTransaction();
+      if (session.inTransaction()) {
+        await session.abortTransaction();
+      }
       session.endSession();
       throw error;
     }

@@ -10,6 +10,8 @@ interface BranchContextType {
   branches: Branch[];
   activeBranch: Branch | null;
   isLoading: boolean;
+  isAllBranches: boolean;
+  isReadOnlyView: boolean;
 }
 
 const BranchContext = createContext<BranchContextType | undefined>(undefined);
@@ -30,6 +32,9 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const branches = branchesData?.data || [];
   const activeBranch = branches.find((b) => b._id === activeBranchId) || null;
 
+  const isAllBranches = activeBranchId === "all";
+  const isReadOnlyView = isAllBranches;
+
   const setActiveBranchId = (id: string) => {
     setActiveBranchIdState(id);
     localStorage.setItem("hms_active_branch_id", id);
@@ -47,7 +52,17 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [branches, activeBranchId]);
 
   return (
-    <BranchContext.Provider value={{ activeBranchId, setActiveBranchId, branches, activeBranch, isLoading }}>
+    <BranchContext.Provider
+      value={{
+        activeBranchId,
+        setActiveBranchId,
+        branches,
+        activeBranch,
+        isLoading,
+        isAllBranches,
+        isReadOnlyView,
+      }}
+    >
       {children}
     </BranchContext.Provider>
   );
@@ -62,6 +77,8 @@ export const useBranchContext = (): BranchContextType => {
       branches: [],
       activeBranch: null,
       isLoading: false,
+      isAllBranches: true,
+      isReadOnlyView: true,
     };
   }
   return context;
