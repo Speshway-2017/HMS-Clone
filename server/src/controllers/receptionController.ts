@@ -7,7 +7,7 @@ import { ReceptionRepository } from "../repositories/receptionRepository";
 import { AppError } from "../utils/AppError";
 import { Types } from "mongoose";
 import { getDoctorDynamicStatus, getBusyDoctorIds } from "../utils/doctorStatus";
-import { buildBranchQuery } from "../utils/branchQueryHelper";
+import { buildBranchQuery, combineBranchQuery } from "../utils/branchQueryHelper";
 import { Doctor } from "../models/Doctor";
 import { Patient } from "../models/Patient";
 import { Queue } from "../models/Queue";
@@ -19,6 +19,7 @@ import { IPBillPayment } from "../models/IPBillPayment";
 import { Appointment } from "../models/Appointment";
 import { getIPBillItemsSummary } from "./ipBillController";
 import { AppointmentSlotService } from "../services/appointmentSlotService";
+
 
 
 // Validation Schemas
@@ -356,9 +357,9 @@ export const getAdmissions = catchAsync(async (req: Request, res: Response) => {
         billingType: { $in: ["LAB", "RADIOLOGY", "PHARMACY"] },
         status: { $ne: "paid" }
       });
-      
+
       const duesTotal = unpaidInvoices.reduce((sum, inv: any) => sum + (inv.totals?.patientBalance ?? inv.totals?.total ?? 0), 0);
-      
+
       (adm as any).labPharmacyDues = unpaidInvoices.map((inv: any) => ({
         _id: inv._id,
         invoiceNumber: inv.invoiceNumber,
@@ -437,7 +438,7 @@ export const exportReports = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const getAuditLogs = catchAsync(async (req: Request, res: Response) => {
-  const logs = await ReceptionRepository.getAuditLogs(req.hospitalFilter!.hospital as any);
+  const logs = await ReceptionRepository.getAuditLogs(req.hospitalFilter as any);
   res.json({ status: "success", data: { logs } });
 });
 
@@ -670,7 +671,7 @@ export const checkInAppointment = catchAsync(async (req: Request, res: Response)
 
 export const getQueueDetails = catchAsync(async (req: Request, res: Response) => {
   const hospitalFilter = buildBranchQuery(req.hospitalFilter);
-  
+
   // Update scheduled alerts & mark missed appointments
   if (req.hospitalFilter?.hospital) {
     await ReceptionService.generateScheduledAlerts(req.hospitalFilter.hospital as any);
@@ -692,13 +693,12 @@ export const getQueueDetails = catchAsync(async (req: Request, res: Response) =>
     .sort({ time: 1 });
 
   // Fetch all queue items today
-  const queueItems = await Queue.find({
-    ...hospitalFilter,
+  const queueItems = await Queue.find(combineBranchQuery(req.hospitalFilter, {
     $or: [
       { date: { $gte: startOfToday, $lte: endOfToday } },
       { createdAt: { $gte: startOfToday, $lte: endOfToday } }
     ]
-  })
+  }))
     .populate("patient", "name uhid phone age gender")
     .populate("doctor", "name specialization department")
     .populate("department", "name")
@@ -715,7 +715,7 @@ export const getQueueDetails = catchAsync(async (req: Request, res: Response) =>
   };
 
   const upcomingAppointments: any[] = [];
-  
+
   appointments.forEach((appt: any) => {
     if (appt.status === "scheduled") {
       const diff = getSlotTimeDiff(appt.time);

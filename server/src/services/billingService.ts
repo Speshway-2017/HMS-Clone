@@ -274,7 +274,7 @@ export class BillingService {
     if (status && status.trim()) {
       const st = status.toLowerCase().trim();
       if (st === "pending") {
-        combined = combined.filter(inv => inv.status === "pending");
+        combined = combined.filter(inv => inv.status === "pending" || inv.status === "partially_paid" || inv.status === "overdue");
       } else if (st === "partially_paid" || st === "partial") {
         combined = combined.filter(inv => inv.status === "partially_paid");
       } else if (st === "overdue") {

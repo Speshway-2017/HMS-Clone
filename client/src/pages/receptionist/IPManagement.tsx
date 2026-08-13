@@ -18,6 +18,7 @@ import {
   useRejectAdmissionRequest
 } from "../../features/receptionist";
 import { useDepartments } from "../../features/departments";
+import { isDoctorInDepartment } from "../../lib/doctorUtils";
 import { useStaffList } from "../../features/staff";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
@@ -1082,9 +1083,9 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                         >
                           <option value="">Select Doctor</option>
                           {doctors
-                            ?.filter((doc: any) => !manualDept || doc.department?._id === manualDept || doc.department === manualDept)
+                            ?.filter((doc: any) => isDoctorInDepartment(doc, manualDept, departments))
                             ?.map((doc: any) => (
-                              <option key={doc._id} value={doc._id}>Dr. {doc.name} ({doc.specialization})</option>
+                              <option key={doc._id} value={doc._id}>Dr. {doc.name} ({doc.specialization || "General Medicine"})</option>
                             ))}
                         </SelectField>
 

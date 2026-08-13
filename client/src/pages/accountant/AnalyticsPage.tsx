@@ -6,7 +6,7 @@ import {
   Filter, 
   FileSpreadsheet, 
   FileText,
-  DollarSign
+  IndianRupee
 } from "lucide-react";
 import { useInvoices } from "../../features/invoices";
 import { useAccountantDashboard } from "../../features/accountantDashboard";

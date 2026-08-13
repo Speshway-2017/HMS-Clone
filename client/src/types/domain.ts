@@ -244,6 +244,7 @@ export interface Appointment {
 export interface InventoryItem {
   _id: string;
   name: string;
+  strength?: string;
   sku: string;
   category: "medicines" | "equipment" | "consumables";
   description: string;

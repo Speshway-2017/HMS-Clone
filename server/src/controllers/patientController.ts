@@ -14,6 +14,7 @@ import { LabOrder } from "../models/LabOrder";
 import { RadiologyOrder } from "../models/RadiologyOrder";
 import { emitToHospital } from "../config/socket";
 import { logAudit } from "../utils/auditLogger";
+import { buildBranchQuery } from "../utils/branchQueryHelper";
 
 async function getLoggedDoctor(req: Request) {
   const doctor = await Doctor.findOne({ email: req.user!.email, isActive: { $ne: false } });
@@ -77,7 +78,7 @@ export const listPatients = catchAsync(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req, 20);
   const { status, search } = req.query as Record<string, string | undefined>;
 
-  const filter: Record<string, any> = { ...req.hospitalFilter };
+  const filter: Record<string, any> = { ...buildBranchQuery(req.hospitalFilter) };
   if (status) filter.status = status;
   if (search) filter.name = new RegExp(search, "i");
 
@@ -146,7 +147,16 @@ export const createPatient = catchAsync(async (req: Request, res: Response) => {
     }
   }
 
-  const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
+  let branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
+  if (!branchId && body.assignedDoctor) {
+    const doc = await Doctor.findById(body.assignedDoctor);
+    if (doc?.branch) branchId = doc.branch;
+  }
+  if (!branchId && req.user) {
+    const userBranch = (req.user as any).branch;
+    if (userBranch) branchId = userBranch;
+  }
+
   const patient = await Patient.create({ ...body, hospital: hospitalId, branch: branchId });
 
   if (req.hospitalFilter?.hospital) {
@@ -173,8 +183,8 @@ export const createPatient = catchAsync(async (req: Request, res: Response) => {
 
 export const getPatient = catchAsync(async (req: Request, res: Response) => {
   await checkPatientDoctorAccess(req, req.params.id);
-  const hospitalId = req.hospitalFilter?.hospital || req.user?.hospital;
-  const patient = await Patient.findOne({ _id: req.params.id, hospital: hospitalId }).populate("assignedDoctor", "name");
+  const branchQuery = buildBranchQuery(req.hospitalFilter || { hospital: req.user?.hospital });
+  const patient = await Patient.findOne({ _id: req.params.id, ...branchQuery }).populate("assignedDoctor", "name");
   if (!patient) {
     throw new AppError("Patient not found.", 404);
   }

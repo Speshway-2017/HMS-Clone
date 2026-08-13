@@ -3448,7 +3448,8 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                       </span>
                       {rep.files?.[0]?.secure_url && (
                         <a
-                          href={rep.files[0].secure_url}
+                          href={rep.files[0].secure_url.includes("res.cloudinary.com") ? rep.files[0].secure_url.replace("/upload/", "/upload/fl_attachment/") : rep.files[0].secure_url}
+                          download={rep.files[0].original_filename || "report.pdf"}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
@@ -5205,8 +5206,8 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                                 <Eye className="h-3.5 w-3.5" /> View Full Document
                               </a>
                               <a
-                                href={fileUrl}
-                                download
+                                href={fileUrl.includes("res.cloudinary.com") ? fileUrl.replace("/upload/", "/upload/fl_attachment/") : fileUrl}
+                                download={fileName || "report.pdf"}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-all"

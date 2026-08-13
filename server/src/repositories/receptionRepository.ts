@@ -12,11 +12,10 @@ import { AuditLog } from "../models/AuditLog";
 import { DbNotification } from "../models/DbNotification";
 import { Types } from "mongoose";
 import { AppointmentSlotService } from "../services/appointmentSlotService";
+import { buildBranchQuery, combineBranchQuery } from "../utils/branchQueryHelper";
 
-import { buildBranchQuery } from "../utils/branchQueryHelper";
-
-function toFilter(filterOrId: any): any {
-  return buildBranchQuery(filterOrId);
+function toFilter(filterOrId: any, additionalQuery: Record<string, any> = {}): any {
+  return combineBranchQuery(filterOrId, additionalQuery);
 }
 
 export class ReceptionRepository {
@@ -63,27 +62,26 @@ export class ReceptionRepository {
         matchConditions.push({ _id: { $in: patientIds } });
       }
 
-      return await Patient.find({
-        ...baseFilter,
+      return await Patient.find(toFilter(hospitalId, {
         $or: matchConditions
-      }).sort({ name: 1 }).limit(50);
+      })).sort({ name: 1 }).limit(50);
     }
 
     return await Patient.find(baseFilter).sort({ name: 1 }).limit(50);
   }
 
   static async listPatients(hospitalId: any, page: number, limit: number, search?: string) {
-    const baseFilter = toFilter(hospitalId);
-    const filter: any = { ...baseFilter };
+    let extraFilter: Record<string, any> = {};
     if (search && search.trim()) {
       const regex = new RegExp(search.trim(), "i");
-      filter.$or = [
+      extraFilter.$or = [
         { name: regex },
         { phone: regex },
         { uhid: regex },
         { patientCode: regex }
       ];
     }
+    const filter = toFilter(hospitalId, extraFilter);
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
       Patient.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
@@ -250,13 +248,12 @@ export class ReceptionRepository {
     const endOfDay = new Date(targetDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const queueTokens = await Queue.find({
-      ...toFilter(hospitalId),
+    const queueTokens = await Queue.find(toFilter(hospitalId, {
       $or: [
         { date: { $gte: startOfDay, $lte: endOfDay } },
         { createdAt: { $gte: startOfDay, $lte: endOfDay } }
       ]
-    })
+    }))
       .populate("patient", "name uhid phone age gender")
       .populate("doctor", "name specialization department")
       .populate("department", "name")
@@ -265,13 +262,12 @@ export class ReceptionRepository {
 
     if (queueTokens.length > 0) {
       const apptIds = queueTokens.map((q: any) => q.appointment?._id || q.appointment).filter(Boolean);
-      const appts = await Appointment.find({
-        ...toFilter(hospitalId),
+      const appts = await Appointment.find(toFilter(hospitalId, {
         $or: [
           { _id: { $in: apptIds } },
           { date: { $gte: startOfDay, $lte: endOfDay } }
         ]
-      });
+      }));
       const apptStatusMap = new Map<string, string>();
       const patientApptStatusMap = new Map<string, string>();
       appts.forEach((a: any) => {

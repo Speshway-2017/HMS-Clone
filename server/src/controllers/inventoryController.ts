@@ -9,6 +9,7 @@ import { logAudit } from "../utils/auditLogger";
 
 const inventoryItemSchema = z.object({
   name: z.string().min(1),
+  strength: z.string().optional().default(""),
   sku: z.string().min(1),
   category: z.enum(INVENTORY_CATEGORIES).optional(),
   description: z.string().optional().default(""),
@@ -125,4 +126,45 @@ export const deleteInventoryItem = catchAsync(async (req: Request, res: Response
   });
 
   res.status(204).send();
+});
+
+export const listMedicineNames = catchAsync(async (req: Request, res: Response) => {
+  const filter: Record<string, unknown> = { ...req.hospitalFilter, category: "medicines" };
+  const { search } = req.query as Record<string, string | undefined>;
+  if (search) filter.name = new RegExp(search, "i");
+
+  const names = await InventoryItem.distinct("name", filter);
+  res.json({ status: "success", data: names.sort() });
+});
+
+export const listMedicineVariants = catchAsync(async (req: Request, res: Response) => {
+  const { name } = req.query as Record<string, string | undefined>;
+  if (!name) {
+    throw new AppError("Medicine name is required.", 400);
+  }
+
+  const filter: Record<string, unknown> = {
+    ...req.hospitalFilter,
+    category: "medicines",
+    name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"),
+  };
+
+  const items = await InventoryItem.find(filter)
+    .select("name strength stockQty unitCost sku storageCondition description")
+    .sort({ strength: 1 });
+
+  res.json({
+    status: "success",
+    data: items.map((item) => {
+      const obj = item.toObject();
+      return {
+        _id: obj._id,
+        name: obj.name,
+        strength: obj.strength || "",
+        stockQty: obj.stockQty,
+        unitCost: obj.unitCost,
+        sku: obj.sku,
+      };
+    }),
+  });
 });
