@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, AlertTriangle, PackageCheck, DollarSign } from "lucide-react";
+import { Plus, AlertTriangle, PackageCheck, IndianRupee } from "lucide-react";
 import { useInventory } from "../../features/inventory";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -69,7 +69,7 @@ export function InventoryPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <KpiCard label="Critical Stock Alerts" value={data?.counts.critical ?? 0} icon={<AlertTriangle className="h-5 w-5" />} emphasis />
         <KpiCard label="Total Items" value={data?.counts.total ?? 0} icon={<PackageCheck className="h-5 w-5" />} />
-        <KpiCard label="Total Inventory Value" value={`₹${(data?.counts.totalValue ?? 0).toLocaleString()}`} icon={<DollarSign className="h-5 w-5" />} />
+        <KpiCard label="Total Inventory Value" value={`₹${(data?.counts.totalValue ?? 0).toLocaleString()}`} icon={<IndianRupee className="h-5 w-5" />} />
       </div>
 
       <Card>

@@ -9,6 +9,14 @@ import { Button } from "../../components/ui/Button";
 import { TextareaField } from "../../components/ui/Field";
 import { useCompletedReports, useEditReport, DiagnosticReport } from "../../features/laboratory";
 
+const getDownloadUrl = (url: string) => {
+  if (!url) return "";
+  if (url.includes("res.cloudinary.com")) {
+    return url.replace("/upload/", "/upload/fl_attachment/");
+  }
+  return url;
+};
+
 export function LaboratoryCompletedReports() {
   const { data: reports = [], isLoading, refetch } = useCompletedReports();
   const editReportMutation = useEditReport();
@@ -184,7 +192,8 @@ export function LaboratoryCompletedReports() {
                         </Button>
                         {r.files && r.files.length > 0 && (
                           <a
-                            href={r.files[0].secure_url}
+                            href={getDownloadUrl(r.files[0].secure_url)}
+                            download={r.files[0].original_filename || `${r.testName || "Report"}.pdf`}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center text-xs py-1 px-2 font-semibold text-emerald-700 hover:bg-emerald-50 rounded-lg border border-emerald-200 transition"
@@ -277,7 +286,8 @@ export function LaboratoryCompletedReports() {
                           <span className="font-semibold text-slate-800 text-xs">{file.original_filename}</span>
                         </div>
                         <a
-                          href={file.secure_url}
+                          href={getDownloadUrl(file.secure_url)}
+                          download={file.original_filename || "report.pdf"}
                           target="_blank"
                           rel="noreferrer"
                           className="flex items-center gap-1 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition"

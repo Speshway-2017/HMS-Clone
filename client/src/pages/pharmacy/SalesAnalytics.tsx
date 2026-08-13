@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BarChart3, TrendingUp, TrendingDown, ArrowDownRight, ArrowUpRight, DollarSign, Pill, Award, Clipboard, Download, Calendar, Upload } from "lucide-react";
+import { BarChart3, TrendingUp, TrendingDown, ArrowDownRight, ArrowUpRight, IndianRupee, Pill, Award, Clipboard, Download, Calendar, Upload } from "lucide-react";
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Card } from "../../components/ui/Card";
 import { KpiCard } from "../../components/ui/KpiCard";
@@ -196,7 +196,7 @@ export function PharmacySalesAnalytics() {
             </span>
           </div>
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50 text-green-700">
-            <DollarSign className="h-5 w-5" />
+            <IndianRupee className="h-5 w-5" />
           </div>
         </div>
 
