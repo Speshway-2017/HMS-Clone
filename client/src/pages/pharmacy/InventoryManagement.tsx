@@ -31,6 +31,7 @@ function generateAutoBatchNo(): string {
 interface Medicine {
   _id: string;
   name: string;
+  strength: string;
   category: string;
   sku: string;
   stockQty: number;
@@ -49,6 +50,7 @@ function mapBackendToMedicine(item: any): Medicine {
   return {
     _id: item._id,
     name: item.name,
+    strength: item.strength || "",
     sku: item.sku,
     category: subcategory,
     stockQty: item.stockQty,
@@ -71,6 +73,7 @@ export function PharmacyInventoryManagement() {
 
   // Form Fields
   const [name, setName] = useState("");
+  const [medStrength, setMedStrength] = useState("");
   const [category, setCategory] = useState("Analgesic");
   const [sku, setSku] = useState("");
   const [stockQty, setStockQty] = useState(0);
@@ -112,6 +115,7 @@ export function PharmacyInventoryManagement() {
     setSelectedMed(null);
     const initialCategory = "Analgesic";
     setName("");
+    setMedStrength("");
     setCategory(initialCategory);
     setSku(generateAutoSku("", initialCategory));
     setBatchNo(generateAutoBatchNo());
@@ -140,6 +144,7 @@ export function PharmacyInventoryManagement() {
   const handleOpenEdit = (med: Medicine) => {
     setSelectedMed(med);
     setName(med.name);
+    setMedStrength(med.strength || "");
     setCategory(med.category);
     setSku(med.sku);
     setStockQty(med.stockQty);
@@ -176,6 +181,7 @@ export function PharmacyInventoryManagement() {
 
     const payload = {
       name,
+      strength: medStrength,
       sku,
       category: "medicines" as const,
       description: `${category} | ${expiryDate}`,
@@ -217,9 +223,10 @@ export function PharmacyInventoryManagement() {
   }
 
   const handleExportExcel = () => {
-    const headers = ["Medicine Name", "SKU", "Category", "Batch No", "Stock Qty", "Reorder Level", "Expiry Date", "Unit Price (INR)", "Supplier"];
+    const headers = ["Medicine Name", "Strength", "SKU", "Category", "Batch No", "Stock Qty", "Reorder Level", "Expiry Date", "Unit Price (INR)", "Supplier"];
     const rows = medicines.map((m) => [
       m.name,
+      m.strength || "",
       m.sku,
       m.category,
       m.batchNo,
@@ -362,6 +369,14 @@ export function PharmacyInventoryManagement() {
               )
             },
             {
+              header: "Strength",
+              render: (r) => (
+                <span className="inline-block rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700">
+                  {r.strength || "—"}
+                </span>
+              )
+            },
+            {
               header: "Batch No",
               render: (r) => <span className="font-mono text-xs text-slate-650">{r.batchNo}</span>
             },
@@ -438,9 +453,16 @@ export function PharmacyInventoryManagement() {
             <InputField
               label="Medicine Name"
               required
-              placeholder="e.g. Paracetamol 650mg"
+              placeholder="e.g. Paracetamol"
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
+            />
+
+            <InputField
+              label="Strength / Power"
+              placeholder="e.g. 500mg, 100mg, 10ml"
+              value={medStrength}
+              onChange={(e) => setMedStrength(e.target.value)}
             />
 
             <SelectField
@@ -569,10 +591,10 @@ export function PharmacyInventoryManagement() {
         isOpen={isImportOpen}
         title="Import Medicine Inventory Excel"
         sampleFilename="Medicine_Inventory_Import_Template.csv"
-        sampleHeaders={["Medicine Name", "SKU", "Category", "Batch No", "Stock Qty", "Reorder Level", "Expiry Date", "Unit Price", "Supplier"]}
+        sampleHeaders={["Medicine Name", "Strength", "SKU", "Category", "Batch No", "Stock Qty", "Reorder Level", "Expiry Date", "Unit Price", "Supplier"]}
         sampleRows={[
-          ["Paracetamol 500mg", "ANA-PAR-101", "Analgesic", "B2026-01", 200, 20, "2027-12-31", 15.5, "PharmaCorp"],
-          ["Amoxicillin 250mg", "ANT-AMO-202", "Antibiotic", "B2026-02", 100, 15, "2027-06-30", 45.0, "MediSupply"],
+          ["Paracetamol", "500mg", "ANA-PAR-101", "Analgesic", "B2026-01", 200, 20, "2027-12-31", 15.5, "PharmaCorp"],
+          ["Amoxicillin", "250mg", "ANT-AMO-202", "Antibiotic", "B2026-02", 100, 15, "2027-06-30", 45.0, "MediSupply"],
         ]}
         onClose={() => setIsImportOpen(false)}
         onImport={handleImportMeds}

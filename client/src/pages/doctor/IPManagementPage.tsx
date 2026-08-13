@@ -11,7 +11,7 @@ import { KpiCard } from "../../components/ui/KpiCard";
 import { Modal } from "../../components/ui/Modal";
 import { InputField, TextareaField, SelectField } from "../../components/ui/Field";
 import { usePatients } from "../../features/patients";
-import { useInventory } from "../../features/inventory";
+import { useInventory, useMedicineNames, useMedicineVariants } from "../../features/inventory";
 import { useMyHospital } from "../../features/hospitals";
 import {
   useDoctorInpatients,
@@ -46,6 +46,99 @@ function formatINR(amount: number | string | undefined) {
 }
 
 const TABS = ["Admitted Patients", "Daily Notes", "Treatment Plan", "Lab Records", "Radiology", "Medical Timeline", "Discharge"];
+
+function IPMedicineStrengthSelect({
+  medicineName,
+  value,
+  onChange,
+}: {
+  medicineName: string;
+  value: string;
+  onChange: (val: string) => void;
+}) {
+  const { data: variants } = useMedicineVariants(medicineName);
+  const [isCustom, setIsCustom] = useState(false);
+
+  useEffect(() => {
+    setIsCustom(false);
+  }, [medicineName]);
+
+  const hasVariants = variants && variants.length > 0;
+
+  if (isCustom || (!hasVariants && value)) {
+    return (
+      <div>
+        <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+          Strength
+        </label>
+        <div className="flex gap-1">
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="e.g. 500mg"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100"
+          />
+          {hasVariants && (
+            <button
+              type="button"
+              onClick={() => { setIsCustom(false); onChange(""); }}
+              className="text-[9px] text-navy-700 hover:underline whitespace-nowrap font-bold"
+              title="Switch back to dropdown"
+            >
+              ↩ List
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasVariants) {
+    return (
+      <div>
+        <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+          Strength
+        </label>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="e.g. 500mg"
+          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+        Strength
+      </label>
+      <select
+        value={value}
+        onChange={(e) => {
+          if (e.target.value === "__other__") {
+            setIsCustom(true);
+            onChange("");
+          } else {
+            onChange(e.target.value);
+          }
+        }}
+        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100 cursor-pointer"
+      >
+        <option value="">— Select Strength —</option>
+        {variants.map((v) => (
+          <option key={v._id} value={v.strength}>
+            {v.strength || "N/A"} (Stock: {v.stockQty})
+          </option>
+        ))}
+        <option value="__other__">✏️ Other (Custom)</option>
+      </select>
+    </div>
+  );
+}
 
 export function IPManagementPage() {
   const queryClient = useQueryClient();
@@ -111,6 +204,8 @@ export function IPManagementPage() {
   // Medication form states (matching OP consultation rx fields)
   const { data: inventoryData } = useInventory({ category: "medicines" });
   const rawMeds = inventoryData?.data || [];
+  const { data: medicineNames } = useMedicineNames();
+  const uniqueMedNames = medicineNames || [];
 
   const [drugName, setDrugName] = useState("");
   const [strength, setStrength] = useState("");
@@ -753,21 +848,20 @@ export function IPManagementPage() {
                           />
                           <datalist id="ip-med-datalist-inline">
                             {drugName.trim().length > 0 &&
-                              rawMeds
-                                .filter((m: any) =>
-                                  m.name.toLowerCase().includes(drugName.toLowerCase())
+                              uniqueMedNames
+                                .filter((n: string) =>
+                                  n.toLowerCase().includes(drugName.toLowerCase())
                                 )
-                                .map((m: any) => (
-                                  <option key={m._id} value={m.name} />
+                                .map((n: string) => (
+                                  <option key={n} value={n} />
                                 ))}
                           </datalist>
                         </div>
                         <div>
-                          <InputField
-                            label="Strength"
+                          <IPMedicineStrengthSelect
+                            medicineName={drugName}
                             value={strength}
-                            onChange={(e) => setStrength(e.target.value)}
-                            placeholder="e.g. 500mg"
+                            onChange={(val) => setStrength(val)}
                           />
                         </div>
                         <div>

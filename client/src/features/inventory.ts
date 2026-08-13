@@ -65,3 +65,37 @@ export function useDeleteInventoryItem() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["inventory"] }),
   });
 }
+
+export function useMedicineNames(search?: string) {
+  return useQuery({
+    queryKey: ["medicine-names", search],
+    queryFn: async () => {
+      const params: Record<string, string> = {};
+      if (search) params.search = search;
+      const res = await api.get<{ status: string; data: string[] }>("/inventory/medicine-names", { params });
+      return res.data.data;
+    },
+  });
+}
+
+export interface MedicineVariant {
+  _id: string;
+  name: string;
+  strength: string;
+  stockQty: number;
+  unitCost: number;
+  sku: string;
+}
+
+export function useMedicineVariants(name: string) {
+  return useQuery({
+    queryKey: ["medicine-variants", name],
+    enabled: !!name && name.trim().length > 0,
+    queryFn: async () => {
+      const res = await api.get<{ status: string; data: MedicineVariant[] }>("/inventory/medicine-variants", {
+        params: { name },
+      });
+      return res.data.data;
+    },
+  });
+}
