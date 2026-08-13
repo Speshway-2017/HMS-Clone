@@ -70,6 +70,17 @@ export async function scopeToHospital(req: Request, _res: Response, next: NextFu
       }
     }
 
+    // STRICT MULTI-BRANCH READ-ONLY ENFORCEMENT:
+    // Block all mutation operations (POST, PUT, PATCH, DELETE) when "All Branches" view mode is selected!
+    if (req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS") {
+      const isGlobalHospitalRoute = req.originalUrl.includes("/branches") || req.originalUrl.includes("/hospitals") || req.originalUrl.includes("/auth/");
+      if (!isGlobalHospitalRoute) {
+        if (req.user.role === "hospital_admin" && (branchHeader === "all" || (tenantScope.branchId === null && !tenantScope.isBranchScoped))) {
+          throw new AppError("Action forbidden in 'All Branches' mode. Please select a specific branch context to add, edit, or delete records.", 403);
+        }
+      }
+    }
+
     req.tenantContext = tenantScope;
 
     // Preserve full filter object for backwards compatibility with existing controllers
