@@ -3,6 +3,7 @@ import { Schema, model, InferSchemaType, Types } from "mongoose";
 const auditLogSchema = new Schema(
   {
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", default: null },
+    branch: { type: Schema.Types.ObjectId, ref: "Branch", default: null },
     user: { type: Schema.Types.ObjectId, ref: "User", default: null },
     userEmail: { type: String, default: "" },
     userRole: { type: String, default: "system" },
@@ -33,7 +34,7 @@ auditLogSchema.pre("validate", function (next) {
   next();
 });
 
-auditLogSchema.index({ hospital: 1, timestamp: -1 });
+auditLogSchema.index({ hospital: 1, branch: 1, timestamp: -1 });
 auditLogSchema.index({ user: 1, timestamp: -1 });
 auditLogSchema.index({ action: 1 });
 

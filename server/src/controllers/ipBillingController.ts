@@ -240,10 +240,13 @@ const getIPRunningCharges = async (admission: any, hospitalId: any) => {
     postedAt: admission.admissionDate
   });
 
+  const branchFilter = admission.branch ? { branch: admission.branch } : {};
+
   // 4. Doctor Charges (Consultations/Visits/Surgery/Procedures during stay)
   const appointments = await Appointment.find({
     patient: patientId,
     hospital: hospitalId,
+    ...branchFilter,
     status: "completed",
     date: { $gte: stayStart, $lte: stayEnd }
   }).populate("doctor", "name specialization consultationFee").lean();
@@ -339,6 +342,7 @@ const getIPRunningCharges = async (admission: any, hospitalId: any) => {
   const labOrders = await LabOrder.find({
     patient: patientId,
     hospital: hospitalId,
+    ...branchFilter,
     status: "completed",
     date: { $gte: stayStart, $lte: stayEnd }
   }).lean();
@@ -375,6 +379,7 @@ const getIPRunningCharges = async (admission: any, hospitalId: any) => {
   const radiologyOrders = await RadiologyOrder.find({
     patient: patientId,
     hospital: hospitalId,
+    ...branchFilter,
     status: "completed",
     date: { $gte: stayStart, $lte: stayEnd }
   }).lean();
@@ -409,6 +414,7 @@ const getIPRunningCharges = async (admission: any, hospitalId: any) => {
   const prescriptions = await Prescription.find({
     patient: patientId,
     hospital: hospitalId,
+    ...branchFilter,
     status: { $in: ["Dispensed", "Completed"] },
     createdAt: { $gte: stayStart, $lte: stayEnd }
   }).lean();

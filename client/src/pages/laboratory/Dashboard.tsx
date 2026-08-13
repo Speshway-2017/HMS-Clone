@@ -156,23 +156,7 @@ export function LaboratoryDashboard() {
     { name: "Follow-up / Revisit", value: revisitRequests, color: "#8b5cf6" }
   ].filter(d => d.value > 0);
 
-  // 6. Reports Delivery Funnel
-  let delivered = 0;
-  let ready = 0;
-  let processing = 0;
-  let awaitingSample = 0;
-  dbRequests.forEach((r: any) => {
-    if (r.status === "completed") delivered++;
-    else if (r.status === "verified" || r.status === "report_uploaded") ready++;
-    else if (r.status === "processing" || r.status === "accepted") processing++;
-    else if (r.status === "pending") awaitingSample++;
-  });
-  const deliveryStatusData = [
-    { name: "Awaiting Sample", value: awaitingSample, color: "#6b7280" },
-    { name: "Processing", value: processing, color: "#3b82f6" },
-    { name: "Ready for Delivery", value: ready, color: "#f59e0b" },
-    { name: "Delivered & Closed", value: delivered, color: "#10b981" }
-  ].filter(d => d.value > 0);
+
 
   const COLORS = ["#1e3a8a", "#10b981", "#3b82f6", "#f59e0b", "#ec4899", "#8b5cf6"];
 
@@ -190,7 +174,7 @@ export function LaboratoryDashboard() {
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Laboratory Dashboard</h1>
-          <p className="text-sm text-slate-500">Monitor diagnostic test requests, sample collections, QC and reports delivery.</p>
+          <p className="text-sm text-slate-500">Monitor diagnostic test requests, sample collections, and quality control.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 border border-blue-200">
@@ -228,7 +212,7 @@ export function LaboratoryDashboard() {
           label="Completed Reports" 
           value={stats.completedReports} 
           icon={<FileText className="h-4 w-4" />} 
-          to="/laboratory/reports"
+          to="/laboratory/completed-reports"
           size="sm"
         />
         <KpiCard 
@@ -250,7 +234,7 @@ export function LaboratoryDashboard() {
               <h3 className="text-base font-semibold text-slate-800">Weekly Test Priority & Growth</h3>
               <p className="text-xs text-slate-500">Live monitoring of Routine (bar), Urgent (line), and emergency STAT (line) requests.</p>
             </div>
-            <Link to="/laboratory/reports" className="text-xs font-semibold text-navy-700 hover:text-navy-800 flex items-center gap-1">
+            <Link to="/laboratory/completed-reports" className="text-xs font-semibold text-navy-700 hover:text-navy-800 flex items-center gap-1">
               View Reports <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
@@ -482,7 +466,7 @@ export function LaboratoryDashboard() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Revisits vs New Requests */}
-        <Card>
+        <Card className="lg:col-span-2">
           <h3 className="mb-4 text-base font-semibold text-slate-800">Revisits vs New Requests</h3>
           <div className="h-[250px]">
             {patientTypeData.length === 0 ? (
@@ -509,30 +493,6 @@ export function LaboratoryDashboard() {
                     formatter={(value) => <span className="text-[11px] text-slate-650 font-medium">{value}</span>}
                   />
                 </PieChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </Card>
-
-        {/* Delivery & Processing Pipeline status */}
-        <Card>
-          <h3 className="mb-4 text-base font-semibold text-slate-800">Reports Delivery Pipeline</h3>
-          <div className="h-[250px]">
-            {deliveryStatusData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-slate-400 text-xs">No active reports in delivery.</div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={deliveryStatusData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: "#64748B" }} />
-                  <YAxis tick={{ fontSize: 10, fill: "#64748B" }} />
-                  <Tooltip formatter={(v: number) => [`${v} Reports`]} />
-                  <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={28}>
-                    {deliveryStatusData.map((entry, idx) => (
-                      <Cell key={`cell-${idx}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
               </ResponsiveContainer>
             )}
           </div>
