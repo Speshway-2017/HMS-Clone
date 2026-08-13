@@ -172,7 +172,7 @@ export const getOPHistory = catchAsync(async (req: Request, res: Response) => {
 export const bookAppointment = catchAsync(async (req: Request, res: Response) => {
   const appointmentData = appointmentBookingSchema.parse(req.body);
   const result = await ReceptionService.bookAppointment(
-    req.hospitalFilter!.hospital as any,
+    req.hospitalFilter as any,
     appointmentData,
     req.user!._id
   );
@@ -195,9 +195,8 @@ export const checkDuplicateAppointment = catchAsync(async (req: Request, res: Re
 
 export const processBillingPayment = catchAsync(async (req: Request, res: Response) => {
   const paymentData = paymentSchema.parse(req.body);
-  const hospitalId = req.hospitalFilter?.hospital || req.user?.hospital;
   
-  const invoice = await Invoice.findOne({ _id: paymentData.invoiceId, hospital: hospitalId });
+  const invoice = await Invoice.findOne({ _id: paymentData.invoiceId, ...buildBranchQuery(req.hospitalFilter) });
   if (!invoice) {
     throw new AppError("Invoice not found.", 404);
   }
@@ -240,7 +239,7 @@ export const simulateDoctorComplete = catchAsync(async (req: Request, res: Respo
     ward: req.body.ward || "General",
     roomType: req.body.roomType || "General"
   };
-  const result = await ReceptionService.simulateDoctorComplete(req.hospitalFilter!.hospital as any, data, req.user!._id);
+  const result = await ReceptionService.simulateDoctorComplete(req.hospitalFilter as any, data, req.user!._id);
   res.json({ status: "success", data: result });
 });
 
@@ -267,7 +266,7 @@ export const rejectAdmissionRequest = catchAsync(async (req: Request, res: Respo
     throw new AppError("Forbidden: You do not have permission to perform this action.", 403);
   }
   const result = await ReceptionService.rejectAdmissionRequest(
-    req.hospitalFilter!.hospital as any,
+    req.hospitalFilter as any,
     req.params.id,
     req.user!._id
   );
@@ -286,7 +285,7 @@ export const transferPatient = catchAsync(async (req: Request, res: Response) =>
   }).parse(req.body);
 
   const admission = await ReceptionService.transferPatient(
-    req.hospitalFilter!.hospital as any,
+    req.hospitalFilter as any,
     transferData,
     req.user!._id
   );

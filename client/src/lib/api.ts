@@ -93,14 +93,21 @@ api.interceptors.response.use(
   }
 );
 
-export interface ApiErrorResponse {
-  status: "error" | "fail";
-  message: string;
-}
-
 export function getApiErrorMessage(error: unknown): string {
-  if (axios.isAxiosError<ApiErrorResponse>(error)) {
-    return error.response?.data?.message ?? "Something went wrong. Please try again.";
+  if (axios.isAxiosError(error) && error.response?.data) {
+    const data: any = error.response.data;
+    if (typeof data.message === "string" && data.message.trim()) {
+      return data.message;
+    }
+    if (typeof data.error === "string" && data.error.trim()) {
+      return data.error;
+    }
+    if (typeof data.detail === "string" && data.detail.trim()) {
+      return data.detail;
+    }
+  }
+  if (error instanceof Error && error.message) {
+    return error.message;
   }
   return "Something went wrong. Please try again.";
 }

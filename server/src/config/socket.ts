@@ -27,9 +27,12 @@ export function initSocket(server: HTTPServer, _clientUrl: string) {
         const decoded = jwt.verify(token, env.jwtSecret) as any;
         socket.data.user = decoded;
 
-        // Auto join user hospital room if present in token payload
+        // Auto join user hospital & branch room if present in token payload
         if (decoded.hospitalId) {
           socket.join(decoded.hospitalId.toString());
+          if (decoded.branchId) {
+            socket.join(`hospital:${decoded.hospitalId}:branch:${decoded.branchId}`);
+          }
         }
         if (decoded.role === "doctor" && (decoded.doctorId || decoded.userId || decoded.id)) {
           const docId = decoded.doctorId || decoded.userId || decoded.id;
@@ -38,7 +41,7 @@ export function initSocket(server: HTTPServer, _clientUrl: string) {
       }
       next();
     } catch {
-      // Allow connection even if unauthenticated (for public queues/telemedicine guest links), but mark unauth
+      // Allow connection even if unauthenticated
       next();
     }
   });
@@ -56,19 +59,26 @@ export function initSocket(server: HTTPServer, _clientUrl: string) {
       }
     });
 
-    // Allow joining a specific hospital room to avoid cross-hospital leakage
-    socket.on("join_hospital", (hospitalId: string) => {
+    // Allow joining a specific hospital & branch room
+    socket.on("join_hospital", (hospitalId: string, branchId?: string) => {
       if (hospitalId) {
         socket.join(hospitalId.toString());
-        console.log(`Socket ${socket.id} joined hospital room: ${hospitalId}`);
+        if (branchId) {
+          socket.join(`hospital:${hospitalId}:branch:${branchId}`);
+        }
       }
     });
 
-    // Allow joining a doctor-specific room to enforce notification isolation
+    socket.on("join_branch", (data: { hospitalId: string; branchId: string }) => {
+      if (data?.hospitalId && data?.branchId) {
+        socket.join(`hospital:${data.hospitalId}:branch:${data.branchId}`);
+      }
+    });
+
+    // Allow joining a doctor-specific room
     socket.on("join_doctor", (doctorId: string) => {
       if (doctorId) {
         socket.join(`doctor:${doctorId}`);
-        console.log(`Socket ${socket.id} joined doctor room: doctor:${doctorId}`);
       }
     });
 
@@ -76,7 +86,6 @@ export function initSocket(server: HTTPServer, _clientUrl: string) {
     socket.on("join_consultation_room", (roomId: string) => {
       if (roomId) {
         socket.join(`telemedicine:${roomId}`);
-        console.log(`Socket ${socket.id} joined telemedicine room: telemedicine:${roomId}`);
       }
     });
 
@@ -84,89 +93,24 @@ export function initSocket(server: HTTPServer, _clientUrl: string) {
       if (data?.roomId) {
         io?.to(`telemedicine:${data.roomId}`).emit("telemedicine_session_started", data);
         io?.to(`telemedicine:${data.roomId}`).emit("google_meet_session_started", data);
-        io?.emit("telemedicine_session_started", data);
-        io?.emit("google_meet_session_started", data);
       }
     });
 
     socket.on("start_google_meet_session", (data: { roomId: string; appointmentId: string; doctorName: string; meetUrl: string }) => {
       if (data?.roomId) {
         io?.to(`telemedicine:${data.roomId}`).emit("google_meet_session_started", data);
-        io?.emit("google_meet_session_started", data);
-        io?.emit("start_google_meet_session", data);
-        io?.emit("meeting:created", data);
-        io?.emit("appointment_updated", { appointmentId: data.appointmentId || data.roomId, meetingLink: data.meetUrl });
       }
     });
 
     socket.on("end_telemedicine_session", (data: { roomId: string; appointmentId: string }) => {
       if (data?.roomId) {
         io?.to(`telemedicine:${data.roomId}`).emit("telemedicine_session_ended", data);
-        io?.emit("telemedicine_session_ended", data);
-        io?.emit("appointment_updated", { appointmentId: data.appointmentId || data.roomId, status: "completed" });
       }
     });
 
     socket.on("send_telemedicine_chat", (data: { roomId: string; sender: string; text: string; time: string }) => {
       if (data?.roomId) {
         io?.to(`telemedicine:${data.roomId}`).emit("telemedicine_chat_received", data);
-      }
-    });
-
-    // Enterprise Meeting & WebRTC Signaling Events
-    socket.on("meeting:create", (data: { roomId: string; appointmentId: string; doctorName: string; patientId?: string }) => {
-      if (data?.roomId) {
-        socket.join(`telemedicine:${data.roomId}`);
-        io?.to(`telemedicine:${data.roomId}`).emit("meeting:created", data);
-        io?.emit("telemedicine_session_started", data);
-        io?.emit("meeting:created", data);
-      }
-    });
-
-    socket.on("meeting:join", (data: { roomId: string; participantId?: string; role?: string }) => {
-      if (data?.roomId) {
-        socket.join(`telemedicine:${data.roomId}`);
-        socket.to(`telemedicine:${data.roomId}`).emit("meeting:joined", data);
-      }
-    });
-
-    socket.on("meeting:offer", (data: { roomId: string; offer: any; sender: string }) => {
-      if (data?.roomId) {
-        socket.to(`telemedicine:${data.roomId}`).emit("meeting:offer", data);
-      }
-    });
-
-    socket.on("meeting:answer", (data: { roomId: string; answer: any; sender: string }) => {
-      if (data?.roomId) {
-        socket.to(`telemedicine:${data.roomId}`).emit("meeting:answer", data);
-      }
-    });
-
-    socket.on("meeting:ice-candidate", (data: { roomId: string; candidate: any; sender: string }) => {
-      if (data?.roomId) {
-        socket.to(`telemedicine:${data.roomId}`).emit("meeting:ice-candidate", data);
-      }
-    });
-
-    socket.on("meeting:leave", (data: { roomId: string; sender: string }) => {
-      if (data?.roomId) {
-        socket.to(`telemedicine:${data.roomId}`).emit("meeting:left", data);
-      }
-    });
-
-    socket.on("meeting:end", (data: { roomId: string; appointmentId: string }) => {
-      if (data?.roomId) {
-        io?.to(`telemedicine:${data.roomId}`).emit("meeting:ended", data);
-        io?.to(`telemedicine:${data.roomId}`).emit("telemedicine_session_ended", data);
-        io?.emit("telemedicine_session_ended", data);
-      }
-    });
-
-    socket.on("consultation:update", (data: { roomId: string; status: string; appointmentId: string }) => {
-      if (data?.roomId) {
-        io?.to(`telemedicine:${data.roomId}`).emit("consultation:updated", data);
-        io?.emit("appointment_updated", data);
-        io?.emit("dashboard_update", data);
       }
     });
 
@@ -205,32 +149,22 @@ export function getIO(): Server {
 }
 
 /**
- * Emit an event to all clients in a specific hospital room
+ * Emit an event to all clients in a specific hospital and optional branch room
  */
-export function emitToHospital(hospitalId: string | object, event: string, data: any) {
+export function emitToHospital(hospitalId: string | object, event: string, data: any, branchId?: string | object | null) {
   if (io && hospitalId) {
-    const roomId = hospitalId.toString();
-    io.to(roomId).emit(event, data);
-    
-    // Broadcast generic dashboard update for reactive query invalidations
-    io.to(roomId).emit("dashboard_update", { type: event, data });
+    const hId = hospitalId.toString();
+    const bId = branchId ? branchId.toString() : null;
 
-    // Global broadcast fallback so single-tenant/all connected clients also get live updates
-    io.emit(event, data);
-    io.emit("dashboard_update", { type: event, data });
-
-    // Conformed Event Syncing:
-    if (event === "ip_bill_update") {
-      io.to(roomId).emit("ip_billing_update", data);
-      io.emit("ip_billing_update", data);
-    } else if (event === "ip_billing_update") {
-      io.to(roomId).emit("ip_bill_update", data);
-      io.emit("ip_bill_update", data);
+    if (bId) {
+      const branchRoom = `hospital:${hId}:branch:${bId}`;
+      io.to(branchRoom).emit(event, data);
+      io.to(branchRoom).emit("dashboard_update", { type: event, data });
     }
-  } else if (io) {
-    // If hospitalId missing, broadcast globally
-    io.emit(event, data);
-    io.emit("dashboard_update", { type: event, data });
+
+    // Always emit to hospital room (for admins viewing all branches)
+    io.to(hId).emit(event, data);
+    io.to(hId).emit("dashboard_update", { type: event, data });
   }
 }
 
@@ -241,9 +175,6 @@ export function emitToDoctor(doctorId: string | object, event: string, data: any
   if (io && doctorId) {
     const docIdStr = doctorId.toString();
     io.to(`doctor:${docIdStr}`).emit(event, data);
-    io.emit(event, data); // Fallback
-  } else if (io) {
-    io.emit(event, data);
   }
 }
 

@@ -3,11 +3,12 @@ import { catchAsync } from "../utils/catchAsync";
 import { AppError } from "../utils/AppError";
 import { Ward } from "../models/Ward";
 import { Room } from "../models/Room";
+import { buildBranchQuery } from "../utils/branchQueryHelper";
 
 export const listWards = catchAsync(async (req: Request, res: Response) => {
   const { search, wardType, status, page = 1, limit = 10 } = req.query;
 
-  const query: any = { ...req.hospitalFilter };
+  const query: any = buildBranchQuery(req.hospitalFilter);
 
   if (search) {
     query.$or = [

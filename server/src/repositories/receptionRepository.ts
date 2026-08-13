@@ -26,13 +26,11 @@ export class ReceptionRepository {
   }
 
   static async findPatientById(hospitalId: any, id: string) {
-    const targetHospital = typeof hospitalId === "object" ? (hospitalId.hospital || hospitalId) : hospitalId;
-    return await Patient.findOne({ _id: id, hospital: targetHospital }).populate("assignedDoctor", "name");
+    return await Patient.findOne({ _id: id, ...toFilter(hospitalId) }).populate("assignedDoctor", "name");
   }
 
   static async searchPatients(hospitalId: any, queryStr: string) {
-    const targetHospital = typeof hospitalId === "object" ? (hospitalId.hospital || hospitalId) : hospitalId;
-    const baseFilter = { hospital: targetHospital };
+    const baseFilter = toFilter(hospitalId);
     let patientIds: any[] = [];
     if (queryStr && queryStr.trim()) {
       const regex = new RegExp(queryStr.trim(), "i");
@@ -399,8 +397,8 @@ export class ReceptionRepository {
       .sort({ admissionDate: -1 });
   }
 
-  static async updateAdmissionStatus(hospitalId: Types.ObjectId, id: string, status: "admitted" | "discharged", updateData: any) {
-    return await Admission.findOneAndUpdate({ _id: id, hospital: hospitalId }, { status, ...updateData }, { new: true });
+  static async updateAdmissionStatus(hospitalId: any, id: string, status: "admitted" | "discharged", updateData: any) {
+    return await Admission.findOneAndUpdate({ _id: id, ...toFilter(hospitalId) }, { status, ...updateData }, { new: true });
   }
 
   // ── Billing & Payment Operations ──
@@ -408,20 +406,20 @@ export class ReceptionRepository {
     return await Invoice.create(data);
   }
 
-  static async findInvoiceById(hospitalId: Types.ObjectId, id: string) {
-    return await Invoice.findOne({ _id: id, hospital: hospitalId }).populate("patient", "name uhid phone age gender");
+  static async findInvoiceById(hospitalId: any, id: string) {
+    return await Invoice.findOne({ _id: id, ...toFilter(hospitalId) }).populate("patient", "name uhid phone age gender");
   }
 
-  static async updateInvoiceStatus(hospitalId: Types.ObjectId, id: string, status: string) {
-    return await Invoice.findOneAndUpdate({ _id: id, hospital: hospitalId }, { status }, { new: true });
+  static async updateInvoiceStatus(hospitalId: any, id: string, status: string) {
+    return await Invoice.findOneAndUpdate({ _id: id, ...toFilter(hospitalId) }, { status }, { new: true });
   }
 
   static async createPayment(data: any) {
     return await Payment.create(data);
   }
 
-  static async getPaymentHistory(hospitalId: Types.ObjectId) {
-    return await Payment.find({ hospital: hospitalId })
+  static async getPaymentHistory(hospitalId: any) {
+    return await Payment.find(toFilter(hospitalId))
       .populate("patient", "name uhid phone")
       .populate({
         path: "invoice",
@@ -430,8 +428,8 @@ export class ReceptionRepository {
       .sort({ paidAt: -1 });
   }
 
-  static async getPendingInvoices(hospitalId: Types.ObjectId) {
-    return await Invoice.find({ hospital: hospitalId, status: "pending" })
+  static async getPendingInvoices(hospitalId: any) {
+    return await Invoice.find({ ...toFilter(hospitalId), status: "pending" })
       .populate("patient", "name uhid phone")
       .sort({ createdAt: -1 });
   }
