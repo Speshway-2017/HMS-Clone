@@ -649,7 +649,8 @@ export function usePatientDetail(patientId: string) {
       const res = await api.get<{ data: { patient: any, currentConsultation: any, activeAdmission?: any, hasExistingAppointments?: boolean } }>(`/reception/patients/${patientId}`);
       return res.data.data;
     },
-    enabled: !!patientId
+    enabled: !!patientId && patientId !== "undefined" && patientId !== "null",
+    retry: false
   });
 }
 
