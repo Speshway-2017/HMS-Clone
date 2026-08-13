@@ -12,6 +12,7 @@ import {
 import { useDepartments } from "../../features/departments";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { generateTimeSlots, isSlotBooked, formatSlot12Hour } from "../../lib/slotUtils";
+import { isDoctorInDepartment } from "../../lib/doctorUtils";
 import { Clock } from "lucide-react";
 import { formatINR } from "../../lib/currency";
 import { Button } from "../../components/ui/Button";
@@ -381,7 +382,7 @@ export function OPManagementPage({ activeTab = "queue" }: Props) {
               >
                 <option value="">Select Doctor</option>
                 {doctors
-                  ?.filter((d: any) => !selectedDeptId || (d.department?._id === selectedDeptId || d.department === selectedDeptId))
+                  ?.filter((d: any) => isDoctorInDepartment(d, selectedDeptId, departments))
                   .map((doc: any) => (
                     <option key={doc._id} value={doc._id}>
                       {doc.name}

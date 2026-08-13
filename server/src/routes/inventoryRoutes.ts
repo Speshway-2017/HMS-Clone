@@ -7,11 +7,16 @@ import {
   getInventoryItem,
   updateInventoryItem,
   deleteInventoryItem,
+  listMedicineNames,
+  listMedicineVariants,
 } from "../controllers/inventoryController";
 
 const router = Router();
 
 router.use(protect, scopeToHospital);
+
+router.get("/medicine-names", restrictTo("hospital_admin", "pharmacist", "doctor"), listMedicineNames);
+router.get("/medicine-variants", restrictTo("hospital_admin", "pharmacist", "doctor"), listMedicineVariants);
 
 router.route("/")
   .get(restrictTo("hospital_admin", "pharmacist", "laboratory", "doctor"), listInventory)
@@ -23,3 +28,4 @@ router.route("/:id")
   .delete(restrictTo("hospital_admin", "pharmacist", "laboratory"), deleteInventoryItem);
 
 export default router;
+

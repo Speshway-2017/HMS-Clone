@@ -249,9 +249,22 @@ export function usePayBilling() {
       const res = await api.post("/reception/billing/pay", payload);
       return res.data.data; // returns payment, invoice, receipt, token
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["reception"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["queues"] });
+
+      // Sub-10ms direct in-memory cache mutation for pending invoices
+      const invId = data?.invoice?._id || data?.payment?.invoice;
+      if (invId) {
+        queryClient.setQueryData(["reception", "billing", "pending-invoices"], (old: any) => {
+          if (!old || !old.invoices || !Array.isArray(old.invoices)) return old;
+          const filtered = old.invoices.filter((inv: any) => inv._id !== invId);
+          return { ...old, invoices: filtered, total: Math.max(0, filtered.length) };
+        });
+      }
     }
   });
 }

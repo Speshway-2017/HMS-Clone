@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../../core/config/user_session.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../routes/app_routes.dart';
 import '../../../utils/responsive_helper.dart';
 import '../../nurse/services/nurse_service.dart';
-import '../widgets/admin_drawer.dart';
+import '../services/admin_api_service.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -12,194 +14,153 @@ class AdminDashboard extends StatefulWidget {
 }
 
 class _AdminDashboardState extends State<AdminDashboard> {
+  int _currentIndex = 0;
+  final List<int> _navigationHistory = [0];
+  bool _isLoading = true;
+
+  final AdminApiService _apiService = AdminApiService();
   final NurseService _nurseService = NurseService();
 
-  bool _isLoading = true;
+  // Dynamic Backend Data
+  Map<String, dynamic>? _hospitalProfile;
+  List<Map<String, dynamic>> _branches = [];
+  List<Map<String, dynamic>> _departments = [];
+  List<Map<String, dynamic>> _doctors = [];
+  List<Map<String, dynamic>> _staff = [];
+  List<Map<String, dynamic>> _roles = [];
+  Map<String, dynamic>? _analytics;
+  List<Map<String, dynamic>> _enquiries = [];
   List<Map<String, dynamic>> _beds = [];
   List<Map<String, dynamic>> _wards = [];
+
+  // Filter & Search States
+  String _infraSubFilter = 'Departments';
+  String _staffSubFilter = 'All Doctors';
+  String _analyticsSubFilter = 'Analytics Metrics';
   String _selectedWardFilter = 'All Wards';
+
+  final TextEditingController _deptSearchController = TextEditingController();
+  final TextEditingController _staffSearchController = TextEditingController();
+
+  // Form Controllers for Modals
+  final TextEditingController _formNameController = TextEditingController();
+  final TextEditingController _formCodeController = TextEditingController();
+  final TextEditingController _formDescController = TextEditingController();
+  final TextEditingController _formPhoneController = TextEditingController();
+  final TextEditingController _formEmailController = TextEditingController();
+  final TextEditingController _formFeeController = TextEditingController();
+  final TextEditingController _formLocationController = TextEditingController();
+
+  bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
-    _loadAdminBedData();
+    _loadAllAdminData();
   }
 
-  Future<void> _loadAdminBedData() async {
+  Future<void> _loadAllAdminData() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Execute network requests in parallel for ultra-fast loading speed
       final results = await Future.wait([
-        _nurseService.getInpatients().catchError((_) => <dynamic>[]),
+        _apiService.fetchHospitalProfile().catchError((_) => null),
+        _apiService.fetchBranches().catchError((_) => <Map<String, dynamic>>[]),
+        _apiService.fetchDepartments().catchError((_) => <Map<String, dynamic>>[]),
+        _apiService.fetchDoctors().catchError((_) => <Map<String, dynamic>>[]),
+        _apiService.fetchStaff().catchError((_) => <Map<String, dynamic>>[]),
+        _apiService.fetchRoles().catchError((_) => <Map<String, dynamic>>[]),
+        _apiService.fetchHospitalAnalytics().catchError((_) => null),
+        _apiService.fetchEnquiries().catchError((_) => <Map<String, dynamic>>[]),
         _nurseService.getBeds().catchError((_) => <dynamic>[]),
         _nurseService.getWards().catchError((_) => <dynamic>[]),
+        _nurseService.getInpatients().catchError((_) => <dynamic>[]),
       ]);
 
-      final inpatients = results[0];
-      final bedsData = results[1];
-      final wardsData = results[2];
+      final hospProfile = results[0] as Map<String, dynamic>?;
+      final branchesData = results[1] as List<Map<String, dynamic>>;
+      final deptsData = results[2] as List<Map<String, dynamic>>;
+      final docsData = results[3] as List<Map<String, dynamic>>;
+      final staffData = results[4] as List<Map<String, dynamic>>;
+      final rolesData = results[5] as List<Map<String, dynamic>>;
+      final analyticsData = results[6] as Map<String, dynamic>?;
+      final enquiriesData = results[7] as List<Map<String, dynamic>>;
+      final bedsRaw = results[8] as List<dynamic>;
+      final wardsRaw = results[9] as List<dynamic>;
+      final inpatientsRaw = results[10] as List<dynamic>;
 
+      // Map Inpatient data for bed roster
       final List<Map<String, dynamic>> mappedPatients = [];
-      for (var adm in inpatients) {
+      for (var adm in inpatientsRaw) {
         final patient = adm['patient'];
         if (patient == null) continue;
-
         final vitalsList = adm['vitals'] as List<dynamic>? ?? [];
         final lastVital = vitalsList.isNotEmpty ? vitalsList.last : null;
-        final String bp = lastVital != null ? (lastVital['bloodPressure'] ?? '--/--') : '--/--';
-        final String pulse = lastVital != null ? (lastVital['pulseRate'] ?? '--') : '--';
-        final String spo2 = lastVital != null ? (lastVital['oxygenSaturation'] ?? '--') : '--';
-        final String temp = lastVital != null ? (lastVital['temperature'] ?? '--') : '--';
-
-        final doctorObj = adm['admittingDoctor'];
-        String doctorName = 'Dr. Unassigned';
-        if (doctorObj != null) {
-          if (doctorObj is Map) {
-            final dName = doctorObj['name'] ?? '';
-            final dSpec = doctorObj['specialization'] ?? '';
-            doctorName = dName.isNotEmpty 
-                ? (dSpec.isNotEmpty ? 'Dr. $dName ($dSpec)' : 'Dr. $dName') 
-                : 'Dr. Unassigned';
-          } else if (doctorObj is String && doctorObj.isNotEmpty) {
-            doctorName = doctorObj.startsWith('Dr.') ? doctorObj : 'Dr. $doctorObj';
-          }
-        }
-
-        final room = adm['room'];
-        final bed = adm['bed'];
-        final roomNumber = room != null ? (room['roomNumber'] ?? 'N/A') : 'N/A';
-        final bedNumber = bed != null ? (bed['bedNumber'] ?? 'N/A') : 'N/A';
-        final ward = adm['ward'] ?? 'Ward';
-
         mappedPatients.add({
           'id': patient['_id'] ?? '',
-          'admissionId': adm['_id'] ?? '',
-          'name': patient['name'] ?? 'Unknown',
+          'name': patient['name'] ?? 'Unknown Patient',
           'uhid': patient['uhid'] ?? '',
-          'room': '$ward • Room $roomNumber • Bed $bedNumber',
-          'doctor': doctorName,
-          'bp': bp,
-          'pulse': pulse.contains('bpm') || pulse == '--' ? pulse : '$pulse bpm',
-          'spo2': spo2.contains('%') || spo2 == '--' ? spo2 : '$spo2%',
-          'temp': temp.contains('°F') || temp == '--' ? temp : '$temp °F',
+          'doctor': (adm['admittingDoctor']?['name'] != null)
+              ? 'Dr. ${adm['admittingDoctor']['name']}'
+              : 'Dr. Attending',
+          'bp': lastVital != null ? (lastVital['bloodPressure'] ?? '--/--') : '--/--',
+          'pulse': lastVital != null ? (lastVital['pulseRate'] ?? '--') : '--',
+          'spo2': lastVital != null ? (lastVital['oxygenSaturation'] ?? '--') : '--',
+          'temp': lastVital != null ? (lastVital['temperature'] ?? '--') : '--',
         });
       }
 
+      // Map Beds
       final List<Map<String, dynamic>> mappedBeds = [];
-      for (var b in bedsData) {
-        final bedId = b['_id']?.toString() ?? '';
+      for (var b in bedsRaw) {
         final bedCode = b['bedCode'] ?? b['bedNumber'] ?? 'Bed';
         final rawStatus = b['status']?.toString() ?? 'Available';
         final bool isOccupied = b['isOccupied'] == true || rawStatus.toLowerCase() == 'occupied';
-
         final wardObj = b['ward'];
-        String wardName = 'General Ward A';
-        if (wardObj is Map) {
-          wardName = wardObj['name'] ?? 'General Ward A';
-        } else if (wardObj is String && wardObj.isNotEmpty) {
-          wardName = wardObj;
-        }
-
+        final wardName = wardObj is Map ? (wardObj['name'] ?? 'General Ward A') : (wardObj?.toString() ?? 'General Ward A');
         final roomObj = b['room'];
-        String roomNum = '101';
-        if (roomObj is Map) {
-          roomNum = roomObj['roomNumber']?.toString() ?? '101';
-        } else if (roomObj is String && roomObj.isNotEmpty) {
-          roomNum = roomObj;
-        }
+        final roomNum = roomObj is Map ? (roomObj['roomNumber']?.toString() ?? '101') : (roomObj?.toString() ?? '101');
 
-        Map<String, dynamic>? assignedPatient;
+        Map<String, dynamic>? pAssigned;
         if (isOccupied) {
           for (var p in mappedPatients) {
-            final pRoom = p['room'].toString();
-            if (pRoom.contains(bedCode) || pRoom.contains(roomNum)) {
-              assignedPatient = p;
-              break;
-            }
+            pAssigned = p;
+            break;
           }
         }
 
         mappedBeds.add({
-          'id': bedId,
+          'id': b['_id']?.toString() ?? bedCode,
           'bedCode': bedCode,
           'wardName': wardName,
           'roomNumber': roomNum,
           'status': isOccupied ? 'Occupied' : rawStatus,
           'isOccupied': isOccupied,
-          'patientName': assignedPatient != null ? assignedPatient['name'] : (b['patient']?['name'] ?? b['patientName']),
-          'patientUhid': assignedPatient != null ? assignedPatient['uhid'] : (b['patient']?['uhid']),
-          'doctor': assignedPatient != null ? assignedPatient['doctor'] : null,
-          'bp': assignedPatient != null ? assignedPatient['bp'] : '--/--',
-          'pulse': assignedPatient != null ? assignedPatient['pulse'] : '--',
-          'spo2': assignedPatient != null ? assignedPatient['spo2'] : '--',
-          'temp': assignedPatient != null ? assignedPatient['temp'] : '--',
+          'patientName': pAssigned != null ? pAssigned['name'] : (b['patient']?['name']),
+          'patientUhid': pAssigned != null ? pAssigned['uhid'] : (b['patient']?['uhid']),
+          'doctor': pAssigned != null ? pAssigned['doctor'] : null,
+          'bp': pAssigned != null ? pAssigned['bp'] : '--/--',
+          'pulse': pAssigned != null ? pAssigned['pulse'] : '--',
+          'spo2': pAssigned != null ? pAssigned['spo2'] : '--',
+          'temp': pAssigned != null ? pAssigned['temp'] : '--',
         });
       }
 
-      if (mappedBeds.isEmpty) {
-        final List<String> defaultWards = ['General Ward A', 'ICU Care Station', 'Private Ward B'];
-        for (var wName in defaultWards) {
-          final wardPts = mappedPatients.where((p) => (p['room'] ?? '').toString().contains(wName)).toList();
-          int bIdx = 1;
-          for (var p in wardPts) {
-            mappedBeds.add({
-              'id': 'b-$wName-$bIdx',
-              'bedCode': 'Bed 0$bIdx',
-              'wardName': wName,
-              'roomNumber': p['room'].toString().contains('Room') ? p['room'].toString().split('•')[1].replaceAll('Room', '').trim() : '10$bIdx',
-              'status': 'Occupied',
-              'isOccupied': true,
-              'patientName': p['name'],
-              'patientUhid': p['uhid'] ?? 'UHID-P$bIdx',
-              'doctor': p['doctor'],
-              'bp': p['bp'],
-              'pulse': p['pulse'],
-              'spo2': p['spo2'],
-              'temp': p['temp'],
-            });
-            bIdx++;
-          }
-          for (int avail = 1; avail <= 2; avail++) {
-            mappedBeds.add({
-              'id': 'b-$wName-avail-$avail',
-              'bedCode': 'Bed 0$bIdx',
-              'wardName': wName,
-              'roomNumber': '10$bIdx',
-              'status': 'Available',
-              'isOccupied': false,
-              'patientName': null,
-              'patientUhid': null,
-              'doctor': null,
-              'bp': '--/--',
-              'pulse': '--',
-              'spo2': '--',
-              'temp': '--',
-            });
-            bIdx++;
-          }
-        }
-      }
-
+      // Map Wards
       final List<Map<String, dynamic>> mappedWards = [];
-      for (var w in wardsData) {
-        final wardName = w['name']?.toString() ?? 'Ward';
-        final wardCode = w['code']?.toString() ?? '';
-        final wardType = w['wardType']?.toString() ?? 'General';
-        final floorNumber = w['floorNumber'] ?? 1;
-
-        int occupied = mappedBeds.where((b) => (b['wardName'] ?? '').toString().toLowerCase().contains(wardName.toLowerCase()) && b['isOccupied'] == true).length;
-        int total = mappedBeds.where((b) => (b['wardName'] ?? '').toString().toLowerCase().contains(wardName.toLowerCase())).length;
+      for (var w in wardsRaw) {
+        final wName = w['name']?.toString() ?? 'Ward';
+        int occupied = mappedBeds.where((b) => (b['wardName'] ?? '').toString().toLowerCase().contains(wName.toLowerCase()) && b['isOccupied'] == true).length;
+        int total = mappedBeds.where((b) => (b['wardName'] ?? '').toString().toLowerCase().contains(wName.toLowerCase())).length;
         if (total == 0) total = occupied + 4;
 
         mappedWards.add({
-          'id': w['_id']?.toString() ?? wardName,
-          'name': wardName,
-          'code': wardCode,
-          'wardType': wardType,
-          'floorNumber': floorNumber,
+          'id': w['_id']?.toString() ?? wName,
+          'name': wName,
+          'code': w['code']?.toString() ?? 'WRD',
+          'wardType': w['wardType']?.toString() ?? 'General',
           'occupiedBeds': occupied,
           'totalBeds': total,
           'availableBeds': total - occupied,
@@ -207,44 +168,438 @@ class _AdminDashboardState extends State<AdminDashboard> {
         });
       }
 
-      if (mappedWards.isEmpty) {
-        final Set<String> uniqueWards = mappedBeds.map((b) => b['wardName'].toString()).toSet();
-        if (uniqueWards.isEmpty) uniqueWards.addAll(['General Ward A', 'ICU Care Station', 'Private Ward B']);
-        for (var wName in uniqueWards) {
-          int occupied = mappedBeds.where((b) => b['wardName'] == wName && b['isOccupied'] == true).length;
-          int total = mappedBeds.where((b) => b['wardName'] == wName).length;
-          if (total == 0) total = occupied + 4;
-          mappedWards.add({
-            'id': wName,
-            'name': wName,
-            'code': wName.length >= 3 ? wName.substring(0, 3).toUpperCase() : wName.toUpperCase(),
-            'wardType': wName.toLowerCase().contains('icu') ? 'ICU' : 'General',
-            'floorNumber': 1,
-            'occupiedBeds': occupied,
-            'totalBeds': total,
-            'availableBeds': total - occupied,
-            'occupancyRate': total > 0 ? (occupied / total * 100).round() : 0,
-          });
-        }
+      if (mounted) {
+        setState(() {
+          _hospitalProfile = hospProfile;
+          _branches = branchesData;
+          _departments = deptsData;
+          _doctors = docsData;
+          _staff = staffData;
+          _roles = rolesData;
+          _analytics = analyticsData;
+          _enquiries = enquiriesData;
+          _beds = mappedBeds;
+          _wards = mappedWards;
+          _isLoading = false;
+        });
       }
-
-      setState(() {
-        _beds = mappedBeds;
-        _wards = mappedWards;
-        _isLoading = false;
-      });
     } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _onBranchChanged(String newBranchId, String branchName) {
+    UserSession.selectedBranchId = newBranchId;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Switched view to $branchName'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: AppColors.navy700,
+      ),
+    );
+    _loadAllAdminData();
+  }
+
+  void _switchTab(int newIndex, [String? subFilter]) {
+    setState(() {
+      if (subFilter != null) {
+        if (newIndex == 1) _infraSubFilter = subFilter;
+        if (newIndex == 3) _staffSubFilter = subFilter;
+        if (newIndex == 4) _analyticsSubFilter = subFilter;
+      }
+      if (_currentIndex != newIndex) {
+        _navigationHistory.add(newIndex);
+        _currentIndex = newIndex;
+      }
+    });
+  }
+
+  void _goBack() {
+    if (_navigationHistory.length > 1) {
       setState(() {
-        _beds = [];
-        _wards = [];
-        _isLoading = false;
+        _navigationHistory.removeLast();
+        _currentIndex = _navigationHistory.last;
+      });
+    } else if (_currentIndex != 0) {
+      setState(() {
+        _currentIndex = 0;
+        _navigationHistory.clear();
+        _navigationHistory.add(0);
       });
     }
+  }
+
+  Future<void> _handleLogout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.logout_rounded, color: AppColors.errorRed),
+              SizedBox(width: 10),
+              Text(
+                'Sign Out Admin',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Are you sure you want to end your System Admin session?',
+            style: TextStyle(fontSize: 12, color: AppColors.slate600),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel', style: TextStyle(color: AppColors.slate600)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.errorRed,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Log Out', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true && mounted) {
+      await UserSession.clear();
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
+    }
+  }
+
+  String get _hospitalName {
+    return _hospitalProfile?['name']?.toString() ?? UserSession.user?['hospitalName'] ?? 'Sunrise Hospital';
   }
 
   @override
   Widget build(BuildContext context) {
     final responsive = ResponsiveHelper.of(context);
+
+    final List<Widget> pages = [
+      _buildHomeOverviewTab(responsive),
+      _buildInfrastructureTab(responsive),
+      const SizedBox.shrink(), // Index 2 is Floating Trigger
+      _buildStaffAndRolesTab(responsive),
+      _buildAnalyticsAndFinanceTab(responsive),
+    ];
+
+    final safeIndex = _currentIndex < pages.length ? _currentIndex : 0;
+
+    return PopScope(
+      canPop: _currentIndex == 0 && _navigationHistory.length <= 1,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          _goBack();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: _buildTopAppBar(),
+        body: SafeArea(
+          child: RefreshIndicator(
+            onRefresh: _loadAllAdminData,
+            color: AppColors.navy700,
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: AppColors.navy700))
+                : pages[safeIndex],
+          ),
+        ),
+        bottomNavigationBar: _buildFiveSectionBottomNavbar(),
+      ),
+    );
+  }
+
+  // --- TOP APP BAR WITH BRANCH SWITCHER IN THE MIDDLE ---
+  PreferredSizeWidget _buildTopAppBar() {
+    final currentBranchId = UserSession.selectedBranchId;
+
+    // Construct Branch Dropdown Items
+    final List<DropdownMenuItem<String>> branchDropdownItems = [
+      const DropdownMenuItem<String>(
+        value: 'all',
+        child: Row(
+          children: [
+            Icon(Icons.hub_rounded, size: 14, color: AppColors.navy700),
+            SizedBox(width: 6),
+            Text('All Branches', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+          ],
+        ),
+      ),
+      const DropdownMenuItem<String>(
+        value: 'main',
+        child: Row(
+          children: [
+            Icon(Icons.local_hospital_rounded, size: 14, color: AppColors.navy700),
+            SizedBox(width: 6),
+            Text('Main Hospital', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+          ],
+        ),
+      ),
+      ..._branches.map((b) {
+        final id = b['_id']?.toString() ?? b['branchId']?.toString() ?? '';
+        final bName = b['name']?.toString() ?? 'Branch';
+        return DropdownMenuItem<String>(
+          value: id,
+          child: Row(
+            children: [
+              const Icon(Icons.location_city_rounded, size: 14, color: AppColors.navy700),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  bName,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.slate900),
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    ];
+
+    // Determine current selected branch display text
+    String selectedBranchLabel = 'All Branches';
+    if (currentBranchId == 'main') {
+      selectedBranchLabel = 'Main Hospital';
+    } else if (currentBranchId != 'all') {
+      final match = _branches.firstWhere(
+        (b) => (b['_id']?.toString() == currentBranchId || b['branchId']?.toString() == currentBranchId),
+        orElse: () => {'name': 'Branch'},
+      );
+      selectedBranchLabel = match['name']?.toString() ?? 'Branch';
+    }
+
+    return AppBar(
+      backgroundColor: AppColors.navy700,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      automaticallyImplyLeading: false,
+      titleSpacing: 12.0,
+      title: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Left: Hospital Logo / Short Title
+          Row(
+            children: [
+              if (_currentIndex != 0) ...[
+                Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 18),
+                    tooltip: 'Back',
+                    onPressed: _goBack,
+                  ),
+                ),
+              ],
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'HMS Admin',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.3),
+                  ),
+                  Text(
+                    _hospitalName,
+                    style: TextStyle(fontSize: 10, color: AppColors.navy100.withOpacity(0.8)),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          // MIDDLE: BRANCH SWITCHER PILL DROPDOWN
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 8),
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: branchDropdownItems.any((item) => item.value == currentBranchId) ? currentBranchId : 'all',
+                  isExpanded: true,
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.navy700, size: 18),
+                  dropdownColor: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  items: branchDropdownItems,
+                  onChanged: (val) {
+                    if (val != null) {
+                      String label = 'All Branches';
+                      if (val == 'main') {
+                        label = 'Main Hospital';
+                      } else if (val != 'all') {
+                        final found = _branches.firstWhere((b) => (b['_id']?.toString() == val || b['branchId']?.toString() == val), orElse: () => {'name': 'Branch'});
+                        label = found['name']?.toString() ?? 'Branch';
+                      }
+                      _onBranchChanged(val, label);
+                    }
+                  },
+                  hint: Text(
+                    selectedBranchLabel,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.navy700),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Right: Actions (Sync & Logout)
+          Row(
+            children: [
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 19),
+                tooltip: 'Sync Database',
+                onPressed: _loadAllAdminData,
+              ),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: const Icon(Icons.logout_rounded, color: AppColors.emerald400, size: 19),
+                tooltip: 'Sign Out',
+                onPressed: _handleLogout,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- 5-SECTION BOTTOM NAVIGATION BAR ---
+  Widget _buildFiveSectionBottomNavbar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Container(
+          height: 68,
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(index: 0, icon: Icons.grid_view_rounded, label: 'Overview'),
+              _buildNavItem(index: 1, icon: Icons.business_rounded, label: 'Infra & Depts'),
+              _buildHighlightedNavItem(),
+              _buildNavItem(index: 3, icon: Icons.people_alt_rounded, label: 'Staff & Roles'),
+              _buildNavItem(index: 4, icon: Icons.bar_chart_rounded, label: 'Analytics'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem({required int index, required IconData icon, required String label}) {
+    final isSelected = _currentIndex == index;
+    return Expanded(
+      child: InkWell(
+        onTap: () => _switchTab(index),
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 22,
+              color: isSelected ? AppColors.navy700 : const Color(0xFF94A3B8),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? AppColors.navy700 : const Color(0xFF64748B),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHighlightedNavItem() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      child: InkWell(
+        onTap: _showQuickManageModal,
+        borderRadius: BorderRadius.circular(30),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.navy700, AppColors.navy950],
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.navy700.withOpacity(0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.add_rounded, color: Colors.white, size: 22),
+            ),
+            const SizedBox(height: 2),
+            const Text(
+              'Quick Manage',
+              style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.navy700),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- TAB 0: HOME OVERVIEW ---
+  Widget _buildHomeOverviewTab(ResponsiveHelper responsive) {
     final int totalBedsCount = _beds.length;
     final int occupiedBedsCount = _beds.where((b) => b['isOccupied'] == true).length;
     final int availableBedsCount = _beds.where((b) => b['isOccupied'] != true && b['status'] != 'Maintenance').length;
@@ -259,329 +614,1043 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ? _beds
         : _beds.where((b) => (b['wardName'] ?? '').toString().toLowerCase().contains(_selectedWardFilter.toLowerCase())).toList();
 
-    return Scaffold(
-      backgroundColor: AppColors.slate50,
-      appBar: AppBar(
-        backgroundColor: AppColors.navy700,
-        foregroundColor: AppColors.white,
-        title: const Text(
-          'HMS Admin Portal',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.3,
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Welcome Banner
+          _buildWelcomeBanner(responsive),
+          const SizedBox(height: 20),
+
+          // 2. Capacity KPI Cards Grid
+          const Text(
+            'Network Bed & Capacity Summary',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900),
           ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _loadAdminBedData,
+          const SizedBox(height: 10),
+          _buildKpiGrid(responsive, totalBedsCount, occupiedBedsCount, availableBedsCount, occupancyRate),
+          const SizedBox(height: 24),
+
+          // 3. Quick Stats Strip
+          _buildSystemStatsStrip(),
+          const SizedBox(height: 24),
+
+          // 4. All Modules Quick Actions Grid
+          const Text(
+            'Admin Modules & Quick Operations',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900),
           ),
+          const SizedBox(height: 12),
+          _buildQuickOperationsGrid(),
+          const SizedBox(height: 24),
+
+          // 5. Live Bed Roster Section
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Hospital Bed Roster',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.emerald50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFA7F3D0)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.check_circle_rounded, size: 12, color: AppColors.emerald600),
+                    SizedBox(width: 4),
+                    Text(
+                      'Live Sync',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.emerald600),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Ward Filters
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: wardOptions.map((wName) {
+                final isSelected = _selectedWardFilter == wName;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(wName),
+                    selected: isSelected,
+                    selectedColor: AppColors.navy700,
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    labelStyle: TextStyle(
+                      color: isSelected ? Colors.white : AppColors.slate700,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      fontSize: 11,
+                    ),
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _selectedWardFilter = wName;
+                        });
+                      }
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Beds List
+          displayedBeds.isEmpty
+              ? Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: const Center(
+                    child: Text('No registered beds matching this ward.', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: displayedBeds.length,
+                  itemBuilder: (context, index) {
+                    final bed = displayedBeds[index];
+                    return _buildBedCardItem(bed);
+                  },
+                ),
         ],
       ),
-      drawer: const AdminDrawer(activeRoute: '/admin/dashboard'),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.navy700))
-          : RefreshIndicator(
-              onRefresh: _loadAdminBedData,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.all(responsive.scaleWidth(16.0)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildWelcomeCard(responsive),
-                    SizedBox(height: responsive.scaleHeight(20.0)),
-                    Text(
-                      'Network Bed & Capacity Summary',
-                      style: TextStyle(
-                        fontSize: responsive.scaleText(15.0),
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.slate800,
-                      ),
+    );
+  }
+
+  // --- TAB 1: INFRASTRUCTURE (DEPARTMENTS, BRANCHES, WARDS/BEDS, DETAILS) ---
+  Widget _buildInfrastructureTab(ResponsiveHelper responsive) {
+    final subFilters = ['Departments', 'Branches', 'Wards & Beds', 'Hospital Details'];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Filter Chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: subFilters.map((sf) {
+                final isSelected = _infraSubFilter == sf;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(sf),
+                    selected: isSelected,
+                    selectedColor: AppColors.navy700,
+                    backgroundColor: Colors.white,
+                    side: BorderSide(color: isSelected ? AppColors.navy700 : const Color(0xFFE2E8F0)),
+                    labelStyle: TextStyle(
+                      color: isSelected ? Colors.white : AppColors.slate700,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      fontSize: 12,
                     ),
-                    const SizedBox(height: 10),
-                    _buildKpiGrid(responsive, totalBedsCount, occupiedBedsCount, availableBedsCount, occupancyRate),
-                    SizedBox(height: responsive.scaleHeight(24.0)),
-                    
-                    // Complete Bed Details Section
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    onSelected: (val) {
+                      if (val) setState(() => _infraSubFilter = sf);
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          if (_infraSubFilter == 'Departments') _buildDepartmentsSubView(),
+          if (_infraSubFilter == 'Branches') _buildBranchesSubView(),
+          if (_infraSubFilter == 'Wards & Beds') _buildWardsSubView(),
+          if (_infraSubFilter == 'Hospital Details') _buildHospitalDetailsSubView(),
+        ],
+      ),
+    );
+  }
+
+  // --- TAB 3: STAFF & ROLES (DOCTORS, STAFF, ADMINS, ROLES) ---
+  Widget _buildStaffAndRolesTab(ResponsiveHelper responsive) {
+    final subFilters = ['All Doctors', 'Nursing Staff', 'Admins', 'Roles & RBAC'];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Filter Chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: subFilters.map((sf) {
+                final isSelected = _staffSubFilter == sf;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(sf),
+                    selected: isSelected,
+                    selectedColor: AppColors.navy700,
+                    backgroundColor: Colors.white,
+                    side: BorderSide(color: isSelected ? AppColors.navy700 : const Color(0xFFE2E8F0)),
+                    labelStyle: TextStyle(
+                      color: isSelected ? Colors.white : AppColors.slate700,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                    onSelected: (val) {
+                      if (val) setState(() => _staffSubFilter = sf);
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          if (_staffSubFilter == 'All Doctors') _buildDoctorsSubView(),
+          if (_staffSubFilter == 'Nursing Staff') _buildNursingStaffSubView(),
+          if (_staffSubFilter == 'Admins') _buildAdminsSubView(),
+          if (_staffSubFilter == 'Roles & RBAC') _buildRolesSubView(),
+        ],
+      ),
+    );
+  }
+
+  // --- TAB 4: ANALYTICS & FINANCE ---
+  Widget _buildAnalyticsAndFinanceTab(ResponsiveHelper responsive) {
+    final subFilters = ['Analytics Metrics', 'Financial Reports', 'Enquiries', 'Hospital Settings'];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Filter Chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: subFilters.map((sf) {
+                final isSelected = _analyticsSubFilter == sf;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(sf),
+                    selected: isSelected,
+                    selectedColor: AppColors.navy700,
+                    backgroundColor: Colors.white,
+                    side: BorderSide(color: isSelected ? AppColors.navy700 : const Color(0xFFE2E8F0)),
+                    labelStyle: TextStyle(
+                      color: isSelected ? Colors.white : AppColors.slate700,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                    onSelected: (val) {
+                      if (val) setState(() => _analyticsSubFilter = sf);
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          if (_analyticsSubFilter == 'Analytics Metrics') _buildAnalyticsSubView(),
+          if (_analyticsSubFilter == 'Financial Reports') _buildFinancialReportsSubView(),
+          if (_analyticsSubFilter == 'Enquiries') _buildEnquiriesSubView(),
+          if (_analyticsSubFilter == 'Hospital Settings') _buildSettingsSubView(),
+        ],
+      ),
+    );
+  }
+
+  // --- SUB-VIEWS IMPLEMENTATION ---
+
+  // 1. DEPARTMENTS SUB-VIEW
+  Widget _buildDepartmentsSubView() {
+    final filtered = _departments.where((d) {
+      final name = (d['name'] ?? '').toString().toLowerCase();
+      final spec = (d['specialization'] ?? '').toString().toLowerCase();
+      final query = _deptSearchController.text.toLowerCase();
+      return name.contains(query) || spec.contains(query);
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Departments (${_departments.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.navy700,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: _showAddDepartmentModal,
+              icon: const Icon(Icons.add_rounded, size: 16),
+              label: const Text('Add Dept', style: TextStyle(fontSize: 12)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Search Input
+        TextField(
+          controller: _deptSearchController,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            hintText: 'Search department by name or specialty...',
+            prefixIcon: const Icon(Icons.search_rounded, color: AppColors.slate400, size: 18),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            fillColor: Colors.white,
+            filled: true,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        filtered.isEmpty
+            ? Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+                child: const Center(child: Text('No departments found.', style: TextStyle(color: Color(0xFF64748B), fontSize: 12))),
+              )
+            : ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: filtered.length,
+                itemBuilder: (context, index) {
+                  final dept = filtered[index];
+                  final name = dept['name'] ?? 'Department';
+                  final code = dept['code'] ?? 'DEPT';
+                  final spec = dept['specialization'] ?? 'General Specialty';
+                  final status = (dept['status'] ?? 'operational').toString();
+                  final fee = dept['consultationFee'] ?? 500;
+                  final docs = dept['doctors'] ?? 0;
+                  final beds = dept['totalBeds'] ?? 0;
+                  final isEmergency = dept['isEmergency'] == true;
+                  final isDisabled = dept['isDisabled'] == true;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Hospital Bed Details & Roster',
-                          style: TextStyle(
-                            fontSize: responsive.scaleText(15.0),
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.slate800,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(color: AppColors.navy50, borderRadius: BorderRadius.circular(6)),
+                                  child: Text(code, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: AppColors.navy700)),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: isDisabled ? const Color(0xFFFEE2E2) : AppColors.emerald50,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                isDisabled ? 'INACTIVE' : status.toUpperCase(),
+                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: isDisabled ? Colors.red : AppColors.emerald600),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(spec, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Doctors: $docs • Beds: $beds', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+                            Text('Fee: ₹$fee', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.navy700)),
+                          ],
+                        ),
+                        if (isEmergency) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(4)),
+                            child: const Text('🚨 24/7 Emergency Services Active', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red)),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
+      ],
+    );
+  }
+
+  // 2. BRANCHES SUB-VIEW
+  Widget _buildBranchesSubView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Hospital Branches (${_branches.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.navy700,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: _showAddBranchModal,
+              icon: const Icon(Icons.add_rounded, size: 16),
+              label: const Text('Add Branch', style: TextStyle(fontSize: 12)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        _branches.isEmpty
+            ? Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+                child: const Center(child: Text('No branches added yet.', style: TextStyle(color: Color(0xFF64748B), fontSize: 12))),
+              )
+            : ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _branches.length,
+                itemBuilder: (context, index) {
+                  final b = _branches[index];
+                  final name = b['name'] ?? 'Branch Name';
+                  final bId = b['branchId'] ?? 'BR-${index + 1}';
+                  final city = b['city'] ?? 'City';
+                  final state = b['state'] ?? 'State';
+                  final staffCount = b['totalStaff'] ?? 0;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(color: AppColors.navy50, borderRadius: BorderRadius.circular(10)),
+                          child: const Icon(Icons.location_city_rounded, color: AppColors.navy700, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+                              const SizedBox(height: 2),
+                              Text('$city, $state • ID: $bId', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                            ],
                           ),
                         ),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.emerald50,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFFA7F3D0)),
+                          decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
+                          child: Text('$staffCount Staff', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.slate800)),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+      ],
+    );
+  }
+
+  // 3. WARDS SUB-VIEW
+  Widget _buildWardsSubView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Wards & Capacity Overview', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+        const SizedBox(height: 14),
+
+        _wards.isEmpty
+            ? Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+                child: const Center(child: Text('No ward data available.', style: TextStyle(color: Color(0xFF64748B), fontSize: 12))),
+              )
+            : ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _wards.length,
+                itemBuilder: (context, index) {
+                  final w = _wards[index];
+                  final wName = w['name'] ?? 'Ward';
+                  final occupied = w['occupiedBeds'] ?? 0;
+                  final total = w['totalBeds'] ?? 10;
+                  final rate = w['occupancyRate'] ?? 0;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(wName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+                            Text('$occupied / $total Beds Occupied', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.navy700)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: total > 0 ? occupied / total : 0,
+                            minHeight: 6,
+                            backgroundColor: const Color(0xFFE2E8F0),
+                            color: rate > 80 ? Colors.red : AppColors.emerald500,
                           ),
-                          child: const Row(
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+      ],
+    );
+  }
+
+  // 4. HOSPITAL DETAILS SUB-VIEW
+  Widget _buildHospitalDetailsSubView() {
+    final hosp = _hospitalProfile ?? {};
+    final hName = hosp['name'] ?? _hospitalName;
+    final code = hosp['code'] ?? 'HOSP';
+    final email = hosp['contactEmail'] ?? 'contact@hospital.org';
+    final phone = hosp['contactPhone'] ?? '+91 98765 43210';
+    final capacity = hosp['bedCapacity'] ?? 100;
+    final address = hosp['address'] ?? 'Main Hospital Campus, Medical Enclave';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE2E8F0))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(hName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: AppColors.navy50, borderRadius: BorderRadius.circular(6)),
+                child: Text('CODE: $code', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.navy700)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 12),
+          _buildDetailRow(Icons.business_rounded, 'Address', address),
+          _buildDetailRow(Icons.email_outlined, 'Contact Email', email),
+          _buildDetailRow(Icons.phone_outlined, 'Contact Phone', phone),
+          _buildDetailRow(Icons.king_bed_outlined, 'Max Bed Capacity', '$capacity Total Network Beds'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: AppColors.navy700),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.slate800)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 5. DOCTORS SUB-VIEW
+  Widget _buildDoctorsSubView() {
+    final filtered = _doctors.where((d) {
+      final name = (d['name'] ?? '').toString().toLowerCase();
+      final spec = (d['specialization'] ?? '').toString().toLowerCase();
+      final query = _staffSearchController.text.toLowerCase();
+      return name.contains(query) || spec.contains(query);
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Doctors Directory (${_doctors.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.navy700,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: _showAddDoctorModal,
+              icon: const Icon(Icons.add_rounded, size: 16),
+              label: const Text('Add Doctor', style: TextStyle(fontSize: 12)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Search Input
+        TextField(
+          controller: _staffSearchController,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            hintText: 'Search doctor by name or specialty...',
+            prefixIcon: const Icon(Icons.search_rounded, color: AppColors.slate400, size: 18),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            fillColor: Colors.white,
+            filled: true,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        filtered.isEmpty
+            ? Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+                child: const Center(child: Text('No doctors registered.', style: TextStyle(color: Color(0xFF64748B), fontSize: 12))),
+              )
+            : ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: filtered.length,
+                itemBuilder: (context, index) {
+                  final doc = filtered[index];
+                  final name = doc['name'] ?? 'Doctor';
+                  final docName = name.startsWith('Dr.') ? name : 'Dr. $name';
+                  final spec = doc['specialization'] ?? 'Specialist';
+                  final qual = doc['qualification'] ?? 'MBBS, MD';
+                  final status = (doc['status'] ?? 'on_duty').toString();
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 22,
+                          backgroundColor: AppColors.navy50,
+                          child: Text(
+                            name.isNotEmpty ? name[0].toUpperCase() : 'D',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.navy700),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(Icons.check_circle_rounded, size: 12, color: AppColors.emerald600),
-                              SizedBox(width: 4),
-                              Text(
-                                'DB Live Sync',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.emerald600,
-                                ),
-                              ),
+                              Text(docName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+                              Text('$spec • $qual', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: status == 'on_duty' ? AppColors.emerald50 : const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            status.replaceAll('_', ' ').toUpperCase(),
+                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: status == 'on_duty' ? AppColors.emerald600 : Colors.amber.shade900),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+      ],
+    );
+  }
+
+  // 6. NURSING STAFF SUB-VIEW
+  Widget _buildNursingStaffSubView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Nursing & Support Staff (${_staff.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.navy700,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: _showAddStaffModal,
+              icon: const Icon(Icons.add_rounded, size: 16),
+              label: const Text('Add Staff', style: TextStyle(fontSize: 12)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        _staff.isEmpty
+            ? Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+                child: const Center(child: Text('No staff members registered.', style: TextStyle(color: Color(0xFF64748B), fontSize: 12))),
+              )
+            : ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _staff.length,
+                itemBuilder: (context, index) {
+                  final s = _staff[index];
+                  final sName = s['name'] ?? 'Staff Member';
+                  final role = s['role'] ?? 'Staff';
+                  final empId = s['employeeId'] ?? 'EMP-${index + 1}';
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor: const Color(0xFFEEF2FF),
+                          child: const Icon(Icons.person_outline_rounded, color: Color(0xFF4F46E5), size: 18),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(sName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+                              Text('$role • ID: $empId', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                             ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
-
-                    // Ward Filters
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      child: Row(
-                        children: wardOptions.map((wardName) {
-                          final isSelected = _selectedWardFilter == wardName;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: ChoiceChip(
-                              label: Text(wardName),
-                              selected: isSelected,
-                              selectedColor: AppColors.navy700,
-                              backgroundColor: const Color(0xFFF1F5F9),
-                              labelStyle: TextStyle(
-                                color: isSelected ? Colors.white : AppColors.slate700,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                                fontSize: 12,
-                              ),
-                              onSelected: (selected) {
-                                if (selected) {
-                                  setState(() {
-                                    _selectedWardFilter = wardName;
-                                  });
-                                }
-                              },
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Beds Roster Cards List
-                    displayedBeds.isEmpty
-                        ? Container(
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.slate200),
-                            ),
-                            child: const Center(
-                              child: Text(
-                                'No registered beds in this ward.',
-                                style: TextStyle(color: AppColors.slate500, fontSize: 12),
-                              ),
-                            ),
-                          )
-                        : ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: displayedBeds.length,
-                            itemBuilder: (context, index) {
-                              final bed = displayedBeds[index];
-                              final String bedCode = bed['bedCode'] ?? 'Bed';
-                              final String roomNum = bed['roomNumber'] ?? '101';
-                              final String wardName = bed['wardName'] ?? 'Ward';
-                              final bool isOccupied = bed['isOccupied'] == true;
-                              final String status = bed['status'] ?? 'Available';
-                              final String patientName = bed['patientName'] ?? 'Inpatient';
-                              final String doctor = bed['doctor'] ?? 'Dr. Unassigned';
-                              final String bp = bed['bp'] ?? '--/--';
-                              final String pulse = bed['pulse'] ?? '--';
-                              final String spo2 = bed['spo2'] ?? '--';
-                              final String temp = bed['temp'] ?? '--';
-
-                              Color statusColor = AppColors.emerald600;
-                              Color statusBg = AppColors.emerald50;
-                              String statusText = 'AVAILABLE';
-
-                              if (isOccupied) {
-                                statusColor = Colors.purple.shade700;
-                                statusBg = Colors.purple.shade50;
-                                statusText = 'OCCUPIED';
-                              } else if (status == 'Maintenance') {
-                                statusColor = Colors.amber.shade800;
-                                statusBg = Colors.amber.shade50;
-                                statusText = 'MAINTENANCE';
-                              }
-
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 10),
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.02),
-                                      blurRadius: 6,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: isOccupied ? Colors.purple.shade50 : AppColors.emerald50,
-                                            borderRadius: BorderRadius.circular(10),
-                                          ),
-                                          child: Icon(
-                                            isOccupied ? Icons.king_bed_rounded : Icons.bed_outlined,
-                                            size: 20,
-                                            color: isOccupied ? Colors.purple.shade700 : AppColors.emerald600,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                '$bedCode • Room $roomNum',
-                                                style: const TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: AppColors.slate900,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                wardName,
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Colors.indigo.shade700,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                          decoration: BoxDecoration(
-                                            color: statusBg,
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            statusText,
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                              color: statusColor,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    if (isOccupied) ...[
-                                      const Padding(
-                                        padding: EdgeInsets.symmetric(vertical: 8.0),
-                                        child: Divider(height: 1, color: Color(0xFFF1F5F9)),
-                                      ),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                patientName,
-                                                style: const TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: AppColors.slate900,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Row(
-                                                children: [
-                                                  const Icon(Icons.person_pin_rounded, size: 12, color: AppColors.navy700),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    doctor,
-                                                    style: const TextStyle(
-                                                      fontSize: 11,
-                                                      color: AppColors.slate600,
-                                                      fontWeight: FontWeight.w500,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          _buildMiniVital('BP', bp),
-                                          _buildMiniVital('Pulse', pulse),
-                                          _buildMiniVital('SpO2', spo2),
-                                          _buildMiniVital('Temp', temp),
-                                        ],
-                                      ),
-                                    ] else ...[
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        status == 'Maintenance'
-                                            ? 'Under maintenance or sanitation check'
-                                            : 'Available and disinfected for new patient admission',
-                                        style: const TextStyle(fontSize: 11, color: AppColors.slate500),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                  ],
-                ),
+                  );
+                },
               ),
-            ),
+      ],
     );
   }
 
-  Widget _buildWelcomeCard(ResponsiveHelper responsive) {
+  // 7. ADMINS SUB-VIEW
+  Widget _buildAdminsSubView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Hospital System Admins', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: AppColors.navy50,
+                child: const Icon(Icons.admin_panel_settings_rounded, color: AppColors.navy700, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(UserSession.userName.isNotEmpty ? UserSession.userName : 'System Admin', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+                    Text(UserSession.userEmail.isNotEmpty ? UserSession.userEmail : 'admin@hospital.org', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: AppColors.emerald50, borderRadius: BorderRadius.circular(6)),
+                child: const Text('SUPER ADMIN', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: AppColors.emerald600)),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 8. ROLES SUB-VIEW
+  Widget _buildRolesSubView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Roles & Permissions (${_roles.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.navy700,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: _showAddRoleModal,
+              icon: const Icon(Icons.add_rounded, size: 16),
+              label: const Text('Add Role', style: TextStyle(fontSize: 12)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        _roles.isEmpty
+            ? Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+                child: const Center(child: Text('No custom roles configured.', style: TextStyle(color: Color(0xFF64748B), fontSize: 12))),
+              )
+            : ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _roles.length,
+                itemBuilder: (context, index) {
+                  final r = _roles[index];
+                  final label = r['label'] ?? r['role'] ?? 'Role';
+                  final desc = r['description'] ?? 'System Access Role';
+                  final permissions = (r['permissions'] is List) ? (r['permissions'] as List) : [];
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+                        const SizedBox(height: 4),
+                        Text(desc, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                        if (permissions.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: permissions.map((p) => Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(6)),
+                              child: Text(p.toString(), style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+                            )).toList(),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
+      ],
+    );
+  }
+
+  // 9. ANALYTICS SUB-VIEW
+  Widget _buildAnalyticsSubView() {
+    final a = _analytics ?? {};
+    final totalPatients = a['totalPatients'] ?? 1420;
+    final totalAppts = a['totalAppointments'] ?? 890;
+    final totalRevenue = a['totalRevenue'] ?? 450000;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Hospital Performance Analytics', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+        const SizedBox(height: 14),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.35,
+          children: [
+            _buildKpiCard(title: 'Total Revenue', value: '₹$totalRevenue', icon: Icons.payments_rounded, iconColor: AppColors.emerald600, bgColor: AppColors.emerald50),
+            _buildKpiCard(title: 'Total Patients', value: '$totalPatients', icon: Icons.people_alt_rounded, iconColor: AppColors.navy600, bgColor: AppColors.navy50),
+            _buildKpiCard(title: 'Appointments', value: '$totalAppts', icon: Icons.calendar_month_rounded, iconColor: Colors.purple.shade700, bgColor: Colors.purple.shade50),
+            _buildKpiCard(title: 'Active Network', value: '${_branches.length} Branches', icon: Icons.location_city_rounded, iconColor: Colors.amber.shade900, bgColor: const Color(0xFFFEF3C7)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // 10. FINANCIAL REPORTS SUB-VIEW
+  Widget _buildFinancialReportsSubView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Hospital Financial Reports', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE2E8F0))),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Monthly Revenue Summary', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+              SizedBox(height: 4),
+              Text('Consolidated billing across OP, IPD, Pharmacy & Diagnostics.', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+              SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Invoiced Collections', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  Text('₹4,50,000', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.emerald600)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 11. ENQUIRIES SUB-VIEW
+  Widget _buildEnquiriesSubView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Patient Public Enquiries (${_enquiries.length})', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+        const SizedBox(height: 14),
+
+        _enquiries.isEmpty
+            ? Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+                child: const Center(child: Text('No public web enquiries received.', style: TextStyle(color: Color(0xFF64748B), fontSize: 12))),
+              )
+            : ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _enquiries.length,
+                itemBuilder: (context, index) {
+                  final e = _enquiries[index];
+                  final pName = e['name'] ?? 'Visitor';
+                  final phone = e['phone'] ?? '';
+                  final message = e['message'] ?? e['subject'] ?? 'Enquiry details...';
+                  final status = (e['status'] ?? 'pending').toString();
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(pName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(6)),
+                              child: Text(status.toUpperCase(), style: TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.amber.shade900)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(phone, style: const TextStyle(fontSize: 11, color: AppColors.navy700, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
+                        Text(message, style: const TextStyle(fontSize: 12, color: Color(0xFF334155))),
+                      ],
+                    ),
+                  );
+                },
+              ),
+      ],
+    );
+  }
+
+  // 12. SETTINGS SUB-VIEW
+  Widget _buildSettingsSubView() {
     return Container(
-      padding: EdgeInsets.all(responsive.scaleWidth(20.0)),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE2E8F0))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Hospital Network Settings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+          const SizedBox(height: 12),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.edit_rounded, color: AppColors.navy700),
+            title: const Text('Edit Hospital Info', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+            subtitle: const Text('Update name, license, address, and email', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+            trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+            onTap: _showEditHospitalModal,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- HELPER COMPONENTS FOR OVERVIEW TAB ---
+
+  Widget _buildWelcomeBanner(ResponsiveHelper responsive) {
+    return Container(
+      padding: const EdgeInsets.all(20.0),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            AppColors.navy800,
-            AppColors.navy950,
-          ],
+          colors: [AppColors.navy800, AppColors.navy950],
         ),
         borderRadius: BorderRadius.circular(16.0),
         boxShadow: [
           BoxShadow(
-            color: AppColors.navy950.withValues(alpha: 0.1),
+            color: AppColors.navy950.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -593,51 +1662,34 @@ class _AdminDashboardState extends State<AdminDashboard> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.white.withValues(alpha: 0.12),
+              color: Colors.white.withOpacity(0.12),
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Text(
               'LIVE NETWORK ENVIRONMENT',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
-                color: AppColors.emerald400,
-                letterSpacing: 0.5,
-              ),
+              style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.emerald400, letterSpacing: 0.5),
             ),
           ),
           const SizedBox(height: 12),
           Text(
-            'Welcome back, System Admin',
-            style: TextStyle(
-              fontSize: responsive.scaleText(18.0),
-              fontWeight: FontWeight.bold,
-              color: AppColors.white,
-            ),
+            'Welcome, ${UserSession.userName.isNotEmpty ? UserSession.userName : "System Admin"}',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
           ),
           const SizedBox(height: 4),
           Text(
-            'Sunrise General Hospital Network',
-            style: TextStyle(
-              fontSize: responsive.scaleText(12.0),
-              color: AppColors.navy100.withValues(alpha: 0.8),
-              fontWeight: FontWeight.w500,
-            ),
+            _hospitalName,
+            style: TextStyle(fontSize: 12, color: AppColors.navy100.withOpacity(0.8), fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 16),
-          Divider(color: AppColors.white.withValues(alpha: 0.1), height: 1),
+          Divider(color: Colors.white.withOpacity(0.1), height: 1),
           const SizedBox(height: 12),
-          Row(
+          const Row(
             children: [
-              const Icon(Icons.shield_outlined, color: AppColors.emerald400, size: 16),
-              const SizedBox(width: 8),
+              Icon(Icons.shield_outlined, color: AppColors.emerald400, size: 16),
+              SizedBox(width: 8),
               Text(
                 'HIPAA compliancy is active & secure.',
-                style: TextStyle(
-                  fontSize: responsive.scaleText(11.0),
-                  color: AppColors.white.withValues(alpha: 0.9),
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -648,58 +1700,28 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _buildKpiGrid(ResponsiveHelper responsive, int totalBeds, int occupiedBeds, int availableBeds, int occupancyRate) {
     return GridView.count(
-      crossAxisCount: responsive.isTablet ? 4 : 2,
+      crossAxisCount: 2,
       crossAxisSpacing: 12,
       mainAxisSpacing: 12,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       childAspectRatio: 1.35,
       children: [
-        _buildKpiCard(
-          title: 'Total Capacity',
-          value: '$totalBeds Beds',
-          icon: Icons.local_hospital_rounded,
-          iconColor: AppColors.navy600,
-          bgColor: AppColors.navy50,
-        ),
-        _buildKpiCard(
-          title: 'Bed Occupancy Rate',
-          value: '$occupancyRate%',
-          icon: Icons.hotel_rounded,
-          iconColor: occupancyRate > 80 ? AppColors.errorRed : AppColors.emerald600,
-          bgColor: occupancyRate > 80 ? AppColors.errorBg : AppColors.emerald50,
-        ),
-        _buildKpiCard(
-          title: 'Occupied Beds',
-          value: '$occupiedBeds',
-          icon: Icons.king_bed_rounded,
-          iconColor: Colors.purple.shade700,
-          bgColor: Colors.purple.shade50,
-        ),
-        _buildKpiCard(
-          title: 'Available Beds',
-          value: '$availableBeds',
-          icon: Icons.event_available_rounded,
-          iconColor: AppColors.emerald600,
-          bgColor: AppColors.emerald50,
-        ),
+        _buildKpiCard(title: 'Total Capacity', value: '$totalBeds Beds', icon: Icons.local_hospital_rounded, iconColor: AppColors.navy600, bgColor: AppColors.navy50),
+        _buildKpiCard(title: 'Occupancy Rate', value: '$occupancyRate%', icon: Icons.hotel_rounded, iconColor: occupancyRate > 80 ? Colors.red : AppColors.emerald600, bgColor: occupancyRate > 80 ? const Color(0xFFFEE2E2) : AppColors.emerald50),
+        _buildKpiCard(title: 'Occupied Beds', value: '$occupiedBeds', icon: Icons.king_bed_rounded, iconColor: Colors.purple.shade700, bgColor: Colors.purple.shade50),
+        _buildKpiCard(title: 'Available Beds', value: '$availableBeds', icon: Icons.event_available_rounded, iconColor: AppColors.emerald600, bgColor: AppColors.emerald50),
       ],
     );
   }
 
-  Widget _buildKpiCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color iconColor,
-    required Color bgColor,
-  }) {
+  Widget _buildKpiCard({required String title, required String value, required IconData icon, required Color iconColor, required Color bgColor}) {
     return Container(
       padding: const EdgeInsets.all(12.0),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12.0),
-        border: Border.all(color: AppColors.slate200),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -708,32 +1730,172 @@ class _AdminDashboardState extends State<AdminDashboard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.slate500,
-                ),
-              ),
+              Text(title, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
               Container(
                 padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: bgColor,
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(8)),
                 child: Icon(icon, color: iconColor, size: 14),
               ),
             ],
           ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: AppColors.slate900,
+          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.slate900)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSystemStatsStrip() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildStatItem('Departments', '${_departments.length}', Icons.business_rounded),
+          _buildStatItem('Doctors', '${_doctors.length}', Icons.medical_services_rounded),
+          _buildStatItem('Branches', '${_branches.length}', Icons.location_city_rounded),
+          _buildStatItem('Roles', '${_roles.length}', Icons.admin_panel_settings_rounded),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, IconData icon) {
+    return Column(
+      children: [
+        Icon(icon, size: 18, color: AppColors.navy700),
+        const SizedBox(height: 4),
+        Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.slate900)),
+        Text(label, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+      ],
+    );
+  }
+
+  Widget _buildQuickOperationsGrid() {
+    final ops = [
+      {'title': 'Departments', 'icon': Icons.business_rounded, 'action': () => _switchTab(1, 'Departments')},
+      {'title': 'Branches', 'icon': Icons.location_city_rounded, 'action': () => _switchTab(1, 'Branches')},
+      {'title': 'Doctors', 'icon': Icons.medical_services_rounded, 'action': () => _switchTab(3, 'All Doctors')},
+      {'title': 'Nursing Staff', 'icon': Icons.person_add_rounded, 'action': () => _switchTab(3, 'Nursing Staff')},
+      {'title': 'Roles & RBAC', 'icon': Icons.admin_panel_settings_rounded, 'action': () => _switchTab(3, 'Roles & RBAC')},
+      {'title': 'Analytics', 'icon': Icons.analytics_rounded, 'action': () => _switchTab(4, 'Analytics Metrics')},
+      {'title': 'Financials', 'icon': Icons.payments_rounded, 'action': () => _switchTab(4, 'Financial Reports')},
+      {'title': 'Enquiries', 'icon': Icons.help_outline_rounded, 'action': () => _switchTab(4, 'Enquiries')},
+      {'title': 'Settings', 'icon': Icons.settings_rounded, 'action': () => _switchTab(4, 'Hospital Settings')},
+    ];
+
+    return GridView.count(
+      crossAxisCount: 3,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+      childAspectRatio: 1.1,
+      children: ops.map((op) {
+        return InkWell(
+          onTap: op['action'] as VoidCallback,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(op['icon'] as IconData, size: 22, color: AppColors.navy700),
+                const SizedBox(height: 6),
+                Text(op['title'] as String, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.slate800), textAlign: TextAlign.center),
+              ],
             ),
           ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildBedCardItem(Map<String, dynamic> bed) {
+    final String bedCode = bed['bedCode'] ?? 'Bed';
+    final String roomNum = bed['roomNumber'] ?? '101';
+    final String wardName = bed['wardName'] ?? 'Ward';
+    final bool isOccupied = bed['isOccupied'] == true;
+    final String patientName = bed['patientName'] ?? 'Inpatient';
+    final String doctor = bed['doctor'] ?? 'Dr. Unassigned';
+    final String bp = bed['bp'] ?? '--/--';
+    final String pulse = bed['pulse'] ?? '--';
+    final String spo2 = bed['spo2'] ?? '--';
+    final String temp = bed['temp'] ?? '--';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isOccupied ? Colors.purple.shade50 : AppColors.emerald50,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  isOccupied ? Icons.king_bed_rounded : Icons.bed_outlined,
+                  size: 20,
+                  color: isOccupied ? Colors.purple.shade700 : AppColors.emerald600,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('$bedCode • Room $roomNum', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+                    Text(wardName, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.indigo.shade700)),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isOccupied ? Colors.purple.shade50 : AppColors.emerald50,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  isOccupied ? 'OCCUPIED' : 'AVAILABLE',
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: isOccupied ? Colors.purple.shade700 : AppColors.emerald600),
+                ),
+              ),
+            ],
+          ),
+          if (isOccupied) ...[
+            const Padding(padding: EdgeInsets.symmetric(vertical: 8.0), child: Divider(height: 1, color: Color(0xFFF1F5F9))),
+            Text(patientName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+            const SizedBox(height: 2),
+            Text(doctor, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildMiniVital('BP', bp),
+                _buildMiniVital('Pulse', pulse),
+                _buildMiniVital('SpO2', spo2),
+                _buildMiniVital('Temp', temp),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -743,16 +1905,387 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 10, color: AppColors.slate400, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.slate800),
-        ),
+        Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF64748B))),
+        Text(value, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.slate900)),
       ],
+    );
+  }
+
+  // --- MODAL DIALOGS FOR QUICK ACTIONS ---
+
+  void _showQuickManageModal() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Admin Quick Operations', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.business_rounded, color: AppColors.navy700),
+                title: const Text('Add Department', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                onTap: () { Navigator.pop(ctx); _showAddDepartmentModal(); },
+              ),
+              ListTile(
+                leading: const Icon(Icons.location_city_rounded, color: AppColors.navy700),
+                title: const Text('Add Branch', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                onTap: () { Navigator.pop(ctx); _showAddBranchModal(); },
+              ),
+              ListTile(
+                leading: const Icon(Icons.medical_services_rounded, color: AppColors.navy700),
+                title: const Text('Add Doctor', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                onTap: () { Navigator.pop(ctx); _showAddDoctorModal(); },
+              ),
+              ListTile(
+                leading: const Icon(Icons.person_add_rounded, color: AppColors.navy700),
+                title: const Text('Add Staff Member', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                onTap: () { Navigator.pop(ctx); _showAddStaffModal(); },
+              ),
+              ListTile(
+                leading: const Icon(Icons.admin_panel_settings_rounded, color: AppColors.navy700),
+                title: const Text('Create Role & Permissions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                onTap: () { Navigator.pop(ctx); _showAddRoleModal(); },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAddDepartmentModal() {
+    _formNameController.clear();
+    _formCodeController.clear();
+    _formDescController.clear();
+    _formFeeController.text = '500';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Add New Department', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+              const SizedBox(height: 14),
+              TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Department Name (e.g. Cardiology)')),
+              const SizedBox(height: 10),
+              TextField(controller: _formCodeController, decoration: const InputDecoration(labelText: 'Dept Code (e.g. CARD)')),
+              const SizedBox(height: 10),
+              TextField(controller: _formFeeController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Consultation Fee (₹)')),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () async {
+                          if (_formNameController.text.isEmpty) return;
+                          setState(() => _isSubmitting = true);
+                          final success = await _apiService.createDepartment({
+                            'name': _formNameController.text.trim(),
+                            'code': _formCodeController.text.trim().toUpperCase(),
+                            'consultationFee': double.tryParse(_formFeeController.text) ?? 500,
+                          });
+                          setState(() => _isSubmitting = false);
+                          if (!ctx.mounted) return;
+                          Navigator.pop(ctx);
+                          if (success) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Department created successfully!'), backgroundColor: AppColors.emerald600));
+                            _loadAllAdminData();
+                          }
+                        },
+                  child: const Text('Save Department'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAddBranchModal() {
+    _formNameController.clear();
+    _formCodeController.clear();
+    _formLocationController.clear();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Add New Branch', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+              const SizedBox(height: 14),
+              TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Branch Name (e.g. City Center Branch)')),
+              const SizedBox(height: 10),
+              TextField(controller: _formCodeController, decoration: const InputDecoration(labelText: 'Branch ID Code (e.g. BR-002)')),
+              const SizedBox(height: 10),
+              TextField(controller: _formLocationController, decoration: const InputDecoration(labelText: 'City / Location')),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () async {
+                          if (_formNameController.text.isEmpty) return;
+                          setState(() => _isSubmitting = true);
+                          final success = await _apiService.createBranch({
+                            'name': _formNameController.text.trim(),
+                            'branchId': _formCodeController.text.trim(),
+                            'city': _formLocationController.text.trim(),
+                          });
+                          setState(() => _isSubmitting = false);
+                          if (!ctx.mounted) return;
+                          Navigator.pop(ctx);
+                          if (success) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Branch created successfully!'), backgroundColor: AppColors.emerald600));
+                            _loadAllAdminData();
+                          }
+                        },
+                  child: const Text('Save Branch'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAddDoctorModal() {
+    _formNameController.clear();
+    _formDescController.clear();
+    _formEmailController.clear();
+    _formPhoneController.clear();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Add New Doctor', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+              const SizedBox(height: 14),
+              TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Doctor Full Name')),
+              const SizedBox(height: 10),
+              TextField(controller: _formDescController, decoration: const InputDecoration(labelText: 'Specialization (e.g. Cardiologist)')),
+              const SizedBox(height: 10),
+              TextField(controller: _formEmailController, decoration: const InputDecoration(labelText: 'Email Address')),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () async {
+                          if (_formNameController.text.isEmpty) return;
+                          setState(() => _isSubmitting = true);
+                          final success = await _apiService.createDoctor({
+                            'name': _formNameController.text.trim(),
+                            'specialization': _formDescController.text.trim(),
+                            'email': _formEmailController.text.trim(),
+                          });
+                          setState(() => _isSubmitting = false);
+                          if (!ctx.mounted) return;
+                          Navigator.pop(ctx);
+                          if (success) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Doctor registered successfully!'), backgroundColor: AppColors.emerald600));
+                            _loadAllAdminData();
+                          }
+                        },
+                  child: const Text('Save Doctor'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAddStaffModal() {
+    _formNameController.clear();
+    _formDescController.clear();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Add New Staff Member', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+              const SizedBox(height: 14),
+              TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Staff Name')),
+              const SizedBox(height: 10),
+              TextField(controller: _formDescController, decoration: const InputDecoration(labelText: 'Role (e.g. Staff Nurse)')),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () async {
+                          if (_formNameController.text.isEmpty) return;
+                          setState(() => _isSubmitting = true);
+                          final success = await _apiService.createStaff({
+                            'name': _formNameController.text.trim(),
+                            'role': _formDescController.text.trim(),
+                          });
+                          setState(() => _isSubmitting = false);
+                          if (!ctx.mounted) return;
+                          Navigator.pop(ctx);
+                          if (success) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Staff member registered!'), backgroundColor: AppColors.emerald600));
+                            _loadAllAdminData();
+                          }
+                        },
+                  child: const Text('Save Staff Member'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAddRoleModal() {
+    _formNameController.clear();
+    _formDescController.clear();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Create Custom Role', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+              const SizedBox(height: 14),
+              TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Role Label (e.g. Pharmacy Manager)')),
+              const SizedBox(height: 10),
+              TextField(controller: _formDescController, decoration: const InputDecoration(labelText: 'Role Description')),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () async {
+                          if (_formNameController.text.isEmpty) return;
+                          setState(() => _isSubmitting = true);
+                          final success = await _apiService.createRole({
+                            'label': _formNameController.text.trim(),
+                            'description': _formDescController.text.trim(),
+                            'permissions': ['hospital_view', 'billing_view'],
+                          });
+                          setState(() => _isSubmitting = false);
+                          if (!ctx.mounted) return;
+                          Navigator.pop(ctx);
+                          if (success) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Custom role created!'), backgroundColor: AppColors.emerald600));
+                            _loadAllAdminData();
+                          }
+                        },
+                  child: const Text('Save Role'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showEditHospitalModal() {
+    final hosp = _hospitalProfile ?? {};
+    _formNameController.text = hosp['name']?.toString() ?? _hospitalName;
+    _formEmailController.text = hosp['contactEmail']?.toString() ?? '';
+    _formPhoneController.text = hosp['contactPhone']?.toString() ?? '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Edit Hospital Profile', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+              const SizedBox(height: 14),
+              TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Hospital Name')),
+              const SizedBox(height: 10),
+              TextField(controller: _formEmailController, decoration: const InputDecoration(labelText: 'Contact Email')),
+              const SizedBox(height: 10),
+              TextField(controller: _formPhoneController, decoration: const InputDecoration(labelText: 'Contact Phone')),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () async {
+                          setState(() => _isSubmitting = true);
+                          final success = await _apiService.updateHospitalProfile({
+                            'name': _formNameController.text.trim(),
+                            'contactEmail': _formEmailController.text.trim(),
+                            'contactPhone': _formPhoneController.text.trim(),
+                          });
+                          setState(() => _isSubmitting = false);
+                          if (!ctx.mounted) return;
+                          Navigator.pop(ctx);
+                          if (success) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hospital profile updated!'), backgroundColor: AppColors.emerald600));
+                            _loadAllAdminData();
+                          }
+                        },
+                  child: const Text('Update Profile'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

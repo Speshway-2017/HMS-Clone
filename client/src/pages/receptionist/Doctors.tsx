@@ -5,6 +5,7 @@ import { useDepartments } from "../../features/departments";
 import { SelectField } from "../../components/ui/Field";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
+import { isDoctorInDepartment, getDoctorDepartmentName } from "../../lib/doctorUtils";
 
 interface Props {
   activeTab?: "availability" | "timings";
@@ -48,7 +49,7 @@ export function DoctorsPage({ activeTab = "availability" }: Props) {
     },
     {
       header: "Department",
-      render: (row: any) => <span className="text-xs">{row.department?.name || "Cardiology"}</span>
+      render: (row: any) => <span className="text-xs">{getDoctorDepartmentName(row)}</span>
     },
     {
       header: "Duty Status",
@@ -86,7 +87,7 @@ export function DoctorsPage({ activeTab = "availability" }: Props) {
   ];
 
   const filteredDoctors = doctors?.filter(
-    (d: any) => !selectedDeptId || (d.department?._id === selectedDeptId || d.department === selectedDeptId)
+    (d: any) => isDoctorInDepartment(d, selectedDeptId, departments)
   ) || [];
 
   return (

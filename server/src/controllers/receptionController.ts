@@ -7,7 +7,7 @@ import { ReceptionRepository } from "../repositories/receptionRepository";
 import { AppError } from "../utils/AppError";
 import { Types } from "mongoose";
 import { getDoctorDynamicStatus, getBusyDoctorIds } from "../utils/doctorStatus";
-import { buildBranchQuery } from "../utils/branchQueryHelper";
+import { buildBranchQuery, combineBranchQuery } from "../utils/branchQueryHelper";
 import { Doctor } from "../models/Doctor";
 import { Patient } from "../models/Patient";
 import { Queue } from "../models/Queue";
@@ -19,6 +19,7 @@ import { IPBillPayment } from "../models/IPBillPayment";
 import { Appointment } from "../models/Appointment";
 import { getIPBillItemsSummary } from "./ipBillController";
 import { AppointmentSlotService } from "../services/appointmentSlotService";
+
 
 
 // Validation Schemas
@@ -172,7 +173,7 @@ export const getOPHistory = catchAsync(async (req: Request, res: Response) => {
 export const bookAppointment = catchAsync(async (req: Request, res: Response) => {
   const appointmentData = appointmentBookingSchema.parse(req.body);
   const result = await ReceptionService.bookAppointment(
-    req.hospitalFilter!.hospital as any,
+    req.hospitalFilter as any,
     appointmentData,
     req.user!._id
   );
@@ -196,7 +197,7 @@ export const checkDuplicateAppointment = catchAsync(async (req: Request, res: Re
 export const processBillingPayment = catchAsync(async (req: Request, res: Response) => {
   const paymentData = paymentSchema.parse(req.body);
   const hospitalId = req.hospitalFilter?.hospital || req.user?.hospital;
-  
+
   const invoice = await Invoice.findOne({ _id: paymentData.invoiceId, hospital: hospitalId });
   if (!invoice) {
     throw new AppError("Invoice not found.", 404);
@@ -240,7 +241,7 @@ export const simulateDoctorComplete = catchAsync(async (req: Request, res: Respo
     ward: req.body.ward || "General",
     roomType: req.body.roomType || "General"
   };
-  const result = await ReceptionService.simulateDoctorComplete(req.hospitalFilter!.hospital as any, data, req.user!._id);
+  const result = await ReceptionService.simulateDoctorComplete(req.hospitalFilter as any, data, req.user!._id);
   res.json({ status: "success", data: result });
 });
 
@@ -357,9 +358,9 @@ export const getAdmissions = catchAsync(async (req: Request, res: Response) => {
         billingType: { $in: ["LAB", "RADIOLOGY", "PHARMACY"] },
         status: { $ne: "paid" }
       });
-      
+
       const duesTotal = unpaidInvoices.reduce((sum, inv: any) => sum + (inv.totals?.patientBalance ?? inv.totals?.total ?? 0), 0);
-      
+
       (adm as any).labPharmacyDues = unpaidInvoices.map((inv: any) => ({
         _id: inv._id,
         invoiceNumber: inv.invoiceNumber,
@@ -438,7 +439,7 @@ export const exportReports = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const getAuditLogs = catchAsync(async (req: Request, res: Response) => {
-  const logs = await ReceptionRepository.getAuditLogs(req.hospitalFilter!.hospital as any);
+  const logs = await ReceptionRepository.getAuditLogs(req.hospitalFilter as any);
   res.json({ status: "success", data: { logs } });
 });
 
@@ -671,7 +672,7 @@ export const checkInAppointment = catchAsync(async (req: Request, res: Response)
 
 export const getQueueDetails = catchAsync(async (req: Request, res: Response) => {
   const hospitalFilter = buildBranchQuery(req.hospitalFilter);
-  
+
   // Update scheduled alerts & mark missed appointments
   if (req.hospitalFilter?.hospital) {
     await ReceptionService.generateScheduledAlerts(req.hospitalFilter.hospital as any);
@@ -693,13 +694,12 @@ export const getQueueDetails = catchAsync(async (req: Request, res: Response) =>
     .sort({ time: 1 });
 
   // Fetch all queue items today
-  const queueItems = await Queue.find({
-    ...hospitalFilter,
+  const queueItems = await Queue.find(combineBranchQuery(req.hospitalFilter, {
     $or: [
       { date: { $gte: startOfToday, $lte: endOfToday } },
       { createdAt: { $gte: startOfToday, $lte: endOfToday } }
     ]
-  })
+  }))
     .populate("patient", "name uhid phone age gender")
     .populate("doctor", "name specialization department")
     .populate("department", "name")
@@ -716,7 +716,7 @@ export const getQueueDetails = catchAsync(async (req: Request, res: Response) =>
   };
 
   const upcomingAppointments: any[] = [];
-  
+
   appointments.forEach((appt: any) => {
     if (appt.status === "scheduled") {
       const diff = getSlotTimeDiff(appt.time);
