@@ -268,7 +268,7 @@ export class ReceptionService {
     // Find all patient document IDs associated with this patient (by patientId or linked user account)
     let allPatientIds: any[] = [patientId];
     if (patient.user) {
-      const relatedDocs = await Patient.find({ ...branchFilter, user: patient.user }).select("_id");
+      const relatedDocs = await Patient.find({ hospital: targetHospital, user: patient.user }).select("_id");
       if (relatedDocs.length > 0) {
         allPatientIds = relatedDocs.map(p => p._id);
       }
@@ -276,7 +276,6 @@ export class ReceptionService {
 
     const recentAppointmentsList = await Appointment.find({
       ...queryScope,
-      ...branchFilter,
       patient: { $in: allPatientIds },
       status: { $nin: ["cancelled", "no_show"] }
     }).sort({ date: -1, createdAt: -1 }).limit(20).populate("doctor department");
@@ -285,7 +284,6 @@ export class ReceptionService {
 
     const activeAdmission = await Admission.findOne({
       ...queryScope,
-      ...branchFilter,
       patient: { $in: allPatientIds },
       status: {
         $in: [

@@ -46,6 +46,8 @@ async function runBranchIsolationTests() {
     process.exit(1);
   }
 
+  const frcsBranchId = loginFRCS.data.data.user.branch;
+
   // 2. Authenticate receptionist@hms.com (Branch A / Main Hospital)
   const loginHMS = await postJSON(`${BASE_URL}/auth/login`, {
     email: "receptionist@hms.com",
@@ -109,10 +111,10 @@ async function runBranchIsolationTests() {
   // ---------------------------------------------------------
   console.log("\n--- TEST 2: Admin Branch Switching ---");
 
-  // Admin selects FRCS branch
+  // Admin selects FRCS branch dynamically
   const admAdminFRCS = await getJSON(`${BASE_URL}/reception/admissions?status=admitted`, {
     Authorization: `Bearer ${tokenAdmin}`,
-    "X-Branch-ID": "6a7af34021c9633db292c91c"
+    "X-Branch-ID": frcsBranchId
   });
   const vikramAdminFRCS = (admAdminFRCS.data.data?.admissions || []).find((a: any) => a.admissionNumber === "IP2026000004");
 

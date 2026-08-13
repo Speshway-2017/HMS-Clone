@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, AlertTriangle, PackageCheck, IndianRupee } from "lucide-react";
 import { useInventory } from "../../features/inventory";
+import { useBranchContext } from "../../context/BranchContext";
+import { AllBranchesNoticeBanner } from "../../components/common/AllBranchesNoticeBanner";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { KpiCard } from "../../components/ui/KpiCard";
@@ -17,6 +19,7 @@ const STOCK_TONE: Record<InventoryItem["stockStatus"], "danger" | "warning" | "s
 };
 
 export function InventoryPage() {
+  const { isAllBranches } = useBranchContext();
   const [page, setPage] = useState(1);
   const [category, setCategory] = useState("");
   const { data, isLoading } = useInventory({ page, category: category || undefined });
@@ -54,16 +57,24 @@ export function InventoryPage() {
 
   return (
     <div className="space-y-6">
+      <AllBranchesNoticeBanner />
+
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Inventory Dashboard</h1>
           <p className="text-sm text-slate-500">Real-time stock levels and reorder alerts.</p>
         </div>
-        <Link to="/admin/inventory/new">
-          <Button variant="primary">
-            <Plus className="h-4 w-4" /> Add Item
+        {!isAllBranches ? (
+          <Link to="/admin/inventory/new">
+            <Button variant="primary">
+              <Plus className="h-4 w-4" /> Add Item
+            </Button>
+          </Link>
+        ) : (
+          <Button variant="outline" disabled className="opacity-60 cursor-not-allowed bg-slate-100 text-slate-400" title="Switch to a specific branch to add items">
+            <Plus className="h-4 w-4" /> Add Item (Read Only)
           </Button>
-        </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
