@@ -22,6 +22,8 @@ import {
 import { useWards, useDeleteWard, WardInfo } from "../../features/wards";
 import { useRooms, useDeleteRoom, RoomInfo } from "../../features/rooms";
 import { useBeds, useUpdateBed, useDeleteBed, BedInfo } from "../../features/beds";
+import { useBranchContext } from "../../context/BranchContext";
+import { AllBranchesNoticeBanner } from "../../components/common/AllBranchesNoticeBanner";
 
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -61,6 +63,7 @@ const BED_STATUS_COLORS: Record<string, "success" | "danger" | "warning" | "info
 };
 
 export function BedsPage() {
+  const { isAllBranches } = useBranchContext();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"wards" | "rooms" | "beds">("wards");
 
