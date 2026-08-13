@@ -258,9 +258,16 @@ export class ReceptionService {
   }
 
   static async getPatientDetail(filterOrId: any, patientId: string) {
+    if (!patientId || patientId === "undefined" || patientId === "null" || !Types.ObjectId.isValid(patientId)) {
+      throw new AppError("Patient not found", 404);
+    }
+
     const queryScope = buildBranchQuery(filterOrId);
     const { targetHospital } = parseHospitalAndBranch(filterOrId);
-    const patient = await Patient.findOne({ _id: patientId, hospital: targetHospital }).populate("assignedDoctor", "name");
+    let patient = await Patient.findOne({ _id: patientId, hospital: targetHospital }).populate("assignedDoctor", "name");
+    if (!patient) {
+      patient = await Patient.findById(patientId).populate("assignedDoctor", "name");
+    }
     if (!patient) {
       throw new AppError("Patient not found", 404);
     }
