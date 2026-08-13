@@ -7,7 +7,7 @@ import {
   CheckCircle, 
   AlertCircle,
   Clock,
-  DollarSign
+  IndianRupee
 } from "lucide-react";
 import { usePaymentHistory, usePendingInvoices } from "../../features/receptionist";
 import { Card } from "../../components/ui/Card";
@@ -100,7 +100,7 @@ export function AccountantPaymentsPage() {
         <KpiCard 
           label="Total Collections" 
           value={`₹${totalCollections.toLocaleString("en-IN")}`} 
-          icon={<DollarSign className="h-5 w-5" />} 
+          icon={<IndianRupee className="h-5 w-5" />} 
           emphasis 
         />
         <KpiCard 

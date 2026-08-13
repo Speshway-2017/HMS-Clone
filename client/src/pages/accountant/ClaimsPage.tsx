@@ -7,7 +7,7 @@ import {
   Eye,
   ShieldAlert,
   TrendingUp,
-  DollarSign,
+  IndianRupee,
   RefreshCw,
   AlertCircle,
 } from "lucide-react";
@@ -161,7 +161,7 @@ export function AccountantClaimsPage() {
         <KpiCard 
           label="Total Settled Reimbursements" 
           value={`₹${settledTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`} 
-          icon={<DollarSign className="h-5 w-5" />} 
+          icon={<IndianRupee className="h-5 w-5" />} 
           emphasis 
         />
       </div>
