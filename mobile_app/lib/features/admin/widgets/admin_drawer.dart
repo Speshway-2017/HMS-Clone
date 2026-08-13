@@ -5,10 +5,12 @@ import '../../../widgets/app_logo.dart';
 
 class AdminDrawer extends StatelessWidget {
   final String activeRoute;
+  final Function(int tabIndex, String? subFilter)? onSelectTab;
 
   const AdminDrawer({
     super.key,
     required this.activeRoute,
+    this.onSelectTab,
   });
 
   @override
@@ -53,7 +55,7 @@ class AdminDrawer extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        'Admin Workspace',
+                        'Admin Portal Workspace',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -75,57 +77,91 @@ class AdminDrawer extends StatelessWidget {
                 _buildDrawerItem(
                   context,
                   icon: Icons.dashboard_outlined,
-                  title: 'Dashboard',
+                  title: 'Dashboard Home',
                   route: AppRoutes.adminDashboard,
+                  tabIndex: 0,
+                  subFilter: null,
                 ),
                 _buildDrawerItem(
                   context,
                   icon: Icons.local_hospital_outlined,
-                  title: 'Hospitals',
+                  title: 'Hospitals Details',
                   route: '/admin/hospitals',
+                  tabIndex: 1,
+                  subFilter: 'Hospital Details',
                 ),
                 _buildDrawerItem(
                   context,
                   icon: Icons.alt_route_outlined,
-                  title: 'Branches',
+                  title: 'Hospital Branches',
                   route: '/admin/branches',
+                  tabIndex: 1,
+                  subFilter: 'Branches',
                 ),
                 _buildDrawerItem(
                   context,
                   icon: Icons.business_outlined,
-                  title: 'Departments',
+                  title: 'Departments & Capacity',
                   route: '/admin/departments',
+                  tabIndex: 1,
+                  subFilter: 'Departments',
+                ),
+                _buildDrawerItem(
+                  context,
+                  icon: Icons.king_bed_outlined,
+                  title: 'Wards & Beds Roster',
+                  route: '/admin/beds',
+                  tabIndex: 1,
+                  subFilter: 'Wards & Beds',
                 ),
                 _buildDrawerItem(
                   context,
                   icon: Icons.people_outline,
-                  title: 'Admins',
-                  route: '/admin/admins',
+                  title: 'Doctors & Staff',
+                  route: '/admin/staff',
+                  tabIndex: 3,
+                  subFilter: 'All Doctors',
                 ),
                 _buildDrawerItem(
                   context,
                   icon: Icons.admin_panel_settings_outlined,
-                  title: 'Manage Roles',
+                  title: 'Roles & RBAC Permissions',
                   route: '/admin/roles',
+                  tabIndex: 3,
+                  subFilter: 'Roles & RBAC',
                 ),
                 _buildDrawerItem(
                   context,
                   icon: Icons.analytics_outlined,
-                  title: 'Analytics',
+                  title: 'Analytics Metrics',
                   route: '/admin/analytics',
+                  tabIndex: 4,
+                  subFilter: 'Analytics Metrics',
                 ),
                 _buildDrawerItem(
                   context,
                   icon: Icons.assignment_outlined,
-                  title: 'Reports Hub',
+                  title: 'Financial Reports',
                   route: '/admin/reports',
+                  tabIndex: 4,
+                  subFilter: 'Financial Reports',
+                ),
+                _buildDrawerItem(
+                  context,
+                  icon: Icons.help_outline,
+                  title: 'Patient Enquiries',
+                  route: '/admin/enquiries',
+                  tabIndex: 4,
+                  subFilter: 'Enquiries',
                 ),
                 const Divider(color: AppColors.slate200, height: 24),
                 _buildDrawerItem(
                   context,
                   icon: Icons.settings_outlined,
-                  title: 'Settings',
+                  title: 'Hospital Settings',
                   route: '/admin/settings',
+                  tabIndex: 4,
+                  subFilter: 'Hospital Settings',
                 ),
               ],
             ),
@@ -151,7 +187,7 @@ class AdminDrawer extends StatelessWidget {
                   ),
                 ),
                 onTap: () {
-                  Navigator.pop(context); // Close drawer
+                  Navigator.pop(context);
                   Navigator.pushReplacementNamed(context, AppRoutes.login);
                 },
               ),
@@ -167,6 +203,8 @@ class AdminDrawer extends StatelessWidget {
     required IconData icon,
     required String title,
     required String route,
+    required int tabIndex,
+    required String? subFilter,
   }) {
     final isSelected = activeRoute == route;
     
@@ -203,15 +241,10 @@ class AdminDrawer extends StatelessWidget {
             : null,
         onTap: () {
           Navigator.pop(context); // Close drawer
-          if (!isSelected && route == AppRoutes.adminDashboard) {
-            Navigator.pushReplacementNamed(context, route);
-          } else if (!isSelected) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('$title module integration is pending.'),
-                duration: const Duration(seconds: 1),
-              ),
-            );
+          if (onSelectTab != null) {
+            onSelectTab!(tabIndex, subFilter);
+          } else {
+            Navigator.pushReplacementNamed(context, AppRoutes.adminDashboard);
           }
         },
       ),
