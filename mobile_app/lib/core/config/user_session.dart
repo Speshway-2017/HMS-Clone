@@ -5,14 +5,24 @@ class UserSession {
   static const String _keyToken = 'jwt_token';
   static const String _keyUser = 'user_json';
   static const String _keyPatient = 'patient_json';
+  static const String _keySelectedBranch = 'selected_branch_id';
 
   static String? _token;
   static Map<String, dynamic>? _userData;
   static Map<String, dynamic>? _patientData;
+  static String _selectedBranchId = 'all';
 
   static String? get token => _token;
   static Map<String, dynamic>? get user => _userData;
   static Map<String, dynamic>? get patient => _patientData;
+  static String get selectedBranchId => _selectedBranchId;
+
+  static set selectedBranchId(String branchId) {
+    _selectedBranchId = branchId;
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString(_keySelectedBranch, branchId);
+    }).catchError((_) {});
+  }
 
   static String get userName => _userData?['name'] ?? _patientData?['name'] ?? 'Patient';
   static String get userEmail => _userData?['email'] ?? _patientData?['email'] ?? '';
@@ -25,6 +35,7 @@ class UserSession {
     try {
       final prefs = await SharedPreferences.getInstance();
       _token = prefs.getString(_keyToken);
+      _selectedBranchId = prefs.getString(_keySelectedBranch) ?? 'all';
 
       final userStr = prefs.getString(_keyUser);
       if (userStr != null && userStr.isNotEmpty) {
@@ -69,22 +80,25 @@ class UserSession {
     _token = null;
     _userData = null;
     _patientData = null;
+    _selectedBranchId = 'all';
 
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_keyToken);
       await prefs.remove(_keyUser);
       await prefs.remove(_keyPatient);
+      await prefs.remove(_keySelectedBranch);
     } catch (_) {
       // Storage clear fallback
     }
   }
 
-  /// Returns authorization headers for API HTTP requests
+  /// Returns authorization headers for API HTTP requests (with branch filter header)
   static Map<String, String> get headers {
     final map = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'x-branch-id': _selectedBranchId,
     };
     if (_token != null && _token!.isNotEmpty) {
       map['Authorization'] = 'Bearer $_token';
