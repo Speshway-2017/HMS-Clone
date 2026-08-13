@@ -3,6 +3,7 @@ import { Schema, model, InferSchemaType, Types } from "mongoose";
 const ipChargeSchema = new Schema(
   {
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
+    branch: { type: Schema.Types.ObjectId, ref: "Branch", default: null },
     admission: { type: Schema.Types.ObjectId, ref: "Admission", required: true },
     patient: { type: Schema.Types.ObjectId, ref: "Patient", required: true },
     category: {
@@ -39,7 +40,8 @@ const ipChargeSchema = new Schema(
   { timestamps: true }
 );
 
-// Prevent duplicate postings for same system-generated service/external reference within an admission
+// Compound indexes
+ipChargeSchema.index({ hospital: 1, branch: 1, admission: 1 });
 ipChargeSchema.index({ hospital: 1, admission: 1, externalId: 1 }, { unique: true, sparse: true });
 
 export type IPCharge = InferSchemaType<typeof ipChargeSchema> & { _id: Types.ObjectId };
