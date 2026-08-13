@@ -53,9 +53,9 @@ export function useAppointment(id: string | undefined) {
  * IMPORTANT: Always invalidate ["appointment-slots", doctorId, date] after any
  * booking, cancellation, or reschedule mutation.
  */
-export function useAvailableSlots(doctorId?: string, date?: string) {
+export function useAvailableSlots(doctorId?: string, date?: string, patientId?: string) {
   return useQuery({
-    queryKey: ["appointment-slots", doctorId, date],
+    queryKey: ["appointment-slots", doctorId, date, patientId],
     enabled: !!doctorId && !!date,
     staleTime: 0,          // Never serve stale slot availability data
     gcTime: 0,             // Evict from cache immediately when no longer subscribed
@@ -64,7 +64,7 @@ export function useAvailableSlots(doctorId?: string, date?: string) {
       if (!doctorId || !date) return [] as string[];
       const res = await api.get<{ data: { bookedSlots: string[] } }>(
         "/appointments/available-slots",
-        { params: { doctorId, date } }
+        { params: { doctorId, date, patientId } }
       );
       return res.data.data.bookedSlots;
     },

@@ -269,14 +269,21 @@ export const getPublicHospitalBranches = catchAsync(async (_req: Request, res: R
 });
 
 export const getPublicBookedSlots = catchAsync(async (req: Request, res: Response) => {
-  const { doctorId, date } = req.query as Record<string, string>;
+  const { doctorId, date, phone, patientId } = req.query as Record<string, string>;
   if (!doctorId || !date) {
     return res.json({ status: "success", data: { bookedSlots: [] } });
   }
 
+  let resolvedPatientId = patientId;
+  if (!resolvedPatientId && phone) {
+    const patientDoc = await Patient.findOne({ phone: phone.trim() }).select("_id");
+    if (patientDoc) {
+      resolvedPatientId = patientDoc._id.toString();
+    }
+  }
+
   // Delegate to the shared AppointmentSlotService — single source of truth.
-  // No hospitalId scope for public routes (doctor may be cross-hospital in a multi-tenant setup).
-  const bookedSlots = await AppointmentSlotService.getBookedSlots(doctorId, date);
+  const bookedSlots = await AppointmentSlotService.getBookedSlots(doctorId, date, undefined, resolvedPatientId);
   res.json({ status: "success", data: { bookedSlots } });
 });
 
@@ -311,9 +318,39 @@ export const createPublicAppointment = catchAsync(async (req: Request, res: Resp
       status: "opd"
     });
   }
+
+  const bookingDate = new Date(date);
+
+  // 1b. Check doctor slot conflict
+  const slotClash = await AppointmentSlotService.checkSlotConflict(
+    doctorId,
+    bookingDate,
+    time,
+    hospital._id
+  );
+  if (slotClash) {
+    throw new AppError(
+      "This appointment slot has already been booked. Please choose another available slot.",
+      409
+    );
+  }
+
+  // 1c. Check patient slot conflict across all doctors
+  const patientSlotClash = await AppointmentSlotService.checkPatientSlotConflict(
+    patient._id,
+    bookingDate,
+    time,
+    hospital._id
+  );
+  if (patientSlotClash) {
+    const otherDocName = (patientSlotClash.doctor as any)?.name || "another doctor";
+    throw new AppError(
+      `Patient already has an active appointment scheduled at ${time} with Dr. ${otherDocName}. A patient cannot book appointments with multiple doctors at the exact same time slot.`,
+      409
+    );
+  }
   
   // 2. Generate Reference ID
-  const bookingDate = new Date(date);
   const dateStr = bookingDate.toISOString().split("T")[0].replace(/-/g, "");
   const aptPrefix = `APT-${dateStr}-`;
   
