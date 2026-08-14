@@ -252,8 +252,7 @@ export function BedsPage() {
     { header: "Code", render: (w) => <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">{w.code}</span> },
     { header: "Type (Section)", render: (w) => <Badge tone={w.wardType === "ICU" || w.wardType === "NICU" ? "danger" : "info"}>{w.wardType}</Badge> },
     { header: "Floor", render: (w) => <span className="text-slate-600 font-medium">Floor {w.floorNumber}</span> },
-    { header: "Nurse Station", render: (w) => <span className="text-xs text-slate-600 font-medium">{(w as any).nurseStation || "NS-1"}</span> },
-    { header: "Max Rooms", render: (w) => <span className="font-bold text-slate-700">{(w as any).maxRooms || 20} Rooms</span> },
+    { header: "Max Rooms", render: (w) => <span className="font-bold text-slate-700">{w.maxRooms ?? 20} Rooms</span> },
     {
       header: "Status",
       render: (w) => (
@@ -264,12 +263,18 @@ export function BedsPage() {
       header: "Actions",
       render: (w) => (
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(`/admin/beds/edit-ward/${w._id}`)} className="text-slate-400 hover:text-navy-700 transition-colors" title="Edit Ward Master">
-            <Pencil className="h-4 w-4" />
-          </button>
-          <button onClick={() => handleDeleteWard(w._id)} className="text-slate-400 hover:text-red-650 transition-colors" title="Delete Ward">
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {!isAllBranches ? (
+            <>
+              <button onClick={() => navigate(`/admin/beds/edit-ward/${w._id}`)} className="text-slate-400 hover:text-navy-700 transition-colors" title="Edit Ward Master">
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button onClick={() => handleDeleteWard(w._id)} className="text-slate-400 hover:text-red-650 transition-colors" title="Delete Ward">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
+          ) : (
+            <span className="text-xs text-slate-400 italic">Read-Only</span>
+          )}
         </div>
       )
     }
@@ -285,7 +290,7 @@ export function BedsPage() {
         </div>
       )
     },
-    { header: "Ward", render: (r) => <span className="text-slate-700 font-semibold">{r.wardName || (typeof r.ward === "object" ? r.ward.name : "—")}</span> },
+    { header: "Ward", render: (r) => <span className="text-slate-700 font-semibold">{r.wardName || (typeof r.ward === "object" && r.ward ? (r.ward as any).name : "—")}</span> },
     { header: "Accommodation", render: (r) => <Badge tone="info">{r.roomType}</Badge> },
     {
       header: "Climate",
@@ -334,12 +339,18 @@ export function BedsPage() {
           <button onClick={() => setViewRoomDetails(r)} className="text-slate-400 hover:text-navy-700 transition-colors" title="View Details">
             <Eye className="h-4 w-4" />
           </button>
-          <button onClick={() => navigate(`/admin/beds/edit-room/${r._id}`)} className="text-slate-400 hover:text-navy-700 transition-colors" title="Edit Room Master Data">
-            <Pencil className="h-4 w-4" />
-          </button>
-          <button onClick={() => handleDeleteRoom(r)} className="text-slate-400 hover:text-red-650 transition-colors" title="Delete Room">
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {!isAllBranches ? (
+            <>
+              <button onClick={() => navigate(`/admin/beds/edit-room/${r._id}`)} className="text-slate-400 hover:text-navy-700 transition-colors" title="Edit Room Master Data">
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button onClick={() => handleDeleteRoom(r)} className="text-slate-400 hover:text-red-650 transition-colors" title="Delete Room">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
+          ) : (
+            <span className="text-xs text-slate-400 italic">Read-Only</span>
+          )}
         </div>
       )
     }
@@ -350,8 +361,8 @@ export function BedsPage() {
       header: "Bed ID",
       render: (b) => <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded">{b.bedCode}</span>
     },
-    { header: "Ward", render: (b) => <span className="text-slate-700 font-semibold">{typeof b.ward === "object" ? b.ward.name : "—"}</span> },
-    { header: "Room", render: (b) => <span className="text-slate-700 font-bold">Room {typeof b.room === "object" ? b.room.roomNumber : "—"}</span> },
+    { header: "Ward", render: (b) => <span className="text-slate-700 font-semibold">{typeof b.ward === "object" && b.ward ? (b.ward as any).name : "—"}</span> },
+    { header: "Room", render: (b) => <span className="text-slate-700 font-bold">Room {typeof b.room === "object" && b.room ? (b.room as any).roomNumber : "—"}</span> },
     {
       header: "Patient",
       render: (b) => (
@@ -381,55 +392,61 @@ export function BedsPage() {
       header: "Actions",
       render: (b) => (
         <div className="flex items-center gap-2">
-          {b.status === "Available" && (
-            <button
-              onClick={() => navigate("/reception/ip-management")}
-              className="text-xs bg-navy-700 text-white px-2 py-1 rounded hover:bg-navy-800 transition flex items-center gap-1 font-medium"
-              title="Assign Patient"
-            >
-              <UserPlus className="h-3 w-3" /> Assign
-            </button>
+          {!isAllBranches ? (
+            <>
+              {b.status === "Available" && (
+                <button
+                  onClick={() => navigate("/reception/ip-management")}
+                  className="text-xs bg-navy-700 text-white px-2 py-1 rounded hover:bg-navy-800 transition flex items-center gap-1 font-medium"
+                  title="Assign Patient"
+                >
+                  <UserPlus className="h-3 w-3" /> Assign
+                </button>
+              )}
+              {b.status === "Occupied" && (
+                <button
+                  onClick={() => navigate("/reception/ip-management")}
+                  className="text-xs bg-amber-600 text-white px-2 py-1 rounded hover:bg-amber-700 transition flex items-center gap-1 font-medium"
+                  title="Transfer Patient"
+                >
+                  <ArrowRightLeft className="h-3 w-3" /> Transfer
+                </button>
+              )}
+              <button
+                onClick={() => navigate(`/admin/beds/edit-bed/${b._id}`)}
+                className="p-1.5 rounded text-slate-400 hover:text-navy-700 transition"
+                title="Edit Bed Master"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => handleToggleBedBlock(b)}
+                className={`p-1.5 rounded transition ${b.status === "Blocked" ? "text-red-600 bg-red-50 hover:bg-red-100" : "text-slate-400 hover:bg-slate-100"}`}
+                title={b.status === "Blocked" ? "Unblock Bed" : "Block Bed"}
+                disabled={b.status === "Occupied"}
+              >
+                <Ban className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => handleMarkCleaning(b)}
+                className={`p-1.5 rounded transition ${b.status === "Cleaning" ? "text-amber-600 bg-amber-50 hover:bg-amber-100" : "text-slate-400 hover:bg-slate-100"}`}
+                title={b.status === "Cleaning" ? "Mark Cleaning Finished" : "Mark for Cleaning"}
+                disabled={b.status === "Occupied"}
+              >
+                <Sparkles className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => handleDeleteBed(b._id)}
+                className="p-1.5 rounded text-slate-400 hover:text-red-650 transition"
+                title="Delete Bed"
+                disabled={b.status === "Occupied"}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
+          ) : (
+            <span className="text-xs text-slate-400 italic">Read-Only</span>
           )}
-          {b.status === "Occupied" && (
-            <button
-              onClick={() => navigate("/reception/ip-management")}
-              className="text-xs bg-amber-600 text-white px-2 py-1 rounded hover:bg-amber-700 transition flex items-center gap-1 font-medium"
-              title="Transfer Patient"
-            >
-              <ArrowRightLeft className="h-3 w-3" /> Transfer
-            </button>
-          )}
-          <button
-            onClick={() => navigate(`/admin/beds/edit-bed/${b._id}`)}
-            className="p-1.5 rounded text-slate-400 hover:text-navy-700 transition"
-            title="Edit Bed Master"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => handleToggleBedBlock(b)}
-            className={`p-1.5 rounded transition ${b.status === "Blocked" ? "text-red-600 bg-red-50 hover:bg-red-100" : "text-slate-400 hover:bg-slate-100"}`}
-            title={b.status === "Blocked" ? "Unblock Bed" : "Block Bed"}
-            disabled={b.status === "Occupied"}
-          >
-            <Ban className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => handleMarkCleaning(b)}
-            className={`p-1.5 rounded transition ${b.status === "Cleaning" ? "text-amber-600 bg-amber-50 hover:bg-amber-100" : "text-slate-400 hover:bg-slate-100"}`}
-            title={b.status === "Cleaning" ? "Mark Cleaning Finished" : "Mark for Cleaning"}
-            disabled={b.status === "Occupied"}
-          >
-            <Sparkles className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => handleDeleteBed(b._id)}
-            className="p-1.5 rounded text-slate-400 hover:text-red-650 transition"
-            title="Delete Bed"
-            disabled={b.status === "Occupied"}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
         </div>
       )
     }
@@ -437,6 +454,8 @@ export function BedsPage() {
 
   return (
     <div className="space-y-6 w-full pb-10">
+      <AllBranchesNoticeBanner />
+
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
@@ -449,19 +468,37 @@ export function BedsPage() {
         </div>
         <div className="flex gap-3">
           {activeTab === "wards" && (
-            <Button variant="primary" onClick={() => navigate("/admin/beds/create-ward")}>
-              <Plus className="h-4 w-4" /> Create Ward
-            </Button>
+            !isAllBranches ? (
+              <Button variant="primary" onClick={() => navigate("/admin/beds/create-ward")}>
+                <Plus className="h-4 w-4" /> Create Ward
+              </Button>
+            ) : (
+              <Button variant="outline" disabled className="opacity-60 cursor-not-allowed bg-slate-100 text-slate-400 border-slate-200" title="Switch to a specific branch to create wards">
+                <Plus className="h-4 w-4" /> Create Ward (Read Only)
+              </Button>
+            )
           )}
           {activeTab === "rooms" && (
-            <Button variant="primary" onClick={() => navigate("/admin/beds/create-room")}>
-              <Plus className="h-4 w-4" /> Create Room
-            </Button>
+            !isAllBranches ? (
+              <Button variant="primary" onClick={() => navigate("/admin/beds/create-room")}>
+                <Plus className="h-4 w-4" /> Create Room
+              </Button>
+            ) : (
+              <Button variant="outline" disabled className="opacity-60 cursor-not-allowed bg-slate-100 text-slate-400 border-slate-200" title="Switch to a specific branch to create rooms">
+                <Plus className="h-4 w-4" /> Create Room (Read Only)
+              </Button>
+            )
           )}
           {activeTab === "beds" && (
-            <Button variant="primary" onClick={() => navigate("/admin/beds/create-beds")}>
-              <Plus className="h-4 w-4" /> Configure Beds
-            </Button>
+            !isAllBranches ? (
+              <Button variant="primary" onClick={() => navigate("/admin/beds/create-beds")}>
+                <Plus className="h-4 w-4" /> Configure Beds
+              </Button>
+            ) : (
+              <Button variant="outline" disabled className="opacity-60 cursor-not-allowed bg-slate-100 text-slate-400 border-slate-200" title="Switch to a specific branch to configure beds">
+                <Plus className="h-4 w-4" /> Configure Beds (Read Only)
+              </Button>
+            )
           )}
         </div>
       </div>

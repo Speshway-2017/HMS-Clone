@@ -11,6 +11,7 @@ import { ImportExcelModal } from "../../components/ui/ImportExcelModal";
 import { exportToExcel } from "../../lib/excelUtils";
 import { InputField, SelectField } from "../../components/ui/Field";
 import { useInventory, useCreateInventoryItem, useUpdateInventoryItem, useDeleteInventoryItem } from "../../features/inventory";
+import { useSuppliers } from "../../features/suppliers";
 
 function generateAutoSku(medName: string = "", cat: string = "Analgesic"): string {
   const catPrefix = (cat || "MED").substring(0, 3).toUpperCase();
@@ -46,7 +47,7 @@ function mapBackendToMedicine(item: any): Medicine {
   const parts = item.description ? item.description.split(" | ") : [];
   const subcategory = parts[0] || "Analgesic";
   const expiryDate = parts[1] || "";
-  
+
   return {
     _id: item._id,
     name: item.name,
@@ -82,17 +83,9 @@ export function PharmacyInventoryManagement() {
   const [price, setPrice] = useState(0);
   const [batchNo, setBatchNo] = useState("");
   const [supplier, setSupplier] = useState("");
-  const [appSuppliers, setAppSuppliers] = useState<{ _id: string; name: string }[]>([]);
-
-  // Load suppliers from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem("hms_pharmacy_suppliers");
-    if (saved) {
-      setAppSuppliers(JSON.parse(saved));
-    }
-  }, [isAddEditOpen]);
 
   // TanStack Query Hooks
+  const { data: dbSuppliers = [] } = useSuppliers();
   const { data: inventoryData, isLoading } = useInventory({ category: "medicines", search });
   const createMutation = useCreateInventoryItem();
   const updateMutation = useUpdateInventoryItem(selectedMed?._id || "");
@@ -175,10 +168,14 @@ export function PharmacyInventoryManagement() {
     }
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting || createMutation.isPending || updateMutation.isPending) return;
     if (!name || !sku || !batchNo) return;
 
+    setIsSubmitting(true);
     const payload = {
       name,
       strength: medStrength,
@@ -196,18 +193,23 @@ export function PharmacyInventoryManagement() {
     try {
       if (selectedMed) {
         await updateMutation.mutateAsync(payload);
+        toast.success("Medicine updated successfully!");
       } else {
         await createMutation.mutateAsync(payload);
+        toast.success("Medicine added successfully!");
       }
       setIsAddEditOpen(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to save medicine", err);
+      toast.error(err?.response?.data?.message || "Failed to save medicine.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const filtered = medicines.filter(m => {
-    const matchesSearch = 
-      m.name.toLowerCase().includes(search.toLowerCase()) || 
+    const matchesSearch =
+      m.name.toLowerCase().includes(search.toLowerCase()) ||
       m.sku.toLowerCase().includes(search.toLowerCase()) ||
       m.batchNo.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = filterCategory === "All" || m.category === filterCategory;
@@ -312,9 +314,8 @@ export function PharmacyInventoryManagement() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setFilterCategory("All")}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-              filterCategory === "All" ? "bg-navy-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${filterCategory === "All" ? "bg-navy-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
           >
             All Categories
           </button>
@@ -322,9 +323,8 @@ export function PharmacyInventoryManagement() {
             <button
               key={cat}
               onClick={() => setFilterCategory(cat)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                filterCategory === cat ? "bg-navy-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${filterCategory === cat ? "bg-navy-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
             >
               {cat}
             </button>
@@ -443,9 +443,9 @@ export function PharmacyInventoryManagement() {
       </Card>
 
       {/* Add / Edit Modal */}
-      <Modal 
-        title={selectedMed ? "Edit Medicine" : "Add New Medicine"} 
-        isOpen={isAddEditOpen} 
+      <Modal
+        title={selectedMed ? "Edit Medicine" : "Add New Medicine"}
+        isOpen={isAddEditOpen}
         onClose={() => setIsAddEditOpen(false)}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -548,31 +548,49 @@ export function PharmacyInventoryManagement() {
               onChange={(e) => setPrice(Number(e.target.value))}
             />
 
-            <InputField
-              label="Supplier"
-              required
-              value={supplier}
-              onChange={(e) => setSupplier(e.target.value)}
-              placeholder="e.g. Acme Pharma Distributors"
-              className="sm:col-span-2"
-              list="suppliers-datalist"
-            />
-            <datalist id="suppliers-datalist">
-              {supplier.trim().length > 0 &&
-                appSuppliers
-                  .filter((s) =>
-                    s.name.toLowerCase().includes(supplier.toLowerCase())
-                  )
-                  .map((s) => <option key={s._id} value={s.name} />)}
-            </datalist>
+            {dbSuppliers.length > 0 ? (
+              <SelectField
+                label="Supplier"
+                required
+                value={supplier}
+                onChange={(e) => setSupplier(e.target.value)}
+                className="sm:col-span-2"
+              >
+                <option value="">-- Select Registered Supplier --</option>
+                {dbSuppliers.map((s) => (
+                  <option key={s._id} value={s.name}>
+                    {s.name} ({s.supplierId || s.phone || "Active"})
+                  </option>
+                ))}
+                {supplier && !dbSuppliers.some((s) => s.name === supplier) && (
+                  <option value={supplier}>{supplier}</option>
+                )}
+              </SelectField>
+            ) : (
+              <InputField
+                label="Supplier"
+                required
+                value={supplier}
+                onChange={(e) => setSupplier(e.target.value)}
+                placeholder="e.g. Apollo Pharmacy Distributors"
+                className="sm:col-span-2"
+              />
+            )}
           </div>
 
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
             <Button type="button" variant="secondary" onClick={() => setIsAddEditOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit">
-              {selectedMed ? "Save Changes" : "Add Medicine"}
+            <Button
+              type="submit"
+              disabled={isSubmitting || createMutation.isPending || updateMutation.isPending}
+            >
+              {isSubmitting || createMutation.isPending || updateMutation.isPending
+                ? "Saving..."
+                : selectedMed
+                  ? "Save Changes"
+                  : "Add Medicine"}
             </Button>
           </div>
         </form>

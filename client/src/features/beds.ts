@@ -45,8 +45,9 @@ export interface ListBedsResponse {
 }
 
 export function useBeds(params: { search?: string; ward?: string; room?: string; status?: string; page?: number; limit?: number } = {}) {
+  const activeBranchId = localStorage.getItem("hms_active_branch_id") || "all";
   return useQuery({
-    queryKey: ["beds", params],
+    queryKey: ["beds", params, activeBranchId],
     queryFn: async () => {
       const res = await api.get<{ data: ListBedsResponse }>("/beds", { params });
       return res.data.data;

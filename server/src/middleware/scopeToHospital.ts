@@ -30,7 +30,7 @@ export async function scopeToHospital(req: Request, _res: Response, next: NextFu
           hospitalId: null as any,
           branchId: null,
           isBranchScoped: false,
-          queryFilter: { branch: null }
+          queryFilter: { hospital: null as any, branch: null }
         };
       }
       return next();

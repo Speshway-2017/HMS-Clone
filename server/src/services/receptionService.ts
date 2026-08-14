@@ -275,7 +275,7 @@ export class ReceptionService {
     // Find all patient document IDs associated with this patient (by patientId or linked user account)
     let allPatientIds: any[] = [patientId];
     if (patient.user) {
-      const relatedDocs = await Patient.find({ hospital: targetHospital, user: patient.user }).select("_id");
+      const relatedDocs = await Patient.find({ ...queryScope, user: patient.user }).select("_id");
       if (relatedDocs.length > 0) {
         allPatientIds = relatedDocs.map(p => p._id);
       }
@@ -1410,8 +1410,10 @@ export class ReceptionService {
 
     if (outcome === "ip") {
       // Create an Admission Request notification for receptionists
+      const docBranch = (queueItem.doctor as any)?.branch || (patient as any)?.branch || (queueItem as any)?.branch || null;
       await ReceptionRepository.createNotification({
         hospital: hospitalId,
+        branch: docBranch,
         title: "Inpatient Admission Request",
         message: `Dr. ${(queueItem.doctor as any).name} requested IP admission for ${patient.name} (${patient.uhid}) due to: ${notes}`,
         type: "admission_request",

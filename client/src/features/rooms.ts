@@ -47,8 +47,9 @@ export interface ListRoomsResponse {
 }
 
 export function useRooms(params: { search?: string; ward?: string; status?: string; page?: number; limit?: number } = {}) {
+  const activeBranchId = localStorage.getItem("hms_active_branch_id") || "all";
   return useQuery({
-    queryKey: ["rooms", params],
+    queryKey: ["rooms", params, activeBranchId],
     queryFn: async () => {
       const res = await api.get<{ data: ListRoomsResponse }>("/rooms", { params });
       return res.data.data;
