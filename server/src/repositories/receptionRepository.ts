@@ -179,13 +179,11 @@ export class ReceptionRepository {
 
   static async getRoomsAvailability(hospitalId: any) {
     let filter = toFilter(hospitalId);
-    let hId = filter.hospital || filter._id || hospitalId;
 
     let rooms = await Room.find({ ...filter, status: { $ne: "Inactive" } }).populate("ward").lean();
 
     if (!rooms || rooms.length === 0) {
-      await ReceptionRepository.seedDefaultWardsAndRooms(hId);
-      rooms = await Room.find({ ...filter, status: { $ne: "Inactive" } }).populate("ward").lean();
+      return [];
     }
 
     const beds = await Bed.find(filter).lean();
