@@ -23,6 +23,8 @@ export interface WardInfo {
   code: string;
   wardType: WardType;
   floorNumber: number;
+  maxRooms?: number;
+  nurseStation?: string;
   description: string;
   status: "Active" | "Inactive";
   createdAt: string;
@@ -40,8 +42,9 @@ export interface ListWardsResponse {
 }
 
 export function useWards(params: { search?: string; wardType?: string; status?: string; page?: number; limit?: number } = {}) {
+  const activeBranchId = localStorage.getItem("hms_active_branch_id") || "all";
   return useQuery({
-    queryKey: ["wards", params],
+    queryKey: ["wards", params, activeBranchId],
     queryFn: async () => {
       const res = await api.get<{ data: ListWardsResponse }>("/wards", { params });
       return res.data.data;
@@ -54,6 +57,8 @@ export interface CreateWardPayload {
   code: string;
   wardType: string;
   floorNumber: number;
+  maxRooms?: number;
+  nurseStation?: string;
   description?: string;
   status?: string;
 }
@@ -76,6 +81,8 @@ export interface UpdateWardPayload {
   code?: string;
   wardType?: string;
   floorNumber?: number;
+  maxRooms?: number;
+  nurseStation?: string;
   description?: string;
   status?: string;
 }

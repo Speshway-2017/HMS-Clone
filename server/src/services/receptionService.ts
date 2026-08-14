@@ -1410,8 +1410,10 @@ export class ReceptionService {
 
     if (outcome === "ip") {
       // Create an Admission Request notification for receptionists
+      const docBranch = (queueItem.doctor as any)?.branch || (patient as any)?.branch || (queueItem as any)?.branch || null;
       await ReceptionRepository.createNotification({
         hospital: hospitalId,
+        branch: docBranch,
         title: "Inpatient Admission Request",
         message: `Dr. ${(queueItem.doctor as any).name} requested IP admission for ${patient.name} (${patient.uhid}) due to: ${notes}`,
         type: "admission_request",

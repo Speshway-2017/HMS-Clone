@@ -152,7 +152,7 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
 
     // Database Notifications: Targeted to doctorId, patientRefId, or role
     DbNotification.find({
-      hospital: hospitalFilter.hospital,
+      ...buildBranchQuery(hospitalFilter),
       $or: [
         ...(doctorId ? [
           { recipientDoctor: doctorId },

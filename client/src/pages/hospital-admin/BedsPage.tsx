@@ -252,8 +252,7 @@ export function BedsPage() {
     { header: "Code", render: (w) => <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">{w.code}</span> },
     { header: "Type (Section)", render: (w) => <Badge tone={w.wardType === "ICU" || w.wardType === "NICU" ? "danger" : "info"}>{w.wardType}</Badge> },
     { header: "Floor", render: (w) => <span className="text-slate-600 font-medium">Floor {w.floorNumber}</span> },
-    { header: "Nurse Station", render: (w) => <span className="text-xs text-slate-600 font-medium">{(w as any).nurseStation || "NS-1"}</span> },
-    { header: "Max Rooms", render: (w) => <span className="font-bold text-slate-700">{(w as any).maxRooms || 20} Rooms</span> },
+    { header: "Max Rooms", render: (w) => <span className="font-bold text-slate-700">{w.maxRooms ?? 20} Rooms</span> },
     {
       header: "Status",
       render: (w) => (
@@ -291,7 +290,7 @@ export function BedsPage() {
         </div>
       )
     },
-    { header: "Ward", render: (r) => <span className="text-slate-700 font-semibold">{r.wardName || (typeof r.ward === "object" ? r.ward.name : "—")}</span> },
+    { header: "Ward", render: (r) => <span className="text-slate-700 font-semibold">{r.wardName || (typeof r.ward === "object" && r.ward ? (r.ward as any).name : "—")}</span> },
     { header: "Accommodation", render: (r) => <Badge tone="info">{r.roomType}</Badge> },
     {
       header: "Climate",
@@ -362,8 +361,8 @@ export function BedsPage() {
       header: "Bed ID",
       render: (b) => <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded">{b.bedCode}</span>
     },
-    { header: "Ward", render: (b) => <span className="text-slate-700 font-semibold">{typeof b.ward === "object" ? b.ward.name : "—"}</span> },
-    { header: "Room", render: (b) => <span className="text-slate-700 font-bold">Room {typeof b.room === "object" ? b.room.roomNumber : "—"}</span> },
+    { header: "Ward", render: (b) => <span className="text-slate-700 font-semibold">{typeof b.ward === "object" && b.ward ? (b.ward as any).name : "—"}</span> },
+    { header: "Room", render: (b) => <span className="text-slate-700 font-bold">Room {typeof b.room === "object" && b.room ? (b.room as any).roomNumber : "—"}</span> },
     {
       header: "Patient",
       render: (b) => (
