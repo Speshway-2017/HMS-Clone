@@ -286,3 +286,18 @@ export interface Invoice {
   totals: InvoiceTotals;
   billingType?: string;
 }
+
+export interface Supplier {
+  _id: string;
+  supplierId: string;
+  name: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  address: string;
+  outstandingBalance: number;
+  status: "active" | "inactive";
+  createdAt?: string;
+  updatedAt?: string;
+}
+

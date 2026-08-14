@@ -14,8 +14,9 @@ interface InventoryListResponse extends Paginated<InventoryItem> {
 }
 
 export function useInventory(params?: InventoryListParams) {
+  const activeBranchId = localStorage.getItem("hms_active_branch_id") || "all";
   return useQuery({
-    queryKey: ["inventory", params],
+    queryKey: ["inventory", params, activeBranchId],
     queryFn: async () => {
       const res = await api.get<InventoryListResponse>("/inventory", { params });
       return res.data;
@@ -67,8 +68,9 @@ export function useDeleteInventoryItem() {
 }
 
 export function useMedicineNames(search?: string) {
+  const activeBranchId = localStorage.getItem("hms_active_branch_id") || "all";
   return useQuery({
-    queryKey: ["medicine-names", search],
+    queryKey: ["medicine-names", search, activeBranchId],
     queryFn: async () => {
       const params: Record<string, string> = {};
       if (search) params.search = search;
@@ -88,8 +90,9 @@ export interface MedicineVariant {
 }
 
 export function useMedicineVariants(name: string) {
+  const activeBranchId = localStorage.getItem("hms_active_branch_id") || "all";
   return useQuery({
-    queryKey: ["medicine-variants", name],
+    queryKey: ["medicine-variants", name, activeBranchId],
     enabled: !!name && name.trim().length > 0,
     queryFn: async () => {
       const res = await api.get<{ status: string; data: MedicineVariant[] }>("/inventory/medicine-variants", {
