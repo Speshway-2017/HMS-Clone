@@ -4,6 +4,7 @@ import '../features/authentication/screens/login_screen.dart';
 import '../features/admin/screens/admin_dashboard.dart';
 import '../features/admin/screens/admin_profile_screen.dart';
 import '../features/doctor/screens/doctor_dashboard.dart';
+import '../features/doctor/screens/doctor_profile_screen.dart';
 import '../features/nurse/screens/nurse_dashboard.dart';
 import '../features/nurse/screens/assign_task_screen.dart';
 import '../features/nurse/screens/shift_handover_screen.dart';
@@ -20,6 +21,7 @@ class AppRoutes {
   static const String adminDashboard = '/admin/dashboard';
   static const String adminProfile = '/admin/profile';
   static const String doctorDashboard = '/doctor/dashboard';
+  static const String doctorProfile = '/doctor/profile';
   static const String nurseDashboard = '/nurse/dashboard';
   static const String nurseAssignTask = '/nurse/assign-task';
   static const String nurseShiftHandover = '/nurse/shift-handover';
@@ -84,6 +86,18 @@ class AppRoutes {
             );
           },
           transitionDuration: const Duration(milliseconds: 500),
+        );
+      case doctorProfile:
+        return PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => const DoctorProfileScreen(),
+          settings: settings,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: animation,
+              child: child,
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 300),
         );
       case nurseDashboard:
         return PageRouteBuilder(
