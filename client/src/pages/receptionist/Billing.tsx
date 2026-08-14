@@ -650,13 +650,13 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
+      <div className="print:hidden">
         <h1 className="text-2xl font-bold text-slate-900">Billing Desk</h1>
         <p className="text-sm text-slate-500">Collect consultation fees, manage inpatient bills, and track receipts.</p>
       </div>
 
       {/* Tabs Navigation Row */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 shadow-sm max-w-max">
+      <div className="print:hidden flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 shadow-sm max-w-max">
           <button
             onClick={() => setTab("consultation")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
@@ -705,7 +705,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
       {/* OPD Consultation Billing Tab */}
       {tab === "consultation" && (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          <div className={`${invoice ? "md:col-span-2" : "md:col-span-3"} space-y-6`}>
+          <div className={`${invoice ? "md:col-span-2" : "md:col-span-3"} space-y-6 print:hidden`}>
             {invoiceLoading ? (
               <div className="p-12 text-center text-slate-400">Loading invoice details...</div>
             ) : invoice ? (
@@ -907,7 +907,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
 
           <div className="space-y-6">
             {invoice && (
-              <Card className="space-y-4">
+              <Card className="print:hidden space-y-4">
                 <h3 className="text-sm font-bold text-slate-850 border-b pb-2">Process Receipt Payment</h3>
                 <form onSubmit={handleProcessPayment} className="space-y-3">
                   <SelectField
@@ -1018,7 +1018,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
 
       {/* OPD Pending Bills Tab */}
       {tab === "pending" && (
-        <Card>
+        <Card className="print:hidden">
           <h2 className="text-base font-bold text-slate-800 mb-4">Pending Consultation Bills</h2>
           {pendingLoading ? (
             <div className="py-8 text-center text-slate-400">Loading pending list...</div>
@@ -1030,7 +1030,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
 
       {/* OPD Completed Bills Tab */}
       {tab === "completed" && (
-        <Card>
+        <Card className="print:hidden">
           <h2 className="text-base font-bold text-slate-800 mb-4">Completed Payments History</h2>
           {completedLoading ? (
             <div className="py-8 text-center text-slate-400">Loading completed bills...</div>
@@ -1042,7 +1042,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
 
       {/* OPD Today's Collections Tab */}
       {tab === "collections" && (
-        <Card className="space-y-4">
+        <Card className="print:hidden space-y-4">
           <div className="flex justify-between items-center border-b pb-2">
             <h2 className="text-base font-bold text-slate-800">Collections Summary Today</h2>
             <span className="text-sm font-bold text-navy-700 bg-navy-50 border px-3 py-1 rounded">Total Received: {formatINR(todayTotal)}</span>
@@ -1057,7 +1057,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
 
       {/* ── INPATIENT (IP) BILLING WORKSPACE TAB ── */}
       {tab === "ip" && (
-        <div className="space-y-6">
+        <div className="space-y-6 print:hidden">
           {!selectedAdmissionId ? (
             // Search and Select Patient Selector
             <Card className="space-y-4">

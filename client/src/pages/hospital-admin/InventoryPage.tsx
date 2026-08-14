@@ -42,7 +42,13 @@ export function InventoryPage() {
           <div className="h-2 w-24 rounded-full bg-slate-100">
             <div
               className={`h-2 rounded-full ${i.stockStatus === "critical" ? "bg-red-500" : i.stockStatus === "low" ? "bg-amber-500" : "bg-emerald-500"}`}
-              style={{ width: `${i.maxLevel > 0 ? Math.min(100, (i.stockQty / i.maxLevel) * 100) : 0}%` }}
+              style={{
+                width: `${
+                  i.maxLevel > 0
+                    ? Math.min(100, (i.stockQty / i.maxLevel) * 100)
+                    : Math.min(100, (i.stockQty / Math.max(i.stockQty * 1.2, 100)) * 100)
+                }%`
+              }}
             />
           </div>
           <span className="text-sm text-slate-600">
