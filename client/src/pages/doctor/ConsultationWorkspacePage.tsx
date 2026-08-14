@@ -377,6 +377,8 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
   const [admitExpectedStay, setAdmitExpectedStay] = useState("");
   const [admitReason, setAdmitReason] = useState("");
   const [admitSpecialInstructions, setAdmitSpecialInstructions] = useState("");
+  // Explicit flag — ONLY true when the doctor deliberately clicks "Recommend Admission"
+  const [admitRecommended, setAdmitRecommended] = useState(false);
 
   // Sync ward & room/bed type with Admin DB when fetched
   useEffect(() => {
@@ -469,6 +471,8 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
           setAdmitNotes(rec.clinicalNotes || "");
           setAdmitReason(rec.admissionReason || "");
           setAdmitSpecialInstructions(rec.specialInstructions || "");
+          // Restore the explicit recommended flag from the saved draft
+          setAdmitRecommended(!!(rec as any).recommended);
         }
       } else {
         setTemperature(appt.vitals?.temperature || "");
@@ -540,7 +544,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
         clinicalNotes: admitNotes,
         admissionReason: admitReason,
         specialInstructions: admitSpecialInstructions,
-        recommended: !!(admitDiagnosis || admitWard !== "General" || admitReason),
+        recommended: admitRecommended,
       }
     };
 
@@ -586,6 +590,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
     admitNotes,
     admitReason,
     admitSpecialInstructions,
+    admitRecommended,
   ]);
 
   if (isLoading) {
@@ -718,7 +723,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
           clinicalNotes: admitNotes,
           admissionReason: admitReason,
           specialInstructions: admitSpecialInstructions,
-          recommended: !!(admitDiagnosis || admitWard !== "General" || admitReason),
+          recommended: admitRecommended,
         }
       };
 
@@ -929,6 +934,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
         },
         appointmentId: appointment._id,
       });
+      setAdmitRecommended(true);
       toast.success("Admission recommendation saved to draft!");
     } catch (err: any) {
       const errMsg = err.response?.data?.message || err.message || "Failed to recommend admission";

@@ -2033,7 +2033,8 @@ export class ReceptionService {
     }
   }
 
-  static async transferPatient(hospitalId: Types.ObjectId, transferData: any, userId: Types.ObjectId) {
+  static async transferPatient(filterOrId: any, transferData: any, userId: Types.ObjectId) {
+    const { targetHospital: hospitalId } = parseHospitalAndBranch(filterOrId);
     const { admissionId, newRoomId, newBedId, notes } = transferData;
 
     const session = await mongoose.startSession();
@@ -2041,7 +2042,8 @@ export class ReceptionService {
 
     try {
       const admission = await Admission.findOne({ _id: admissionId, hospital: hospitalId }).session(session);
-      if (!admission || admission.status !== "admitted") {
+      const activeStatuses = ["admitted", "Admitted", "Bed Allocated", "Under Observation", "Waiting for Bed", "In Ward", "ICU", "Operation Scheduled", "Under Treatment", "Transferred"];
+      if (!admission || !activeStatuses.includes(admission.status)) {
         throw new AppError("Active admission record not found.", 404);
       }
 
@@ -2113,8 +2115,8 @@ export class ReceptionService {
       // Release old bed
       await ReceptionRepository.updateBedOccupancy(hospitalId, admission.bed.toString(), false);
 
-      // Occupy new bed
-      await ReceptionRepository.updateBedOccupancy(hospitalId, newBedId, true);
+      // Occupy new bed with patient and admission links
+      await ReceptionRepository.updateBedOccupancy(hospitalId, newBedId, true, admission.patient, admission._id);
 
       // Update admission record
       admission.room = newRoomId;
@@ -2153,9 +2155,11 @@ export class ReceptionService {
     }
   }
 
-  static async requestDischarge(hospitalId: Types.ObjectId, admissionId: string, notes: string, userId: Types.ObjectId) {
+  static async requestDischarge(filterOrId: any, admissionId: string, notes: string, userId: Types.ObjectId) {
+    const { targetHospital: hospitalId } = parseHospitalAndBranch(filterOrId);
     const admission = await Admission.findOne({ _id: admissionId, hospital: hospitalId }).populate("patient");
-    if (!admission || admission.status !== "admitted") {
+    const activeStatuses = ["admitted", "Admitted", "Bed Allocated", "Under Observation", "Waiting for Bed", "In Ward", "ICU", "Operation Scheduled", "Under Treatment", "Transferred"];
+    if (!admission || !activeStatuses.includes(admission.status)) {
       throw new AppError("Active admission record not found.", 404);
     }
 
@@ -2341,7 +2345,8 @@ export class ReceptionService {
     }
   }
 
-  static async rescheduleAppointment(hospitalId: Types.ObjectId, appointmentId: string, data: any, userId: Types.ObjectId) {
+  static async rescheduleAppointment(filterOrId: any, appointmentId: string, data: any, userId: Types.ObjectId) {
+    const { targetHospital: hospitalId } = parseHospitalAndBranch(filterOrId);
     const { newDate, newTime, doctorId, departmentId, reason, remarks } = data;
 
     // ── 1. Date / time guards ──────────────────────────────────────────────────
