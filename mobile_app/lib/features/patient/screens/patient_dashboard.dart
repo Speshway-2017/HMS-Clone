@@ -38,6 +38,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
   String _selectedBookingType = 'In-Person OP Visit';
   final TextEditingController _bookingReasonController = TextEditingController();
   bool _isBookingSubmitting = false;
+  List<String> _remoteBookedSlots = [];
 
   // Medical Records / History Filter State
   String _selectedHistoryFilter = 'All Records';
@@ -58,21 +59,6 @@ class _PatientDashboardState extends State<PatientDashboard> {
     'Pediatrics',
     'Dermatology',
     'Surgery'
-  ];
-
-  final List<String> _availableTimeSlots = [
-    '09:00 AM',
-    '09:30 AM',
-    '10:00 AM',
-    '10:30 AM',
-    '11:00 AM',
-    '11:30 AM',
-    '02:00 PM',
-    '02:30 PM',
-    '03:00 PM',
-    '03:30 PM',
-    '04:00 PM',
-    '04:30 PM'
   ];
 
   @override
@@ -194,10 +180,23 @@ class _PatientDashboardState extends State<PatientDashboard> {
 
   Map<String, dynamic>? get _nextAppointment {
     if (_appointments.isEmpty) return null;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     for (var appt in _appointments) {
       final status = (appt['status'] ?? '').toString().toLowerCase();
-      if (status != 'cancelled' && status != 'completed') {
-        return appt;
+      if (status != 'cancelled' && status != 'completed' && status != 'missed' && status != 'no_show') {
+        final dateRaw = appt['date'] ?? appt['createdAt'];
+        if (dateRaw != null) {
+          final apptDate = DateTime.tryParse(dateRaw.toString());
+          if (apptDate != null) {
+            final apptDay = DateTime(apptDate.year, apptDate.month, apptDate.day);
+            if (!apptDay.isBefore(today)) {
+              return appt;
+            }
+          }
+        } else {
+          return appt;
+        }
       }
     }
     return _appointments.first;
@@ -205,10 +204,82 @@ class _PatientDashboardState extends State<PatientDashboard> {
 
   List<Map<String, dynamic>> get _upcomingAppointments {
     if (_appointments.isEmpty) return [];
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     return _appointments.where((appt) {
       final status = (appt['status'] ?? '').toString().toLowerCase();
-      return status != 'cancelled' && status != 'completed' && status != 'missed';
+      if (status == 'cancelled' || status == 'completed' || status == 'missed' || status == 'no_show') {
+        return false;
+      }
+      final dateRaw = appt['date'] ?? appt['createdAt'];
+      if (dateRaw != null) {
+        final apptDate = DateTime.tryParse(dateRaw.toString());
+        if (apptDate != null) {
+          final apptDay = DateTime(apptDate.year, apptDate.month, apptDate.day);
+          if (apptDay.isBefore(today)) {
+            return false;
+          }
+        }
+      }
+      return true;
     }).toList();
+  }
+
+  Map<String, dynamic> _getAppointmentStatusInfo(Map<String, dynamic> appt) {
+    final rawStatus = (appt['status'] ?? 'scheduled').toString().toLowerCase();
+    final dateRaw = appt['date'] ?? appt['createdAt'];
+
+    bool isPastDate = false;
+    if (dateRaw != null) {
+      final apptDate = DateTime.tryParse(dateRaw.toString());
+      if (apptDate != null) {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final apptDay = DateTime(apptDate.year, apptDate.month, apptDate.day);
+        if (apptDay.isBefore(today)) {
+          isPastDate = true;
+        }
+      }
+    }
+
+    if (rawStatus == 'cancelled') {
+      return {
+        'label': 'Cancelled',
+        'isPastAutoCompleted': false,
+        'color': const Color(0xFFEF4444),
+        'bgColor': const Color(0xFFFEF2F2),
+        'borderColor': const Color(0xFFFCA5A5),
+      };
+    }
+
+    if (rawStatus == 'completed' && !isPastDate) {
+      return {
+        'label': 'Completed (Attended)',
+        'isPastAutoCompleted': false,
+        'color': const Color(0xFF059669),
+        'bgColor': const Color(0xFFECFDF5),
+        'borderColor': const Color(0xFFA7F3D0),
+      };
+    }
+
+    // Day completed and patient forgot to attend (or past date unattended)
+    if (isPastDate || rawStatus == 'missed' || rawStatus == 'no_show') {
+      return {
+        'label': 'Completed (Past Date)',
+        'isPastAutoCompleted': true,
+        'color': const Color(0xFF7C3AED), // Distinct Vibrant Purple
+        'bgColor': const Color(0xFFF3E8FF), // Soft Purple Background
+        'borderColor': const Color(0xFFDDD6FE), // Light Purple Border
+      };
+    }
+
+    return {
+      'label': rawStatus.toUpperCase(),
+      'isPastAutoCompleted': false,
+      'color': const Color(0xFF2563EB),
+      'bgColor': const Color(0xFFEFF6FF),
+      'borderColor': const Color(0xFFBFDBFE),
+    };
   }
 
   void _showUpcomingAppointmentsModal(BuildContext context) {
@@ -555,6 +626,234 @@ class _PatientDashboardState extends State<PatientDashboard> {
     });
   }
 
+  /// Normalizes and compares two time slot strings (e.g. "10:00 AM" vs "10:00 AM" or "09:30 AM" vs "9:30 AM")
+  bool _isSameTimeSlot(String time1, String time2) {
+    final t1 = time1.trim().toUpperCase();
+    final t2 = time2.trim().toUpperCase();
+    if (t1 == t2) return true;
+
+    String norm(String s) {
+      var str = s.replaceAll(' ', '');
+      if (str.startsWith('0')) str = str.substring(1);
+      return str;
+    }
+    return norm(t1) == norm(t2);
+  }
+
+  /// Checks if the patient already has an active appointment on targetDate and targetTime slot
+  Map<String, dynamic>? _getPatientSlotConflict(DateTime targetDate, String targetTime) {
+    if (_appointments.isEmpty) return null;
+
+    final targetDateStr = targetDate.toString().split(' ')[0];
+
+    for (var appt in _appointments) {
+      final status = (appt['status'] ?? '').toString().toLowerCase();
+      if (status == 'cancelled' || status == 'no_show' || status == 'completed' || status == 'missed') {
+        continue;
+      }
+
+      final dateRaw = appt['date'] ?? appt['createdAt'];
+      if (dateRaw == null) continue;
+
+      String apptDateStr = '';
+      if (dateRaw is String) {
+        apptDateStr = dateRaw.split('T')[0];
+      } else if (dateRaw is DateTime) {
+        apptDateStr = dateRaw.toString().split(' ')[0];
+      }
+
+      if (apptDateStr != targetDateStr) continue;
+
+      final apptTime = (appt['time'] ?? '').toString().trim();
+      if (apptTime.isEmpty) continue;
+
+      if (_isSameTimeSlot(apptTime, targetTime)) {
+        return appt;
+      }
+    }
+
+    return null;
+  }
+
+  /// Fetches real-time booked time slots for the selected doctor & date from MERN backend
+  Future<void> _fetchRemoteBookedSlots() async {
+    if (_selectedBookingDoctor == null) {
+      if (mounted) setState(() => _remoteBookedSlots = []);
+      return;
+    }
+    final docId = (_selectedBookingDoctor!['_id'] ?? _selectedBookingDoctor!['id'] ?? '').toString();
+    final dateStr = _selectedBookingDate.toString().split(' ')[0];
+    if (docId.isEmpty || dateStr.isEmpty) return;
+
+    final booked = await _apiService.fetchBookedSlots(doctorId: docId, date: dateStr);
+    if (mounted) {
+      setState(() {
+        _remoteBookedSlots = booked;
+      });
+    }
+  }
+
+  /// Converts HH:MM or HH:MM AM/PM to 24-hour HH:MM format
+  String _normalizeTo24Hour(String timeStr) {
+    if (timeStr.isEmpty) return "";
+    final t = timeStr.trim();
+    final amPmMatch = RegExp(r'^(\d{1,2}):(\d{2})\s*(AM|PM)$', caseSensitive: false).firstMatch(t);
+    if (amPmMatch != null) {
+      int h = int.parse(amPmMatch.group(1)!);
+      final m = amPmMatch.group(2)!;
+      final period = amPmMatch.group(3)!.toUpperCase();
+      if (period == "PM" && h != 12) h += 12;
+      if (period == "AM" && h == 12) h = 0;
+      return '${h.toString().padLeft(2, '0')}:$m';
+    }
+    final hmMatch = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(t);
+    if (hmMatch != null) {
+      return '${int.parse(hmMatch.group(1)!).toString().padLeft(2, '0')}:${hmMatch.group(2)!}';
+    }
+    return t;
+  }
+
+  /// Builds a list of 12-hour AM/PM formatted time slots from `from` to `to` with `durationMinutes` increments
+  List<String> _buildTimeSlots(String from, String to, int durationMinutes, String? breakTime) {
+    List<String> slots = [];
+    final startParts = from.split(':').map((e) => int.tryParse(e) ?? 0).toList();
+    final endParts = to.split(':').map((e) => int.tryParse(e) ?? 0).toList();
+
+    if (startParts.length < 2 || endParts.length < 2) return slots;
+
+    int current = startParts[0] * 60 + startParts[1];
+    int end = endParts[0] * 60 + endParts[1];
+
+    int breakStart = -1;
+    int breakEnd = -1;
+    if (breakTime != null && breakTime.contains(':')) {
+      final bParts = breakTime.split(':').map((e) => int.tryParse(e) ?? 0).toList();
+      if (bParts.length >= 2) {
+        breakStart = bParts[0] * 60 + bParts[1];
+        breakEnd = breakStart + 60;
+      }
+    }
+
+    while (current + durationMinutes <= end) {
+      if (breakStart != -1 && current >= breakStart && current < breakEnd) {
+        current += durationMinutes;
+        continue;
+      }
+      int h = current ~/ 60;
+      int m = current % 60;
+
+      String period = h >= 12 ? 'PM' : 'AM';
+      int h12 = h % 12 == 0 ? 12 : h % 12;
+      String hStr = h12.toString().padLeft(2, '0');
+      String mStr = m.toString().padLeft(2, '0');
+      slots.add('$hStr:$mStr $period');
+
+      current += durationMinutes;
+    }
+    return slots;
+  }
+
+  /// Dynamic slot generator based on Doctor schedule from backend DB
+  List<String> _getDoctorAvailableSlots(Map<String, dynamic>? doctor, DateTime targetDate) {
+    if (doctor == null) return [];
+
+    // Doctor global status
+    final docStatus = (doctor['status'] ?? '').toString().toLowerCase();
+    final isActive = doctor['isActive'] != false;
+    if (!isActive || docStatus == 'on_leave' || docStatus == 'inactive' || docStatus == 'off_duty') {
+      return [];
+    }
+
+    final targetDateStr = targetDate.toString().split(' ')[0];
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    final dayName = days[targetDate.weekday % 7];
+
+    String fromTime = "09:00";
+    String toTime = "17:00";
+    int duration = 30;
+    String? breakTime = "13:00";
+
+    // 1. Monthly availability override
+    List monthlyList = doctor['monthlyAvailability'] is List ? doctor['monthlyAvailability'] : [];
+    Map<String, dynamic>? monthlyOverride;
+    for (var item in monthlyList) {
+      if (item is Map && item['date']?.toString() == targetDateStr) {
+        monthlyOverride = Map<String, dynamic>.from(item);
+        break;
+      }
+    }
+
+    if (monthlyOverride != null) {
+      if (monthlyOverride['active'] == false) {
+        return [];
+      }
+      if (monthlyOverride['from'] != null && monthlyOverride['from'].toString() != '—') {
+        fromTime = monthlyOverride['from'].toString();
+      }
+      if (monthlyOverride['to'] != null && monthlyOverride['to'].toString() != '—') {
+        toTime = monthlyOverride['to'].toString();
+      }
+    } else {
+      // 2. Weekly working hours schedule
+      List workingHoursList = doctor['workingHours'] is List ? doctor['workingHours'] : [];
+      Map<String, dynamic>? daySchedule;
+      for (var item in workingHoursList) {
+        if (item is Map && item['day']?.toString().toLowerCase() == dayName.toLowerCase()) {
+          daySchedule = Map<String, dynamic>.from(item);
+          break;
+        }
+      }
+
+      if (daySchedule != null) {
+        if (daySchedule['active'] == false) {
+          return []; // Off-duty on Saturday / Sunday or configured off day
+        }
+        final f = daySchedule['from']?.toString() ?? '';
+        final t = daySchedule['to']?.toString() ?? '';
+        if (f.isEmpty || f == '—' || t.isEmpty || t == '—') {
+          return [];
+        }
+        fromTime = f;
+        toTime = t;
+      } else {
+        // Fallback default: Saturday and Sunday are holidays if not specified
+        if (dayName == "Saturday" || dayName == "Sunday") {
+          return [];
+        }
+      }
+    }
+
+    // 3. Consultation Settings
+    final consultSettings = doctor['consultationSettings'];
+    if (consultSettings is Map) {
+      final dur = consultSettings['slotDuration'];
+      if (dur is int && dur > 0) duration = dur;
+      if (dur is String) duration = int.tryParse(dur) ?? duration;
+
+      if (consultSettings['breakTime'] != null) {
+        breakTime = consultSettings['breakTime'].toString();
+      }
+    }
+
+    List<String> rawSlots = _buildTimeSlots(fromTime, toTime, duration, breakTime);
+
+    // Filter out past slots if date is today
+    final now = DateTime.now();
+    final isToday = targetDate.year == now.year && targetDate.month == now.month && targetDate.day == now.day;
+    if (isToday) {
+      rawSlots = rawSlots.where((slotStr) {
+        final slot24 = _normalizeTo24Hour(slotStr);
+        final parts = slot24.split(':');
+        if (parts.length < 2) return true;
+        final h = int.tryParse(parts[0]) ?? 0;
+        final m = int.tryParse(parts[1]) ?? 0;
+        return h > now.hour || (h == now.hour && m > now.minute);
+      }).toList();
+    }
+
+    return rawSlots;
+  }
+
   /// Unified dataset combining Lab Reports, Prescriptions, Appointments, and History logs
   List<Map<String, dynamic>> get _combinedMedicalLogs {
     final List<Map<String, dynamic>> list = [];
@@ -620,6 +919,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
       final docName = _parseNameString(appt['doctor'], 'Dr. Shankar');
       final formattedDoc = docName.startsWith('Dr.') || docName.startsWith('dr.') ? docName : 'Dr. $docName';
 
+      final statusInfo = _getAppointmentStatusInfo(appt);
       list.add({
         'id': appt['_id'] ?? appt['id'],
         'category': isVideo ? 'Video Consultations' : 'Walk-In OPD',
@@ -631,6 +931,8 @@ class _PatientDashboardState extends State<PatientDashboard> {
         'subText': _parseNameString(appt['department'], 'General Medicine'),
         'fileUrl': null,
         'rawDate': DateTime.tryParse(appt['date']?.toString() ?? '') ?? DateTime.now(),
+        'statusInfo': statusInfo,
+        'rawAppt': appt,
       });
     }
 
@@ -1709,6 +2011,59 @@ class _PatientDashboardState extends State<PatientDashboard> {
     final formattedDocName = rawDocName.startsWith('Dr.') ? rawDocName : 'Dr. $rawDocName';
     final dateStr = _selectedBookingDate.toString().split(' ')[0];
 
+    // Check if doctor is off-duty / on holiday on selected date
+    final activeSlots = _getDoctorAvailableSlots(_selectedBookingDoctor, _selectedBookingDate);
+    if (activeSlots.isEmpty) {
+      final dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][_selectedBookingDate.weekday % 7];
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Doctor Off-Duty / Holiday: $formattedDocName has no consultation hours on $dayName ($dateStr). Please choose another date.',
+          ),
+          backgroundColor: Colors.amber.shade900,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+      return;
+    }
+
+    // Validate if patient already has an active appointment at exact same date and time slot
+    final conflictAppt = _getPatientSlotConflict(_selectedBookingDate, _selectedBookingTime);
+    if (conflictAppt != null) {
+      final conflictDoc = conflictAppt['doctor'];
+      final conflictDocName = _parseNameString(conflictDoc, conflictAppt['doctorName']?.toString() ?? 'another doctor');
+      final formattedConflictDoc = conflictDocName.startsWith('Dr.') || conflictDocName.startsWith('dr.') ? conflictDocName : 'Dr. $conflictDocName';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Appointment Conflict: You already have an active appointment scheduled at $_selectedBookingTime on $dateStr with $formattedConflictDoc. You cannot book multiple appointments at the exact same day and time slot.',
+          ),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+      return;
+    }
+
+    // Check if slot was booked by another patient on backend
+    final isRemoteBooked = _remoteBookedSlots.any((b) => _normalizeTo24Hour(b) == _normalizeTo24Hour(_selectedBookingTime));
+    if (isRemoteBooked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Slot Unavailable: The time slot $_selectedBookingTime on $dateStr has already been booked. Please select an available slot.',
+          ),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isBookingSubmitting = true;
     });
@@ -1981,6 +2336,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                     setState(() {
                       _selectedBookingDoctor = doc;
                     });
+                    _fetchRemoteBookedSlots();
                   },
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 10),
@@ -2143,6 +2499,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                             setState(() {
                               _selectedBookingDate = picked;
                             });
+                            _fetchRemoteBookedSlots();
                           }
                         },
                       ),
@@ -2168,6 +2525,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                             setState(() {
                               _selectedBookingDate = dt;
                             });
+                            _fetchRemoteBookedSlots();
                           },
                           borderRadius: BorderRadius.circular(12),
                           child: Container(
@@ -2209,45 +2567,186 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   ),
                   const SizedBox(height: 16),
 
-                  const Text(
-                    'Available Time Slots',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
-                  ),
-                  const SizedBox(height: 8),
+                  Builder(
+                    builder: (context) {
+                      final activeSlots = _getDoctorAvailableSlots(activeDoc, _selectedBookingDate);
+                      final dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][_selectedBookingDate.weekday % 7];
+                      final dateStr = _selectedBookingDate.toString().split(' ')[0];
+                      final rawDocName = _parseNameString(activeDoc['name'] ?? activeDoc['user'], 'Doctor');
+                      final formattedDocName = rawDocName.startsWith('Dr.') ? rawDocName : 'Dr. $rawDocName';
 
-                  // Time Slots Wrap Grid
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _availableTimeSlots.map((slot) {
-                      final isSelected = _selectedBookingTime == slot;
-                      return InkWell(
-                        onTap: () {
-                          setState(() {
-                            _selectedBookingTime = slot;
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      if (activeSlots.isEmpty) {
+                        return Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(top: 8, bottom: 8),
+                          padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isSelected ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
-                            ),
+                            color: const Color(0xFFFFFBEB),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFFDE68A)),
                           ),
-                          child: Text(
-                            slot,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                              color: isSelected ? Colors.white : const Color(0xFF334155),
-                            ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.wb_sunny_rounded, color: Color(0xFFD97706), size: 24),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Doctor Off-Duty / Holiday ($dayName)',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '$formattedDocName has no active consultation slots scheduled on $dayName ($dateStr). Please select another available working day.',
+                                      style: const TextStyle(fontSize: 11, color: Color(0xFFB45309), height: 1.3),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
+                        );
+                      }
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Available Time Slots',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: activeSlots.map((slot) {
+                              final isSelected = _selectedBookingTime == slot;
+                              final conflictAppt = _getPatientSlotConflict(_selectedBookingDate, slot);
+                              final isRemoteBooked = _remoteBookedSlots.any((b) => _normalizeTo24Hour(b) == _normalizeTo24Hour(slot));
+                              final hasConflict = conflictAppt != null || isRemoteBooked;
+
+                              Color bgColor = const Color(0xFFF1F5F9);
+                              Color borderColor = const Color(0xFFE2E8F0);
+                              Color textColor = const Color(0xFF334155);
+
+                              if (isSelected) {
+                                bgColor = hasConflict ? const Color(0xFFDC2626) : const Color(0xFF1E293B);
+                                borderColor = hasConflict ? const Color(0xFFDC2626) : const Color(0xFF1E293B);
+                                textColor = Colors.white;
+                              } else if (hasConflict) {
+                                bgColor = const Color(0xFFFEF2F2);
+                                borderColor = const Color(0xFFFCA5A5);
+                                textColor = const Color(0xFF991B1B);
+                              }
+
+                              return InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedBookingTime = slot;
+                                  });
+                                  if (hasConflict) {
+                                    String msg = 'Slot Conflict: Time slot $slot on $dateStr is already booked.';
+                                    if (conflictAppt != null) {
+                                      final conflictDoc = conflictAppt['doctor'];
+                                      final conflictDocName = _parseNameString(conflictDoc, conflictAppt['doctorName']?.toString() ?? 'another doctor');
+                                      final formattedConflictDoc = conflictDocName.startsWith('Dr.') || conflictDocName.startsWith('dr.') ? conflictDocName : 'Dr. $conflictDocName';
+                                      msg = 'Slot Conflict: You already have an appointment booked at $slot on $dateStr with $formattedConflictDoc.';
+                                    }
+                                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(msg),
+                                        backgroundColor: Colors.red.shade700,
+                                        behavior: SnackBarBehavior.floating,
+                                        duration: const Duration(seconds: 4),
+                                      ),
+                                    );
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: bgColor,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: borderColor),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (hasConflict) ...[
+                                        Icon(
+                                          Icons.lock_clock,
+                                          size: 12,
+                                          color: isSelected ? Colors.white : const Color(0xFFDC2626),
+                                        ),
+                                        const SizedBox(width: 4),
+                                      ],
+                                      Text(
+                                        slot,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: isSelected || hasConflict ? FontWeight.bold : FontWeight.w600,
+                                          color: textColor,
+                                          decoration: hasConflict && !isSelected ? TextDecoration.lineThrough : null,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+
+                  // Conflict Warning Banner if selected slot has active conflict
+                  Builder(
+                    builder: (context) {
+                      final activeConflict = _getPatientSlotConflict(_selectedBookingDate, _selectedBookingTime);
+                      if (activeConflict == null) return const SizedBox.shrink();
+
+                      final conflictDoc = activeConflict['doctor'];
+                      final conflictDocName = _parseNameString(conflictDoc, activeConflict['doctorName']?.toString() ?? 'another doctor');
+                      final formattedConflictDoc = conflictDocName.startsWith('Dr.') || conflictDocName.startsWith('dr.') ? conflictDocName : 'Dr. $conflictDocName';
+                      final formattedDateStr = _selectedBookingDate.toString().split(' ')[0];
+
+                      return Container(
+                        margin: const EdgeInsets.only(top: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFCA5A5)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 22),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Time Slot Already Booked',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF991B1B)),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'You already have an active appointment scheduled at $_selectedBookingTime on $formattedDateStr with $formattedConflictDoc. You cannot book multiple appointments at the exact same day and time.',
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF7F1D1D), height: 1.3),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       );
-                    }).toList(),
+                    },
                   ),
                   const SizedBox(height: 16),
 
@@ -2523,28 +3022,35 @@ class _PatientDashboardState extends State<PatientDashboard> {
                       const SizedBox(height: 16),
 
                       // Submit Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1E293B),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            elevation: 0,
-                          ),
-                          onPressed: _isBookingSubmitting ? null : _handleConfirmBooking,
-                          child: _isBookingSubmitting
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                )
-                              : const Text(
-                                  'Confirm & Book Appointment',
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                                ),
-                        ),
+                      Builder(
+                        builder: (context) {
+                          final activeConflict = _getPatientSlotConflict(_selectedBookingDate, _selectedBookingTime);
+                          final hasConflict = activeConflict != null;
+
+                          return SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: hasConflict ? const Color(0xFFDC2626) : const Color(0xFF1E293B),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                elevation: 0,
+                              ),
+                              onPressed: _isBookingSubmitting ? null : _handleConfirmBooking,
+                              child: _isBookingSubmitting
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                    )
+                                  : Text(
+                                      hasConflict ? 'Slot Unavailable (Already Booked)' : 'Confirm & Book Appointment',
+                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                                    ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -2942,18 +3448,37 @@ class _PatientDashboardState extends State<PatientDashboard> {
                                 style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                            if (item['statusInfo'] != null) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: item['statusInfo']['bgColor'] as Color,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: item['statusInfo']['borderColor'] as Color),
+                                ),
+                                child: Text(
+                                  item['statusInfo']['label'].toString(),
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: item['statusInfo']['color'] as Color,
+                                  ),
+                                ),
                               ),
-                              child: Text(
-                                item['typeLabel'].toString(),
-                                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                            ] else ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: Text(
+                                  item['typeLabel'].toString(),
+                                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                                ),
                               ),
-                            ),
+                            ],
                           ],
                         ),
                       ),

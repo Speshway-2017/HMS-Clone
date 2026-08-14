@@ -78,6 +78,11 @@ import { useDoctors } from "../../features/doctors";
 import { useNotifications } from "../../features/notifications";
 import { generateTimeSlots, isSlotBooked } from "../../lib/slotUtils";
 import { api } from "../../lib/api";
+import { downloadPDF } from "../../utils/pdfGenerator";
+import { DiagnosticReportPDF } from "../../components/pdf/DiagnosticReportPDF";
+import { PrescriptionPDF } from "../../components/pdf/PrescriptionPDF";
+import { ConsultationSlipPDF } from "../../components/pdf/ConsultationSlipPDF";
+import { InvoiceReceiptPDF } from "../../components/pdf/InvoiceReceiptPDF";
 
 const CustomPatientTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -96,6 +101,52 @@ const CustomPatientTooltip = ({ active, payload, label }: any) => {
   }
   return null;
 };
+
+function getAppointmentStatusDetails(appt: any) {
+  const rawStatus = (appt?.status || "scheduled").toLowerCase();
+
+  if (rawStatus === "cancelled") {
+    return {
+      label: "Cancelled",
+      tone: "danger",
+      isPastAutoCompleted: false,
+      badgeClass: "bg-red-50 text-red-700 border border-red-200",
+    };
+  }
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const apptDateObj = appt?.date ? new Date(appt.date) : null;
+  const isPastDate = apptDateObj
+    ? new Date(apptDateObj.getFullYear(), apptDateObj.getMonth(), apptDateObj.getDate()) < today
+    : false;
+
+  if (rawStatus === "completed" && !isPastDate) {
+    return {
+      label: "Completed (Attended)",
+      tone: "success",
+      isPastAutoCompleted: false,
+      badgeClass: "bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold",
+    };
+  }
+
+  // Day completed and patient forgot to attend (or past date unattended)
+  if (isPastDate || rawStatus === "missed" || rawStatus === "no_show") {
+    return {
+      label: "Completed (Past Date)",
+      tone: "warning",
+      isPastAutoCompleted: true,
+      badgeClass: "bg-purple-100 text-purple-800 border border-purple-300 font-extrabold shadow-sm",
+    };
+  }
+
+  return {
+    label: rawStatus.toUpperCase(),
+    tone: "info",
+    isPastAutoCompleted: false,
+    badgeClass: "bg-blue-50 text-blue-700 border border-blue-200 font-bold",
+  };
+}
 
 function normalizeTime(t: string): string {
   if (!t) return "";
@@ -2800,7 +2851,10 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
           {/* ========================================================================= */}
           {apptSubTab === "completed" && (
             <div className="space-y-4">
-              {appointments.filter((a) => a.status === "completed").length === 0 ? (
+              {appointments.filter((a) => {
+                const details = getAppointmentStatusDetails(a);
+                return a.status === "completed" || details.isPastAutoCompleted;
+              }).length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-slate-400 border border-dashed rounded-xl bg-slate-50">
                   <CheckCircle2 className="h-12 w-12 text-slate-300 mb-2" />
                   <p className="text-sm font-semibold">No past consultation records found.</p>
@@ -2808,20 +2862,29 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
               ) : (
                 <div className="space-y-3">
                   {appointments
-                    .filter((a) => a.status === "completed")
+                    .filter((a) => {
+                      const details = getAppointmentStatusDetails(a);
+                      return a.status === "completed" || details.isPastAutoCompleted;
+                    })
                     .map((a) => {
                       const docName = typeof a.doctor === "object" ? (a.doctor as any).name : a.doctor;
                       const deptName = typeof a.department === "object" && a.department ? (a.department as any).name : "General Medicine";
+                      const statusDetails = getAppointmentStatusDetails(a);
 
                       return (
                         <div key={a._id} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                           <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 font-extrabold text-sm">
-                              ✓
+                            <div className={`flex h-10 w-10 items-center justify-center rounded-xl font-extrabold text-sm ${statusDetails.isPastAutoCompleted ? "bg-purple-100 text-purple-700 border border-purple-200" : "bg-emerald-100 text-emerald-700 border border-emerald-200"}`}>
+                              {statusDetails.isPastAutoCompleted ? "⏱" : "✓"}
                             </div>
                             <div>
-                              <h4 className="text-sm font-extrabold text-slate-800">Dr. {docName}</h4>
-                              <p className="text-xs text-slate-500">{deptName} · Completed on {new Date(a.date).toLocaleDateString("en-IN")}</p>
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-sm font-extrabold text-slate-800">Dr. {docName}</h4>
+                                <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold ${statusDetails.badgeClass}`}>
+                                  {statusDetails.label}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500">{deptName} · Scheduled Date: {new Date(a.date).toLocaleDateString("en-IN")}</p>
                               <p className="text-[10px] font-mono text-slate-400">Ref: {a.referenceId || "REF-1002"}</p>
                             </div>
                           </div>
@@ -3419,28 +3482,29 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                               <Eye className="h-3.5 w-3.5 text-indigo-700" /> View Prescription
                             </button>
 
-                            <a
-                              href={rx.pdfUrl || rx.fileUrl || "#"}
-                              onClick={(e) => {
-                                if (!rx.pdfUrl && !rx.fileUrl) {
-                                  e.preventDefault();
-                                  const content = `METROPOLITAN HOSPITAL DIGITAL RX PASS\nRX No: ${rx.prescriptionNumber || rx._id}\nDoctor: ${typeof rx.doctor === "object" ? rx.doctor?.name : rx.doctor || "Specialist"}\nDiagnosis: ${rx.diagnosis || "N/A"}\nMedications:\n` + (rx.medications || []).map((m: any) => `- ${m.name} (${m.frequency || "1-0-1"})`).join("\n");
-                                  const blob = new Blob([content], { type: "text/plain" });
-                                  const url = URL.createObjectURL(blob);
-                                  const a = document.createElement("a");
-                                  a.href = url;
-                                  a.download = `Prescription-${rx.prescriptionNumber || "RX"}.txt`;
-                                  a.click();
-                                  URL.revokeObjectURL(url);
-                                  toast.success("Downloaded prescription details file.");
+                            <button
+                              onClick={() => {
+                                if (rx.pdfUrl || rx.fileUrl) {
+                                  window.open(rx.pdfUrl || rx.fileUrl, "_blank");
+                                } else {
+                                  downloadPDF(
+                                    <PrescriptionPDF
+                                      prescription={{
+                                        ...rx,
+                                        patientName: patient?.name || user?.name || "Valued Patient",
+                                        patientId: (patient as any)?._id || (patient as any)?.patientId || "PAT-REGISTERED",
+                                        medicines: rx.medications || rx.medicines,
+                                      }}
+                                      hospitalName={(patient as any)?.hospital?.name || "General Hospital Management System"}
+                                    />,
+                                    `Prescription-${rx.prescriptionNumber || "RX"}.pdf`
+                                  );
                                 }
                               }}
-                              target="_blank"
-                              rel="noopener noreferrer"
                               className="flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-xs font-bold text-white transition-all shadow active:scale-95 cursor-pointer"
                             >
                               <Download className="h-3.5 w-3.5" /> Download RX PDF
-                            </a>
+                            </button>
                           </div>
                         </div>
                       </Card>
@@ -3847,8 +3911,32 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                             ) : (
                               <button
                                 onClick={() => {
+                                  const rcpNo = `RCP-${inv._id ? inv._id.slice(-6).toUpperCase() : "INV"}`;
+                                  downloadPDF(
+                                    <InvoiceReceiptPDF
+                                      invoice={{
+                                        invoiceNumber: rcpNo,
+                                        invoiceId: inv._id,
+                                        date: new Date(inv.updatedAt || inv.createdAt || Date.now()).toLocaleDateString("en-IN"),
+                                        patientName: patient?.name || user?.name || "Valued Patient",
+                                        patientId: (patient as any)?._id || (patient as any)?.patientId || "PAT-REGISTERED",
+                                        status: inv.status || "PAID",
+                                        paymentMethod: inv.paymentMethod || "UPI / ONLINE PORTAL",
+                                        items: inv.items || [
+                                          { description: inv.description || "Hospital Medical & OPD Services", amount: inv.totals?.total || 4500 }
+                                        ],
+                                        subtotal: inv.totals?.subtotal || inv.totals?.total || 4500,
+                                        discount: inv.totals?.discount || 0,
+                                        totalAmount: inv.totals?.total || 4500,
+                                        amountPaid: inv.totals?.paid || inv.totals?.total || 4500,
+                                        balance: inv.totals?.balance || 0
+                                      }}
+                                      hospitalName={(patient as any)?.hospital?.name || "General Hospital Management System"}
+                                    />,
+                                    `Receipt-${rcpNo}.pdf`
+                                  );
                                   setPaidReceipt({
-                                    receiptNo: `RCP-${inv._id.slice(-6).toUpperCase()}`,
+                                    receiptNo: rcpNo,
                                     invoiceId: inv._id,
                                     amount: inv.totals?.total || 4500,
                                     date: new Date(inv.updatedAt || Date.now()).toLocaleDateString("en-IN"),
@@ -3856,7 +3944,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                                     patientName: patient?.name || user?.name
                                   });
                                 }}
-                                className="flex items-center gap-2 rounded-xl bg-navy-800 hover:bg-navy-900 px-4 py-2.5 text-xs font-bold text-white transition-all shadow active:scale-95"
+                                className="flex items-center gap-2 rounded-xl bg-navy-800 hover:bg-navy-900 px-4 py-2.5 text-xs font-bold text-white transition-all shadow active:scale-95 cursor-pointer"
                               >
                                 <Download className="h-4 w-4 text-emerald-400" /> Download Official Receipt (PDF)
                               </button>
@@ -4604,15 +4692,18 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   if (rx.pdfUrl || rx.fileUrl) {
                     window.open(rx.pdfUrl || rx.fileUrl, "_blank");
                   } else {
-                    const content = `METROPOLITAN HOSPITAL DIGITAL RX PASS\nRX No: ${rx.prescriptionNumber || rx._id}\nDoctor: ${typeof rx.doctor === "object" ? rx.doctor?.name : rx.doctor || "Specialist"}\nDiagnosis: ${rx.diagnosis || "N/A"}\nMedications:\n` + (rx.medications || []).map((m: any) => `- ${m.name} (${m.frequency || "1-0-1"})`).join("\n");
-                    const blob = new Blob([content], { type: "text/plain" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `Prescription-${rx.prescriptionNumber || "RX"}.txt`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                    toast.success("Downloaded prescription file.");
+                    downloadPDF(
+                      <PrescriptionPDF
+                        prescription={{
+                          ...rx,
+                          patientName: patient?.name || user?.name || "Valued Patient",
+                          patientId: (patient as any)?._id || (patient as any)?.patientId || "PAT-REGISTERED",
+                          medicines: rx.medications || rx.medicines,
+                        }}
+                        hospitalName={(patient as any)?.hospital?.name || "General Hospital Management System"}
+                      />,
+                      `Prescription-${rx.prescriptionNumber || "RX"}.pdf`
+                    );
                   }
                 }}
                 className="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-white font-bold text-xs flex items-center gap-1.5 shadow cursor-pointer active:scale-95"
@@ -4853,15 +4944,33 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
             </div>
 
             <div className="flex justify-end gap-2 pt-4 border-t mt-6 print:hidden">
-              <button onClick={() => setViewApptSlip(null)} className="rounded-lg px-4 py-2 border font-bold text-xs">
+              <button onClick={() => setViewApptSlip(null)} className="rounded-lg px-4 py-2 border font-bold text-xs cursor-pointer hover:bg-slate-50">
                 Close
+              </button>
+              <button
+                onClick={() => {
+                  downloadPDF(
+                    <ConsultationSlipPDF
+                      consultation={{
+                        ...viewApptSlip,
+                        patientName: patient?.name || user?.name || "Valued Patient",
+                        patientId: (patient as any)?._id || (patient as any)?.patientId || "PAT-REGISTERED",
+                      }}
+                      hospitalName={(patient as any)?.hospital?.name || "General Hospital Management System"}
+                    />,
+                    `Consultation-Slip-${viewApptSlip.referenceId || "OPD"}.pdf`
+                  );
+                }}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-white font-bold text-xs hover:bg-emerald-700 flex items-center gap-1.5 cursor-pointer shadow active:scale-95"
+              >
+                <Download className="h-4 w-4" /> Download PDF Slip
               </button>
               <button
                 onClick={() => {
                   toast.success("Printing Outpatient Appointment Slip...");
                   window.print();
                 }}
-                className="rounded-lg bg-navy-700 px-4 py-2 text-white font-bold text-xs hover:bg-navy-800 flex items-center gap-1.5"
+                className="rounded-lg bg-navy-700 px-4 py-2 text-white font-bold text-xs hover:bg-navy-800 flex items-center gap-1.5 cursor-pointer shadow active:scale-95"
               >
                 <Printer className="h-4 w-4" /> Print Slip Pass
               </button>
@@ -5308,12 +5417,32 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
               <p className="text-[11px] font-semibold text-slate-400">
                 Official Digital Report issued by Spesway Hospitals Pathology & Diagnostic Lab
               </p>
-              <button
-                onClick={() => setSelectedReport(null)}
-                className="rounded-xl bg-navy-800 px-5 py-2 text-xs font-extrabold text-white hover:bg-navy-900 shadow transition-all cursor-pointer"
-              >
-                Close Report
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    downloadPDF(
+                      <DiagnosticReportPDF
+                        report={{
+                          ...selectedReport,
+                          patientName: patient?.name || user?.name || "Valued Patient",
+                          patientId: (patient as any)?._id || (patient as any)?.patientId || "PAT-REGISTERED",
+                        }}
+                        hospitalName={(patient as any)?.hospital?.name || "General Hospital Management System"}
+                      />,
+                      `${safeText(selectedReport.testName || selectedReport.title, "Diagnostic_Report")}.pdf`
+                    );
+                  }}
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-emerald-700 shadow transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Download className="h-4 w-4" /> Download PDF Report
+                </button>
+                <button
+                  onClick={() => setSelectedReport(null)}
+                  className="rounded-xl bg-navy-800 px-5 py-2 text-xs font-extrabold text-white hover:bg-navy-900 shadow transition-all cursor-pointer"
+                >
+                  Close Report
+                </button>
+              </div>
             </div>
           </div>
         </div>
