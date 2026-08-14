@@ -475,27 +475,6 @@ export function DoctorSettingsPage() {
                 )}
               </div>
 
-              {/* Password strength guide */}
-              {newPassword && (
-                <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 space-y-1.5">
-                  <p className="text-xs font-semibold text-slate-500 mb-2">Password requirements</p>
-                  {[
-                    { label: "At least 8 characters",     ok: newPassword.length >= 8      },
-                    { label: "Contains a number",         ok: /\d/.test(newPassword)        },
-                    { label: "Contains uppercase letter", ok: /[A-Z]/.test(newPassword)     },
-                    { label: "Contains special character",ok: /[^A-Za-z0-9]/.test(newPassword) },
-                  ].map((req) => (
-                    <div key={req.label} className={`flex items-center gap-2 text-xs ${req.ok ? "text-emerald-600" : "text-slate-400"}`}>
-                      {req.ok
-                        ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                        : <XCircle className="h-3.5 w-3.5 shrink-0" />
-                      }
-                      {req.label}
-                    </div>
-                  ))}
-                </div>
-              )}
-
               <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 pt-2">
                 <p className="flex items-center justify-center sm:justify-start gap-1.5 text-xs text-slate-400">
                   <Lock className="h-3.5 w-3.5 shrink-0" /> Encrypted end-to-end

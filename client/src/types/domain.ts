@@ -51,7 +51,7 @@ export interface Branch {
 export interface Department {
   _id: string;
   hospital: { _id: string; name: string } | string;
-  branch: string | null;
+  branch: { _id: string; name: string } | string | null;
 
   // Core identity
   name: string;
