@@ -20,6 +20,15 @@ export async function scopeToHospital(req: Request, _res: Response, next: NextFu
         req.hospitalFilter = { hospital: hospitalId, branch: null };
       } else {
         req.hospitalFilter = { branch: null };
+<<<<<<< Updated upstream
+=======
+        req.tenantContext = {
+          hospitalId: null as any,
+          branchId: null,
+          isBranchScoped: false,
+          queryFilter: { hospital: null as any, branch: null }
+        };
+>>>>>>> Stashed changes
       }
       return next();
     }
