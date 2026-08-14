@@ -151,6 +151,7 @@ export const createAdmissionRequest = catchAsync(async (req: Request, res: Respo
     // Create DB notification for receptionist fallback
     await DbNotification.create([{
       hospital: hospitalId,
+      branch: branchId,
       title: "New Admission Request",
       message: `Dr. ${docProfile?.name || doctor.name} requested IP admission for ${patient.name} (${patient.uhid}) due to: ${primaryDiagnosis}`,
       type: "admission_request",
