@@ -9,9 +9,9 @@ export interface SpringScaleInProps {
   triggerOnView?: boolean;
 }
 
-const DURATION_S = 0.36;
+const DURATION_S = 0.75;
 const MS = 1000;
-const EASE = [0.34, 1.56, 0.64, 1] as const;
+const EASE = [0.16, 1, 0.3, 1] as const;
 
 export default function SpringScaleIn({
   children,

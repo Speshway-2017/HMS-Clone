@@ -282,7 +282,6 @@ export class ReceptionService {
     }
 
     const recentAppointmentsList = await Appointment.find({
-      ...branchFilter,
       ...queryScope,
       patient: { $in: allPatientIds },
       status: { $nin: ["cancelled", "no_show"] }
@@ -291,7 +290,6 @@ export class ReceptionService {
     const lastAppointment = recentAppointmentsList.length > 0 ? recentAppointmentsList[0] : null;
 
     const activeAdmission = await Admission.findOne({
-      ...branchFilter,
       ...queryScope,
       patient: { $in: allPatientIds },
       status: {
