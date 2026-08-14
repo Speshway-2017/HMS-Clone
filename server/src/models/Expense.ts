@@ -3,6 +3,7 @@ import { Schema, model, InferSchemaType, Types } from "mongoose";
 const expenseSchema = new Schema(
   {
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
+    branch: { type: Schema.Types.ObjectId, ref: "Branch", default: null },
     category: {
       type: String,
       enum: ["Utilities", "Rent/Lease", "Medical Supplies", "Equipment Maintenance", "Salaries", "Admin Expenses", "Vendor Payments"],

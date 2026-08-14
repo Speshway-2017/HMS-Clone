@@ -16,9 +16,9 @@ import { notifyAssignedDoctorForPatient } from "../utils/autoNotifyAssignedDocto
 
 import { buildBranchQuery } from "../utils/branchQueryHelper";
 
-async function findOrder(requestId: string, hospitalId?: string | Types.ObjectId) {
-  const query: any = { _id: requestId };
-  if (hospitalId) query.hospital = hospitalId;
+async function findOrder(requestId: string, hospitalFilter?: any) {
+  const filter = buildBranchQuery(hospitalFilter);
+  const query: any = { _id: requestId, ...filter };
   let order: any = await LabOrder.findOne(query).populate("patient").populate("doctor");
   let type: "Laboratory" | "Radiology" = "Laboratory";
   if (!order) {

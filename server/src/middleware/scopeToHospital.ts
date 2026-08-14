@@ -3,67 +3,46 @@ import { AppError } from "../utils/AppError";
 import { Branch } from "../models/Branch";
 import { User } from "../models/User";
 import { Types } from "mongoose";
+import { getDataScope } from "../utils/dataScope";
 
 /**
- * Must run after `protect`. Restricts hospital_admin/accountant requests to
- * their own hospital and active branch; super_admin may optionally filter via ?hospitalId= or x-branch-id.
+ * Must run after `protect`. Restricts user requests to their own hospital and active branch.
  */
 export async function scopeToHospital(req: Request, _res: Response, next: NextFunction) {
   try {
     const branchHeader = (req.headers["x-branch-id"] || req.headers["x-branch"] || req.query.branchId || req.query.branch) as string | undefined;
 
-    // Public / Unauthenticated requests (e.g. Landing Page, Public Doctor Directory, Public Booking)
+    // Public / Unauthenticated requests
     if (!req.user) {
       const hospitalId = req.query.hospitalId as string | undefined;
-      // Landing page and public booking default to Main/Parent Hospital (branch: null)
-      if (hospitalId) {
-        req.hospitalFilter = { hospital: hospitalId, branch: null };
+      if (hospitalId && Types.ObjectId.isValid(hospitalId)) {
+        const hId = new Types.ObjectId(hospitalId);
+        req.hospitalFilter = { hospital: hId, branch: null };
+        req.tenantContext = {
+          hospitalId: hId,
+          branchId: null,
+          isBranchScoped: true,
+          queryFilter: { hospital: hId, branch: null }
+        };
       } else {
         req.hospitalFilter = { branch: null };
-<<<<<<< Updated upstream
-=======
         req.tenantContext = {
           hospitalId: null as any,
           branchId: null,
           isBranchScoped: false,
+
           queryFilter: { hospital: null as any, branch: null }
         };
->>>>>>> Stashed changes
+          queryFilter: { branch: null }
+        };
       }
       return next();
     }
-
-    if (req.user.role === "super_admin") {
-      const hospitalId = req.query.hospitalId as string | undefined;
-      const filter: any = {};
-      if (hospitalId) filter.hospital = hospitalId;
-      if (branchHeader && branchHeader !== "all" && branchHeader !== "main" && Types.ObjectId.isValid(branchHeader)) {
-        filter.branch = branchHeader;
-      } else if (branchHeader === "main") {
-        filter.branch = null;
-      }
-      req.hospitalFilter = filter;
-      return next();
-    }
-
-    if (!req.user.hospital) {
-      if (req.user.role === "patient") {
-        if (branchHeader && branchHeader !== "all" && branchHeader !== "main" && Types.ObjectId.isValid(branchHeader)) {
-          req.hospitalFilter = { branch: branchHeader };
-        } else {
-          req.hospitalFilter = { branch: null };
-        }
-        return next();
-      }
-      throw new AppError("This account is not assigned to a hospital.", 403);
-    }
-
-    const baseFilter: any = { hospital: req.user.hospital };
 
     let userBranch = (req.user as any).branch;
 
-    // If branch is not directly set on User account, resolve from Staff or Doctor profile
-    if (!userBranch && (req.user.role as string) !== "hospital_admin") {
+    // Resolve branch if missing on user document from Staff or Doctor
+    if (!userBranch && req.user.role !== "hospital_admin" && req.user.role !== "super_admin") {
       const { Staff } = await import("../models/Staff");
       const { Doctor } = await import("../models/Doctor");
 
@@ -84,25 +63,38 @@ export async function scopeToHospital(req: Request, _res: Response, next: NextFu
       }
     }
 
-    // Locked branch on User/Staff/Doctor account
-    if (userBranch) {
-      baseFilter.branch = userBranch;
-    } else if ((req.user.role as string) === "hospital_admin" && branchHeader === "all") {
-      // "all" explicitly requested by admin
-      delete baseFilter.branch;
-    } else if (branchHeader && branchHeader !== "main" && Types.ObjectId.isValid(branchHeader)) {
-      const validBranch = await Branch.findOne({ _id: branchHeader, hospital: req.user.hospital });
-      if (validBranch) {
-        baseFilter.branch = validBranch._id;
-      } else {
-        baseFilter.branch = null;
+    const tenantScope = getDataScope(req);
+
+    // Re-verify active branch ownership if selected branch header passed
+    if (tenantScope.branchId && req.user.role === "hospital_admin") {
+      const validBranch = await Branch.findOne({ _id: tenantScope.branchId, hospital: tenantScope.hospitalId });
+      if (!validBranch) {
+        throw new AppError("Forbidden: Selected branch is invalid or unauthorized for your hospital.", 403);
       }
-    } else {
-      // Main hospital view (branchHeader is "main" or omitted)
-      baseFilter.branch = null;
     }
 
-    req.hospitalFilter = baseFilter;
+    // STRICT MULTI-BRANCH READ-ONLY ENFORCEMENT:
+    // Block all mutation operations (POST, PUT, PATCH, DELETE) when "All Branches" view mode is selected!
+    if (req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS") {
+      const isGlobalHospitalRoute = req.originalUrl.includes("/branches") || req.originalUrl.includes("/hospitals") || req.originalUrl.includes("/auth/");
+      if (!isGlobalHospitalRoute) {
+        if (req.user.role === "hospital_admin" && (branchHeader === "all" || (tenantScope.branchId === null && !tenantScope.isBranchScoped))) {
+          throw new AppError("Action forbidden in 'All Branches' mode. Please select a specific branch context to add, edit, or delete records.", 403);
+        }
+      }
+    }
+
+    req.tenantContext = tenantScope;
+
+    // Preserve full filter object for backwards compatibility with existing controllers
+    const filterObj: any = { hospital: tenantScope.hospitalId };
+    if (tenantScope.branchId !== undefined && tenantScope.branchId !== null) {
+      filterObj.branch = tenantScope.branchId;
+    } else if (tenantScope.isBranchScoped && tenantScope.branchId === null) {
+      filterObj.branch = null;
+    }
+    req.hospitalFilter = filterObj;
+
     next();
   } catch (err) {
     next(err);

@@ -23,6 +23,15 @@ export default function AnimatedSubmitButton({
 
   return (
     <div className="flex justify-center w-full my-2">
+      <svg xmlns="http://www.w3.org/2000/svg" version="1.1" className="absolute w-0 h-0 pointer-events-none" aria-hidden="true">
+        <defs>
+          <filter id="goo">
+            <feGaussianBlur in="SourceGraphic" result="blur" stdDeviation="10" />
+            <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 21 -7" result="goo" />
+            <feBlend in2="goo" in="SourceGraphic" result="mix" />
+          </filter>
+        </defs>
+      </svg>
       <style>{`
         @keyframes spinBtn {
           0% {
@@ -63,6 +72,8 @@ export default function AnimatedSubmitButton({
           border-bottom: 4px solid #2563eb !important;
           animation: spinBtn 1.6s ease-in-out forwards !important;
           background: white !important;
+          border-radius: 50% !important;
+          padding: 0 !important;
         }
 
         .animated-btn-spin span {
@@ -80,11 +91,13 @@ export default function AnimatedSubmitButton({
         type={type}
         disabled={disabled || isActive}
         onClick={onClick}
-        className={`animated-submit-btn select-none relative flex items-center justify-center h-[50px] w-full rounded-[50px] border-4 border-blue-600 bg-blue-600 transition-all duration-300 outline-none ${
-          !isActive ? "hover:bg-blue-700 hover:border-blue-700 active:scale-95 cursor-pointer shadow-md shadow-blue-500/20" : "cursor-wait"
+        className={`select-none relative flex items-center justify-center h-[50px] outline-none ${
+          !isActive
+            ? "blob-btn blob-btn--reverse w-full hover:shadow-lg hover:shadow-blue-500/35 hover:-translate-y-0.5 active:scale-95 cursor-pointer shadow-md shadow-blue-500/20"
+            : "cursor-wait border-4 border-blue-600 bg-blue-600 rounded-[50px] transition-all duration-300"
         } ${isActive ? "animated-btn-spin" : ""} ${isSuccess ? "animated-btn-success" : ""} ${className}`}
       >
-        <span className="absolute text-white font-bold uppercase tracking-[2px] text-xs transition-opacity duration-200 pointer-events-none">
+        <span className={`${!isActive ? "relative z-10" : "absolute text-white"} font-bold uppercase tracking-[2px] text-xs transition-colors duration-500 pointer-events-none`}>
           {text}
         </span>
         <svg
@@ -96,6 +109,17 @@ export default function AnimatedSubmitButton({
         >
           <path d="M0 11c2.761.575 6.312 1.688 9 3.438 3.157-4.23 8.828-8.187 15-11.438-5.861 5.775-10.711 12.328-14 18.917-2.651-3.766-5.547-7.271-10-10.917z" />
         </svg>
+
+        {!isActive && (
+          <span className="blob-btn__inner pointer-events-none">
+            <span className="blob-btn__blobs">
+              <span className="blob-btn__blob"></span>
+              <span className="blob-btn__blob"></span>
+              <span className="blob-btn__blob"></span>
+              <span className="blob-btn__blob"></span>
+            </span>
+          </span>
+        )}
       </button>
     </div>
   );

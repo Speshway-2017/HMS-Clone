@@ -3,6 +3,7 @@ import { Schema, model, InferSchemaType, Types } from "mongoose";
 const dbNotificationSchema = new Schema(
   {
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
+    branch: { type: Schema.Types.ObjectId, ref: "Branch", default: null },
     title: { type: String, required: true },
     message: { type: String, required: true },
     type: { type: String, enum: ["admission_request", "appointment", "inventory", "invoice", "general"], default: "general" },
@@ -17,9 +18,10 @@ const dbNotificationSchema = new Schema(
   { timestamps: true }
 );
 
-// Performance: Index doctor notifications for fast retrieval
-dbNotificationSchema.index({ hospital: 1, recipientDoctor: 1, isRead: 1 });
-dbNotificationSchema.index({ hospital: 1, recipientDoctor: 1, createdAt: -1 });
+// Performance: Indexes
+dbNotificationSchema.index({ hospital: 1, branch: 1, recipientRole: 1, isRead: 1 });
+dbNotificationSchema.index({ hospital: 1, branch: 1, recipientDoctor: 1, isRead: 1 });
+dbNotificationSchema.index({ hospital: 1, branch: 1, createdAt: -1 });
 
 export type DbNotification = InferSchemaType<typeof dbNotificationSchema> & { _id: Types.ObjectId };
 export const DbNotification = model("DbNotification", dbNotificationSchema);

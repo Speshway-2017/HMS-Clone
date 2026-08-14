@@ -196,9 +196,8 @@ export const checkDuplicateAppointment = catchAsync(async (req: Request, res: Re
 
 export const processBillingPayment = catchAsync(async (req: Request, res: Response) => {
   const paymentData = paymentSchema.parse(req.body);
-  const hospitalId = req.hospitalFilter?.hospital || req.user?.hospital;
-
-  const invoice = await Invoice.findOne({ _id: paymentData.invoiceId, hospital: hospitalId });
+  
+  const invoice = await Invoice.findOne({ _id: paymentData.invoiceId, ...buildBranchQuery(req.hospitalFilter) });
   if (!invoice) {
     throw new AppError("Invoice not found.", 404);
   }
@@ -268,7 +267,7 @@ export const rejectAdmissionRequest = catchAsync(async (req: Request, res: Respo
     throw new AppError("Forbidden: You do not have permission to perform this action.", 403);
   }
   const result = await ReceptionService.rejectAdmissionRequest(
-    req.hospitalFilter!.hospital as any,
+    req.hospitalFilter as any,
     req.params.id,
     req.user!._id
   );
@@ -287,7 +286,7 @@ export const transferPatient = catchAsync(async (req: Request, res: Response) =>
   }).parse(req.body);
 
   const admission = await ReceptionService.transferPatient(
-    req.hospitalFilter!.hospital as any,
+    req.hospitalFilter as any,
     transferData,
     req.user!._id
   );
