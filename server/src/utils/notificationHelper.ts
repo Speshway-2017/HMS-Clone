@@ -5,6 +5,7 @@ import { emitToDoctor, emitToHospital } from "../config/socket";
 
 export interface DoctorNotificationPayload {
   hospital: Types.ObjectId | string;
+  branch?: Types.ObjectId | string | null;
   title: string;
   message: string;
   type: "admission_request" | "appointment" | "inventory" | "invoice" | "general";
@@ -19,8 +20,19 @@ export interface DoctorNotificationPayload {
  * and emits real-time events to that doctor's room and hospital rooms.
  */
 export async function createDoctorNotification(payload: DoctorNotificationPayload) {
+  let docBranch = payload.branch;
+  if (!docBranch) {
+    try {
+      const docDoc = await Doctor.findById(payload.recipientDoctor);
+      docBranch = docDoc?.branch || null;
+    } catch {
+      // Ignore lookup error
+    }
+  }
+
   const notif = await DbNotification.create({
     hospital: payload.hospital,
+    branch: docBranch || null,
     title: payload.title,
     message: payload.message,
     type: payload.type,

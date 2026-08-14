@@ -1,9 +1,10 @@
-import { FormEvent, useEffect, useState } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import AnimatedInput from "../../components/ui/AnimatedInput";
 import AnimatedSubmitButton from "../../components/ui/AnimatedSubmitButton";
 import SpringScaleIn from "../../components/ui/SpringScaleIn";
+import { motion, AnimatePresence } from "motion/react";
 import { ROLE_HOME_PATH } from "../../types/auth";
 import { usePublicHospital } from "../../features/hospitals";
 import { ShieldCheck, Lock, Mail, Activity, ArrowLeft, CheckCircle2, Eye, EyeOff } from "lucide-react";
@@ -138,17 +139,27 @@ export function LoginPage() {
           </div>
 
           {/* Carousel Promo */}
-          <div className="rounded-xl border border-blue-500/20 bg-blue-900/20 p-4 backdrop-blur-md min-h-[110px] transition-all duration-300">
+          <div className="rounded-xl border border-blue-500/20 bg-blue-900/20 p-4 backdrop-blur-md min-h-[110px] overflow-hidden">
             <span className="text-[9px] font-bold text-blue-400 uppercase tracking-widest block mb-1">
               SYSTEM BENEFIT
             </span>
-            <h4 className="text-xs font-bold flex items-center gap-1.5 text-white">
-              <ShieldCheck className="h-4 w-4 text-blue-400" />
-              {promos[activePromoIdx].title}
-            </h4>
-            <p className="mt-1.5 text-xs text-slate-300 leading-relaxed">
-              {promos[activePromoIdx].desc}
-            </p>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activePromoIdx}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <h4 className="text-xs font-bold flex items-center gap-1.5 text-white">
+                  <ShieldCheck className="h-4 w-4 text-blue-400" />
+                  {promos[activePromoIdx].title}
+                </h4>
+                <p className="mt-1.5 text-xs text-slate-300 leading-relaxed">
+                  {promos[activePromoIdx].desc}
+                </p>
+              </motion.div>
+            </AnimatePresence>
           </div>
 
           {/* Quick trust metrics */}
@@ -192,7 +203,12 @@ export function LoginPage() {
             </div>
 
             {/* Login Card */}
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-8 shadow-xl transition-all duration-500 ease-out hover:shadow-2xl hover:shadow-blue-500/10 hover:border-blue-200/50 hover:-translate-y-1">
+            <motion.div
+              initial={{ opacity: 0, y: 25 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+              className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-8 shadow-xl transition-all duration-500 ease-out hover:shadow-2xl hover:shadow-blue-500/10 hover:border-blue-200/50 hover:-translate-y-1"
+            >
               <form onSubmit={handleSubmit} className="space-y-4 text-xs font-semibold text-slate-700">
                 {/* Email / Phone input with AnimatedInput */}
                 <div>
@@ -266,7 +282,7 @@ export function LoginPage() {
                   </Link>
                 </p>
               </div>
-            </div>
+            </motion.div>
 
             {/* Back button */}
             <div className="text-center">

@@ -15,7 +15,9 @@ export function InventoryItemDetailsPage() {
     return <p className="text-slate-400">Loading...</p>;
   }
 
-  const percentToMax = item.maxLevel > 0 ? Math.min(100, Math.round((item.stockQty / item.maxLevel) * 100)) : 0;
+  const percentToMax = item.maxLevel > 0
+    ? Math.min(100, Math.round((item.stockQty / item.maxLevel) * 100))
+    : Math.min(100, Math.round((item.stockQty / Math.max(item.stockQty * 1.2, 100)) * 100));
 
   return (
     <div className="space-y-6">

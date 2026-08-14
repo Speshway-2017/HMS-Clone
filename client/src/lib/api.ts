@@ -11,9 +11,14 @@ api.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   const activeBranchId = localStorage.getItem("hms_active_branch_id");
-  if (activeBranchId) {
+  // Only forward X-Branch-ID when it is a real MongoDB ObjectId (not "all" or "main")
+  if (activeBranchId && activeBranchId !== "all" && activeBranchId !== "main") {
     config.headers["X-Branch-ID"] = activeBranchId;
+  } else if (activeBranchId === "main") {
+    config.headers["X-Branch-ID"] = "main";
   }
+  // "all" is intentionally NOT forwarded — admin in "All Branches" mode gets the
+  // unfiltered hospital-wide query on GETs; POST/PATCH/DELETE must set a branch explicitly.
   return config;
 });
 

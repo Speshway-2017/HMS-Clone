@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { Plus, ArrowRight, MoreVertical, Pencil, PowerOff, Power, Trash2, AlertTriangle } from "lucide-react";
 import { useDepartments, useToggleDepartmentStatus, useDeleteDepartment } from "../../features/departments";
 import { useAuth } from "../../context/AuthContext";
+import { useBranchContext } from "../../context/BranchContext";
+import { AllBranchesNoticeBanner } from "../../components/common/AllBranchesNoticeBanner";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { getDepartmentTheme } from "../../config/departmentTheme";
@@ -168,6 +170,7 @@ function DeleteConfirmModal({ department, onConfirm, onCancel, isDeleting, error
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function DepartmentsPage() {
+  const { isAllBranches } = useBranchContext();
   const { data: departments, isLoading } = useDepartments();
   const { user } = useAuth();
   const basePath = ROLE_HOME_PATH[user!.role];
@@ -212,6 +215,8 @@ export function DepartmentsPage() {
 
   return (
     <div className="space-y-6">
+      <AllBranchesNoticeBanner />
+
       {/* Header */}
       <div className="flex flex-col justify-between gap-4 rounded-xl bg-navy-700 p-6 text-white sm:flex-row sm:items-center">
         <div>
@@ -222,11 +227,22 @@ export function DepartmentsPage() {
               : "Manage medical infrastructure and monitor departments for your hospital."}
           </p>
         </div>
-        <Link to={`${basePath}/departments/new`}>
-          <Button variant="secondary" className="bg-white">
-            <Plus className="h-4 w-4" /> Add Department
+        {!isAllBranches ? (
+          <Link to={`${basePath}/departments/new`}>
+            <Button variant="secondary" className="bg-white">
+              <Plus className="h-4 w-4" /> Add Department
+            </Button>
+          </Link>
+        ) : (
+          <Button
+            variant="secondary"
+            disabled
+            className="bg-white/60 text-white/50 opacity-60 cursor-not-allowed border-none shadow-none"
+            title="Switch to a specific branch to add departments"
+          >
+            <Plus className="h-4 w-4" /> Add Department (Read Only)
           </Button>
-        </Link>
+        )}
       </div>
 
       {isLoading && <p className="text-slate-400">Loading...</p>}
@@ -234,18 +250,50 @@ export function DepartmentsPage() {
         <p className="text-slate-400">No departments yet — add the first one.</p>
       )}
 
-      {/* Department cards grid */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {departments?.map((dept) => (
-          <DepartmentCard
-            key={dept._id}
-            dept={dept}
-            basePath={basePath}
-            onEdit={() => setEditTarget(dept)}
-            onDeleteClick={() => handleDeleteClick(dept)}
-          />
-        ))}
-      </div>
+      {!isLoading && departments && departments.length > 0 && (() => {
+        // Group departments by branch name
+        const groupedDepts: Record<string, Department[]> = {};
+        departments.forEach((dept) => {
+          let branchName = "Main Hospital";
+          if (dept.branch && typeof dept.branch === "object") {
+            branchName = dept.branch.name;
+          }
+          if (!groupedDepts[branchName]) {
+            groupedDepts[branchName] = [];
+          }
+          groupedDepts[branchName].push(dept);
+        });
+
+        const branchNames = Object.keys(groupedDepts).sort((a, b) => {
+          if (a === "Main Hospital") return -1;
+          if (b === "Main Hospital") return 1;
+          return a.localeCompare(b);
+        });
+
+        return (
+          <div className="space-y-8">
+            {branchNames.map((branchName) => (
+              <div key={branchName} className="space-y-4">
+                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-200 pb-2">
+                  {branchName} ({groupedDepts[branchName].length})
+                </h2>
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {groupedDepts[branchName].map((dept) => (
+                    <DepartmentCard
+                      key={dept._id}
+                      dept={dept}
+                      basePath={basePath}
+                      onEdit={() => setEditTarget(dept)}
+                      onDeleteClick={() => handleDeleteClick(dept)}
+                      isAllBranches={isAllBranches}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Edit modal */}
       <EditDepartmentModal
@@ -275,9 +323,10 @@ interface DepartmentCardProps {
   basePath: string;
   onEdit: () => void;
   onDeleteClick: () => void;
+  isAllBranches: boolean;
 }
 
-function DepartmentCard({ dept, basePath, onEdit, onDeleteClick }: DepartmentCardProps) {
+function DepartmentCard({ dept, basePath, onEdit, onDeleteClick, isAllBranches }: DepartmentCardProps) {
   const theme = getDepartmentTheme(dept.category);
   const status = STATUS_LABEL[dept.status] ?? STATUS_LABEL.operational;
   const toggleStatus = useToggleDepartmentStatus(dept._id);
@@ -301,22 +350,30 @@ function DepartmentCard({ dept, basePath, onEdit, onDeleteClick }: DepartmentCar
         </div>
         <div className="flex items-center gap-2">
           {!dept.isDisabled && <Badge tone={status.tone}>{status.text}</Badge>}
-          <ThreeDotMenu
-            department={dept}
-            onEdit={onEdit}
-            onToggleStatus={() => toggleStatus.mutate()}
-            onDelete={onDeleteClick}
-            isToggling={toggleStatus.isPending}
-          />
+          {!isAllBranches && (
+            <ThreeDotMenu
+              department={dept}
+              onEdit={onEdit}
+              onToggleStatus={() => toggleStatus.mutate()}
+              onDelete={onDeleteClick}
+              isToggling={toggleStatus.isPending}
+            />
+          )}
         </div>
       </div>
 
       {/* Name + description */}
       <h3 className="text-lg font-semibold text-navy-700">{dept.name}</h3>
-      {dept.code && (
-        <p className="mt-0.5 font-mono text-xs text-slate-400">{dept.code}</p>
-      )}
-      <p className="mt-1 text-sm text-slate-500">{dept.description || "No description provided."}</p>
+      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
+        {dept.code && <span className="font-mono">{dept.code}</span>}
+        {dept.branch && typeof dept.branch === "object" && (
+          <>
+            {dept.code && <span>•</span>}
+            <span className="font-semibold text-slate-500">{dept.branch.name}</span>
+          </>
+        )}
+      </div>
+      <p className="mt-1.5 text-sm text-slate-500">{dept.description || "No description provided."}</p>
 
       {/* Extra badges */}
       {(dept.isEmergency || dept.specialization) && (

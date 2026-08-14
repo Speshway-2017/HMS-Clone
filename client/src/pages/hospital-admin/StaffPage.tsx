@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { UserPlus, UserCheck, UserX, Clock, CalendarOff, Star, Pencil, Trash2, Eye, Search, Filter, CalendarCheck, CalendarRange, FileSpreadsheet } from "lucide-react";
 import { useStaffList, useTopStaff, useDeleteStaff } from "../../features/staff";
+import { useBranchContext } from "../../context/BranchContext";
+import { AllBranchesNoticeBanner } from "../../components/common/AllBranchesNoticeBanner";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { KpiCard } from "../../components/ui/KpiCard";
@@ -20,6 +22,7 @@ const DUTY_TONE: Record<string, "success" | "warning" | "neutral" | "danger"> = 
 };
 
 export function StaffPage() {
+  const { isAllBranches } = useBranchContext();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -122,20 +125,28 @@ export function StaffPage() {
           >
             <Eye className="h-4 w-4" />
           </Link>
-          <Link
-            to={`/admin/staff/${s._id}/edit`}
-            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-all"
-            title="Edit Staff Member"
-          >
-            <Pencil className="h-4 w-4" />
-          </Link>
-          <button
-            onClick={() => setDeleteTargetStaff({ id: s._id, name: s.name })}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all cursor-pointer"
-            title="Delete Staff Member"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {!isAllBranches ? (
+            <>
+              <Link
+                to={`/admin/staff/${s._id}/edit`}
+                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-all"
+                title="Edit Staff Member"
+              >
+                <Pencil className="h-4 w-4" />
+              </Link>
+              <button
+                onClick={() => setDeleteTargetStaff({ id: s._id, name: s.name })}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all cursor-pointer"
+                title="Delete Staff Member"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
+          ) : (
+            <span className="p-1.5 text-slate-300 cursor-not-allowed" title="Switch to a specific branch to edit or delete staff">
+              <Pencil className="h-4 w-4 opacity-40" />
+            </span>
+          )}
         </div>
       ),
     },
@@ -143,6 +154,8 @@ export function StaffPage() {
 
   return (
     <div className="space-y-6">
+      <AllBranchesNoticeBanner />
+
       {/* Page Header with Action Buttons */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-4 border-slate-200">
         <div>
@@ -167,11 +180,17 @@ export function StaffPage() {
               <FileSpreadsheet className="h-4 w-4 text-amber-600" /> Leave Requests
             </Button>
           </Link>
-          <Link to="/admin/staff/new">
-            <Button variant="primary" size="sm" className="gap-1.5 font-extrabold shadow">
-              <UserPlus className="h-4 w-4" /> Onboard New Staff
+          {!isAllBranches ? (
+            <Link to="/admin/staff/new">
+              <Button variant="primary" size="sm" className="gap-1.5 font-extrabold shadow">
+                <UserPlus className="h-4 w-4" /> Onboard New Staff
+              </Button>
+            </Link>
+          ) : (
+            <Button variant="outline" size="sm" disabled className="gap-1.5 font-extrabold opacity-60 cursor-not-allowed bg-slate-100 text-slate-400" title="Switch to a specific branch to onboard staff">
+              <UserPlus className="h-4 w-4" /> Onboard Staff (Read Only)
             </Button>
-          </Link>
+          )}
         </div>
       </div>
 

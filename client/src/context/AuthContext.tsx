@@ -31,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tokenStorage.clear();
       tokenStorage.broadcastSessionEvent("LOGOUT");
       localStorage.removeItem("nurse_shift_completed");
+      localStorage.removeItem("hms_active_branch_id");
       setUser(null);
     }
   }, []);
@@ -120,6 +121,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tokenStorage.set(res.data.data.token, res.data.data.refreshToken);
       tokenStorage.broadcastSessionEvent("LOGIN", loggedUser.id);
       localStorage.removeItem("nurse_shift_completed");
+      if (loggedUser.role !== "hospital_admin") {
+        localStorage.removeItem("hms_active_branch_id");
+      }
       setUser(loggedUser);
       return loggedUser;
     } catch (error) {

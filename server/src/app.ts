@@ -40,6 +40,7 @@ import laboratoryRoutes from "./routes/laboratoryRoutes";
 import consultationRoutes from "./routes/consultationRoutes";
 import diagnosticReportRoutes from "./routes/diagnosticReportRoutes";
 
+import supplierRoutes from "./routes/supplierRoutes";
 import blogRoutes from "./routes/blogRoutes";
 import attendanceRoutes from "./routes/attendanceRoutes";
 import leaveRoutes from "./routes/leaveRoutes";
@@ -134,6 +135,7 @@ app.use("/api/v1/nurse", nurseRoutes);
 app.use("/api/v1/patients", patientRoutes);
 app.use("/api/v1/appointments", appointmentRoutes);
 app.use("/api/v1/inventory", inventoryRoutes);
+app.use("/api/v1/suppliers", supplierRoutes);
 app.use("/api/v1/invoices", invoiceRoutes);
 app.use("/api/v1/ip-billing", ipBillingRoutes);
 app.use("/api/v1/ip-bills", ipBillRoutes);

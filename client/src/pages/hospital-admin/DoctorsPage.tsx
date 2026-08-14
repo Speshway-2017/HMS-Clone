@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { UserPlus, Stethoscope, Activity, CalendarOff, Pencil, Trash2, Eye } from "lucide-react";
 import { useDoctors, useDeleteDoctor } from "../../features/doctors";
 import { useDepartments } from "../../features/departments";
+import { useBranchContext } from "../../context/BranchContext";
+import { AllBranchesNoticeBanner } from "../../components/common/AllBranchesNoticeBanner";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { KpiCard } from "../../components/ui/KpiCard";
@@ -20,6 +22,7 @@ const STATUS_TONE: Record<Doctor["status"], "success" | "danger" | "neutral"> = 
 };
 
 export function DoctorsPage() {
+  const { isAllBranches } = useBranchContext();
   const [page, setPage] = useState(1);
   const [department, setDepartment] = useState("");
   const [status, setStatus] = useState("");
@@ -68,19 +71,27 @@ export function DoctorsPage() {
       header: "Actions",
       render: (d) => (
         <div className="flex items-center gap-2 text-slate-400">
-          <Link to={`/admin/doctors/${d._id}`} className="hover:text-navy-700">
+          <Link to={`/admin/doctors/${d._id}`} className="hover:text-navy-700" title="View Doctor Profile">
             <Eye className="h-4 w-4" />
           </Link>
-          <Link to={`/admin/doctors/${d._id}/edit`} className="hover:text-navy-700">
-            <Pencil className="h-4 w-4" />
-          </Link>
-          <button
-            onClick={() => setDeleteTargetDoctor({ id: d._id, name: d.name })}
-            className="hover:text-red-600 cursor-pointer"
-            title="Remove Doctor"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {!isAllBranches ? (
+            <>
+              <Link to={`/admin/doctors/${d._id}/edit`} className="hover:text-navy-700" title="Edit Doctor">
+                <Pencil className="h-4 w-4" />
+              </Link>
+              <button
+                onClick={() => setDeleteTargetDoctor({ id: d._id, name: d.name })}
+                className="hover:text-red-600 cursor-pointer"
+                title="Remove Doctor"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </>
+          ) : (
+            <span className="text-slate-300 cursor-not-allowed" title="Switch to a specific branch to edit or remove doctors">
+              <Pencil className="h-4 w-4 opacity-40" />
+            </span>
+          )}
         </div>
       ),
     },
@@ -88,16 +99,29 @@ export function DoctorsPage() {
 
   return (
     <div className="space-y-6">
+      <AllBranchesNoticeBanner />
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Doctor Directory</h1>
           <p className="text-sm text-slate-500">Manage medical professionals and their clinical status.</p>
         </div>
-        <Link to="/admin/doctors/new" className="shrink-0">
-          <Button variant="primary" className="w-full sm:w-auto">
-            <UserPlus className="h-4 w-4" /> Add Doctor
+        {!isAllBranches ? (
+          <Link to="/admin/doctors/new" className="shrink-0">
+            <Button variant="primary" className="w-full sm:w-auto">
+              <UserPlus className="h-4 w-4" /> Add Doctor
+            </Button>
+          </Link>
+        ) : (
+          <Button
+            variant="outline"
+            disabled
+            className="w-full sm:w-auto opacity-60 cursor-not-allowed bg-slate-100 text-slate-400 border-slate-200"
+            title="Switch to a specific branch to add doctors"
+          >
+            <UserPlus className="h-4 w-4" /> Add Doctor (Read Only)
           </Button>
-        </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

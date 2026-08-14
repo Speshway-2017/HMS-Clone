@@ -348,4 +348,26 @@ class PatientApiService {
     }
     return null;
   }
+
+  /// Fetches booked time slots for a doctor on a given date from MERN backend (GET /appointments/available-slots)
+  Future<List<String>> fetchBookedSlots({required String doctorId, required String date}) async {
+    if (doctorId.isEmpty || date.isEmpty) return [];
+    final url = Uri.parse('${ApiConfig.baseUrl}/appointments/available-slots?doctorId=$doctorId&date=$date');
+    try {
+      final response = await _client.get(
+        url,
+        headers: UserSession.headers,
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded['data'] != null && decoded['data']['bookedSlots'] is List) {
+          return (decoded['data']['bookedSlots'] as List).map((s) => s.toString()).toList();
+        }
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
 }

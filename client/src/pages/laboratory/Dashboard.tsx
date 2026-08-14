@@ -20,8 +20,9 @@ import { useLaboratoryRequests } from "../../features/laboratory";
 
 export function LaboratoryDashboard() {
   const navigate = useNavigate();
-  const { data: dbRequests = [], isLoading: isRequestsLoading } = useLaboratoryRequests();
+  const { data: dbRequests, isLoading: isRequestsLoading } = useLaboratoryRequests();
   const { data: invoiceData, isLoading: isInvoicesLoading } = useInvoices({ billingType: "LAB", limit: 100 });
+  const requestsList = dbRequests || [];
 
   const [stats, setStats] = useState({
     pendingRequests: 0,
@@ -39,11 +40,11 @@ export function LaboratoryDashboard() {
     const inventory = JSON.parse(savedInventory);
 
     // Set statistics
-    const pending = dbRequests.filter((r: any) => r.status === "pending").length;
-    const samples = dbRequests.filter((r: any) => r.status === "accepted").length;
-    const inProgress = dbRequests.filter((r: any) => r.status === "processing").length;
-    const completed = dbRequests.filter((r: any) => r.status === "completed").length;
-    const critical = dbRequests.filter((r: any) => r.status === "report_uploaded" || r.status === "verified").length;
+    const pending = requestsList.filter((r: any) => r.status === "pending").length;
+    const samples = requestsList.filter((r: any) => r.status === "accepted").length;
+    const inProgress = requestsList.filter((r: any) => r.status === "processing").length;
+    const completed = requestsList.filter((r: any) => r.status === "completed").length;
+    const critical = requestsList.filter((r: any) => r.status === "report_uploaded" || r.status === "verified").length;
 
     setStats({
       pendingRequests: pending,
@@ -82,7 +83,7 @@ export function LaboratoryDashboard() {
   const liveWeeklyTrend = last7DaysList.map(dateStr => {
     const dObj = new Date(dateStr);
     const dayName = daysOfWeek[dObj.getDay()];
-    const dayRequests = dbRequests.filter((r: any) => {
+    const dayRequests = requestsList.filter((r: any) => {
       const rDate = new Date(r.createdAt || r.date).toISOString().split("T")[0];
       return rDate === dateStr;
     });
@@ -96,7 +97,7 @@ export function LaboratoryDashboard() {
 
   // 2. Volume by investigation test name (top 5 requested tests)
   const testCounts: Record<string, number> = {};
-  dbRequests.forEach((r: any) => {
+  requestsList.forEach((r: any) => {
     (r.tests || []).forEach((t: string) => {
       testCounts[t] = (testCounts[t] || 0) + 1;
     });
@@ -125,7 +126,7 @@ export function LaboratoryDashboard() {
 
   // 4. Test Requests Status split
   const reqStatusCounts: Record<string, number> = {};
-  dbRequests.forEach((r: any) => {
+  requestsList.forEach((r: any) => {
     const st = r.status || "pending";
     const label = st === "report_uploaded" ? "Report Uploaded" : st.charAt(0).toUpperCase() + st.slice(1);
     reqStatusCounts[label] = (reqStatusCounts[label] || 0) + 1;
@@ -137,14 +138,14 @@ export function LaboratoryDashboard() {
 
   // 5. Revisits vs New requests
   const patientRequestCounts: Record<string, number> = {};
-  dbRequests.forEach((r: any) => {
+  requestsList.forEach((r: any) => {
     if (r.patientId) {
       patientRequestCounts[r.patientId] = (patientRequestCounts[r.patientId] || 0) + 1;
     }
   });
   let newRequests = 0;
   let revisitRequests = 0;
-  dbRequests.forEach((r: any) => {
+  requestsList.forEach((r: any) => {
     if (r.patientId && patientRequestCounts[r.patientId] > 1) {
       revisitRequests++;
     } else {

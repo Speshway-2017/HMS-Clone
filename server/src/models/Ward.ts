@@ -12,6 +12,7 @@ const wardSchema = new Schema(
         "General Ward",
         "Semi-Private Ward",
         "Private Ward",
+        "VIP Ward",
         "ICU",
         "NICU",
         "PICU",
@@ -19,6 +20,8 @@ const wardSchema = new Schema(
         "Emergency Ward",
         "Operation Theatre",
         "Labour Ward",
+        "Maternity",
+        "Isolation",
         "Semi Private",
         "Private",
         "Deluxe",
@@ -27,6 +30,8 @@ const wardSchema = new Schema(
       required: true
     },
     floorNumber: { type: Number, required: true },
+    maxRooms: { type: Number, default: 20 },
+    nurseStation: { type: String, default: "" },
     description: { type: String, default: "" },
     status: { type: String, enum: ["Active", "Inactive"], default: "Active" }
   },

@@ -12,14 +12,19 @@ async function setAllPasswords() {
   const pass123 = await bcrypt.hash("receptionist@123", 10);
   const adminPass = await bcrypt.hash("admin123", 10);
 
-  // Update receptionist accounts to accept receptionist@123
+  // Update receptionist accounts
   await db.collection("users").updateMany(
     { email: { $in: ["receptionist@hms.com", "receptionist@frcs.com", "receptionist@cms.com"] } },
     { $set: { passwordHash: pass123, status: "active" } }
   );
 
-  console.log("✓ Updated receptionist accounts password to receptionist@123");
+  // Update admin accounts
+  await db.collection("users").updateMany(
+    { email: { $in: ["admin@hms.com", "admin@frcs.com"] } },
+    { $set: { passwordHash: adminPass, status: "active" } }
+  );
 
+  console.log("✓ Updated accounts passwords");
   await mongoose.disconnect();
 }
 
