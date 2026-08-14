@@ -260,34 +260,37 @@ export class ReceptionRepository {
 
     if (queueTokens.length > 0) {
       const apptIds = queueTokens.map((q: any) => q.appointment?._id || q.appointment).filter(Boolean);
-      const appts = await Appointment.find(toFilter(hospitalId, {
-        $or: [
-          { _id: { $in: apptIds } },
-          { date: { $gte: startOfDay, $lte: endOfDay } }
-        ]
-      }));
+
+      // Look up appointments by explicit _id without branch filter — _id is globally unique
+      // and branch scoping here would incorrectly exclude appointments from different branches,
+      // causing completed consultations to appear as "waiting" in the queue.
+      const apptsByIds = apptIds.length > 0
+        ? await Appointment.find({ hospital: (typeof hospitalId === "object" && hospitalId?.hospital) ? hospitalId.hospital : hospitalId, _id: { $in: apptIds } })
+        : [];
+
       const apptStatusMap = new Map<string, string>();
-      const patientApptStatusMap = new Map<string, string>();
-      appts.forEach((a: any) => {
+      apptsByIds.forEach((a: any) => {
         apptStatusMap.set(a._id.toString(), a.status);
-        if (a.patient) {
-          patientApptStatusMap.set(a.patient.toString(), a.status);
-        }
       });
 
       return queueTokens.map((q: any) => {
         const plain = q.toObject ? q.toObject() : q;
         const apptId = q.appointment?._id ? q.appointment._id.toString() : (q.appointment ? q.appointment.toString() : null);
-        const patId = q.patient?._id ? q.patient._id.toString() : (q.patient ? q.patient.toString() : null);
-        const statusFromAppt = (apptId && apptStatusMap.get(apptId)) || (patId && patientApptStatusMap.get(patId));
 
-        if (statusFromAppt === "completed") {
+        // Prefer the queue's own persisted status (set by doctor actions), then fall back
+        // to appointment status for cases where the queue record was not explicitly updated.
+        const queueStatus = plain.status; // already-persisted queue status
+        const statusFromAppt = apptId ? apptStatusMap.get(apptId) : undefined;
+
+        if (queueStatus === "completed" || statusFromAppt === "completed") {
           plain.status = "completed";
-        } else if (statusFromAppt === "in_consultation") {
-          plain.status = "called";
-        } else if (statusFromAppt === "cancelled" || statusFromAppt === "no_show") {
+        } else if (queueStatus === "skipped" || statusFromAppt === "cancelled" || statusFromAppt === "no_show") {
           plain.status = "skipped";
+        } else if (queueStatus === "called" || statusFromAppt === "in_consultation") {
+          plain.status = "called";
         }
+        // else: leave as "waiting" (queue's own status)
+
         return plain;
       });
     }
