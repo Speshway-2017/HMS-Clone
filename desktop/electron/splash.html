@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hospital Management System</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 520px;
+      height: 360px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    .container {
+      width: 520px;
+      height: 360px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #0f4c75 100%);
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    /* Animated background orbs */
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(60px);
+      opacity: 0.15;
+      animation: float 6s ease-in-out infinite;
+    }
+
+    .orb-1 {
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, #3b82f6, #1d4ed8);
+      top: -100px;
+      right: -100px;
+      animation-delay: 0s;
+    }
+
+    .orb-2 {
+      width: 200px;
+      height: 200px;
+      background: radial-gradient(circle, #06b6d4, #0891b2);
+      bottom: -80px;
+      left: -60px;
+      animation-delay: 2s;
+    }
+
+    .orb-3 {
+      width: 150px;
+      height: 150px;
+      background: radial-gradient(circle, #8b5cf6, #6d28d9);
+      top: 50%;
+      left: -40px;
+      animation-delay: 4s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) scale(1); }
+      50% { transform: translateY(-20px) scale(1.05); }
+    }
+
+    /* Grid pattern overlay */
+    .grid-overlay {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* Content */
+    .content {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    /* Icon / Logo */
+    .logo-wrapper {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, #3b82f6, #06b6d4);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 32px rgba(59,130,246,0.4);
+      animation: pulse-glow 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 8px 32px rgba(59,130,246,0.4); }
+      50% { box-shadow: 0 8px 48px rgba(59,130,246,0.7), 0 0 0 8px rgba(59,130,246,0.1); }
+    }
+
+    .logo-svg {
+      width: 44px;
+      height: 44px;
+      fill: none;
+      stroke: white;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* Title */
+    .title {
+      text-align: center;
+    }
+
+    .title h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #f8fafc;
+      letter-spacing: -0.3px;
+      line-height: 1.2;
+    }
+
+    .title p {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 4px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+
+    /* Role badges */
+    .roles {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 380px;
+    }
+
+    .role-badge {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      opacity: 0;
+      animation: fade-in-up 0.4s ease forwards;
+    }
+
+    .role-badge:nth-child(1) { animation-delay: 0.3s; background: rgba(59,130,246,0.2); color: #93c5fd; border: 1px solid rgba(59,130,246,0.3); }
+    .role-badge:nth-child(2) { animation-delay: 0.45s; background: rgba(16,185,129,0.2); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); }
+    .role-badge:nth-child(3) { animation-delay: 0.6s; background: rgba(245,158,11,0.2); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); }
+    .role-badge:nth-child(4) { animation-delay: 0.75s; background: rgba(139,92,246,0.2); color: #c4b5fd; border: 1px solid rgba(139,92,246,0.3); }
+    .role-badge:nth-child(5) { animation-delay: 0.9s; background: rgba(236,72,153,0.2); color: #f9a8d4; border: 1px solid rgba(236,72,153,0.3); }
+    .role-badge:nth-child(6) { animation-delay: 1.05s; background: rgba(6,182,212,0.2); color: #67e8f9; border: 1px solid rgba(6,182,212,0.3); }
+
+    @keyframes fade-in-up {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Loading bar */
+    .loading-wrapper {
+      width: 240px;
+      margin-top: 8px;
+    }
+
+    .loading-label {
+      font-size: 11px;
+      color: #475569;
+      text-align: center;
+      margin-bottom: 8px;
+      animation: text-cycle 3s ease-in-out infinite;
+    }
+
+    @keyframes text-cycle {
+      0%, 30% { opacity: 1; }
+      40%, 60% { opacity: 0.4; }
+      70%, 100% { opacity: 1; }
+    }
+
+    .loading-track {
+      width: 100%;
+      height: 3px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .loading-bar {
+      height: 100%;
+      border-radius: 99px;
+      background: linear-gradient(90deg, #3b82f6, #06b6d4, #8b5cf6);
+      background-size: 200% 100%;
+      animation: loading 2s ease-in-out infinite, shimmer 1.5s linear infinite;
+    }
+
+    @keyframes loading {
+      0% { width: 0%; }
+      50% { width: 70%; }
+      90% { width: 92%; }
+      100% { width: 92%; }
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% center; }
+      100% { background-position: -200% center; }
+    }
+
+    /* Version */
+    .version {
+      position: absolute;
+      bottom: 16px;
+      right: 20px;
+      font-size: 10px;
+      color: #334155;
+      letter-spacing: 0.5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="grid-overlay"></div>
+
+    <div class="content">
+      <!-- Logo -->
+      <div class="logo-wrapper">
+        <svg class="logo-svg" viewBox="0 0 24 24">
+          <!-- Hospital cross / medical icon -->
+          <rect x="3" y="3" width="18" height="18" rx="3" stroke="white" stroke-width="1.5" fill="rgba(255,255,255,0.1)"/>
+          <line x1="12" y1="7" x2="12" y2="17" stroke="white" stroke-width="2.5"/>
+          <line x1="7" y1="12" x2="17" y2="12" stroke="white" stroke-width="2.5"/>
+        </svg>
+      </div>
+
+      <!-- Title -->
+      <div class="title">
+        <h1>Hospital Management System</h1>
+        <p>Healthcare Platform</p>
+      </div>
+
+      <!-- Role badges -->
+      <div class="roles">
+        <span class="role-badge">Admin</span>
+        <span class="role-badge">Doctor</span>
+        <span class="role-badge">Receptionist</span>
+        <span class="role-badge">Laboratory</span>
+        <span class="role-badge">Pharmacist</span>
+        <span class="role-badge">Accountant</span>
+      </div>
+
+      <!-- Loading -->
+      <div class="loading-wrapper">
+        <p class="loading-label" id="status-text">Starting services...</p>
+        <div class="loading-track">
+          <div class="loading-bar"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="version">v1.0.0</div>
+  </div>
+
+  <script>
+    const messages = [
+      "Starting services...",
+      "Connecting to database...",
+      "Loading Hospital Management System...",
+      "Preparing your workspace...",
+      "Almost ready..."
+    ];
+    let i = 0;
+    const label = document.getElementById("status-text");
+    setInterval(() => {
+      i = (i + 1) % messages.length;
+      label.textContent = messages[i];
+    }, 2200);
+  </script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+{
+  "name": "hms-desktop",
+  "version": "1.0.0",
+  "description": "Hospital Management System - Desktop Application",
+  "author": "Hospital Management System",
+  "main": "electron/main.js",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\" \"wait-on http://localhost:5173 http://localhost:5000/api/v1/health && cross-env NODE_ENV=development electron .\"",
+    "dev:electron-only": "cross-env NODE_ENV=development electron .",
+    "dev:client": "cd ../client && npm run dev",
+    "dev:server": "cd ../server && npm run dev",
+    "build:client": "cd ../client && npm run build",
+    "build:server": "cd ../server && npm run build",
+    "build": "npm run build:server && npm run build:client",
+    "dist": "npm run build && npx electron-builder",
+    "dist:win": "npm run build && npx electron-builder --win",
+    "dist:dir": "npm run build && npx electron-builder --dir"
+  },
+  "dependencies": {
+    "electron-is-dev": "^3.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^33.4.0",
+    "electron-builder": "^25.1.8",
+    "wait-on": "^8.0.3"
+  },
+  "build": {
+    "appId": "com.hms.desktop",
+    "productName": "Hospital Management System",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "node_modules/**/*"
+    ],
+    "extraFiles": [
+      {
+        "from": "../server/dist",
+        "to": "server/dist"
+      },
+      {
+        "from": "../server/node_modules",
+        "to": "server/node_modules",
+        "filter": [
+          "**/*",
+          "!**/*.ts",
+          "!**/*.tsx",
+          "!**/*.md",
+          "!**/test/**",
+          "!**/tests/**"
+        ]
+      },
+      {
+        "from": "../server/.env",
+        "to": "server/.env"
+      },
+      {
+        "from": "../client/dist",
+        "to": "client/dist"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "requestedExecutionLevel": "asInvoker",
+      "sign": false,
+      "signingHashAlgorithms": []
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "HMS Desktop"
+    }
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
+  }
+}
