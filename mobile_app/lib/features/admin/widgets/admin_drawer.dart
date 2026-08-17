@@ -176,15 +176,24 @@ class AdminDrawer extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
                 color: AppColors.errorBg,
               ),
-              child: ListTile(
-                leading: const Icon(Icons.logout_rounded, color: AppColors.errorRed),
-                title: const Text(
-                  'Secure Log Out',
-                  style: TextStyle(
-                    color: AppColors.errorRed,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+                clipBehavior: Clip.antiAlias,
+                child: ListTile(
+                  leading: const Icon(Icons.logout_rounded, color: AppColors.errorRed),
+                  title: const Text(
+                    'Secure Log Out',
+                    style: TextStyle(
+                      color: AppColors.errorRed,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
                   ),
+                  onTap: () {
+                    Navigator.pop(context); // Close drawer
+                    Navigator.pushReplacementNamed(context, AppRoutes.login);
+                  },
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -214,7 +223,11 @@ class AdminDrawer extends StatelessWidget {
         color: isSelected ? AppColors.navy50 : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: ListTile(
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
         visualDensity: const VisualDensity(horizontal: 0, vertical: -2),
         leading: Icon(
           icon,
@@ -248,6 +261,7 @@ class AdminDrawer extends StatelessWidget {
           }
         },
       ),
+    ),
     );
   }
 }
