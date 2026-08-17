@@ -341,10 +341,11 @@ export const getAdmissions = catchAsync(async (req: Request, res: Response) => {
 
   const admissions = await Admission.find(query)
     .populate("patient", "name uhid phone age gender bloodGroup")
-    .populate("room")
-    .populate("bed")
+    .populate("room", "roomNumber roomName roomType")
+    .populate("bed", "bedNumber bedCode bedType")
     .populate("admittingDoctor", "name specialization")
     .populate("dischargeRequestedBy", "name specialization")
+    .populate("assignedNurse", "name employeeId role")
     .sort({ admissionDate: -1 })
     .lean();
 
@@ -401,18 +402,20 @@ export const getDoctorsAvailability = catchAsync(async (req: Request, res: Respo
 });
 
 export const getRoomsAvailability = catchAsync(async (req: Request, res: Response) => {
-  const availability = await ReceptionRepository.getRoomsAvailability(req.hospitalFilter!.hospital as any);
+  const availability = await ReceptionRepository.getRoomsAvailability(req.hospitalFilter as any);
   res.json({ status: "success", data: { availability } });
 });
 
 export const getNotifications = catchAsync(async (req: Request, res: Response) => {
-  await ReceptionService.generateScheduledAlerts(req.hospitalFilter!.hospital as any);
-  const notifs = await ReceptionRepository.getNotificationsByRole(req.hospitalFilter!.hospital as any, "receptionist");
+  if (req.hospitalFilter?.hospital) {
+    await ReceptionService.generateScheduledAlerts(req.hospitalFilter.hospital as any);
+  }
+  const notifs = await ReceptionRepository.getNotificationsByRole(req.hospitalFilter as any, "receptionist");
   res.json({ status: "success", data: { notifications: notifs } });
 });
 
 export const markNotificationRead = catchAsync(async (req: Request, res: Response) => {
-  const notif = await ReceptionRepository.markNotificationRead(req.hospitalFilter!.hospital as any, req.params.id);
+  const notif = await ReceptionRepository.markNotificationRead(req.hospitalFilter as any, req.params.id);
   res.json({ status: "success", data: { notification: notif } });
 });
 

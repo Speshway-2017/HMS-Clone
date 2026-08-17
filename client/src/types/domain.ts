@@ -51,7 +51,7 @@ export interface Branch {
 export interface Department {
   _id: string;
   hospital: { _id: string; name: string } | string;
-  branch: string | null;
+  branch: { _id: string; name: string } | string | null;
 
   // Core identity
   name: string;
@@ -286,3 +286,18 @@ export interface Invoice {
   totals: InvoiceTotals;
   billingType?: string;
 }
+
+export interface Supplier {
+  _id: string;
+  supplierId: string;
+  name: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  address: string;
+  outstandingBalance: number;
+  status: "active" | "inactive";
+  createdAt?: string;
+  updatedAt?: string;
+}
+

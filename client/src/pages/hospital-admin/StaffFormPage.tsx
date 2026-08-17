@@ -10,6 +10,7 @@ import { FileUpload } from "../../components/ui/FileUpload";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { api } from "../../lib/api";
+import { useBranchContext } from "../../context/BranchContext";
 
 function getRolePrefix(role: string): string {
   const clean = (role || "").toLowerCase().trim();
@@ -33,6 +34,10 @@ export function StaffFormPage() {
   const { data: roles } = useRoles();
   const createStaff = useCreateStaff();
   const updateStaff = useUpdateStaff(id ?? "");
+  const { isAllBranches, branches } = useBranchContext();
+
+  // When admin is in "All Branches" mode, they must choose a branch for the new staff member
+  const [selectedBranchId, setSelectedBranchId] = useState("");
 
   const [form, setForm] = useState({
     name: "",
@@ -86,13 +91,26 @@ export function StaffFormPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    // Validate: when admin is in All Branches mode, a branch must be selected
+    if (!isEdit && isAllBranches && !selectedBranchId) {
+      setError("Please select the branch this staff member belongs to.");
+      return;
+    }
+
     try {
       const payload = { ...form, department: form.department || null };
       if (isEdit) {
         await updateStaff.mutateAsync(payload);
         navigate("/admin/staff");
       } else {
-        const result = await createStaff.mutateAsync(payload);
+        // When admin is in All Branches view, explicitly override X-Branch-ID for this POST
+        const headers: Record<string, string> = {};
+        if (isAllBranches && selectedBranchId) {
+          headers["X-Branch-ID"] = selectedBranchId;
+        }
+        const res = await api.post("/staff", payload, { headers });
+        const result = res.data.data as { staff: any; tempPassword: string | null };
         if (result.tempPassword) {
           setCreated({ name: form.name, email: form.email, tempPassword: result.tempPassword, role: form.role });
         } else {
@@ -222,6 +240,22 @@ export function StaffFormPage() {
         </FormSection>
 
         <FormSection icon={Briefcase} title="Professional Details">
+          {/* Branch selector — only shown to admins in "All Branches" mode */}
+          {!isEdit && isAllBranches && (
+            <SelectField
+              label="Assign to Branch *"
+              required
+              value={selectedBranchId}
+              onChange={(e) => setSelectedBranchId(e.target.value)}
+            >
+              <option value="">Select Branch</option>
+              {branches.map((b) => (
+                <option key={b._id} value={b._id}>
+                  {b.name}
+                </option>
+              ))}
+            </SelectField>
+          )}
           <SelectField
             label="Role / Designation"
             required

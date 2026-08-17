@@ -15,13 +15,27 @@ const DEPT_COLORS = ["#0f172a", "#2563eb", "#059669", "#d97706", "#7c3aed", "#02
 export function DepartmentAnalyticsSection({ departments, invoices, appointments }: DepartmentAnalyticsSectionProps) {
   const metrics = useMemo(() => {
     // Map live departments from MongoDB
-    const statsMap = new Map<string, { id: string; name: string; patientCount: number; revenue: number; completedCount: number; totalApps: number }>();
+    const statsMap = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        originalName: string;
+        patientCount: number;
+        revenue: number;
+        completedCount: number;
+        totalApps: number;
+      }
+    >();
 
     departments.forEach((d) => {
       const dId = d._id ? d._id.toString() : d.name;
+      const branchName = d.branch && typeof d.branch === "object" ? d.branch.name : null;
+      const displayName = branchName ? `${d.name} (${branchName})` : d.name;
       statsMap.set(dId, {
         id: dId,
-        name: d.name || "Department",
+        name: displayName || "Department",
+        originalName: d.name || "Department",
         patientCount: d.patientCount || 0,
         revenue: d.revenue || 0,
         completedCount: 0,
@@ -38,7 +52,7 @@ export function DepartmentAnalyticsSection({ departments, invoices, appointments
       if (!key && deptName) {
         // Find key by name
         for (const [k, v] of statsMap.entries()) {
-          if (v.name.toLowerCase() === deptName.toLowerCase()) {
+          if (v.originalName.toLowerCase() === deptName.toLowerCase()) {
             key = k;
             break;
           }
@@ -67,7 +81,7 @@ export function DepartmentAnalyticsSection({ departments, invoices, appointments
       let key = deptId ? deptId.toString() : "";
       if (!key && deptName) {
         for (const [k, v] of statsMap.entries()) {
-          if (v.name.toLowerCase() === deptName.toLowerCase()) {
+          if (v.originalName.toLowerCase() === deptName.toLowerCase()) {
             key = k;
             break;
           }
@@ -157,7 +171,7 @@ export function DepartmentAnalyticsSection({ departments, invoices, appointments
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-semibold">
                 {metrics.pieData.map((d, idx) => (
-                  <div key={d.name} className="flex items-center gap-1.5 truncate">
+                  <div key={`${d.name}-${idx}`} className="flex items-center gap-1.5 truncate">
                     <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: DEPT_COLORS[idx % DEPT_COLORS.length] }} />
                     <span className="text-slate-600 truncate">{d.name}</span>
                   </div>

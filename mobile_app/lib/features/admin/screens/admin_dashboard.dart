@@ -771,7 +771,29 @@ class _AdminDashboardState extends State<AdminDashboard> {
           _buildWelcomeBanner(responsive),
           const SizedBox(height: 20),
 
-          // 2. Capacity KPI Cards Grid (Isolated for Active Branch)
+          // 2. Capacity KPI Cards Grid
+          const Text(
+            'Network Bed & Capacity Summary',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900),
+          ),
+          const SizedBox(height: 10),
+          _buildKpiGrid(responsive, totalBedsCount, occupiedBedsCount, availableBedsCount, occupancyRate),
+          const SizedBox(height: 24),
+
+          // 3. Quick Stats Strip
+          _buildSystemStatsStrip(),
+          const SizedBox(height: 24),
+
+          // 4. All Modules Quick Actions Grid
+          const Text(
+            'Admin Modules & Quick Operations',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900),
+          ),
+          const SizedBox(height: 12),
+          _buildQuickOperationsGrid(),
+          const SizedBox(height: 24),
+
+          // 5. Live Bed Roster Section
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -978,7 +1000,33 @@ class _AdminDashboardState extends State<AdminDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSubHeaderWithBack(subFilters, _staffSubFilter, (val) => setState(() => _staffSubFilter = val)),
+          // Filter Chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: subFilters.map((sf) {
+                final isSelected = _staffSubFilter == sf;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(sf),
+                    selected: isSelected,
+                    selectedColor: AppColors.navy700,
+                    backgroundColor: Colors.white,
+                    side: BorderSide(color: isSelected ? AppColors.navy700 : const Color(0xFFE2E8F0)),
+                    labelStyle: TextStyle(
+                      color: isSelected ? Colors.white : AppColors.slate700,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                    onSelected: (val) {
+                      if (val) setState(() => _staffSubFilter = sf);
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
           const SizedBox(height: 16),
 
           if (_staffSubFilter == 'All Doctors') _buildDoctorsSubView(),
@@ -999,7 +1047,33 @@ class _AdminDashboardState extends State<AdminDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSubHeaderWithBack(subFilters, _analyticsSubFilter, (val) => setState(() => _analyticsSubFilter = val)),
+          // Filter Chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: subFilters.map((sf) {
+                final isSelected = _analyticsSubFilter == sf;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(sf),
+                    selected: isSelected,
+                    selectedColor: AppColors.navy700,
+                    backgroundColor: Colors.white,
+                    side: BorderSide(color: isSelected ? AppColors.navy700 : const Color(0xFFE2E8F0)),
+                    labelStyle: TextStyle(
+                      color: isSelected ? Colors.white : AppColors.slate700,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                    onSelected: (val) {
+                      if (val) setState(() => _analyticsSubFilter = sf);
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
           const SizedBox(height: 16),
 
           if (_analyticsSubFilter == 'Analytics Metrics') _buildAnalyticsSubView(),
@@ -2097,16 +2171,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
               color: Colors.white.withOpacity(0.12),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.location_on_rounded, size: 12, color: AppColors.emerald400),
-                const SizedBox(width: 4),
-                Text(
-                  'ACTIVE SCOPE: ${_activeBranchLabel.toUpperCase()}',
-                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.emerald400, letterSpacing: 0.5),
-                ),
-              ],
+            child: const Text(
+              'LIVE NETWORK ENVIRONMENT',
+              style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.emerald400, letterSpacing: 0.5),
             ),
           ),
           const SizedBox(height: 12),
@@ -2146,7 +2213,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       physics: const NeverScrollableScrollPhysics(),
       childAspectRatio: 1.35,
       children: [
-        _buildKpiCard(title: 'Branch Capacity', value: '$totalBeds Beds', icon: Icons.local_hospital_rounded, iconColor: AppColors.navy600, bgColor: AppColors.navy50),
+        _buildKpiCard(title: 'Total Capacity', value: '$totalBeds Beds', icon: Icons.local_hospital_rounded, iconColor: AppColors.navy600, bgColor: AppColors.navy50),
         _buildKpiCard(title: 'Occupancy Rate', value: '$occupancyRate%', icon: Icons.hotel_rounded, iconColor: occupancyRate > 80 ? Colors.red : AppColors.emerald600, bgColor: occupancyRate > 80 ? const Color(0xFFFEE2E2) : AppColors.emerald50),
         _buildKpiCard(title: 'Occupied Beds', value: '$occupiedBeds', icon: Icons.king_bed_rounded, iconColor: Colors.purple.shade700, bgColor: Colors.purple.shade50),
         _buildKpiCard(title: 'Available Beds', value: '$availableBeds', icon: Icons.event_available_rounded, iconColor: AppColors.emerald600, bgColor: AppColors.emerald50),
@@ -2402,72 +2469,39 @@ class _AdminDashboardState extends State<AdminDashboard> {
     _formCodeController.clear();
     _formDescController.clear();
     _formFeeController.text = '500';
-    _formBedsController.text = '20';
-    bool isEmergency = false;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-                top: 20, left: 20, right: 20,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2))),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text('Add Department (Web Parity)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-                    const SizedBox(height: 4),
-                    const Text('Create a clinical department with fee structures and bed capacity.', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                    const SizedBox(height: 16),
-                    TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Department Name (e.g. Cardiology)', border: OutlineInputBorder())),
-                    const SizedBox(height: 10),
-                    TextField(controller: _formCodeController, decoration: const InputDecoration(labelText: 'Dept Code (e.g. CARD)', border: OutlineInputBorder())),
-                    const SizedBox(height: 10),
-                    TextField(controller: _formDescController, decoration: const InputDecoration(labelText: 'Medical Specialty Scope', border: OutlineInputBorder())),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: _formFeeController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Consultation Fee (₹)', border: OutlineInputBorder()))),
-                        const SizedBox(width: 10),
-                        Expanded(child: TextField(controller: _formBedsController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Total Ward Beds', border: OutlineInputBorder()))),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('24/7 Emergency Department', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                      subtitle: const Text('Enable emergency triage & continuous monitoring', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
-                      value: isEmergency,
-                      activeColor: AppColors.emerald600,
-                      onChanged: (val) => setModalState(() => isEmergency = val),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                        onPressed: _isSubmitting ? null : () async {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Add New Department', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+              const SizedBox(height: 14),
+              TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Department Name (e.g. Cardiology)')),
+              const SizedBox(height: 10),
+              TextField(controller: _formCodeController, decoration: const InputDecoration(labelText: 'Dept Code (e.g. CARD)')),
+              const SizedBox(height: 10),
+              TextField(controller: _formFeeController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Consultation Fee (₹)')),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () async {
                           if (_formNameController.text.isEmpty) return;
                           setState(() => _isSubmitting = true);
                           final success = await _apiService.createDepartment({
                             'name': _formNameController.text.trim(),
                             'code': _formCodeController.text.trim().toUpperCase(),
-                            'specialization': _formDescController.text.trim(),
                             'consultationFee': double.tryParse(_formFeeController.text) ?? 500,
-                            'totalBeds': int.tryParse(_formBedsController.text) ?? 20,
-                            'isEmergency': isEmergency,
                           });
                           setState(() => _isSubmitting = false);
                           if (!ctx.mounted) return;
@@ -2477,14 +2511,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             _loadAllAdminData();
                           }
                         },
-                        child: const Text('Save Department', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-                      ),
-                    ),
-                  ],
+                  child: const Text('Save Department'),
                 ),
               ),
-            );
-          },
+            ],
+          ),
         );
       },
     );
@@ -2494,83 +2525,52 @@ class _AdminDashboardState extends State<AdminDashboard> {
     _formNameController.clear();
     _formCodeController.clear();
     _formLocationController.clear();
-    _formStateController.clear();
-    _formAddressController.clear();
-    _formPhoneController.clear();
-    _formEmailController.clear();
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) {
         return Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2))),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Add New Branch', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+              const SizedBox(height: 14),
+              TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Branch Name (e.g. City Center Branch)')),
+              const SizedBox(height: 10),
+              TextField(controller: _formCodeController, decoration: const InputDecoration(labelText: 'Branch ID Code (e.g. BR-002)')),
+              const SizedBox(height: 10),
+              TextField(controller: _formLocationController, decoration: const InputDecoration(labelText: 'City / Location')),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () async {
+                          if (_formNameController.text.isEmpty) return;
+                          setState(() => _isSubmitting = true);
+                          final success = await _apiService.createBranch({
+                            'name': _formNameController.text.trim(),
+                            'branchId': _formCodeController.text.trim(),
+                            'city': _formLocationController.text.trim(),
+                          });
+                          setState(() => _isSubmitting = false);
+                          if (!ctx.mounted) return;
+                          Navigator.pop(ctx);
+                          if (success) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Branch created successfully!'), backgroundColor: AppColors.emerald600));
+                            _loadAllAdminData();
+                          }
+                        },
+                  child: const Text('Save Branch'),
                 ),
-                const SizedBox(height: 14),
-                const Text('Add Hospital Branch (Web Parity)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-                const SizedBox(height: 4),
-                const Text('Expand network facility infrastructure with location contact details.', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                const SizedBox(height: 16),
-                TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Branch Name (e.g. City Center Campus)', border: OutlineInputBorder())),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(child: TextField(controller: _formCodeController, decoration: const InputDecoration(labelText: 'Branch ID (e.g. BR-002)', border: OutlineInputBorder()))),
-                    const SizedBox(width: 10),
-                    Expanded(child: TextField(controller: _formLocationController, decoration: const InputDecoration(labelText: 'City Location', border: OutlineInputBorder()))),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                TextField(controller: _formStateController, decoration: const InputDecoration(labelText: 'State / Province / Region', border: OutlineInputBorder())),
-                const SizedBox(height: 10),
-                TextField(controller: _formAddressController, decoration: const InputDecoration(labelText: 'Street Address & Enclave', border: OutlineInputBorder())),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(child: TextField(controller: _formPhoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Contact Phone', border: OutlineInputBorder()))),
-                    const SizedBox(width: 10),
-                    Expanded(child: TextField(controller: _formEmailController, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Branch Email', border: OutlineInputBorder()))),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                    onPressed: _isSubmitting ? null : () async {
-                      if (_formNameController.text.isEmpty) return;
-                      setState(() => _isSubmitting = true);
-                      final success = await _apiService.createBranch({
-                        'name': _formNameController.text.trim(),
-                        'branchId': _formCodeController.text.trim(),
-                        'city': _formLocationController.text.trim(),
-                        'state': _formStateController.text.trim(),
-                        'address': _formAddressController.text.trim(),
-                        'phone': _formPhoneController.text.trim(),
-                        'email': _formEmailController.text.trim(),
-                      });
-                      setState(() => _isSubmitting = false);
-                      if (!ctx.mounted) return;
-                      Navigator.pop(ctx);
-                      if (success) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Branch created successfully!'), backgroundColor: AppColors.emerald600));
-                        _loadAllAdminData();
-                      }
-                    },
-                    child: const Text('Save Hospital Branch', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
@@ -2582,125 +2582,53 @@ class _AdminDashboardState extends State<AdminDashboard> {
     _formDescController.clear();
     _formEmailController.clear();
     _formPhoneController.clear();
-    _formQualController.clear();
-    _formCodeController.clear();
-    _formBioController.clear();
-
-    String selectedDeptId = _departments.isNotEmpty ? (_departments.first['_id']?.toString() ?? '') : '';
-    String gender = 'Male';
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2))),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text('Add Doctor (Web Parity)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-                    const SizedBox(height: 4),
-                    const Text('Register a doctor and auto-create secure user access credentials.', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                    const SizedBox(height: 16),
-                    TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Doctor Full Name (e.g. Dr. Sarah Jenkins)', border: OutlineInputBorder())),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: gender,
-                            decoration: const InputDecoration(labelText: 'Gender', border: OutlineInputBorder()),
-                            items: const [
-                              DropdownMenuItem(value: 'Male', child: Text('Male')),
-                              DropdownMenuItem(value: 'Female', child: Text('Female')),
-                              DropdownMenuItem(value: 'Other', child: Text('Other')),
-                            ],
-                            onChanged: (val) => setModalState(() => gender = val ?? 'Male'),
-                          ),
-                        ),
-                        if (_departments.isNotEmpty) ...[
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: selectedDeptId.isNotEmpty ? selectedDeptId : null,
-                              decoration: const InputDecoration(labelText: 'Department', border: OutlineInputBorder()),
-                              items: _departments.map((d) {
-                                return DropdownMenuItem<String>(
-                                  value: d['_id']?.toString() ?? '',
-                                  child: Text(d['name']?.toString() ?? 'Dept', overflow: TextOverflow.ellipsis),
-                                );
-                              }).toList(),
-                              onChanged: (val) => setModalState(() => selectedDeptId = val ?? ''),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: _formEmailController, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email (For Login)', border: OutlineInputBorder()))),
-                        const SizedBox(width: 10),
-                        Expanded(child: TextField(controller: _formPhoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone Number', border: OutlineInputBorder()))),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: _formDescController, decoration: const InputDecoration(labelText: 'Specialization (e.g. Cardiologist)', border: OutlineInputBorder()))),
-                        const SizedBox(width: 10),
-                        Expanded(child: TextField(controller: _formQualController, decoration: const InputDecoration(labelText: 'Qualifications (e.g. MBBS, MD)', border: OutlineInputBorder()))),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(controller: _formCodeController, decoration: const InputDecoration(labelText: 'License / Reg No (Optional - Auto generated if empty)', border: OutlineInputBorder())),
-                    const SizedBox(height: 10),
-                    TextField(controller: _formBioController, maxLines: 2, decoration: const InputDecoration(labelText: 'Short Professional Bio / Notes', border: OutlineInputBorder())),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                        onPressed: _isSubmitting ? null : () async {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Add New Doctor', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+              const SizedBox(height: 14),
+              TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Doctor Full Name')),
+              const SizedBox(height: 10),
+              TextField(controller: _formDescController, decoration: const InputDecoration(labelText: 'Specialization (e.g. Cardiologist)')),
+              const SizedBox(height: 10),
+              TextField(controller: _formEmailController, decoration: const InputDecoration(labelText: 'Email Address')),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () async {
                           if (_formNameController.text.isEmpty) return;
                           setState(() => _isSubmitting = true);
                           final success = await _apiService.createDoctor({
                             'name': _formNameController.text.trim(),
-                            'gender': gender,
-                            'department': selectedDeptId.isNotEmpty ? selectedDeptId : null,
-                            'email': _formEmailController.text.trim(),
-                            'phone': _formPhoneController.text.trim(),
                             'specialization': _formDescController.text.trim(),
-                            'qualification': _formQualController.text.trim(),
-                            'licenseNo': _formCodeController.text.trim(),
-                            'bio': _formBioController.text.trim(),
+                            'email': _formEmailController.text.trim(),
                           });
                           setState(() => _isSubmitting = false);
                           if (!ctx.mounted) return;
                           Navigator.pop(ctx);
                           if (success) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Doctor registered & credentials created!'), backgroundColor: AppColors.emerald600));
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Doctor registered successfully!'), backgroundColor: AppColors.emerald600));
                             _loadAllAdminData();
                           }
                         },
-                        child: const Text('Save Doctor Profile', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-                      ),
-                    ),
-                  ],
+                  child: const Text('Save Doctor'),
                 ),
               ),
-            );
-          },
+            ],
+          ),
         );
       },
     );
@@ -2708,138 +2636,51 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   void _showAddStaffModal() {
     _formNameController.clear();
-    _formEmailController.clear();
-    _formPhoneController.clear();
-    _formCodeController.clear();
-    _formQualController.clear();
-
-    String staffRole = 'nurse';
-    String gender = 'Female';
-    String dutyStatus = 'on_duty';
-    String selectedDeptId = _departments.isNotEmpty ? (_departments.first['_id']?.toString() ?? '') : '';
+    _formDescController.clear();
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2))),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text('Add Staff Member (Web Parity)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-                    const SizedBox(height: 4),
-                    const Text('Add nursing, administrative, or clinical support staff.', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                    const SizedBox(height: 16),
-                    TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Staff Member Full Name', border: OutlineInputBorder())),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: staffRole,
-                            decoration: const InputDecoration(labelText: 'Staff Role', border: OutlineInputBorder()),
-                            items: const [
-                              DropdownMenuItem(value: 'nurse', child: Text('Nurse')),
-                              DropdownMenuItem(value: 'receptionist', child: Text('Receptionist')),
-                              DropdownMenuItem(value: 'pharmacist', child: Text('Pharmacist')),
-                              DropdownMenuItem(value: 'accountant', child: Text('Accountant')),
-                              DropdownMenuItem(value: 'laboratory', child: Text('Lab Tech')),
-                              DropdownMenuItem(value: 'ward_boy', child: Text('Ward Assistant')),
-                              DropdownMenuItem(value: 'admin_staff', child: Text('Admin Staff')),
-                            ],
-                            onChanged: (val) => setModalState(() => staffRole = val ?? 'nurse'),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: gender,
-                            decoration: const InputDecoration(labelText: 'Gender', border: OutlineInputBorder()),
-                            items: const [
-                              DropdownMenuItem(value: 'Female', child: Text('Female')),
-                              DropdownMenuItem(value: 'Male', child: Text('Male')),
-                              DropdownMenuItem(value: 'Other', child: Text('Other')),
-                            ],
-                            onChanged: (val) => setModalState(() => gender = val ?? 'Female'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: _formEmailController, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder()))),
-                        const SizedBox(width: 10),
-                        Expanded(child: TextField(controller: _formPhoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone Number', border: OutlineInputBorder()))),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(child: TextField(controller: _formQualController, decoration: const InputDecoration(labelText: 'Qualifications', border: OutlineInputBorder()))),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: dutyStatus,
-                            decoration: const InputDecoration(labelText: 'Initial Duty Status', border: OutlineInputBorder()),
-                            items: const [
-                              DropdownMenuItem(value: 'on_duty', child: Text('On Duty')),
-                              DropdownMenuItem(value: 'off_duty', child: Text('Off Duty')),
-                              DropdownMenuItem(value: 'on_leave', child: Text('On Leave')),
-                            ],
-                            onChanged: (val) => setModalState(() => dutyStatus = val ?? 'on_duty'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(controller: _formCodeController, decoration: const InputDecoration(labelText: 'Employee ID (Optional - Auto generated if empty)', border: OutlineInputBorder())),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                        onPressed: _isSubmitting ? null : () async {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Add New Staff Member', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+              const SizedBox(height: 14),
+              TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Staff Name')),
+              const SizedBox(height: 10),
+              TextField(controller: _formDescController, decoration: const InputDecoration(labelText: 'Role (e.g. Staff Nurse)')),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () async {
                           if (_formNameController.text.isEmpty) return;
                           setState(() => _isSubmitting = true);
                           final success = await _apiService.createStaff({
                             'name': _formNameController.text.trim(),
-                            'role': staffRole,
-                            'gender': gender,
-                            'department': selectedDeptId.isNotEmpty ? selectedDeptId : null,
-                            'email': _formEmailController.text.trim(),
-                            'phone': _formPhoneController.text.trim(),
-                            'employeeId': _formCodeController.text.trim(),
-                            'qualifications': _formQualController.text.trim(),
-                            'dutyStatus': dutyStatus,
+                            'role': _formDescController.text.trim(),
                           });
                           setState(() => _isSubmitting = false);
                           if (!ctx.mounted) return;
                           Navigator.pop(ctx);
                           if (success) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Staff member registered successfully!'), backgroundColor: AppColors.emerald600));
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Staff member registered!'), backgroundColor: AppColors.emerald600));
                             _loadAllAdminData();
                           }
                         },
-                        child: const Text('Save Staff Member', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-                      ),
-                    ),
-                  ],
+                  child: const Text('Save Staff Member'),
                 ),
               ),
-            );
-          },
+            ],
+          ),
         );
       },
     );
@@ -2848,106 +2689,51 @@ class _AdminDashboardState extends State<AdminDashboard> {
   void _showAddRoleModal() {
     _formNameController.clear();
     _formDescController.clear();
-    final Set<String> selectedPermissions = {'hospital_view', 'billing_view'};
-
-    final Map<String, String> availablePermissions = {
-      'hospital_view': 'View Hospital Network',
-      'billing_view': 'Access Billing & Invoices',
-      'patient_manage': 'Manage Patient Records',
-      'staff_manage': 'Manage Staff & Duty Roster',
-      'doctor_manage': 'Manage Doctor Profiles',
-      'inventory_manage': 'Pharmacy & Inventory Access',
-      'reports_export': 'Export Financial Analytics',
-    };
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2))),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text('Create Custom Role & RBAC (Web Parity)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-                    const SizedBox(height: 4),
-                    const Text('Define granular access permissions for hospital staff roles.', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                    const SizedBox(height: 16),
-                    TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Role Title (e.g. Pharmacy Manager)', border: OutlineInputBorder())),
-                    const SizedBox(height: 10),
-                    TextField(controller: _formDescController, decoration: const InputDecoration(labelText: 'Role Scope Description', border: OutlineInputBorder())),
-                    const SizedBox(height: 14),
-                    const Text('Granted System Permissions:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.slate900)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: availablePermissions.entries.map((entry) {
-                        final permKey = entry.key;
-                        final permLabel = entry.value;
-                        final isSelected = selectedPermissions.contains(permKey);
-
-                        return FilterChip(
-                          label: Text(permLabel),
-                          selected: isSelected,
-                          selectedColor: AppColors.navy700,
-                          backgroundColor: const Color(0xFFF1F5F9),
-                          labelStyle: TextStyle(
-                            fontSize: 11,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                            color: isSelected ? Colors.white : AppColors.slate800,
-                          ),
-                          onSelected: (bool selected) {
-                            setModalState(() {
-                              if (selected) {
-                                selectedPermissions.add(permKey);
-                              } else {
-                                selectedPermissions.remove(permKey);
-                              }
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 18),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                        onPressed: _isSubmitting ? null : () async {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 20, top: 20, left: 20, right: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Create Custom Role', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900)),
+              const SizedBox(height: 14),
+              TextField(controller: _formNameController, decoration: const InputDecoration(labelText: 'Role Label (e.g. Pharmacy Manager)')),
+              const SizedBox(height: 10),
+              TextField(controller: _formDescController, decoration: const InputDecoration(labelText: 'Role Description')),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy700),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () async {
                           if (_formNameController.text.isEmpty) return;
                           setState(() => _isSubmitting = true);
                           final success = await _apiService.createRole({
                             'label': _formNameController.text.trim(),
                             'description': _formDescController.text.trim(),
-                            'permissions': selectedPermissions.toList(),
+                            'permissions': ['hospital_view', 'billing_view'],
                           });
                           setState(() => _isSubmitting = false);
                           if (!ctx.mounted) return;
                           Navigator.pop(ctx);
                           if (success) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Custom role created with RBAC permissions!'), backgroundColor: AppColors.emerald600));
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Custom role created!'), backgroundColor: AppColors.emerald600));
                             _loadAllAdminData();
                           }
                         },
-                        child: const Text('Save Custom Role', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-                      ),
-                    ),
-                  ],
+                  child: const Text('Save Role'),
                 ),
               ),
-            );
-          },
+            ],
+          ),
         );
       },
     );

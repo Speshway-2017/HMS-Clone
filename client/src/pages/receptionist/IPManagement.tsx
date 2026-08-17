@@ -373,26 +373,28 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const admissionsColumns = [
     {
       header: "UHID",
-      render: (row: any) => <span className="font-mono text-xs font-semibold text-slate-800">{row.patient?.uhid}</span>
+      render: (row: any) => <span className="font-mono text-xs font-semibold text-slate-800">{row.patient?.uhid || "N/A"}</span>
     },
     {
       header: "Patient",
       render: (row: any) => (
         <div>
-          <div className="font-semibold text-slate-900">{row.patient?.name}</div>
-          <div className="text-[10px] text-slate-450">{row.patient?.gender} / {row.patient?.age} yrs</div>
+          <div className="font-semibold text-slate-900">{row.patient?.name || "N/A"}</div>
+          <div className="text-[10px] text-slate-450">
+            {row.patient?.gender || "N/A"}{row.patient?.age !== undefined && row.patient?.age !== null ? ` / ${row.patient.age} yrs` : ""}
+          </div>
         </div>
       )
     },
     {
       header: "Admission Date",
-      render: (row: any) => <span className="text-xs">{new Date(row.admissionDate).toLocaleDateString()}</span>
+      render: (row: any) => <span className="text-xs">{row.admissionDate ? new Date(row.admissionDate).toLocaleDateString("en-IN") : "N/A"}</span>
     },
     {
       header: "Ward / Room / Bed",
       render: (row: any) => (
         <span className="text-xs font-medium text-slate-700">
-          {row.ward} — R{row.room?.roomNumber} / Bed {row.bed?.bedNumber}
+          {(typeof row.ward === "object" ? row.ward?.name : row.ward) || "N/A"} — R{typeof row.room === "object" && row.room ? row.room.roomNumber : (row.room || "N/A")} / Bed {typeof row.bed === "object" && row.bed ? row.bed.bedNumber : (row.bed || "N/A")}
         </span>
       )
     },

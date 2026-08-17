@@ -78,6 +78,11 @@ import { useDoctors } from "../../features/doctors";
 import { useNotifications } from "../../features/notifications";
 import { generateTimeSlots, isSlotBooked } from "../../lib/slotUtils";
 import { api } from "../../lib/api";
+import { downloadPDF } from "../../utils/pdfGenerator";
+import { DiagnosticReportPDF } from "../../components/pdf/DiagnosticReportPDF";
+import { PrescriptionPDF } from "../../components/pdf/PrescriptionPDF";
+import { ConsultationSlipPDF } from "../../components/pdf/ConsultationSlipPDF";
+import { InvoiceReceiptPDF } from "../../components/pdf/InvoiceReceiptPDF";
 
 const CustomPatientTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -96,6 +101,52 @@ const CustomPatientTooltip = ({ active, payload, label }: any) => {
   }
   return null;
 };
+
+function getAppointmentStatusDetails(appt: any) {
+  const rawStatus = (appt?.status || "scheduled").toLowerCase();
+
+  if (rawStatus === "cancelled") {
+    return {
+      label: "Cancelled",
+      tone: "danger",
+      isPastAutoCompleted: false,
+      badgeClass: "bg-red-50 text-red-700 border border-red-200",
+    };
+  }
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const apptDateObj = appt?.date ? new Date(appt.date) : null;
+  const isPastDate = apptDateObj
+    ? new Date(apptDateObj.getFullYear(), apptDateObj.getMonth(), apptDateObj.getDate()) < today
+    : false;
+
+  if (rawStatus === "completed" && !isPastDate) {
+    return {
+      label: "Completed (Attended)",
+      tone: "success",
+      isPastAutoCompleted: false,
+      badgeClass: "bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold",
+    };
+  }
+
+  // Day completed and patient forgot to attend (or past date unattended)
+  if (isPastDate || rawStatus === "missed" || rawStatus === "no_show") {
+    return {
+      label: "Completed (Past Date)",
+      tone: "warning",
+      isPastAutoCompleted: true,
+      badgeClass: "bg-purple-100 text-purple-800 border border-purple-300 font-extrabold shadow-sm",
+    };
+  }
+
+  return {
+    label: rawStatus.toUpperCase(),
+    tone: "info",
+    isPastAutoCompleted: false,
+    badgeClass: "bg-blue-50 text-blue-700 border border-blue-200 font-bold",
+  };
+}
 
 function normalizeTime(t: string): string {
   if (!t) return "";
@@ -605,11 +656,24 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
 
   const targetDoc = getSelectedDoctor();
   const docObjId = targetDoc?._id || targetDoc?.id || selectedDoctorId;
+  const currentPatientId = patient?._id || (patient as any)?.id;
   // Use the shared useAvailableSlots hook (hits /appointments/available-slots)
   // which is accessible to the patient role and uses the same backend service
   // as the Receptionist Dashboard — single source of truth.
-  const { data: bookedSlotsRaw } = useAvailableSlots(docObjId, bookingDate);
+  const { data: bookedSlotsRaw } = useAvailableSlots(docObjId, bookingDate, currentPatientId);
   const bookedSlots = bookedSlotsRaw || [];
+
+  const patientActiveApptsOnDate = useMemo(() => {
+    if (!bookingDate || !appointments || !Array.isArray(appointments)) return [];
+    const targetDateStr = new Date(bookingDate).toISOString().split("T")[0];
+    return appointments.filter((a: any) => {
+      if (!a.date) return false;
+      const aDateStr = new Date(a.date).toISOString().split("T")[0];
+      const isSameDate = aDateStr === targetDateStr;
+      const isActive = !["cancelled", "no_show", "completed", "missed"].includes(String(a.status || "").toLowerCase());
+      return isSameDate && isActive;
+    });
+  }, [appointments, bookingDate]);
 
   const isCancellationAllowed = (dateVal: string | Date, timeStr?: string): boolean => {
     if (!dateVal) return false;
@@ -930,7 +994,15 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
 
     let timeToUse = bookingTime;
     if (timeToUse && bookedSlots.some((b: string) => normalizeTime(b) === normalizeTime(timeToUse))) {
-      toast.error("The selected time slot is already booked for this doctor. Please choose a different slot.");
+      const patientConflict = patientActiveApptsOnDate.find(
+        (a: any) => a.time && normalizeTime(a.time) === normalizeTime(timeToUse)
+      );
+      if (patientConflict) {
+        const conflictDocName = (typeof patientConflict.doctor === "object" ? patientConflict.doctor?.name : null) || "another doctor";
+        toast.error(`You already have an active appointment scheduled at ${timeToUse} with Dr. ${conflictDocName}. You cannot book another doctor at the exact same day and time.`);
+      } else {
+        toast.error("The selected time slot is already booked for this doctor. Please choose a different slot.");
+      }
       return;
     }
 
@@ -2030,8 +2102,8 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
             </div>
           </div>
 
-          {/* Sub-tab Navigation (Receptionist style) */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+          {/* Sub-tab Navigation (Receptionist style - Edge-to-Edge Flush Sticky Header) */}
+          <div className="sticky -top-3 sm:-top-4 md:-top-6 z-30 -mx-3 -mt-3 sm:-mx-4 sm:-mt-4 md:-mx-6 md:-mt-6 px-3 sm:px-4 md:px-6 py-3.5 bg-slate-50/95 backdrop-blur-md border-b border-slate-200/90 shadow-sm transition-all mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap gap-2">
               {[
                 { id: "scheduled", label: "Scheduled & Upcoming", count: scheduledAppointments.length, icon: Clock },
@@ -2435,41 +2507,75 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                         }
 
                         return (
-                          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5 pt-1">
-                            {slots.map((slot) => {
-                              const isBooked = bookedSlots.some(
-                                (b: string) => normalizeTime(b) === normalizeTime(slot)
-                              );
-                              const isSelected = bookingTime === slot || (!!bookingTime && !!slot && normalizeTime(bookingTime) === normalizeTime(slot));
+                          <div className="space-y-3">
+                            {patientActiveApptsOnDate.length > 0 && (
+                              <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 shadow-sm">
+                                <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-amber-600 mt-0.5" />
+                                <div>
+                                  <span className="font-bold">Schedule Conflict Guard Active:</span> You have {patientActiveApptsOnDate.length} active appointment(s) on this date ({new Date(bookingDate || new Date()).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}). Time slots matching your existing appointments are blocked and highlighted in amber.
+                                </div>
+                              </div>
+                            )}
 
-                              if (isBooked) {
+                            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5 pt-1">
+                              {slots.map((slot) => {
+                                const isBooked = bookedSlots.some(
+                                  (b: string) => normalizeTime(b) === normalizeTime(slot)
+                                );
+                                const patientConflict = patientActiveApptsOnDate.find(
+                                  (a: any) => a.time && normalizeTime(a.time) === normalizeTime(slot)
+                                );
+                                const isSelected = bookingTime === slot || (!!bookingTime && !!slot && normalizeTime(bookingTime) === normalizeTime(slot));
+
+                                if (isBooked) {
+                                  const conflictDocName = (typeof patientConflict?.doctor === "object" ? patientConflict?.doctor?.name : null) || "another doctor";
+                                  const tooltipText = patientConflict
+                                    ? `Slot Blocked: You already have an active appointment at ${slot} with Dr. ${conflictDocName}`
+                                    : `This slot is already booked for this doctor`;
+
+                                  return (
+                                    <button
+                                      key={slot}
+                                      type="button"
+                                      disabled
+                                      title={tooltipText}
+                                      onClick={() => {
+                                        if (patientConflict) {
+                                          toast.error(`Slot Blocked: You already have an active appointment scheduled at ${slot} on this day with Dr. ${conflictDocName}.`);
+                                        }
+                                      }}
+                                      className={`rounded-xl border font-bold cursor-not-allowed py-2.5 text-center text-xs relative group transition-all ${
+                                        patientConflict
+                                          ? "border-amber-400 bg-amber-100/90 text-amber-900 shadow-sm ring-1 ring-amber-300"
+                                          : "border-slate-200 bg-slate-100/80 text-slate-400 opacity-60 line-through"
+                                      }`}
+                                    >
+                                      {slot}
+                                      {patientConflict && (
+                                        <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                          <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                }
+
                                 return (
                                   <button
                                     key={slot}
                                     type="button"
-                                    disabled
-                                    title="This slot is already booked"
-                                    className="rounded-xl border border-slate-200 bg-slate-100/80 text-slate-400 font-semibold cursor-not-allowed opacity-60 line-through py-2.5 text-center text-xs"
+                                    onClick={() => setBookingTime(slot)}
+                                    className={`rounded-xl border py-2.5 text-center text-xs font-bold transition-all ${isSelected
+                                        ? "border-emerald-600 bg-emerald-400 text-slate-950 font-black ring-2 ring-emerald-400 shadow-md scale-105"
+                                        : "border-emerald-200 bg-emerald-50/50 text-emerald-800 hover:bg-emerald-100 hover:border-emerald-400"
+                                      }`}
                                   >
                                     {slot}
                                   </button>
                                 );
-                              }
-
-                              return (
-                                <button
-                                  key={slot}
-                                  type="button"
-                                  onClick={() => setBookingTime(slot)}
-                                  className={`rounded-xl border py-2.5 text-center text-xs font-bold transition-all ${isSelected
-                                      ? "border-emerald-600 bg-emerald-400 text-slate-950 font-black ring-2 ring-emerald-400 shadow-md scale-105"
-                                      : "border-emerald-200 bg-emerald-50/50 text-emerald-800 hover:bg-emerald-100 hover:border-emerald-400"
-                                    }`}
-                                >
-                                  {slot}
-                                </button>
-                              );
-                            })}
+                              })}
+                            </div>
                           </div>
                         );
                       })()}
@@ -2745,7 +2851,10 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
           {/* ========================================================================= */}
           {apptSubTab === "completed" && (
             <div className="space-y-4">
-              {appointments.filter((a) => a.status === "completed").length === 0 ? (
+              {appointments.filter((a) => {
+                const details = getAppointmentStatusDetails(a);
+                return a.status === "completed" || details.isPastAutoCompleted;
+              }).length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-slate-400 border border-dashed rounded-xl bg-slate-50">
                   <CheckCircle2 className="h-12 w-12 text-slate-300 mb-2" />
                   <p className="text-sm font-semibold">No past consultation records found.</p>
@@ -2753,20 +2862,29 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
               ) : (
                 <div className="space-y-3">
                   {appointments
-                    .filter((a) => a.status === "completed")
+                    .filter((a) => {
+                      const details = getAppointmentStatusDetails(a);
+                      return a.status === "completed" || details.isPastAutoCompleted;
+                    })
                     .map((a) => {
                       const docName = typeof a.doctor === "object" ? (a.doctor as any).name : a.doctor;
                       const deptName = typeof a.department === "object" && a.department ? (a.department as any).name : "General Medicine";
+                      const statusDetails = getAppointmentStatusDetails(a);
 
                       return (
                         <div key={a._id} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                           <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 font-extrabold text-sm">
-                              ✓
+                            <div className={`flex h-10 w-10 items-center justify-center rounded-xl font-extrabold text-sm ${statusDetails.isPastAutoCompleted ? "bg-purple-100 text-purple-700 border border-purple-200" : "bg-emerald-100 text-emerald-700 border border-emerald-200"}`}>
+                              {statusDetails.isPastAutoCompleted ? "⏱" : "✓"}
                             </div>
                             <div>
-                              <h4 className="text-sm font-extrabold text-slate-800">Dr. {docName}</h4>
-                              <p className="text-xs text-slate-500">{deptName} · Completed on {new Date(a.date).toLocaleDateString("en-IN")}</p>
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-sm font-extrabold text-slate-800">Dr. {docName}</h4>
+                                <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold ${statusDetails.badgeClass}`}>
+                                  {statusDetails.label}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500">{deptName} · Scheduled Date: {new Date(a.date).toLocaleDateString("en-IN")}</p>
                               <p className="text-[10px] font-mono text-slate-400">Ref: {a.referenceId || "REF-1002"}</p>
                             </div>
                           </div>
@@ -2841,8 +2959,8 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
             </div>
           </Card>
 
-          {/* Search Bar & Category Filter Bar */}
-          <Card className="p-4 space-y-4">
+          {/* Search Bar & Category Filter Bar (Edge-to-Edge Flush Sticky Bar) */}
+          <div className="sticky -top-3 sm:-top-4 md:-top-6 z-30 -mx-3 -mt-3 sm:-mx-4 sm:-mt-4 md:-mx-6 md:-mt-6 px-3 sm:px-4 md:px-6 py-3.5 bg-slate-50/95 backdrop-blur-md border-b border-slate-200/90 shadow-md transition-all mb-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               {/* Category Filter Pills */}
               {(() => {
@@ -2909,7 +3027,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 )}
               </div>
             </div>
-          </Card>
+          </div>
 
           {/* Timeline Records Grid */}
           <div className="space-y-4">
@@ -3184,8 +3302,8 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
             </div>
           </Card>
 
-          {/* Search Bar & Filter Tabs */}
-          <Card className="p-4 space-y-4">
+          {/* Search Bar & Filter Tabs (Edge-to-Edge Flush Sticky Bar) */}
+          <div className="sticky -top-3 sm:-top-4 md:-top-6 z-30 -mx-3 -mt-3 sm:-mx-4 sm:-mt-4 md:-mx-6 md:-mt-6 px-3 sm:px-4 md:px-6 py-3.5 bg-slate-50/95 backdrop-blur-md border-b border-slate-200/90 shadow-md transition-all mb-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               {/* Status Filter Pills */}
               <div className="flex flex-wrap items-center gap-2">
@@ -3234,7 +3352,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 )}
               </div>
             </div>
-          </Card>
+          </div>
 
           {/* Prescriptions Grid */}
           <div className="space-y-4">
@@ -3364,28 +3482,29 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                               <Eye className="h-3.5 w-3.5 text-indigo-700" /> View Prescription
                             </button>
 
-                            <a
-                              href={rx.pdfUrl || rx.fileUrl || "#"}
-                              onClick={(e) => {
-                                if (!rx.pdfUrl && !rx.fileUrl) {
-                                  e.preventDefault();
-                                  const content = `METROPOLITAN HOSPITAL DIGITAL RX PASS\nRX No: ${rx.prescriptionNumber || rx._id}\nDoctor: ${typeof rx.doctor === "object" ? rx.doctor?.name : rx.doctor || "Specialist"}\nDiagnosis: ${rx.diagnosis || "N/A"}\nMedications:\n` + (rx.medications || []).map((m: any) => `- ${m.name} (${m.frequency || "1-0-1"})`).join("\n");
-                                  const blob = new Blob([content], { type: "text/plain" });
-                                  const url = URL.createObjectURL(blob);
-                                  const a = document.createElement("a");
-                                  a.href = url;
-                                  a.download = `Prescription-${rx.prescriptionNumber || "RX"}.txt`;
-                                  a.click();
-                                  URL.revokeObjectURL(url);
-                                  toast.success("Downloaded prescription details file.");
+                            <button
+                              onClick={() => {
+                                if (rx.pdfUrl || rx.fileUrl) {
+                                  window.open(rx.pdfUrl || rx.fileUrl, "_blank");
+                                } else {
+                                  downloadPDF(
+                                    <PrescriptionPDF
+                                      prescription={{
+                                        ...rx,
+                                        patientName: patient?.name || user?.name || "Valued Patient",
+                                        patientId: (patient as any)?._id || (patient as any)?.patientId || "PAT-REGISTERED",
+                                        medicines: rx.medications || rx.medicines,
+                                      }}
+                                      hospitalName={(patient as any)?.hospital?.name || "General Hospital Management System"}
+                                    />,
+                                    `Prescription-${rx.prescriptionNumber || "RX"}.pdf`
+                                  );
                                 }
                               }}
-                              target="_blank"
-                              rel="noopener noreferrer"
                               className="flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-xs font-bold text-white transition-all shadow active:scale-95 cursor-pointer"
                             >
                               <Download className="h-3.5 w-3.5" /> Download RX PDF
-                            </a>
+                            </button>
                           </div>
                         </div>
                       </Card>
@@ -3595,8 +3714,8 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
             </div>
           </Card>
 
-          {/* Search Bar & Filter Tabs */}
-          <Card className="p-4 space-y-4">
+          {/* Search Bar & Filter Tabs (Edge-to-Edge Flush Sticky Bar) */}
+          <div className="sticky -top-3 sm:-top-4 md:-top-6 z-30 -mx-3 -mt-3 sm:-mx-4 sm:-mt-4 md:-mx-6 md:-mt-6 px-3 sm:px-4 md:px-6 py-3.5 bg-slate-50/95 backdrop-blur-md border-b border-slate-200/90 shadow-md transition-all mb-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               {/* Status Filter Pills */}
               <div className="flex flex-wrap items-center gap-2">
@@ -3645,7 +3764,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 )}
               </div>
             </div>
-          </Card>
+          </div>
 
           {/* Invoices List Grid & Itemized View */}
           <div className="space-y-4">
@@ -3792,8 +3911,32 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                             ) : (
                               <button
                                 onClick={() => {
+                                  const rcpNo = `RCP-${inv._id ? inv._id.slice(-6).toUpperCase() : "INV"}`;
+                                  downloadPDF(
+                                    <InvoiceReceiptPDF
+                                      invoice={{
+                                        invoiceNumber: rcpNo,
+                                        invoiceId: inv._id,
+                                        date: new Date(inv.updatedAt || inv.createdAt || Date.now()).toLocaleDateString("en-IN"),
+                                        patientName: patient?.name || user?.name || "Valued Patient",
+                                        patientId: (patient as any)?._id || (patient as any)?.patientId || "PAT-REGISTERED",
+                                        status: inv.status || "PAID",
+                                        paymentMethod: inv.paymentMethod || "UPI / ONLINE PORTAL",
+                                        items: inv.items || [
+                                          { description: inv.description || "Hospital Medical & OPD Services", amount: inv.totals?.total || 4500 }
+                                        ],
+                                        subtotal: inv.totals?.subtotal || inv.totals?.total || 4500,
+                                        discount: inv.totals?.discount || 0,
+                                        totalAmount: inv.totals?.total || 4500,
+                                        amountPaid: inv.totals?.paid || inv.totals?.total || 4500,
+                                        balance: inv.totals?.balance || 0
+                                      }}
+                                      hospitalName={(patient as any)?.hospital?.name || "General Hospital Management System"}
+                                    />,
+                                    `Receipt-${rcpNo}.pdf`
+                                  );
                                   setPaidReceipt({
-                                    receiptNo: `RCP-${inv._id.slice(-6).toUpperCase()}`,
+                                    receiptNo: rcpNo,
                                     invoiceId: inv._id,
                                     amount: inv.totals?.total || 4500,
                                     date: new Date(inv.updatedAt || Date.now()).toLocaleDateString("en-IN"),
@@ -3801,7 +3944,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                                     patientName: patient?.name || user?.name
                                   });
                                 }}
-                                className="flex items-center gap-2 rounded-xl bg-navy-800 hover:bg-navy-900 px-4 py-2.5 text-xs font-bold text-white transition-all shadow active:scale-95"
+                                className="flex items-center gap-2 rounded-xl bg-navy-800 hover:bg-navy-900 px-4 py-2.5 text-xs font-bold text-white transition-all shadow active:scale-95 cursor-pointer"
                               >
                                 <Download className="h-4 w-4 text-emerald-400" /> Download Official Receipt (PDF)
                               </button>
@@ -4084,8 +4227,8 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
             </div>
           </Card>
 
-          {/* Category Filter Pills Bar */}
-          <Card className="p-4 space-y-4">
+          {/* Category Filter Pills Bar (Edge-to-Edge Flush Sticky Bar) */}
+          <div className="sticky -top-3 sm:-top-4 md:-top-6 z-30 -mx-3 -mt-3 sm:-mx-4 sm:-mt-4 md:-mx-6 md:-mt-6 px-3 sm:px-4 md:px-6 py-3.5 bg-slate-50/95 backdrop-blur-md border-b border-slate-200/90 shadow-md transition-all mb-4">
             <div className="flex flex-wrap items-center gap-2">
               {[
                 { id: "all", label: "All Activity Logs", count: notifications.length },
@@ -4113,7 +4256,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 );
               })}
             </div>
-          </Card>
+          </div>
 
           {/* Notifications Feed */}
           <div className="space-y-3">
@@ -4297,16 +4440,33 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                         const isBooked = bookedSlots.some(
                           (b: string) => normalizeTime(b) === normalizeTime(slot)
                         );
+                        const patientConflict = patientActiveApptsOnDate.find(
+                          (a: any) => a.time && normalizeTime(a.time) === normalizeTime(slot)
+                        );
                         const isSelected = bookingTime === slot || (!!bookingTime && !!slot && normalizeTime(bookingTime) === normalizeTime(slot));
 
                         if (isBooked) {
+                          const conflictDocName = (typeof patientConflict?.doctor === "object" ? patientConflict?.doctor?.name : null) || "another doctor";
+                          const tooltipText = patientConflict
+                            ? `Slot Blocked: You already have an active appointment at ${slot} with Dr. ${conflictDocName}`
+                            : `This slot is already booked for this doctor`;
+
                           return (
                             <button
                               key={slot}
                               type="button"
                               disabled
-                              title="This slot is already booked"
-                              className="rounded-lg border border-slate-200 bg-slate-100/80 text-slate-400 font-semibold cursor-not-allowed opacity-60 line-through py-1.5 text-center text-xs"
+                              title={tooltipText}
+                              onClick={() => {
+                                if (patientConflict) {
+                                  toast.error(`Slot Blocked: You already have an active appointment scheduled at ${slot} on this day with Dr. ${conflictDocName}.`);
+                                }
+                              }}
+                              className={`rounded-lg border font-bold cursor-not-allowed py-1.5 text-center text-xs relative ${
+                                patientConflict
+                                  ? "border-amber-400 bg-amber-100 text-amber-900 ring-1 ring-amber-300"
+                                  : "border-slate-200 bg-slate-100/80 text-slate-400 opacity-60 line-through"
+                              }`}
                             >
                               {slot}
                             </button>
@@ -4532,15 +4692,18 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   if (rx.pdfUrl || rx.fileUrl) {
                     window.open(rx.pdfUrl || rx.fileUrl, "_blank");
                   } else {
-                    const content = `METROPOLITAN HOSPITAL DIGITAL RX PASS\nRX No: ${rx.prescriptionNumber || rx._id}\nDoctor: ${typeof rx.doctor === "object" ? rx.doctor?.name : rx.doctor || "Specialist"}\nDiagnosis: ${rx.diagnosis || "N/A"}\nMedications:\n` + (rx.medications || []).map((m: any) => `- ${m.name} (${m.frequency || "1-0-1"})`).join("\n");
-                    const blob = new Blob([content], { type: "text/plain" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `Prescription-${rx.prescriptionNumber || "RX"}.txt`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                    toast.success("Downloaded prescription file.");
+                    downloadPDF(
+                      <PrescriptionPDF
+                        prescription={{
+                          ...rx,
+                          patientName: patient?.name || user?.name || "Valued Patient",
+                          patientId: (patient as any)?._id || (patient as any)?.patientId || "PAT-REGISTERED",
+                          medicines: rx.medications || rx.medicines,
+                        }}
+                        hospitalName={(patient as any)?.hospital?.name || "General Hospital Management System"}
+                      />,
+                      `Prescription-${rx.prescriptionNumber || "RX"}.pdf`
+                    );
                   }
                 }}
                 className="rounded-lg bg-emerald-700 hover:bg-emerald-800 px-4 py-2 text-white font-bold text-xs flex items-center gap-1.5 shadow cursor-pointer active:scale-95"
@@ -4781,15 +4944,33 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
             </div>
 
             <div className="flex justify-end gap-2 pt-4 border-t mt-6 print:hidden">
-              <button onClick={() => setViewApptSlip(null)} className="rounded-lg px-4 py-2 border font-bold text-xs">
+              <button onClick={() => setViewApptSlip(null)} className="rounded-lg px-4 py-2 border font-bold text-xs cursor-pointer hover:bg-slate-50">
                 Close
+              </button>
+              <button
+                onClick={() => {
+                  downloadPDF(
+                    <ConsultationSlipPDF
+                      consultation={{
+                        ...viewApptSlip,
+                        patientName: patient?.name || user?.name || "Valued Patient",
+                        patientId: (patient as any)?._id || (patient as any)?.patientId || "PAT-REGISTERED",
+                      }}
+                      hospitalName={(patient as any)?.hospital?.name || "General Hospital Management System"}
+                    />,
+                    `Consultation-Slip-${viewApptSlip.referenceId || "OPD"}.pdf`
+                  );
+                }}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-white font-bold text-xs hover:bg-emerald-700 flex items-center gap-1.5 cursor-pointer shadow active:scale-95"
+              >
+                <Download className="h-4 w-4" /> Download PDF Slip
               </button>
               <button
                 onClick={() => {
                   toast.success("Printing Outpatient Appointment Slip...");
                   window.print();
                 }}
-                className="rounded-lg bg-navy-700 px-4 py-2 text-white font-bold text-xs hover:bg-navy-800 flex items-center gap-1.5"
+                className="rounded-lg bg-navy-700 px-4 py-2 text-white font-bold text-xs hover:bg-navy-800 flex items-center gap-1.5 cursor-pointer shadow active:scale-95"
               >
                 <Printer className="h-4 w-4" /> Print Slip Pass
               </button>
@@ -5236,12 +5417,32 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
               <p className="text-[11px] font-semibold text-slate-400">
                 Official Digital Report issued by Spesway Hospitals Pathology & Diagnostic Lab
               </p>
-              <button
-                onClick={() => setSelectedReport(null)}
-                className="rounded-xl bg-navy-800 px-5 py-2 text-xs font-extrabold text-white hover:bg-navy-900 shadow transition-all cursor-pointer"
-              >
-                Close Report
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    downloadPDF(
+                      <DiagnosticReportPDF
+                        report={{
+                          ...selectedReport,
+                          patientName: patient?.name || user?.name || "Valued Patient",
+                          patientId: (patient as any)?._id || (patient as any)?.patientId || "PAT-REGISTERED",
+                        }}
+                        hospitalName={(patient as any)?.hospital?.name || "General Hospital Management System"}
+                      />,
+                      `${safeText(selectedReport.testName || selectedReport.title, "Diagnostic_Report")}.pdf`
+                    );
+                  }}
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-emerald-700 shadow transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Download className="h-4 w-4" /> Download PDF Report
+                </button>
+                <button
+                  onClick={() => setSelectedReport(null)}
+                  className="rounded-xl bg-navy-800 px-5 py-2 text-xs font-extrabold text-white hover:bg-navy-900 shadow transition-all cursor-pointer"
+                >
+                  Close Report
+                </button>
+              </div>
             </div>
           </div>
         </div>

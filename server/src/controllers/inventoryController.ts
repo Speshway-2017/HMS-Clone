@@ -63,13 +63,13 @@ export const createInventoryItem = catchAsync(async (req: Request, res: Response
     emitToHospital(req.hospitalFilter.hospital, "inventory_updated", { itemId: item._id, name: item.name });
   }
 
-  await logAudit({
+  logAudit({
     req,
     action: "CREATE_INVENTORY_ITEM",
     entity: "InventoryItem",
     entityId: item._id.toString(),
-    details: { name: item.name, sku: item.sku, stockQty: item.stockQty }
-  });
+    details: { name: item.name, sku: item.sku, stockQty: item.stockQty },
+  }).catch((err) => console.error("Audit log error:", err));
 
   res.status(201).json({ status: "success", data: { item: withComputedStatus(item) } });
 });
@@ -96,13 +96,13 @@ export const updateInventoryItem = catchAsync(async (req: Request, res: Response
     emitToHospital(req.hospitalFilter.hospital, "inventory_updated", { itemId: item._id, name: item.name });
   }
 
-  await logAudit({
+  logAudit({
     req,
     action: "UPDATE_INVENTORY_ITEM",
     entity: "InventoryItem",
     entityId: item._id.toString(),
-    details: body
-  });
+    details: body,
+  }).catch((err) => console.error("Audit log error:", err));
 
   res.json({ status: "success", data: { item: withComputedStatus(item) } });
 });
@@ -117,13 +117,13 @@ export const deleteInventoryItem = catchAsync(async (req: Request, res: Response
     emitToHospital(req.hospitalFilter.hospital, "inventory_updated", { itemId: req.params.id });
   }
 
-  await logAudit({
+  logAudit({
     req,
     action: "DELETE_INVENTORY_ITEM",
     entity: "InventoryItem",
     entityId: req.params.id,
-    details: { name: item.name, sku: item.sku }
-  });
+    details: { name: item.name, sku: item.sku },
+  }).catch((err) => console.error("Audit log error:", err));
 
   res.status(204).send();
 });

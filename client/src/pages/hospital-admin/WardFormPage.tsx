@@ -59,7 +59,6 @@ export function WardFormPage() {
     code: "",
     wardType: "General Ward",
     floorNumber: 1,
-    nurseStation: "Nurse Station A",
     maxRooms: 20,
     description: "",
     status: "Active" as "Active" | "Inactive"
@@ -89,7 +88,6 @@ export function WardFormPage() {
               code: ward.code || "",
               wardType: ward.wardType || "General Ward",
               floorNumber: ward.floorNumber ?? 1,
-              nurseStation: ward.nurseStation || "Nurse Station A",
               maxRooms: ward.maxRooms ?? 20,
               description: ward.description || "",
               status: ward.status || "Active"
@@ -243,7 +241,7 @@ export function WardFormPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <SelectField
               label="Ward Type (Hospital Section) *"
               value={form.wardType}
@@ -261,13 +259,6 @@ export function WardFormPage() {
               value={form.floorNumber}
               onChange={(e) => setForm({ ...form, floorNumber: Number(e.target.value) })}
               required
-            />
-
-            <InputField
-              label="Nurse Station"
-              placeholder="e.g. Nurse Station 3, NS-Alpha"
-              value={form.nurseStation}
-              onChange={(e) => setForm({ ...form, nurseStation: e.target.value })}
             />
           </div>
 

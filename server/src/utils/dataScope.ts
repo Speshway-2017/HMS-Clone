@@ -8,7 +8,7 @@ export interface TenantContext {
   branchId: Types.ObjectId | null; // null if hospital-wide admin view ("all") or unassigned main hospital
   isBranchScoped: boolean;
   queryFilter: {
-    hospital: Types.ObjectId;
+    hospital?: Types.ObjectId;
     branch?: Types.ObjectId | null | { $or?: any[] };
   };
 }
@@ -126,17 +126,13 @@ export function getDataScope(req: Request): TenantContext {
       isBranchScoped = false;
     }
   } else {
-    // Other operational roles without explicit user.branch (e.g. Main Hospital receptionist / doctor / nurse)
-    if (branchHeader && branchHeader !== "all" && branchHeader !== "main" && Types.ObjectId.isValid(branchHeader)) {
-      activeBranchId = new Types.ObjectId(branchHeader);
-      isBranchScoped = true;
-      queryFilter.branch = activeBranchId;
-    } else {
-      // Main branch or unassigned
-      activeBranchId = null;
-      isBranchScoped = true;
-      queryFilter.branch = null;
-    }
+    // Other operational roles (receptionist, nurse, lab, pharmacist, etc.) whose user.branch is null.
+    // These users belong to the Main Hospital and their scope MUST be unconditionally locked to
+    // branch: null. The X-Branch-ID header is intentionally IGNORED here — allowing it would
+    // let stale localStorage values from a previous branch session cross-contaminate data.
+    activeBranchId = null;
+    isBranchScoped = true;
+    queryFilter.branch = null;
   }
 
   return {
