@@ -236,6 +236,59 @@ class AdminApiService {
     }
   }
 
+  /// Fetch auto-generated next employee ID (GET /staff/next-employee-id)
+  Future<String?> fetchNextEmployeeId(String role) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/staff/next-employee-id?role=${Uri.encodeComponent(role)}');
+    try {
+      final response = await _client.get(url, headers: UserSession.headers).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        return decoded['data']?['employeeId']?.toString();
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Create doctor with full result payload (POST /doctors)
+  Future<Map<String, dynamic>?> createDoctorWithResult(Map<String, dynamic> data) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/doctors');
+    try {
+      final response = await _client.post(
+        url,
+        headers: UserSession.headers,
+        body: jsonEncode(data),
+      ).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        return decoded['data'] as Map<String, dynamic>? ?? decoded;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Create staff member with full result payload (POST /staff)
+  Future<Map<String, dynamic>?> createStaffWithResult(Map<String, dynamic> data) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/staff');
+    try {
+      final response = await _client.post(
+        url,
+        headers: UserSession.headers,
+        body: jsonEncode(data),
+      ).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        return decoded['data'] as Map<String, dynamic>? ?? decoded;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Fetch staff (GET /staff)
   Future<List<Map<String, dynamic>>> fetchStaff() async {
     final url = Uri.parse('${ApiConfig.baseUrl}/staff');
@@ -254,17 +307,8 @@ class AdminApiService {
 
   /// Create staff member (POST /staff)
   Future<bool> createStaff(Map<String, dynamic> data) async {
-    final url = Uri.parse('${ApiConfig.baseUrl}/staff');
-    try {
-      final response = await _client.post(
-        url,
-        headers: UserSession.headers,
-        body: jsonEncode(data),
-      ).timeout(const Duration(seconds: 10));
-      return response.statusCode == 201 || response.statusCode == 200;
-    } catch (_) {
-      return false;
-    }
+    final res = await createStaffWithResult(data);
+    return res != null;
   }
 
   /// Fetch roles (GET /roles)
@@ -339,6 +383,88 @@ class AdminApiService {
         body: jsonEncode({'status': status}),
       ).timeout(const Duration(seconds: 10));
       return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Fetch single doctor details & patient history (GET /doctors/:id)
+  Future<Map<String, dynamic>?> fetchDoctorDetails(String doctorId) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/doctors/$doctorId');
+    try {
+      final response = await _client.get(url, headers: UserSession.headers).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        return decoded['data'] as Map<String, dynamic>?;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Update doctor details / status (PATCH /doctors/:id)
+  Future<bool> updateDoctor(String doctorId, Map<String, dynamic> data) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/doctors/$doctorId');
+    try {
+      final response = await _client.patch(
+        url,
+        headers: UserSession.headers,
+        body: jsonEncode(data),
+      ).timeout(const Duration(seconds: 10));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Delete doctor (DELETE /doctors/:id)
+  Future<bool> deleteDoctor(String doctorId) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/doctors/$doctorId');
+    try {
+      final response = await _client.delete(url, headers: UserSession.headers).timeout(const Duration(seconds: 10));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Fetch single staff details & role analytics (GET /staff/:id)
+  Future<Map<String, dynamic>?> fetchStaffDetails(String staffId) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/staff/$staffId');
+    try {
+      final response = await _client.get(url, headers: UserSession.headers).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        return decoded['data'] as Map<String, dynamic>?;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Update staff member details / duty status (PATCH /staff/:id)
+  Future<bool> updateStaff(String staffId, Map<String, dynamic> data) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/staff/$staffId');
+    try {
+      final response = await _client.patch(
+        url,
+        headers: UserSession.headers,
+        body: jsonEncode(data),
+      ).timeout(const Duration(seconds: 10));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Delete staff member (DELETE /staff/:id)
+  Future<bool> deleteStaff(String staffId) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/staff/$staffId');
+    try {
+      final response = await _client.delete(url, headers: UserSession.headers).timeout(const Duration(seconds: 10));
+      return response.statusCode == 200 || response.statusCode == 204;
     } catch (_) {
       return false;
     }

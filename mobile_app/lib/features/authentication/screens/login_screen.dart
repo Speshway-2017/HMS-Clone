@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../core/config/api_config.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../routes/app_routes.dart';
@@ -17,32 +18,139 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _ageController = TextEditingController();
+  final _addressController = TextEditingController();
   
   final _emailFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
+  final _confirmPasswordFocusNode = FocusNode();
   final _nameFocusNode = FocusNode();
   final _phoneFocusNode = FocusNode();
+  final _ageFocusNode = FocusNode();
+  final _addressFocusNode = FocusNode();
 
   final _authService = AuthService();
 
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   bool _isLoading = false;
   bool _isRegisterMode = false;
   String? _errorMessage;
 
+  // Demographics & Auto-fetch States
+  String _gender = 'Male';
+  String _bloodGroup = 'O+';
+  bool _isCheckingPhone = false;
+  String? _lastCheckedPhone;
+  String? _phoneCheckMessage;
+  String? _phoneCheckStatus; // 'prefilled' or 'exists'
+
+  @override
+  void initState() {
+    super.initState();
+    _phoneController.addListener(_onPhoneChanged);
+  }
+
   @override
   void dispose() {
+    _phoneController.removeListener(_onPhoneChanged);
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
+    _ageController.dispose();
+    _addressController.dispose();
     _emailFocusNode.dispose();
     _passwordFocusNode.dispose();
+    _confirmPasswordFocusNode.dispose();
     _nameFocusNode.dispose();
     _phoneFocusNode.dispose();
+    _ageFocusNode.dispose();
+    _addressFocusNode.dispose();
     super.dispose();
+  }
+
+  void _onPhoneChanged([String? textVal]) {
+    if (!_isRegisterMode) return;
+    final text = textVal ?? _phoneController.text;
+    final cleanPhone = text.replaceAll(RegExp(r'\D'), '');
+
+    if (cleanPhone.length < 10) {
+      if (_phoneCheckStatus != null || _phoneCheckMessage != null || _lastCheckedPhone != null) {
+        setState(() {
+          _lastCheckedPhone = null;
+          _phoneCheckMessage = null;
+          _phoneCheckStatus = null;
+        });
+      }
+      return;
+    }
+
+    if (cleanPhone.length == 10 && _lastCheckedPhone != cleanPhone && !_isCheckingPhone) {
+      _lastCheckedPhone = cleanPhone;
+      _checkPhoneRegistration(cleanPhone);
+    }
+  }
+
+  Future<void> _checkPhoneRegistration(String phone) async {
+    setState(() {
+      _isCheckingPhone = true;
+      _phoneCheckMessage = null;
+      _phoneCheckStatus = null;
+    });
+
+    try {
+      final res = await _authService.checkPhone(phone);
+      if (!mounted) return;
+
+      if (res['exists'] == true) {
+        if (res['hasPassword'] == true) {
+          setState(() {
+            _phoneCheckStatus = 'exists';
+            _phoneCheckMessage = 'This phone number is already registered. Please log in.';
+          });
+        } else {
+          final p = res['patient'] as Map<String, dynamic>? ?? {};
+          final fetchedName = (p['name'] ?? '').toString();
+          final fetchedEmail = (p['email'] ?? '').toString();
+          final fetchedAge = p['age'] != null && p['age'].toString() != 'null' ? p['age'].toString() : '';
+          final fetchedGender = (p['gender'] ?? '').toString();
+          final fetchedBloodGroup = (p['bloodGroup'] ?? '').toString();
+          final fetchedAddress = (p['address'] ?? '').toString();
+
+          setState(() {
+            _phoneCheckStatus = 'prefilled';
+            _phoneCheckMessage = 'Existing patient profile found! Pre-populating details.';
+            if (fetchedName.isNotEmpty) _nameController.text = fetchedName;
+            if (fetchedEmail.isNotEmpty) _emailController.text = fetchedEmail;
+            if (fetchedAge.isNotEmpty) _ageController.text = fetchedAge;
+            if (['Male', 'Female', 'Other'].contains(fetchedGender)) {
+              _gender = fetchedGender;
+            }
+            if (['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].contains(fetchedBloodGroup)) {
+              _bloodGroup = fetchedBloodGroup;
+            }
+            if (fetchedAddress.isNotEmpty) _addressController.text = fetchedAddress;
+          });
+        }
+      } else {
+        setState(() {
+          _phoneCheckStatus = null;
+          _phoneCheckMessage = null;
+        });
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCheckingPhone = false;
+        });
+      }
+    }
   }
 
   void _showSettingsDialog() {
@@ -94,12 +202,10 @@ class _LoginScreenState extends State<LoginScreen> {
               onPressed: () async {
                 var url = controller.text.trim();
                 if (url.isNotEmpty) {
-                  // Ensure http:// or https:// scheme prefix
                   if (!url.startsWith('http://') && !url.startsWith('https://')) {
                     url = 'http://$url';
                   }
 
-                  // Auto-append default port 5000 if no port is specified
                   final hostPart = url.replaceFirst('http://', '').replaceFirst('https://', '');
                   final hasPort = RegExp(r':\d+').hasMatch(hostPart.split('/').first);
                   if (!hasPort) {
@@ -110,7 +216,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     }
                   }
 
-                  // Auto-append /api/v1 if not specified
                   if (!url.endsWith('/api/v1') && !url.endsWith('/api/v1/')) {
                     if (url.endsWith('/')) {
                       url = '${url}api/v1';
@@ -158,16 +263,34 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     if (_formKey.currentState!.validate()) {
+      final name = _nameController.text.trim();
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
+      final confirmPassword = _confirmPasswordController.text;
+      final phone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+      final ageStr = _ageController.text.trim();
+      final address = _addressController.text.trim();
+
+      if (password != confirmPassword) {
+        setState(() {
+          _errorMessage = 'Passwords do not match. Please verify your confirm password.';
+        });
+        return;
+      }
+
+      if (phone.length != 10) {
+        setState(() {
+          _errorMessage = 'Phone Number must be exactly 10 digits.';
+        });
+        return;
+      }
+
+      final ageVal = int.tryParse(ageStr) ?? 0;
+
       setState(() {
         _isLoading = true;
       });
 
-      final name = _nameController.text.trim();
-      final email = _emailController.text.trim();
-      final password = _passwordController.text;
-      final phone = _phoneController.text.trim();
-
-      // Pre-set session with user's registered name, email, and phone
       AuthService.setRegisteredSession(
         name: name,
         email: email,
@@ -176,7 +299,16 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       try {
-        final role = await _authService.register(name, email, password, phone);
+        final role = await _authService.register(
+          name: name,
+          email: email,
+          password: password,
+          phone: phone,
+          age: ageVal,
+          gender: _gender,
+          bloodGroup: _bloodGroup,
+          address: address,
+        );
 
         if (!mounted) return;
 
@@ -186,7 +318,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Registration successful! Logging in...'),
+            content: Text('Registration successful! Welcome to HMS Enterprise'),
             backgroundColor: AppColors.emerald600,
           ),
         );
@@ -201,7 +333,6 @@ class _LoginScreenState extends State<LoginScreen> {
       } catch (e) {
         if (!mounted) return;
 
-        // If backend server is offline, allow local demo login for the newly registered user profile
         if (e.toString().contains('Unable to connect') || e.toString().contains('timed out')) {
           setState(() {
             _isLoading = false;
@@ -246,7 +377,6 @@ class _LoginScreenState extends State<LoginScreen> {
           _isLoading = false;
         });
 
-        // Map roles returned from MERN database to the correct mobile dashboards
         if (role == 'super_admin' || role == 'hospital_admin') {
           Navigator.pushReplacementNamed(context, AppRoutes.adminDashboard);
         } else if (role == 'doctor') {
@@ -256,7 +386,6 @@ class _LoginScreenState extends State<LoginScreen> {
         } else if (role == 'patient') {
           Navigator.pushReplacementNamed(context, AppRoutes.patientDashboard);
         } else {
-          // If the role is registered in database but not yet supported on mobile
           setState(() {
             _errorMessage = 'The "$role" dashboard is not yet supported in this mobile client.';
           });
@@ -265,7 +394,6 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
 
         final errStr = e.toString();
-        // If backend connection timed out or is unreachable, allow seamless offline demo login
         if (errStr.contains('Unable to connect') ||
             errStr.contains('timed out') ||
             errStr.contains('TimeoutException') ||
@@ -321,7 +449,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
         setState(() {
           _isLoading = false;
-          // Extract message from exception
           _errorMessage = errStr.replaceFirst('Exception: ', '');
         });
       }
@@ -342,22 +469,22 @@ class _LoginScreenState extends State<LoginScreen> {
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
                 padding: EdgeInsets.fromLTRB(
-                  responsive.scaleWidth(24.0),
+                  responsive.scaleWidth(20.0),
                   responsive.scaleHeight(12.0),
-                  responsive.scaleWidth(24.0),
+                  responsive.scaleWidth(20.0),
                   responsive.scaleHeight(20.0),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    SizedBox(height: responsive.scaleHeight(24.0)),
+                    SizedBox(height: responsive.scaleHeight(16.0)),
                     
-                    // Top logo and branding block (Matches small-screen web header)
+                    // Header logo and title
                     Center(
                       child: Column(
                         children: [
-                          AppLogo(size: responsive.scaleWidth(64.0)),
-                          SizedBox(height: responsive.scaleHeight(16.0)),
+                          AppLogo(size: responsive.scaleWidth(56.0)),
+                          SizedBox(height: responsive.scaleHeight(12.0)),
                           Text(
                             'HMS Enterprise',
                             style: TextStyle(
@@ -367,19 +494,19 @@ class _LoginScreenState extends State<LoginScreen> {
                               letterSpacing: -0.5,
                             ),
                           ),
-                          SizedBox(height: responsive.scaleHeight(16.0)),
+                          SizedBox(height: responsive.scaleHeight(12.0)),
                           Text(
-                            _isRegisterMode ? 'Patient Registration' : 'Sign In to Dashboard',
+                            _isRegisterMode ? 'Patient Self-Registration' : 'Sign In to Dashboard',
                             style: TextStyle(
                               fontSize: responsive.scaleText(18.0),
                               fontWeight: FontWeight.w800,
                               color: AppColors.slate900,
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           Text(
                             _isRegisterMode
-                                ? 'Create a patient account to access personal health records.'
+                                ? 'Fill in your details below to create your patient account.'
                                 : 'Enter your credentials registered by the Super Administrator.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
@@ -392,293 +519,108 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     
-                    SizedBox(height: responsive.scaleHeight(28.0)),
+                    SizedBox(height: responsive.scaleHeight(20.0)),
                     
-                    // Form Card
-                    Container(
-                      padding: EdgeInsets.all(responsive.scaleWidth(24.0)),
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(16.0),
-                        border: Border.all(
-                          color: AppColors.slate200,
-                          width: 1.0,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.slate900.withOpacity(0.04),
-                            blurRadius: 20.0,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Full Name Field (Visible in Register Mode only)
-                            if (_isRegisterMode) ...[
-                              Text(
-                                'Full Name',
-                                style: TextStyle(
-                                  fontSize: responsive.scaleText(12.0),
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.slate700,
-                                ),
+                    // Form Content
+                    Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (!_isRegisterMode) _buildSignInCard(responsive) else _buildRegisterFormSections(responsive),
+                          
+                          // Error block
+                          if (_errorMessage != null) ...[
+                            SizedBox(height: responsive.scaleHeight(16.0)),
+                            Container(
+                              padding: const EdgeInsets.all(12.0),
+                              decoration: BoxDecoration(
+                                color: AppColors.errorBg,
+                                border: Border.all(color: AppColors.errorBorder),
+                                borderRadius: BorderRadius.circular(8.0),
                               ),
-                              const SizedBox(height: 6),
-                              TextFormField(
-                                controller: _nameController,
-                                focusNode: _nameFocusNode,
-                                keyboardType: TextInputType.name,
-                                textInputAction: TextInputAction.next,
-                                style: TextStyle(
-                                  fontSize: responsive.scaleText(14.0),
-                                  color: AppColors.slate900,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                decoration: const InputDecoration(
-                                  hintText: 'John Doe',
-                                ),
-                                validator: (value) {
-                                  if (_isRegisterMode) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return 'Full name is required';
-                                    }
-                                    if (value.trim().length < 2) {
-                                      return 'Name must be at least 2 characters';
-                                    }
-                                  }
-                                  return null;
-                                },
-                                onFieldSubmitted: (_) {
-                                  FocusScope.of(context).requestFocus(_emailFocusNode);
-                                },
-                              ),
-                              SizedBox(height: responsive.scaleHeight(20.0)),
-                            ],
-
-                            // Email Field
-                            Text(
-                              _isRegisterMode ? 'Email Address' : 'Administrator / Staff Email',
-                              style: TextStyle(
-                                fontSize: responsive.scaleText(12.0),
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.slate700,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            TextFormField(
-                              controller: _emailController,
-                              focusNode: _emailFocusNode,
-                              keyboardType: TextInputType.emailAddress,
-                              textInputAction: TextInputAction.next,
-                              style: TextStyle(
-                                fontSize: responsive.scaleText(14.0),
-                                color: AppColors.slate900,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              decoration: const InputDecoration(
-                                  hintText: 'name@hospital.com',
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Email is required';
-                                }
-                                final emailRegExp = RegExp(
-                                    r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+");
-                                if (!emailRegExp.hasMatch(value.trim())) {
-                                  return 'Please enter a valid email address';
-                                }
-                                return null;
-                              },
-                              onFieldSubmitted: (_) {
-                                if (_isRegisterMode) {
-                                  FocusScope.of(context).requestFocus(_phoneFocusNode);
-                                } else {
-                                  FocusScope.of(context).requestFocus(_passwordFocusNode);
-                                }
-                              },
-                            ),
-                            
-                            SizedBox(height: responsive.scaleHeight(20.0)),
-
-                            // Phone Field (Visible in Register Mode only)
-                            if (_isRegisterMode) ...[
-                              Text(
-                                'Phone Number',
-                                style: TextStyle(
-                                  fontSize: responsive.scaleText(12.0),
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.slate700,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              TextFormField(
-                                controller: _phoneController,
-                                focusNode: _phoneFocusNode,
-                                keyboardType: TextInputType.phone,
-                                textInputAction: TextInputAction.next,
-                                style: TextStyle(
-                                  fontSize: responsive.scaleText(14.0),
-                                  color: AppColors.slate900,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                decoration: const InputDecoration(
-                                  hintText: '+1 234 567 8900',
-                                ),
-                                validator: (value) {
-                                  if (_isRegisterMode) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return 'Phone number is required';
-                                    }
-                                  }
-                                  return null;
-                                },
-                                onFieldSubmitted: (_) {
-                                  FocusScope.of(context).requestFocus(_passwordFocusNode);
-                                },
-                              ),
-                              SizedBox(height: responsive.scaleHeight(20.0)),
-                            ],
-                            
-                            // Password Field Label
-                            Text(
-                              'Security Password',
-                              style: TextStyle(
-                                fontSize: responsive.scaleText(12.0),
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.slate700,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            TextFormField(
-                              controller: _passwordController,
-                              focusNode: _passwordFocusNode,
-                              obscureText: _obscurePassword,
-                              textInputAction: TextInputAction.done,
-                              style: TextStyle(
-                                fontSize: responsive.scaleText(14.0),
-                                color: AppColors.slate900,
-                                fontWeight: FontWeight.w500,
-                               ),
-                              decoration: InputDecoration(
-                                hintText: '••••••••',
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                                    color: AppColors.slate400,
-                                    size: 20,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _obscurePassword = !_obscurePassword;
-                                    });
-                                  },
-                                ),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Password is required';
-                                }
-                                if (_isRegisterMode && value.length < 6) {
-                                  return 'Password must be at least 6 characters';
-                                }
-                                return null;
-                              },
-                              onFieldSubmitted: (_) => _handleSubmit(),
-                            ),
-                            
-                            // Validation error block
-                            if (_errorMessage != null) ...[
-                              SizedBox(height: responsive.scaleHeight(16.0)),
-                              Container(
-                                padding: const EdgeInsets.all(12.0),
-                                decoration: BoxDecoration(
-                                  color: AppColors.errorBg,
-                                  border: Border.all(color: AppColors.errorBorder),
-                                  borderRadius: BorderRadius.circular(8.0),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.error_outline, color: AppColors.errorRed, size: 16),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        _errorMessage!,
-                                        style: TextStyle(
-                                          color: AppColors.errorRed,
-                                          fontSize: responsive.scaleText(11.0),
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            
-                            SizedBox(height: responsive.scaleHeight(24.0)),
-                            
-                            // Action Button
-                            ElevatedButton(
-                              onPressed: _isLoading ? null : _handleSubmit,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.navy700,
-                                padding: const EdgeInsets.symmetric(vertical: 15.0),
-                              ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.0,
-                                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.white),
-                                      ),
-                                    )
-                                  : Text(
-                                      _isRegisterMode ? 'Register Account' : 'Secure Sign In',
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.error_outline, color: AppColors.errorRed, size: 16),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _errorMessage!,
                                       style: TextStyle(
-                                        fontSize: responsive.scaleText(14.0),
+                                        color: AppColors.errorRed,
+                                        fontSize: responsive.scaleText(11.5),
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                            ),
-                            
-                            const SizedBox(height: 16),
-                            
-                            // Toggle Mode Link
-                            Center(
-                              child: TextButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _isRegisterMode = !_isRegisterMode;
-                                    _errorMessage = null;
-                                  });
-                                },
-                                child: Text(
-                                  _isRegisterMode
-                                      ? 'Already have an account? Sign In'
-                                      : 'Are you a patient? Create an account',
-                                  style: TextStyle(
-                                    color: AppColors.navy700,
-                                    fontSize: responsive.scaleText(12.5),
-                                    fontWeight: FontWeight.bold,
                                   ),
-                                ),
+                                ],
                               ),
                             ),
                           ],
-                        ),
+                          
+                          SizedBox(height: responsive.scaleHeight(20.0)),
+                          
+                          // Submit Button
+                          ElevatedButton(
+                            onPressed: _isLoading ? null : _handleSubmit,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.navy700,
+                              padding: const EdgeInsets.symmetric(vertical: 15.0),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.0,
+                                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.white),
+                                    ),
+                                  )
+                                : Text(
+                                    _isRegisterMode ? 'Complete Registration' : 'Secure Sign In',
+                                    style: TextStyle(
+                                      fontSize: responsive.scaleText(14.0),
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.white,
+                                    ),
+                                  ),
+                          ),
+                          
+                          const SizedBox(height: 14),
+                          
+                          // Toggle Mode Link
+                          Center(
+                            child: TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _isRegisterMode = !_isRegisterMode;
+                                  _errorMessage = null;
+                                  _phoneCheckMessage = null;
+                                  _phoneCheckStatus = null;
+                                });
+                              },
+                              child: Text(
+                                _isRegisterMode
+                                    ? 'Already registered? Sign In →'
+                                    : 'Are you a patient? Create an account',
+                                style: TextStyle(
+                                  color: AppColors.navy700,
+                                  fontSize: responsive.scaleText(12.5),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     
-                    SizedBox(height: responsive.scaleHeight(24.0)),
+                    SizedBox(height: responsive.scaleHeight(20.0)),
                     
                     // Connection Info Banner
                     Container(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(14.0),
                       decoration: BoxDecoration(
                         color: AppColors.navy50,
                         borderRadius: BorderRadius.circular(12.0),
@@ -726,7 +668,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
 
-            // Settings/Gear Icon positioned at top right (painted on top to receive touch events)
+            // Settings/Gear Icon positioned at top right
             Positioned(
               top: 8,
               right: 8,
@@ -739,6 +681,547 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  // --- Sign In Card ---
+  Widget _buildSignInCard(ResponsiveHelper responsive) {
+    return Container(
+      padding: EdgeInsets.all(responsive.scaleWidth(20.0)),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16.0),
+        border: Border.all(color: AppColors.slate200),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.slate900.withOpacity(0.04),
+            blurRadius: 20.0,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Administrator / Staff Email',
+            style: TextStyle(
+              fontSize: responsive.scaleText(12.0),
+              fontWeight: FontWeight.bold,
+              color: AppColors.slate700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          TextFormField(
+            controller: _emailController,
+            focusNode: _emailFocusNode,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            style: TextStyle(
+              fontSize: responsive.scaleText(14.0),
+              color: AppColors.slate900,
+              fontWeight: FontWeight.w500,
+            ),
+            decoration: const InputDecoration(
+              hintText: 'name@hospital.com',
+              prefixIcon: Icon(Icons.mail_outline, size: 18),
+            ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Email is required';
+              }
+              final emailRegExp = RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+");
+              if (!emailRegExp.hasMatch(value.trim())) {
+                return 'Please enter a valid email address';
+              }
+              return null;
+            },
+            onFieldSubmitted: (_) {
+              FocusScope.of(context).requestFocus(_passwordFocusNode);
+            },
+          ),
+          
+          SizedBox(height: responsive.scaleHeight(16.0)),
+
+          Text(
+            'Security Password',
+            style: TextStyle(
+              fontSize: responsive.scaleText(12.0),
+              fontWeight: FontWeight.bold,
+              color: AppColors.slate700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          TextFormField(
+            controller: _passwordController,
+            focusNode: _passwordFocusNode,
+            obscureText: _obscurePassword,
+            textInputAction: TextInputAction.done,
+            style: TextStyle(
+              fontSize: responsive.scaleText(14.0),
+              color: AppColors.slate900,
+              fontWeight: FontWeight.w500,
+            ),
+            decoration: InputDecoration(
+              hintText: '••••••••',
+              prefixIcon: const Icon(Icons.lock_outline, size: 18),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  color: AppColors.slate400,
+                  size: 20,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Password is required';
+              }
+              return null;
+            },
+            onFieldSubmitted: (_) => _handleSubmit(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Registration Sections (Matching Web App Layout) ---
+  Widget _buildRegisterFormSections(ResponsiveHelper responsive) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // SECTION 1: Account & Security Details
+        Container(
+          padding: EdgeInsets.all(responsive.scaleWidth(18.0)),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(16.0),
+            border: Border.all(color: AppColors.slate200),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.slate900.withOpacity(0.04),
+                blurRadius: 16.0,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.person_outline, color: AppColors.navy700, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    '1. ACCOUNT & SECURITY DETAILS',
+                    style: TextStyle(
+                      fontSize: responsive.scaleText(12.0),
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.navy900,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(height: 20, color: AppColors.slate100),
+              
+              // Full Name
+              Text(
+                'Full Name *',
+                style: TextStyle(
+                  fontSize: responsive.scaleText(11.5),
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.slate700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              TextFormField(
+                controller: _nameController,
+                focusNode: _nameFocusNode,
+                textInputAction: TextInputAction.next,
+                style: TextStyle(fontSize: responsive.scaleText(13.0), color: AppColors.slate900, fontWeight: FontWeight.w500),
+                decoration: const InputDecoration(
+                  hintText: 'e.g. Rahul Sharma',
+                  prefixIcon: Icon(Icons.person_outline, size: 18),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) return 'Full Name is required';
+                  if (value.trim().length < 2) return 'Full Name must be at least 2 characters long';
+                  return null;
+                },
+                onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_emailFocusNode),
+              ),
+              
+              const SizedBox(height: 14),
+
+              // Email Address
+              Text(
+                'Email Address *',
+                style: TextStyle(
+                  fontSize: responsive.scaleText(11.5),
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.slate700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              TextFormField(
+                controller: _emailController,
+                focusNode: _emailFocusNode,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                style: TextStyle(fontSize: responsive.scaleText(13.0), color: AppColors.slate900, fontWeight: FontWeight.w500),
+                decoration: const InputDecoration(
+                  hintText: 'rahul@example.com',
+                  prefixIcon: Icon(Icons.mail_outline, size: 18),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) return 'Email Address is required';
+                  final emailRegExp = RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+");
+                  if (!emailRegExp.hasMatch(value.trim())) return 'Please enter a valid email address';
+                  return null;
+                },
+                onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_passwordFocusNode),
+              ),
+
+              const SizedBox(height: 14),
+
+              // Password
+              Text(
+                'Password * (min 6 chars)',
+                style: TextStyle(
+                  fontSize: responsive.scaleText(11.5),
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.slate700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              TextFormField(
+                controller: _passwordController,
+                focusNode: _passwordFocusNode,
+                obscureText: _obscurePassword,
+                textInputAction: TextInputAction.next,
+                style: TextStyle(fontSize: responsive.scaleText(13.0), color: AppColors.slate900, fontWeight: FontWeight.w500),
+                decoration: InputDecoration(
+                  hintText: '••••••••',
+                  prefixIcon: const Icon(Icons.lock_outline, size: 18),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      color: AppColors.slate400,
+                      size: 18,
+                    ),
+                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                  ),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Password is required';
+                  if (value.length < 6) return 'Password must be at least 6 characters long';
+                  return null;
+                },
+                onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_confirmPasswordFocusNode),
+              ),
+
+              const SizedBox(height: 14),
+
+              // Confirm Password
+              Text(
+                'Confirm Password *',
+                style: TextStyle(
+                  fontSize: responsive.scaleText(11.5),
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.slate700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              TextFormField(
+                controller: _confirmPasswordController,
+                focusNode: _confirmPasswordFocusNode,
+                obscureText: _obscureConfirmPassword,
+                textInputAction: TextInputAction.next,
+                style: TextStyle(fontSize: responsive.scaleText(13.0), color: AppColors.slate900, fontWeight: FontWeight.w500),
+                decoration: InputDecoration(
+                  hintText: '••••••••',
+                  prefixIcon: const Icon(Icons.lock_outline, size: 18),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      color: AppColors.slate400,
+                      size: 18,
+                    ),
+                    onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                  ),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Confirm Password is required';
+                  if (value != _passwordController.text) return 'Passwords do not match. Please verify your confirm password';
+                  return null;
+                },
+                onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_phoneFocusNode),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 18),
+
+        // SECTION 2: Patient Demographics & Contact
+        Container(
+          padding: EdgeInsets.all(responsive.scaleWidth(18.0)),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(16.0),
+            border: Border.all(color: AppColors.slate200),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.slate900.withOpacity(0.04),
+                blurRadius: 16.0,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.favorite_outline, color: AppColors.emerald600, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    '2. PATIENT DEMOGRAPHICS & CONTACT',
+                    style: TextStyle(
+                      fontSize: responsive.scaleText(12.0),
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.navy900,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(height: 20, color: AppColors.slate100),
+
+              // Phone Number Field with Auto-fetch
+              Text(
+                'Phone Number *',
+                style: TextStyle(
+                  fontSize: responsive.scaleText(11.5),
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.slate700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              TextFormField(
+                controller: _phoneController,
+                focusNode: _phoneFocusNode,
+                keyboardType: TextInputType.number,
+                maxLength: 10,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                textInputAction: TextInputAction.next,
+                style: TextStyle(fontSize: responsive.scaleText(13.0), color: AppColors.slate900, fontWeight: FontWeight.w500),
+                decoration: InputDecoration(
+                  hintText: '10-digit mobile number',
+                  counterText: '',
+                  prefixIcon: const Icon(Icons.phone_outlined, size: 18),
+                  suffixIcon: _isCheckingPhone
+                      ? const Padding(
+                          padding: EdgeInsets.all(12.0),
+                          child: SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.navy700),
+                          ),
+                        )
+                      : null,
+                ),
+                validator: (value) {
+                  final clean = (value ?? '').replaceAll(RegExp(r'\D'), '');
+                  if (clean.isEmpty) return 'Phone Number is required';
+                  if (clean.length != 10) return 'Phone Number must be exactly 10 digits';
+                  return null;
+                },
+                onChanged: _onPhoneChanged,
+                onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_ageFocusNode),
+              ),
+
+              // Phone Check Banner Notification
+              if (_phoneCheckMessage != null) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _phoneCheckStatus == 'exists' ? AppColors.errorBg : AppColors.emerald50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: _phoneCheckStatus == 'exists' ? AppColors.errorBorder : AppColors.emerald200,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _phoneCheckStatus == 'exists' ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                        color: _phoneCheckStatus == 'exists' ? AppColors.errorRed : AppColors.emerald600,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _phoneCheckMessage!,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: _phoneCheckStatus == 'exists' ? AppColors.errorRed : AppColors.emerald700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 14),
+
+              // Age & Gender Row
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Age *',
+                          style: TextStyle(
+                            fontSize: responsive.scaleText(11.5),
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.slate700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        TextFormField(
+                          controller: _ageController,
+                          focusNode: _ageFocusNode,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          textInputAction: TextInputAction.next,
+                          style: TextStyle(fontSize: responsive.scaleText(13.0), color: AppColors.slate900, fontWeight: FontWeight.w500),
+                          decoration: const InputDecoration(
+                            hintText: 'e.g. 28',
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) return 'Age is required';
+                            final age = int.tryParse(value.trim());
+                            if (age == null || age < 0 || age > 120) return 'Age must be 0-120';
+                            return null;
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Gender *',
+                          style: TextStyle(
+                            fontSize: responsive.scaleText(11.5),
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.slate700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        DropdownButtonFormField<String>(
+                          value: _gender,
+                          style: TextStyle(fontSize: responsive.scaleText(13.0), color: AppColors.slate900, fontWeight: FontWeight.w500),
+                          decoration: const InputDecoration(
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'Male', child: Text('Male')),
+                            DropdownMenuItem(value: 'Female', child: Text('Female')),
+                            DropdownMenuItem(value: 'Other', child: Text('Other')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setState(() => _gender = val);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 14),
+
+              // Blood Group & Address
+              Text(
+                'Blood Group *',
+                style: TextStyle(
+                  fontSize: responsive.scaleText(11.5),
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.slate700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              DropdownButtonFormField<String>(
+                value: _bloodGroup,
+                style: TextStyle(fontSize: responsive.scaleText(13.0), color: AppColors.slate900, fontWeight: FontWeight.w500),
+                decoration: const InputDecoration(
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'O+', child: Text('O+')),
+                  DropdownMenuItem(value: 'O-', child: Text('O-')),
+                  DropdownMenuItem(value: 'A+', child: Text('A+')),
+                  DropdownMenuItem(value: 'A-', child: Text('A-')),
+                  DropdownMenuItem(value: 'B+', child: Text('B+')),
+                  DropdownMenuItem(value: 'B-', child: Text('B-')),
+                  DropdownMenuItem(value: 'AB+', child: Text('AB+')),
+                  DropdownMenuItem(value: 'AB-', child: Text('AB-')),
+                ],
+                onChanged: (val) {
+                  if (val != null) setState(() => _bloodGroup = val);
+                },
+              ),
+
+              const SizedBox(height: 14),
+
+              Text(
+                'Residential Address *',
+                style: TextStyle(
+                  fontSize: responsive.scaleText(11.5),
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.slate700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              TextFormField(
+                controller: _addressController,
+                focusNode: _addressFocusNode,
+                keyboardType: TextInputType.streetAddress,
+                textInputAction: TextInputAction.done,
+                style: TextStyle(fontSize: responsive.scaleText(13.0), color: AppColors.slate900, fontWeight: FontWeight.w500),
+                decoration: const InputDecoration(
+                  hintText: 'House / Street, City, Pincode',
+                  prefixIcon: Icon(Icons.location_on_outlined, size: 18),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) return 'Residential Address is required';
+                  if (value.trim().length < 3) return 'Address must be at least 3 characters long';
+                  return null;
+                },
+                onFieldSubmitted: (_) => _handleSubmit(),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

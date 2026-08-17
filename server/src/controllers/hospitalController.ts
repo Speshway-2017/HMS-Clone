@@ -256,11 +256,19 @@ export const getPublicHospitalDoctors = catchAsync(async (_req: Request, res: Re
   }
 });
 
+import { getRealtimeStaffCountsForBranches } from "../utils/branchStaffHelper";
+
 export const getPublicHospitalBranches = catchAsync(async (_req: Request, res: Response) => {
   try {
-    const branches = await Branch.find({ status: { $ne: "inactive" } })
-      .select("name code city address phone status")
+    const rawBranches = await Branch.find({ status: { $ne: "inactive" } })
+      .select("name code branchId city state street phone status totalStaff")
       .sort({ name: 1 });
+    const countMap = await getRealtimeStaffCountsForBranches(rawBranches.map((b) => b._id));
+    const branches = rawBranches.map((b) => {
+      const obj = b.toObject();
+      obj.totalStaff = countMap.get(b._id.toString()) ?? 0;
+      return obj;
+    });
     return res.json({ status: "success", data: { branches: branches || [] } });
   } catch (err: any) {
     console.error("Error fetching public branches:", err);

@@ -132,52 +132,6 @@ class _PatientDashboardState extends State<PatientDashboard> {
     }
   }
 
-  Future<void> _handleLogout() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: const [
-              Icon(Icons.logout_rounded, color: Colors.redAccent),
-              SizedBox(width: 10),
-              Text(
-                'Log Out',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-              ),
-            ],
-          ),
-          content: const Text(
-            'Are you sure you want to log out of your Patient Portal session?',
-            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Log Out', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirm == true && mounted) {
-      await UserSession.clear();
-      if (!mounted) return;
-      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
-    }
-  }
-
   Map<String, dynamic>? get _nextAppointment {
     if (_appointments.isEmpty) return null;
     final now = DateTime.now();
@@ -1011,7 +965,6 @@ class _PatientDashboardState extends State<PatientDashboard> {
       automaticallyImplyLeading: false,
       titleSpacing: 12.0,
       title: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Back Button if not on Home screen
           if (_currentIndex != 0) ...[
@@ -1033,127 +986,111 @@ class _PatientDashboardState extends State<PatientDashboard> {
             ),
           ],
 
-          // Tappable User Profile Avatar & Details Header
+          // Hospital / Portal Branding Title on Left
           Expanded(
-            child: InkWell(
-              onTap: () async {
-                await Navigator.pushNamed(context, AppRoutes.patientProfile);
-                if (mounted) {
-                  _loadAllData();
-                }
-              },
-              borderRadius: BorderRadius.circular(25),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Row(
-                  children: [
-                    Stack(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.08),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: CircleAvatar(
-                            radius: 20,
-                            backgroundColor: const Color(0xFFDCE7FE),
-                            backgroundImage: _patientPhotoUrl != null
-                                ? NetworkImage(_patientPhotoUrl!)
-                                : null,
-                            child: _patientPhotoUrl == null
-                                ? const Icon(
-                                    Icons.person_rounded,
-                                    color: AppColors.navy700,
-                                    size: 24,
-                                  )
-                                : null,
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF2563EB),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.edit_rounded,
-                              color: Colors.white,
-                              size: 9,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  _patientDisplayName,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.arrow_forward_ios_rounded,
-                                size: 9,
-                                color: Color(0xFF2563EB),
-                              ),
-                            ],
-                          ),
-                          Text(
-                            '$_patientUhid • $_hospitalName',
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _hospitalName,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.3,
+                  ),
                 ),
-              ),
+                Text(
+                  '$_patientUhid • Patient Portal',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ],
             ),
           ),
 
-          // Log Out Action Button
-          Container(
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(
-              color: Color(0xFFFEF2F2),
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              icon: const Icon(
-                Icons.logout_rounded,
-                color: Colors.redAccent,
-                size: 20,
+          const SizedBox(width: 8),
+
+          // Tappable User Profile Section Button (POSITIONED ON RIGHT SIDE)
+          InkWell(
+            onTap: () async {
+              await Navigator.pushNamed(context, AppRoutes.patientProfile);
+              if (mounted) {
+                _loadAllData();
+              }
+            },
+            borderRadius: BorderRadius.circular(24),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEEF2FF),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFDBE4F6)),
               ),
-              tooltip: 'Log Out',
-              onPressed: _handleLogout,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: const Color(0xFFDCE7FE),
+                        backgroundImage: _patientPhotoUrl != null
+                            ? NetworkImage(_patientPhotoUrl!)
+                            : null,
+                        child: _patientPhotoUrl == null
+                            ? const Icon(
+                                Icons.person_rounded,
+                                color: AppColors.navy700,
+                                size: 18,
+                              )
+                            : null,
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(1.5),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF2563EB),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.tune_rounded,
+                            color: Colors.white,
+                            size: 7,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 6),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 80),
+                    child: Text(
+                      _patientDisplayName.split(' ').first,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E3A8A),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: Color(0xFF2563EB),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

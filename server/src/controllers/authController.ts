@@ -23,25 +23,25 @@ const loginSchema = z.object({
 
 const registerSchema = z.object({
   // Section 1: Account & Security (Mandatory)
-  name: z.string().min(2, "Full Name is required"),
-  email: z.string().email("Valid email is required"),
+  name: z.string().min(2, "Full Name must be at least 2 characters long"),
+  email: z.string().email("Valid email address is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 
   // Section 2: Demographics & Contact (Mandatory)
-  phone: z.string().min(5, "Phone Number is required"),
-  age: z.coerce.number({ invalid_type_error: "Age is required" }).min(0, "Age must be valid").max(120, "Age must be valid"),
-  gender: z.string().min(1, "Gender is required"),
-  bloodGroup: z.string().min(1, "Blood Group is required"),
-  address: z.string().min(3, "Residential Address is required"),
+  phone: z.string().min(10, "Phone Number must be at least 10 digits"),
+  age: z.coerce.number({ invalid_type_error: "Valid Age is required" }).min(0, "Age must be between 0 and 120").max(120, "Age must be between 0 and 120"),
+  gender: z.string().min(1, "Gender selection is required"),
+  bloodGroup: z.string().min(1, "Blood Group selection is required"),
+  address: z.string().min(3, "Residential Address must be at least 3 characters long"),
 
-  // Section 3: Emergency Contact (Mandatory)
+  // Section 3: Emergency Contact (Optional - set in Profile)
   emergencyContact: z.object({
-    name: z.string().min(1, "Emergency Contact Name is required"),
-    phone: z.string().min(1, "Emergency Contact Phone is required"),
-    relation: z.string().min(1, "Emergency Contact Relationship is required"),
-  }),
+    name: z.string().optional().default(""),
+    phone: z.string().optional().default(""),
+    relation: z.string().optional().default(""),
+  }).optional().default({ name: "", phone: "", relation: "" }),
 
-  // Section 4: Allergies & Insurance Details (Optional)
+  // Section 4: Allergies & Insurance Details (Optional - set in Profile)
   allergies: z.string().optional().default(""),
   insuranceProvider: z.string().optional().default(""),
   insurancePolicyNumber: z.string().optional().default(""),
