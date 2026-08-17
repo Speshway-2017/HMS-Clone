@@ -707,35 +707,40 @@ class _AdminDashboardState extends State<AdminDashboard> {
           width: isSelected ? 1.8 : 1.0,
         ),
       ),
-      child: ListTile(
-        onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.navy700 : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(10),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          onTap: onTap,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isSelected ? AppColors.navy700 : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: isSelected ? Colors.white : AppColors.navy700, size: 20),
+          ),
+          title: Text(
+            title,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: isSelected ? AppColors.navy900 : AppColors.slate900,
+            ),
+          ),
+          subtitle: Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 11,
+              color: isSelected ? AppColors.navy700 : const Color(0xFF64748B),
+            ),
+          ),
+          trailing: isSelected
+              ? const Icon(Icons.check_circle_rounded, color: AppColors.emerald600, size: 20)
+              : const Icon(Icons.radio_button_unchecked_rounded, color: Color(0xFFCBD5E1), size: 20),
         ),
-        child: Icon(icon, color: isSelected ? Colors.white : AppColors.navy700, size: 20),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.bold,
-          color: isSelected ? AppColors.navy900 : AppColors.slate900,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          fontSize: 11,
-          color: isSelected ? AppColors.navy700 : const Color(0xFF64748B),
-        ),
-      ),
-      trailing: isSelected
-          ? const Icon(Icons.check_circle_rounded, color: AppColors.emerald600, size: 20)
-          : const Icon(Icons.radio_button_unchecked_rounded, color: Color(0xFFCBD5E1), size: 20),
       ),
     );
   }

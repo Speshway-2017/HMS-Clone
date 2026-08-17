@@ -342,23 +342,26 @@ class _ConsultationWorkspaceSheetState extends State<ConsultationWorkspaceSheet>
                       ),
                       child: Column(
                         children: [
-                          SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text(
-                              'Recommend Inpatient (IP) Admission',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.navy900),
+                          Material(
+                            color: Colors.transparent,
+                            child: SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text(
+                                'Recommend Inpatient (IP) Admission',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.navy900),
+                              ),
+                              subtitle: const Text(
+                                'Triggers IP admission request to receptionist workspace',
+                                style: TextStyle(fontSize: 10.5, color: AppColors.slate500),
+                              ),
+                              value: _recommendIp,
+                              activeColor: AppColors.errorRed,
+                              onChanged: (val) {
+                                setState(() {
+                                  _recommendIp = val;
+                                });
+                              },
                             ),
-                            subtitle: const Text(
-                              'Triggers IP admission request to receptionist workspace',
-                              style: TextStyle(fontSize: 10.5, color: AppColors.slate500),
-                            ),
-                            value: _recommendIp,
-                            activeColor: AppColors.errorRed,
-                            onChanged: (val) {
-                              setState(() {
-                                _recommendIp = val;
-                              });
-                            },
                           ),
                           if (_recommendIp) ...[
                             const SizedBox(height: 8),
