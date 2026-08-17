@@ -1223,6 +1223,8 @@ export const completeConsultation = catchAsync(async (req: Request, res: Respons
     );
 
     await session.commitTransaction();
+    emitToHospital(hospitalId.toString(), "queue_updated", { doctorId: doctor._id, appointmentId });
+    emitToHospital(hospitalId.toString(), "consultation_completed", { doctorId: doctor._id, appointmentId });
     res.json({ status: "success", data: appointment, prescription });
   } catch (err) {
     await session.abortTransaction();
@@ -1592,6 +1594,7 @@ export const getMyPatientById = catchAsync(async (req: Request, res: Response) =
     });
   }
 
+<<<<<<< Updated upstream
   // Fetch comprehensive clinical records for this patient across all departments & tabs
   const [appointments, prescriptions, labOrders, radiologyOrders, admissions, diagnosticReports] = await Promise.all([
     Appointment.find(patientQuery).sort({ date: -1, createdAt: -1 }).limit(30),
@@ -1628,6 +1631,152 @@ export const getMyPatientById = catchAsync(async (req: Request, res: Response) =
     }
   });
 
+=======
+  // Fetch this doctor's clinical data for this patient
+  const [appointments, prescriptionsRaw, labOrdersRaw, radiologyOrdersRaw, admissions] = await Promise.all([
+    Appointment.find({ hospital: hospitalId, doctor: doctorObjId, patient: patientId })
+      .sort({ date: -1 })
+      .limit(20),
+    Prescription.find({ hospital: hospitalId, doctor: doctorObjId, patient: patientId })
+      .sort({ createdAt: -1 })
+      .limit(20),
+    LabOrder.find({ hospital: hospitalId, doctor: doctorObjId, patient: patientId })
+      .sort({ createdAt: -1 })
+      .limit(20),
+    RadiologyOrder.find({ hospital: hospitalId, doctor: doctorObjId, patient: patientId })
+      .sort({ createdAt: -1 })
+      .limit(20),
+    Admission.find({ hospital: hospitalId, admittingDoctor: doctorObjId, patient: patientId })
+      .sort({ admissionDate: -1 })
+      .limit(10),
+  ]);
+
+  // Deduplicate prescriptions by _id
+  const seenPrescriptionIds = new Set<string>();
+  const prescriptions: any[] = [];
+  for (const p of prescriptionsRaw) {
+    const obj = p.toObject();
+    const idStr = obj._id ? obj._id.toString() : "";
+    if (!idStr || !seenPrescriptionIds.has(idStr)) {
+      if (idStr) seenPrescriptionIds.add(idStr);
+      prescriptions.push({
+        ...obj,
+        medicines: obj.medications || [],
+      });
+    }
+  }
+
+  // Fetch all DiagnosticReport records for this patient
+  const patientDiagnosticReports = await DiagnosticReport.find({ hospital: hospitalId, patient: patientId })
+    .populate("uploadedBy", "name")
+    .sort({ uploadedAt: -1, createdAt: -1 });
+
+  const processedLabReportIds = new Set<string>();
+
+  // For each LabOrder, find attached DiagnosticReport and files
+  const labOrders = labOrdersRaw.map((o) => {
+    const orderObj = o.toObject();
+    const report = patientDiagnosticReports.find((r) => {
+      if (processedLabReportIds.has(r._id.toString())) return false;
+      if (r.requestId && r.requestId.toString() === o._id.toString()) return true;
+      if (o.appointment && r.appointment && r.appointment.toString() === o.appointment.toString() && r.requestType === "Laboratory") return true;
+      if (r.requestType === "Laboratory" && r.testName && orderObj.tests && orderObj.tests.some((t: string) => t.toLowerCase() === r.testName.toLowerCase())) return true;
+      return false;
+    });
+
+    if (report) {
+      processedLabReportIds.add(report._id.toString());
+    }
+
+    const files = report?.files && report.files.length > 0
+      ? report.files
+      : (orderObj.attachments || []);
+
+    return {
+      ...orderObj,
+      report,
+      files,
+      observations: report?.observations || orderObj.rejectionReason || "",
+      remarks: report?.remarks || "",
+      status: report?.status ? report.status : orderObj.status,
+    };
+  });
+
+  // Synthesize ONLY standalone Laboratory DiagnosticReports not linked to any LabOrder
+  const labReports = patientDiagnosticReports.filter(r => r.requestType === "Laboratory" || (!r.requestType && r.testName));
+  for (const rep of labReports) {
+    if (!processedLabReportIds.has(rep._id.toString())) {
+      const repObj = rep.toObject();
+      labOrders.push({
+        _id: rep._id,
+        orderNumber: (rep as any).orderNumber || rep._id.toString().slice(-6),
+        tests: [rep.testName || "Laboratory Test"],
+        testName: rep.testName || "Laboratory Test",
+        status: rep.status || "report_uploaded",
+        report: repObj,
+        files: repObj.files || [],
+        observations: repObj.observations || repObj.remarks || "",
+        remarks: repObj.remarks || "",
+        createdAt: rep.createdAt || rep.uploadedAt,
+      } as any);
+      processedLabReportIds.add(rep._id.toString());
+    }
+  }
+
+  const processedRadReportIds = new Set<string>();
+
+  // For each RadiologyOrder, find attached DiagnosticReport and scan files
+  const radiologyOrders = radiologyOrdersRaw.map((o) => {
+    const orderObj = o.toObject();
+    const report = patientDiagnosticReports.find((r) => {
+      if (processedRadReportIds.has(r._id.toString())) return false;
+      if (r.requestId && r.requestId.toString() === o._id.toString()) return true;
+      if (o.appointment && r.appointment && r.appointment.toString() === o.appointment.toString() && r.requestType === "Radiology") return true;
+      if (r.requestType === "Radiology" && r.testName && orderObj.type && (r.testName.toLowerCase().includes(orderObj.type.toLowerCase()) || orderObj.type.toLowerCase().includes(r.testName.toLowerCase()))) return true;
+      return false;
+    });
+
+    if (report) {
+      processedRadReportIds.add(report._id.toString());
+    }
+
+    let files: any[] = report?.files && report.files.length > 0 ? (report.files as any[]) : [];
+    if (files.length === 0 && orderObj.resultsUrl) {
+      files = [{ secure_url: orderObj.resultsUrl, original_filename: `${orderObj.type || "Radiology Scan"} Report`, mime_type: "image/png", file_size: 0, public_id: "rad-scan" }];
+    }
+
+    return {
+      ...orderObj,
+      report,
+      files,
+      observations: report?.observations || orderObj.findings || orderObj.notes || "",
+      remarks: report?.remarks || "",
+      status: report?.status ? report.status : orderObj.status,
+    };
+  });
+
+  // Synthesize ONLY standalone Radiology DiagnosticReports not linked to any RadiologyOrder
+  const radReports = patientDiagnosticReports.filter(r => r.requestType === "Radiology");
+  for (const rep of radReports) {
+    if (!processedRadReportIds.has(rep._id.toString())) {
+      const repObj = rep.toObject();
+      radiologyOrders.push({
+        _id: rep._id,
+        orderNumber: (rep as any).orderNumber || rep._id.toString().slice(-6),
+        type: rep.testName || "Radiology Scan",
+        procedureName: rep.testName || "Radiology Scan",
+        status: rep.status || "report_uploaded",
+        report: repObj,
+        files: repObj.files || [],
+        observations: repObj.observations || repObj.remarks || "",
+        remarks: repObj.remarks || "",
+        createdAt: rep.createdAt || rep.uploadedAt,
+      } as any);
+      processedRadReportIds.add(rep._id.toString());
+    }
+  }
+
+>>>>>>> Stashed changes
   res.json({
     status: "success",
     data: {
