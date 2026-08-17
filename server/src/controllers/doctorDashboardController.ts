@@ -1555,6 +1555,7 @@ export const getMyPatients = catchAsync(async (req: Request, res: Response) => {
 export const getMyPatientById = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
+  const doctorObjId = doctor._id;
   const patientIdParam = req.params.patientId;
   const patientId = Types.ObjectId.isValid(patientIdParam) ? new Types.ObjectId(patientIdParam) : null;
 
@@ -1594,61 +1595,23 @@ export const getMyPatientById = catchAsync(async (req: Request, res: Response) =
     });
   }
 
-<<<<<<< Updated upstream
-  // Fetch comprehensive clinical records for this patient across all departments & tabs
-  const [appointments, prescriptions, labOrders, radiologyOrders, admissions, diagnosticReports] = await Promise.all([
-    Appointment.find(patientQuery).sort({ date: -1, createdAt: -1 }).limit(30),
-    Prescription.find(patientQuery).sort({ createdAt: -1 }).limit(30),
-    LabOrder.find(patientQuery).sort({ createdAt: -1 }).limit(30),
-    RadiologyOrder.find(patientQuery).sort({ createdAt: -1 }).limit(30),
-    Admission.find(patientQuery).sort({ admissionDate: -1, createdAt: -1 }).limit(20),
-    DiagnosticReport.find(patientQuery).sort({ createdAt: -1 }).limit(30),
-  ]);
-
-  // Combine lab orders with diagnostic reports if labOrders is empty or missing test items
-  const combinedLabOrders = [...labOrders];
-  diagnosticReports.forEach((report) => {
-    if (report.requestType === "Laboratory") {
-      combinedLabOrders.push({
-        _id: report._id,
-        orderNumber: report.testName,
-        tests: [{ name: report.testName }],
-        status: report.status,
-        createdAt: report.createdAt,
-      } as any);
-    }
-  });
-
-  const combinedRadiology = [...radiologyOrders];
-  diagnosticReports.forEach((report) => {
-    if (report.requestType === "Radiology") {
-      combinedRadiology.push({
-        _id: report._id,
-        procedureName: report.testName,
-        status: report.status,
-        createdAt: report.createdAt,
-      } as any);
-    }
-  });
-
-=======
   // Fetch this doctor's clinical data for this patient
   const [appointments, prescriptionsRaw, labOrdersRaw, radiologyOrdersRaw, admissions] = await Promise.all([
-    Appointment.find({ hospital: hospitalId, doctor: doctorObjId, patient: patientId })
+    Appointment.find({ hospital: hospitalId || patient.hospital, ...patientQuery })
       .sort({ date: -1 })
-      .limit(20),
-    Prescription.find({ hospital: hospitalId, doctor: doctorObjId, patient: patientId })
+      .limit(30),
+    Prescription.find({ hospital: hospitalId || patient.hospital, ...patientQuery })
       .sort({ createdAt: -1 })
-      .limit(20),
-    LabOrder.find({ hospital: hospitalId, doctor: doctorObjId, patient: patientId })
+      .limit(30),
+    LabOrder.find({ hospital: hospitalId || patient.hospital, ...patientQuery })
       .sort({ createdAt: -1 })
-      .limit(20),
-    RadiologyOrder.find({ hospital: hospitalId, doctor: doctorObjId, patient: patientId })
+      .limit(30),
+    RadiologyOrder.find({ hospital: hospitalId || patient.hospital, ...patientQuery })
       .sort({ createdAt: -1 })
-      .limit(20),
-    Admission.find({ hospital: hospitalId, admittingDoctor: doctorObjId, patient: patientId })
+      .limit(30),
+    Admission.find({ hospital: hospitalId || patient.hospital, ...patientQuery })
       .sort({ admissionDate: -1 })
-      .limit(10),
+      .limit(20),
   ]);
 
   // Deduplicate prescriptions by _id
@@ -1776,15 +1739,14 @@ export const getMyPatientById = catchAsync(async (req: Request, res: Response) =
     }
   }
 
->>>>>>> Stashed changes
   res.json({
     status: "success",
     data: {
       patient,
       appointments,
       prescriptions,
-      labOrders: combinedLabOrders,
-      radiologyOrders: combinedRadiology,
+      labOrders,
+      radiologyOrders,
       admissions,
     },
   });
