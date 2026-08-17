@@ -8,6 +8,7 @@ import { getPagination, paginatedResponse } from "../utils/pagination";
 
 import { syncBranchDepartmentsForBranch } from "../utils/branchDepartmentSync";
 import { emitToHospital } from "../config/socket";
+import { getRealtimeStaffCountsForBranches } from "../utils/branchStaffHelper";
 
 const branchSchema = z.object({
   hospital: z.string().min(1),
@@ -36,16 +37,31 @@ export const listBranches = catchAsync(async (req: Request, res: Response) => {
     filter.hospital = hospitalId;
   }
 
-  const [branches, total, summary] = await Promise.all([
+  const [rawBranches, total, allMatchingBranches] = await Promise.all([
     Branch.find(filter).populate("hospital", "name").sort({ createdAt: -1 }).skip(skip).limit(limit),
     Branch.countDocuments(filter),
-    Branch.aggregate([{ $match: filter }, { $group: { _id: null, totalStaff: { $sum: "$totalStaff" } } }]),
+    Branch.find(filter).select("_id"),
   ]);
+
+  const allMatchingIds = allMatchingBranches.map((b) => b._id);
+  const countMap = await getRealtimeStaffCountsForBranches(allMatchingIds);
+
+  const branches = rawBranches.map((b) => {
+    const obj = b.toObject();
+    const realtimeCount = countMap.get(b._id.toString()) ?? 0;
+    obj.totalStaff = realtimeCount;
+    return obj;
+  });
+
+  let grandTotalStaff = 0;
+  for (const cnt of countMap.values()) {
+    grandTotalStaff += cnt;
+  }
 
   res.json({
     status: "success",
     ...paginatedResponse(branches, total, { page, limit, skip }),
-    summary: { totalBranches: total, totalStaff: summary[0]?.totalStaff ?? 0 },
+    summary: { totalBranches: total, totalStaff: grandTotalStaff },
   });
 });
 
@@ -73,7 +89,14 @@ export const getBranch = catchAsync(async (req: Request, res: Response) => {
       throw new AppError("You do not have permission to view this branch.", 403);
     }
   }
-  res.json({ status: "success", data: { branch } });
+
+  const countMap = await getRealtimeStaffCountsForBranches([branch._id]);
+  const realtimeCount = countMap.get(branch._id.toString()) ?? 0;
+
+  const branchObj = branch.toObject();
+  branchObj.totalStaff = realtimeCount;
+
+  res.json({ status: "success", data: { branch: branchObj } });
 });
 
 export const updateBranch = catchAsync(async (req: Request, res: Response) => {

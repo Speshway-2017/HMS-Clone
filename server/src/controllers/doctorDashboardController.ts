@@ -1495,19 +1495,18 @@ export const getMyPatients = catchAsync(async (req: Request, res: Response) => {
   const patientIdSet = new Set<string>(rawIds.map((id: any) => id.toString()));
   const patientIds = Array.from(patientIdSet).map((id) => new Types.ObjectId(id));
 
-  // Step 2: fetch the actual patient documents — scoped to hospital
+  // Step 2: fetch the actual patient documents — strictly scoped to this doctor
   const filter: Record<string, unknown> = {};
 
   if (hospitalId) {
     filter.hospital = hospitalId;
   }
 
-  if (patientIds.length > 0) {
-    filter.$or = [
-      { _id: { $in: patientIds } },
-      { assignedDoctor: { $in: doctorObjIds } },
-    ];
-  }
+  // Always scope patients to those assigned to or treated by this doctor
+  filter.$or = [
+    { _id: { $in: patientIds } },
+    { assignedDoctor: { $in: doctorObjIds } },
+  ];
 
   const searchStr = (search || "").trim();
   if (searchStr) {
@@ -1519,12 +1518,8 @@ export const getMyPatients = catchAsync(async (req: Request, res: Response) => {
         { uhid: new RegExp(escapedSearch, "i") },
       ],
     };
-    if (filter.$or) {
-      filter.$and = [{ $or: filter.$or }, searchFilter];
-      delete filter.$or;
-    } else {
-      filter.$or = searchFilter.$or;
-    }
+    filter.$and = [{ $or: filter.$or }, searchFilter];
+    delete filter.$or;
   }
 
   const patients = await Patient.find(filter)
