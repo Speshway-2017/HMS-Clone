@@ -195,10 +195,6 @@ class AdminDrawer extends StatelessWidget {
                     Navigator.pushReplacementNamed(context, AppRoutes.login);
                   },
                 ),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.pushReplacementNamed(context, AppRoutes.login);
-                },
               ),
             ),
           ),
