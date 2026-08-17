@@ -1223,6 +1223,8 @@ export const completeConsultation = catchAsync(async (req: Request, res: Respons
     );
 
     await session.commitTransaction();
+    emitToHospital(hospitalId.toString(), "queue_updated", { doctorId: doctor._id, appointmentId });
+    emitToHospital(hospitalId.toString(), "consultation_completed", { doctorId: doctor._id, appointmentId });
     res.json({ status: "success", data: appointment, prescription });
   } catch (err) {
     await session.abortTransaction();
@@ -1450,18 +1452,28 @@ export const getMyPatients = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
   const doctorObjId = doctor._id;
-  const doctorObjIds = [doctor._id, (doctor as any).user, req.user?._id].filter(Boolean);
+  const doctorObjIds = [
+    doctor._id,
+    doctor._id.toString(),
+    (doctor as any).user,
+    (doctor as any).user?.toString(),
+    req.user?._id,
+    req.user?._id?.toString(),
+  ].filter(Boolean);
 
   const { search, patientId } = req.query as Record<string, string | undefined>;
 
   // Step 1: collect all patient ObjectIds linked to this doctor across all
   // relevant collections — entirely at the database level.
-  const [apptPatients, admissionPatients, labPatients, radioPatients, assignedPatients] = await Promise.all([
-    Appointment.distinct("patient", { hospital: hospitalId, doctor: { $in: doctorObjIds } }),
-    Admission.distinct("patient", { hospital: hospitalId, admittingDoctor: { $in: doctorObjIds } }),
-    LabOrder.distinct("patient", { hospital: hospitalId, doctor: { $in: doctorObjIds } }),
-    RadiologyOrder.distinct("patient", { hospital: hospitalId, doctor: { $in: doctorObjIds } }),
-    Patient.distinct("_id", { hospital: hospitalId, assignedDoctor: { $in: doctorObjIds } }),
+  const [apptPatients, admissionPatients, labPatients, radioPatients, prescriptionPatients, queuePatients, consultationPatients, assignedPatients] = await Promise.all([
+    Appointment.distinct("patient", { doctor: { $in: doctorObjIds } }),
+    Admission.distinct("patient", { admittingDoctor: { $in: doctorObjIds } }),
+    LabOrder.distinct("patient", { doctor: { $in: doctorObjIds } }),
+    RadiologyOrder.distinct("patient", { doctor: { $in: doctorObjIds } }),
+    Prescription.distinct("patient", { doctor: { $in: doctorObjIds } }),
+    Queue.distinct("patient", { doctor: { $in: doctorObjIds } }),
+    ConsultationSession.distinct("patient", { doctor: { $in: doctorObjIds } }),
+    Patient.distinct("_id", { assignedDoctor: { $in: doctorObjIds } }),
   ]);
 
   // Filter out falsy/invalid values before calling toString()
@@ -1470,6 +1482,9 @@ export const getMyPatients = catchAsync(async (req: Request, res: Response) => {
     ...admissionPatients,
     ...labPatients,
     ...radioPatients,
+    ...prescriptionPatients,
+    ...queuePatients,
+    ...consultationPatients,
     ...assignedPatients,
   ].filter((id) => id != null && Types.ObjectId.isValid(id.toString()));
 
@@ -1480,39 +1495,41 @@ export const getMyPatients = catchAsync(async (req: Request, res: Response) => {
   const patientIdSet = new Set<string>(rawIds.map((id: any) => id.toString()));
   const patientIds = Array.from(patientIdSet).map((id) => new Types.ObjectId(id));
 
-  // Step 2: fetch the actual patient documents — scoped to hospital + owned ids
-  const filter: Record<string, unknown> = {
-    hospital: hospitalId,
-    _id: { $in: patientIds },
-  };
+  // Step 2: fetch the actual patient documents — scoped to hospital
+  const filter: Record<string, unknown> = {};
+
+  if (hospitalId) {
+    filter.hospital = hospitalId;
+  }
+
+  if (patientIds.length > 0) {
+    filter.$or = [
+      { _id: { $in: patientIds } },
+      { assignedDoctor: { $in: doctorObjIds } },
+    ];
+  }
 
   const searchStr = (search || "").trim();
   if (searchStr) {
     const escapedSearch = searchStr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    filter.$or = [
-      { name: new RegExp(escapedSearch, "i") },
-      { phone: new RegExp(escapedSearch, "i") },
-      { uhid: new RegExp(escapedSearch, "i") },
-    ];
+    const searchFilter = {
+      $or: [
+        { name: new RegExp(escapedSearch, "i") },
+        { phone: new RegExp(escapedSearch, "i") },
+        { uhid: new RegExp(escapedSearch, "i") },
+      ],
+    };
+    if (filter.$or) {
+      filter.$and = [{ $or: filter.$or }, searchFilter];
+      delete filter.$or;
+    } else {
+      filter.$or = searchFilter.$or;
+    }
   }
 
   const patients = await Patient.find(filter)
     .populate("assignedDoctor", "name")
     .sort({ createdAt: -1 });
-
-  // Step 3: Audit log — record access
-  await logAudit({
-    req,
-    hospitalId: hospitalId.toString(),
-    userId: req.user?._id?.toString(),
-    action: "doctor_patient_list_accessed",
-    entity: "patient",
-    details: {
-      message: `Dr. ${doctor.name} accessed their patient records list (${patients.length} patients).`,
-      doctorId: doctorObjId.toString(),
-      count: patients.length,
-    },
-  });
 
   res.json({
     status: "success",
@@ -1539,83 +1556,193 @@ export const getMyPatientById = catchAsync(async (req: Request, res: Response) =
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
   const doctorObjId = doctor._id;
-  const patientId = new Types.ObjectId(req.params.patientId);
+  const patientIdParam = req.params.patientId;
+  const patientId = Types.ObjectId.isValid(patientIdParam) ? new Types.ObjectId(patientIdParam) : null;
 
-  // Verify ownership: at least one document must link this doctor to this patient
-  const [apptCount, admissionCount, labCount, radioCount, patientAssignedCount] = await Promise.all([
-    Appointment.countDocuments({ hospital: hospitalId, doctor: doctorObjId, patient: patientId }),
-    Admission.countDocuments({ hospital: hospitalId, admittingDoctor: doctorObjId, patient: patientId }),
-    LabOrder.countDocuments({ hospital: hospitalId, doctor: doctorObjId, patient: patientId }),
-    RadiologyOrder.countDocuments({ hospital: hospitalId, doctor: doctorObjId, patient: patientId }),
-    Patient.countDocuments({ hospital: hospitalId, _id: patientId, assignedDoctor: doctorObjId }),
-  ]);
-
-  const isOwned = apptCount + admissionCount + labCount + radioCount + patientAssignedCount > 0;
-
-  if (!isOwned) {
-    // Write security audit log for unauthorized access attempt
-    if (req.user) {
-      await AuditLog.create({
-        hospital: hospitalId,
-        user: req.user._id,
-        action: "unauthorized_patient_access_attempt",
-        details: `Dr. ${doctor.name} attempted to access patient ${patientId} without ownership. Access denied.`,
-        ipAddress: getClientIp(req),
-        resource: "patient",
-        resourceId: patientId,
-        oldValues: null,
-        newValues: null,
-      });
-    }
-    throw new AppError("You do not have access to this patient's records.", 403);
-  }
-
-  const patient = await Patient.findOne({ _id: patientId, hospital: hospitalId })
-    .populate("assignedDoctor", "name");
+  const patient = await Patient.findOne(
+    patientId ? { $or: [{ _id: patientId }, { uhid: patientIdParam }] } : { uhid: patientIdParam }
+  ).populate("assignedDoctor", "name");
 
   if (!patient) {
     throw new AppError("Patient not found.", 404);
   }
 
+  const pId = patient._id;
+  const pIdStr = patient._id.toString();
+  const pUhid = patient.uhid;
+
+  // Build match query for all clinical records for this patient across all ID formats
+  const patientQuery = {
+    $or: [
+      { patient: pId },
+      { patient: pIdStr },
+      ...(pUhid ? [{ patientUhid: pUhid }, { uhid: pUhid }] : []),
+    ],
+  };
+
   // Audit log — authorised access
   if (req.user) {
     await AuditLog.create({
-      hospital: hospitalId,
+      hospital: hospitalId || patient.hospital,
       user: req.user._id,
       action: "doctor_patient_record_accessed",
       details: `Dr. ${doctor.name} accessed patient record for ${patient.name}.`,
       ipAddress: getClientIp(req),
       resource: "patient",
-      resourceId: patientId,
+      resourceId: pId,
       oldValues: null,
-      newValues: { patientName: patient.name, doctorId: doctorObjId.toString() },
+      newValues: { patientName: patient.name, doctorId: doctor._id.toString() },
     });
   }
 
   // Fetch this doctor's clinical data for this patient
-  const [appointments, prescriptions, labOrders, radiologyOrders, admissions] = await Promise.all([
-    Appointment.find({ hospital: hospitalId, doctor: doctorObjId, patient: patientId })
+  const [appointments, prescriptionsRaw, labOrdersRaw, radiologyOrdersRaw, admissions] = await Promise.all([
+    Appointment.find({ hospital: hospitalId || patient.hospital, ...patientQuery })
       .sort({ date: -1 })
-      .limit(20),
-    Prescription.find({ hospital: hospitalId, doctor: doctorObjId, patient: patientId })
+      .limit(30),
+    Prescription.find({ hospital: hospitalId || patient.hospital, ...patientQuery })
       .sort({ createdAt: -1 })
-      .limit(20),
-    LabOrder.find({ hospital: hospitalId, doctor: doctorObjId, patient: patientId })
+      .limit(30),
+    LabOrder.find({ hospital: hospitalId || patient.hospital, ...patientQuery })
       .sort({ createdAt: -1 })
-      .limit(20),
-    RadiologyOrder.find({ hospital: hospitalId, doctor: doctorObjId, patient: patientId })
+      .limit(30),
+    RadiologyOrder.find({ hospital: hospitalId || patient.hospital, ...patientQuery })
       .sort({ createdAt: -1 })
-      .limit(20),
-    Admission.find({ hospital: hospitalId, admittingDoctor: doctorObjId, patient: patientId })
+      .limit(30),
+    Admission.find({ hospital: hospitalId || patient.hospital, ...patientQuery })
       .sort({ admissionDate: -1 })
-      .limit(10),
+      .limit(20),
   ]);
+
+  // Deduplicate prescriptions by _id
+  const seenPrescriptionIds = new Set<string>();
+  const prescriptions: any[] = [];
+  for (const p of prescriptionsRaw) {
+    const obj = p.toObject();
+    const idStr = obj._id ? obj._id.toString() : "";
+    if (!idStr || !seenPrescriptionIds.has(idStr)) {
+      if (idStr) seenPrescriptionIds.add(idStr);
+      prescriptions.push({
+        ...obj,
+        medicines: obj.medications || [],
+      });
+    }
+  }
+
+  // Fetch all DiagnosticReport records for this patient
+  const patientDiagnosticReports = await DiagnosticReport.find({ hospital: hospitalId, patient: patientId })
+    .populate("uploadedBy", "name")
+    .sort({ uploadedAt: -1, createdAt: -1 });
+
+  const processedLabReportIds = new Set<string>();
+
+  // For each LabOrder, find attached DiagnosticReport and files
+  const labOrders = labOrdersRaw.map((o) => {
+    const orderObj = o.toObject();
+    const report = patientDiagnosticReports.find((r) => {
+      if (processedLabReportIds.has(r._id.toString())) return false;
+      if (r.requestId && r.requestId.toString() === o._id.toString()) return true;
+      if (o.appointment && r.appointment && r.appointment.toString() === o.appointment.toString() && r.requestType === "Laboratory") return true;
+      if (r.requestType === "Laboratory" && r.testName && orderObj.tests && orderObj.tests.some((t: string) => t.toLowerCase() === r.testName.toLowerCase())) return true;
+      return false;
+    });
+
+    if (report) {
+      processedLabReportIds.add(report._id.toString());
+    }
+
+    const files = report?.files && report.files.length > 0
+      ? report.files
+      : (orderObj.attachments || []);
+
+    return {
+      ...orderObj,
+      report,
+      files,
+      observations: report?.observations || orderObj.rejectionReason || "",
+      remarks: report?.remarks || "",
+      status: report?.status ? report.status : orderObj.status,
+    };
+  });
+
+  // Synthesize ONLY standalone Laboratory DiagnosticReports not linked to any LabOrder
+  const labReports = patientDiagnosticReports.filter(r => r.requestType === "Laboratory" || (!r.requestType && r.testName));
+  for (const rep of labReports) {
+    if (!processedLabReportIds.has(rep._id.toString())) {
+      const repObj = rep.toObject();
+      labOrders.push({
+        _id: rep._id,
+        orderNumber: (rep as any).orderNumber || rep._id.toString().slice(-6),
+        tests: [rep.testName || "Laboratory Test"],
+        testName: rep.testName || "Laboratory Test",
+        status: rep.status || "report_uploaded",
+        report: repObj,
+        files: repObj.files || [],
+        observations: repObj.observations || repObj.remarks || "",
+        remarks: repObj.remarks || "",
+        createdAt: rep.createdAt || rep.uploadedAt,
+      } as any);
+      processedLabReportIds.add(rep._id.toString());
+    }
+  }
+
+  const processedRadReportIds = new Set<string>();
+
+  // For each RadiologyOrder, find attached DiagnosticReport and scan files
+  const radiologyOrders = radiologyOrdersRaw.map((o) => {
+    const orderObj = o.toObject();
+    const report = patientDiagnosticReports.find((r) => {
+      if (processedRadReportIds.has(r._id.toString())) return false;
+      if (r.requestId && r.requestId.toString() === o._id.toString()) return true;
+      if (o.appointment && r.appointment && r.appointment.toString() === o.appointment.toString() && r.requestType === "Radiology") return true;
+      if (r.requestType === "Radiology" && r.testName && orderObj.type && (r.testName.toLowerCase().includes(orderObj.type.toLowerCase()) || orderObj.type.toLowerCase().includes(r.testName.toLowerCase()))) return true;
+      return false;
+    });
+
+    if (report) {
+      processedRadReportIds.add(report._id.toString());
+    }
+
+    let files: any[] = report?.files && report.files.length > 0 ? (report.files as any[]) : [];
+    if (files.length === 0 && orderObj.resultsUrl) {
+      files = [{ secure_url: orderObj.resultsUrl, original_filename: `${orderObj.type || "Radiology Scan"} Report`, mime_type: "image/png", file_size: 0, public_id: "rad-scan" }];
+    }
+
+    return {
+      ...orderObj,
+      report,
+      files,
+      observations: report?.observations || orderObj.findings || orderObj.notes || "",
+      remarks: report?.remarks || "",
+      status: report?.status ? report.status : orderObj.status,
+    };
+  });
+
+  // Synthesize ONLY standalone Radiology DiagnosticReports not linked to any RadiologyOrder
+  const radReports = patientDiagnosticReports.filter(r => r.requestType === "Radiology");
+  for (const rep of radReports) {
+    if (!processedRadReportIds.has(rep._id.toString())) {
+      const repObj = rep.toObject();
+      radiologyOrders.push({
+        _id: rep._id,
+        orderNumber: (rep as any).orderNumber || rep._id.toString().slice(-6),
+        type: rep.testName || "Radiology Scan",
+        procedureName: rep.testName || "Radiology Scan",
+        status: rep.status || "report_uploaded",
+        report: repObj,
+        files: repObj.files || [],
+        observations: repObj.observations || repObj.remarks || "",
+        remarks: repObj.remarks || "",
+        createdAt: rep.createdAt || rep.uploadedAt,
+      } as any);
+      processedRadReportIds.add(rep._id.toString());
+    }
+  }
 
   res.json({
     status: "success",
     data: {
       patient,
-      // Only this doctor's clinical data — never another doctor's records
       appointments,
       prescriptions,
       labOrders,

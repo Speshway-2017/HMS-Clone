@@ -45,13 +45,13 @@ export function LaboratoryTestProcessing() {
   };
 
   // Show active accepted/processing diagnostic requests regardless of payment status (paid, unpaid, or partially paid)
-  // Hide: Completed, Cancelled, Rejected
+  // Hide: Completed, Report Uploaded, Verified, Cancelled, Rejected
   const processingQueue = requests.filter(r => {
     const s = (r.status || "").toLowerCase();
 
-    if (s === "completed" || s === "rejected" || s === "cancelled") return false;
+    if (s === "completed" || s === "report_uploaded" || s === "verified" || s === "rejected" || s === "cancelled") return false;
 
-    const isActiveStatus = s === "accepted" || s === "processing" || s === "sample collection" || s === "quality check" || s === "pending" || s === "report_uploaded" || s === "verified";
+    const isActiveStatus = s === "accepted" || s === "processing" || s === "sample collection" || s === "quality check" || s === "pending";
 
     return isActiveStatus;
   });

@@ -355,12 +355,14 @@ export const getDoctorProfileMe = catchAsync(async (req: Request, res: Response)
 const updateDoctorMeSchema = z.object({
   name: z.string().optional(),
   phone: z.string().optional(),
+  photoUrl: z.string().optional(),
   specialization: z.string().optional(),
   qualification: z.string().optional(),
   licenseNo: z.string().optional(),
   bio: z.string().optional(),
   languages: z.string().optional(),
   consultationFee: z.string().optional(),
+  status: z.enum(DOCTOR_STATUSES).optional(),
   opExpiryLimit: z.coerce.number().min(0).optional(),
   workingHours: z.array(z.object({
     day: z.string(),

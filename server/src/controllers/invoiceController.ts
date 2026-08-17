@@ -489,12 +489,31 @@ export const getPendingOverdue = catchAsync(async (req: Request, res: Response) 
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const {
     dateFrom, dateTo, department, doctor, billingType, status,
-    branch, search, uhid, page, limit
+    branch: branchQuery, search, uhid, page, limit
   } = req.query as Record<string, string | undefined>;
+
+  // Resolve the active branch from the tenant context set by scopeToHospital middleware.
+  // This is the authoritative branch scope for the request (from X-Branch-ID header).
+  // If the admin has explicitly filtered by branch in the UI query param, use that.
+  // Otherwise fall back to the middleware-resolved branch so branch-scoped admins
+  // always see data for their active branch.
+  let activeBranch: string | undefined = branchQuery;
+  if (!activeBranch) {
+    const tenantBranchId = req.tenantContext?.branchId;
+    const isBranchScoped = req.tenantContext?.isBranchScoped;
+    if (isBranchScoped && tenantBranchId !== null && tenantBranchId !== undefined) {
+      // A specific branch is selected (e.g. Ameerpet or Madhapur)
+      activeBranch = tenantBranchId.toString();
+    } else if (isBranchScoped && tenantBranchId === null) {
+      // Main Hospital (branch: null) is explicitly selected
+      activeBranch = "main";
+    }
+    // If not branch-scoped ("all" mode), activeBranch stays undefined → hospital-wide query
+  }
 
   const result = await BillingService.getPendingInvoices(hospitalId, {
     dateFrom, dateTo, department, doctor, billingType, status,
-    branch, search, uhid,
+    branch: activeBranch, search, uhid,
     page: page ? parseInt(page) : 1,
     limit: limit ? parseInt(limit) : 20
   });
