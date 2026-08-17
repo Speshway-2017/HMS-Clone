@@ -318,7 +318,7 @@ class _PatientRecordDetailSheetState extends State<PatientRecordDetailSheet> wit
       itemCount: _prescriptions.length,
       itemBuilder: (context, idx) {
         final item = _prescriptions[idx];
-        final medicines = item['medicines'] as List? ?? [];
+        final medicines = (item['medications'] as List? ?? item['medicines'] as List? ?? []);
         final rxNo = item['prescriptionNumber']?.toString() ?? 'RX-${idx + 1}';
 
         return Container(
@@ -330,10 +330,13 @@ class _PatientRecordDetailSheetState extends State<PatientRecordDetailSheet> wit
             children: [
               Text('Prescription #$rxNo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.emerald600)),
               const SizedBox(height: 8),
-              ...medicines.map((m) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4.0),
-                    child: Text('• ${m['name']} — ${m['dosage']} (${m['frequency'] ?? '1-0-1'}, ${m['duration'] ?? '5 days'})', style: const TextStyle(fontSize: 12, color: AppColors.slate800)),
-                  )),
+              if (medicines.isEmpty)
+                const Text('No specific medications listed.', style: TextStyle(fontSize: 11.5, color: AppColors.slate500, fontStyle: FontStyle.italic))
+              else
+                ...medicines.map((m) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4.0),
+                      child: Text('• ${m['name']}${m['strength'] != null && m['strength'].toString().isNotEmpty ? ' (${m['strength']})' : ''} — ${m['dosage'] ?? '1 tab'} (${m['frequency'] ?? '1-0-1'}, ${m['duration'] ?? '5 days'})', style: const TextStyle(fontSize: 12, color: AppColors.slate800)),
+                    )),
             ],
           ),
         );
