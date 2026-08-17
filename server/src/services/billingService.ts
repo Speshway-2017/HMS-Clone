@@ -3,7 +3,7 @@ import { Invoice } from "../models/Invoice";
 import { IPBill } from "../models/IPBill";
 import { Payment } from "../models/Payment";
 import { IPBillPayment } from "../models/IPBillPayment";
-import { buildBranchQuery } from "../utils/branchQueryHelper";
+import { buildBranchQuery, combineBranchQuery } from "../utils/branchQueryHelper";
 import "../models/Patient";
 import "../models/Doctor";
 import "../models/Department";
@@ -67,10 +67,31 @@ export class BillingService {
     const pageLimit = Math.min(100, Math.max(1, Number(limitQ)));
     const skip = (pageNum - 1) * pageLimit;
 
+    // Normalise the branch filter:
+    // "main" is a sentinel meaning "Main Hospital" (branch: null in the DB).
+    // undefined means no branch filter (hospital-wide / "all branches" view).
+    // Any other string is treated as a real branch ObjectId.
+    let resolvedBranch: string | null | undefined;
+    if (branch === "main") {
+      resolvedBranch = null; // matches records with branch: null or branch: { $exists: false }
+    } else if (branch && branch !== "all") {
+      resolvedBranch = branch; // real ObjectId string
+    } else {
+      resolvedBranch = undefined; // no branch filter — hospital-wide
+    }
+
+    // Build a hospitalFilter object that buildBranchQuery understands.
+    // Only include `branch` in the object when we have a defined scope;
+    // omitting `branch` entirely means "match all branches".
+    const branchFilterBase: Record<string, any> = { hospital: hospitalId };
+    if (resolvedBranch !== undefined) {
+      branchFilterBase.branch = resolvedBranch;
+    }
+
     // ─────────────────────────────────────────────────────────────
     // 1. FETCH OP INVOICES
     // ─────────────────────────────────────────────────────────────
-    const opFilter: Record<string, any> = buildBranchQuery({ hospital: hospitalId, branch });
+    const opFilter: Record<string, any> = buildBranchQuery(branchFilterBase);
     if (billingType && billingType.toUpperCase() !== "IP") {
       opFilter.billingType = billingType.toUpperCase();
     }
@@ -188,7 +209,7 @@ export class BillingService {
 
     if (includeIP) {
       const ipFilter: Record<string, any> = {
-        ...buildBranchQuery({ hospital: hospitalId, branch }),
+        ...buildBranchQuery(branchFilterBase),
         status: { $ne: "Cancelled" }
       };
       if (dateFrom || dateTo) {
@@ -320,20 +341,22 @@ export class BillingService {
     const endOfToday = new Date(); endOfToday.setHours(23, 59, 59, 999);
 
     const [todayOpPayments, todayIpPayments] = await Promise.all([
-      Payment.find({
-        hospital: hospitalId,
-        $or: [
-          { paidAt: { $gte: startOfToday, $lte: endOfToday } },
-          { createdAt: { $gte: startOfToday, $lte: endOfToday } }
-        ]
-      }),
-      IPBillPayment.find({
-        hospital: hospitalId,
-        $or: [
-          { paidAt: { $gte: startOfToday, $lte: endOfToday } },
-          { createdAt: { $gte: startOfToday, $lte: endOfToday } }
-        ]
-      })
+      Payment.find(
+        combineBranchQuery(branchFilterBase, {
+          $or: [
+            { paidAt: { $gte: startOfToday, $lte: endOfToday } },
+            { createdAt: { $gte: startOfToday, $lte: endOfToday } }
+          ]
+        })
+      ),
+      IPBillPayment.find(
+        combineBranchQuery(branchFilterBase, {
+          $or: [
+            { paidAt: { $gte: startOfToday, $lte: endOfToday } },
+            { createdAt: { $gte: startOfToday, $lte: endOfToday } }
+          ]
+        })
+      )
     ]);
 
     const todayCollection = r2(
@@ -346,20 +369,22 @@ export class BillingService {
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
     const [monthOpPayments, monthIpPayments] = await Promise.all([
-      Payment.find({
-        hospital: hospitalId,
-        $or: [
-          { paidAt: { $gte: startOfMonth, $lte: endOfMonth } },
-          { createdAt: { $gte: startOfMonth, $lte: endOfMonth } }
-        ]
-      }),
-      IPBillPayment.find({
-        hospital: hospitalId,
-        $or: [
-          { paidAt: { $gte: startOfMonth, $lte: endOfMonth } },
-          { createdAt: { $gte: startOfMonth, $lte: endOfMonth } }
-        ]
-      })
+      Payment.find(
+        combineBranchQuery(branchFilterBase, {
+          $or: [
+            { paidAt: { $gte: startOfMonth, $lte: endOfMonth } },
+            { createdAt: { $gte: startOfMonth, $lte: endOfMonth } }
+          ]
+        })
+      ),
+      IPBillPayment.find(
+        combineBranchQuery(branchFilterBase, {
+          $or: [
+            { paidAt: { $gte: startOfMonth, $lte: endOfMonth } },
+            { createdAt: { $gte: startOfMonth, $lte: endOfMonth } }
+          ]
+        })
+      )
     ]);
 
     const monthCollection = r2(
