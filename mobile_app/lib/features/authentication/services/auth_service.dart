@@ -119,23 +119,78 @@ class AuthService {
     }
   }
 
+  /// Checks if phone number is already registered in the backend
+  Future<Map<String, dynamic>> checkPhone(String phone) async {
+    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+    if (cleanPhone.length < 7) {
+      return {'exists': false};
+    }
+
+    final url = Uri.parse('${ApiConfig.baseUrl}/auth/check-phone?phone=$cleanPhone');
+    try {
+      final response = await _client.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final Map<String, dynamic> dataObj = (decoded is Map<String, dynamic> && decoded['data'] is Map<String, dynamic>)
+            ? decoded['data']
+            : (decoded is Map<String, dynamic> ? decoded : {});
+
+        final bool exists = dataObj['exists'] == true || decoded['exists'] == true;
+        final bool hasPassword = dataObj['hasPassword'] == true || decoded['hasPassword'] == true;
+        final Map<String, dynamic> patient = (dataObj['patient'] is Map<String, dynamic>)
+            ? Map<String, dynamic>.from(dataObj['patient'])
+            : ((decoded['patient'] is Map<String, dynamic>) ? Map<String, dynamic>.from(decoded['patient']) : {});
+
+        if (exists) {
+          return {
+            'exists': true,
+            'hasPassword': hasPassword,
+            'patient': patient,
+          };
+        }
+      }
+    } catch (_) {}
+    return {'exists': false};
+  }
+
   /// Registers a new patient account against the MERN database endpoint.
-  Future<String?> register(String name, String email, String password, String phone) async {
+  Future<String?> register({
+    required String name,
+    required String email,
+    required String password,
+    required String phone,
+    int? age,
+    String? gender,
+    String? bloodGroup,
+    String? address,
+  }) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/auth/register');
     
     try {
+      final bodyMap = <String, dynamic>{
+        'name': name.trim(),
+        'email': email.trim().toLowerCase(),
+        'password': password,
+        'phone': phone.trim(),
+      };
+      if (age != null) bodyMap['age'] = age;
+      if (gender != null && gender.trim().isNotEmpty) bodyMap['gender'] = gender.trim();
+      if (bloodGroup != null && bloodGroup.trim().isNotEmpty) bodyMap['bloodGroup'] = bloodGroup.trim();
+      if (address != null && address.trim().isNotEmpty) bodyMap['address'] = address.trim();
+
       final response = await _client.post(
         url,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: jsonEncode({
-          'name': name.trim(),
-          'email': email.trim(),
-          'password': password,
-          'phone': phone.trim(),
-        }),
+        body: jsonEncode(bodyMap),
       ).timeout(const Duration(seconds: 10));
 
       final decoded = jsonDecode(response.body);
