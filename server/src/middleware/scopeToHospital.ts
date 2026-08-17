@@ -25,7 +25,7 @@ export async function scopeToHospital(req: Request, _res: Response, next: NextFu
           queryFilter: { hospital: hId, branch: null }
         };
       } else {
-        req.hospitalFilter = { branch: null };
+        req.hospitalFilter = { hospital: null as any, branch: null };
         req.tenantContext = {
           hospitalId: null as any,
           branchId: null,
