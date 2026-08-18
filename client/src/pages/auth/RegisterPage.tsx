@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useRegisterPatientUser } from "../../features/auth";
+import { isElectron } from "../../utils/electron";
 import { usePublicHospital } from "../../features/hospitals";
 import { useAuth } from "../../context/AuthContext";
 import { tokenStorage } from "../../lib/tokenStorage";
@@ -20,8 +21,6 @@ import {
   Eye,
   EyeOff,
   MapPin,
-  ShieldAlert,
-  FileText,
   UserPlus,
   Loader2
 } from "lucide-react";
@@ -29,6 +28,10 @@ import toast from "react-hot-toast";
 import { api } from "../../lib/api";
 
 export function RegisterPage() {
+  if (isElectron()) {
+    return <Navigate to="/login" replace />;
+  }
+
   const { data: hospital } = usePublicHospital();
   const hospitalName = hospital?.name || "HMS Enterprise";
   const logoUrl = hospital?.logoUrl;
@@ -51,12 +54,6 @@ export function RegisterPage() {
     gender: "Male",
     bloodGroup: "O+",
     address: "",
-    allergies: "",
-    insuranceProvider: "",
-    insurancePolicyNumber: "",
-    emergencyName: "",
-    emergencyPhone: "",
-    emergencyRelation: "",
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -87,12 +84,6 @@ export function RegisterPage() {
                 gender: p.gender || prev.gender,
                 bloodGroup: p.bloodGroup || prev.bloodGroup,
                 address: p.address || prev.address,
-                allergies: p.allergies || prev.allergies,
-                insuranceProvider: p.insuranceProvider || prev.insuranceProvider,
-                insurancePolicyNumber: p.insurancePolicyNumber || prev.insurancePolicyNumber,
-                emergencyName: p.emergencyName || prev.emergencyName,
-                emergencyPhone: p.emergencyPhone || prev.emergencyPhone,
-                emergencyRelation: p.emergencyRelation || prev.emergencyRelation,
               }));
             }
           }
@@ -114,57 +105,45 @@ export function RegisterPage() {
     e.preventDefault();
     setError(null);
 
-    // Form Validations - Section 1 (Mandatory)
-    if (!formData.name.trim()) {
-      setError("Full Name is required (Section 1).");
+    // Form Validations for every field
+    if (!formData.name.trim() || formData.name.trim().length < 2) {
+      setError("Full Name is required and must be at least 2 characters long.");
       return;
     }
-    if (!formData.email.trim()) {
-      setError("Email address is required (Section 1).");
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.email.trim() || !emailRegex.test(formData.email.trim())) {
+      setError("Please enter a valid email address (e.g. user@example.com).");
       return;
     }
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters long (Section 1).");
+    if (!formData.password || formData.password.length < 6) {
+      setError("Password must be at least 6 characters long.");
       return;
     }
     if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match (Section 1).");
+      setError("Passwords do not match. Please verify your confirm password.");
       return;
     }
 
-    // Form Validations - Section 2 (Mandatory)
-    if (!formData.phone.trim()) {
-      setError("Phone Number is required (Section 2).");
+    const cleanPhone = formData.phone.replace(/\D/g, "");
+    if (!formData.phone.trim() || cleanPhone.length !== 10) {
+      setError("Phone Number must be exactly 10 digits.");
       return;
     }
-    if (!formData.age || isNaN(parseInt(formData.age, 10)) || parseInt(formData.age, 10) < 0) {
-      setError("Valid Age is required (Section 2).");
+    const ageVal = parseInt(formData.age, 10);
+    if (!formData.age || isNaN(ageVal) || ageVal < 0 || ageVal > 120) {
+      setError("Please enter a valid age between 0 and 120 years.");
       return;
     }
-    if (!formData.gender.trim()) {
-      setError("Gender selection is required (Section 2).");
+    if (!formData.gender.trim() || !["Male", "Female", "Other"].includes(formData.gender)) {
+      setError("Please select a valid gender option.");
       return;
     }
-    if (!formData.bloodGroup.trim()) {
-      setError("Blood Group selection is required (Section 2).");
+    if (!formData.bloodGroup.trim() || !["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"].includes(formData.bloodGroup)) {
+      setError("Please select a valid blood group.");
       return;
     }
-    if (!formData.address.trim()) {
-      setError("Residential Address is required (Section 2).");
-      return;
-    }
-
-    // Form Validations - Section 3 (Mandatory)
-    if (!formData.emergencyName.trim()) {
-      setError("Emergency Contact Name is required (Section 3).");
-      return;
-    }
-    if (!formData.emergencyPhone.trim()) {
-      setError("Emergency Contact Phone Number is required (Section 3).");
-      return;
-    }
-    if (!formData.emergencyRelation.trim()) {
-      setError("Emergency Contact Relationship is required (Section 3).");
+    if (!formData.address.trim() || formData.address.trim().length < 3) {
+      setError("Residential Address is required and must be at least 3 characters long.");
       return;
     }
 
@@ -178,14 +157,6 @@ export function RegisterPage() {
         gender: formData.gender,
         bloodGroup: formData.bloodGroup,
         address: formData.address.trim(),
-        allergies: formData.allergies.trim(),
-        insuranceProvider: formData.insuranceProvider.trim(),
-        insurancePolicyNumber: formData.insurancePolicyNumber.trim(),
-        emergencyContact: {
-          name: formData.emergencyName.trim(),
-          phone: formData.emergencyPhone.trim(),
-          relation: formData.emergencyRelation.trim(),
-        },
       };
 
       const result = await registerMutation.mutateAsync(payload);
@@ -404,9 +375,14 @@ export function RegisterPage() {
                         type="tel"
                         name="phone"
                         required
+                        maxLength={10}
+                        pattern="\d{10}"
                         value={formData.phone}
-                        onChange={handleChange}
-                        placeholder="+91 98765 43210"
+                        onChange={(e) => {
+                          const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
+                          setFormData((prev) => ({ ...prev, phone: digitsOnly }));
+                        }}
+                        placeholder="10-digit mobile number"
                         className="w-full rounded-lg border border-slate-300 pl-9 pr-9 py-2 text-xs font-medium outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
                       />
                       <Phone className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
@@ -477,103 +453,7 @@ export function RegisterPage() {
                         placeholder="House / Street, City, Pincode"
                         className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2 text-xs font-medium outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
                       />
-                      <MapPin className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
                     </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 3: Emergency Contact */}
-              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-card space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-950 flex items-center gap-2 border-b border-slate-100 pb-2">
-                  <ShieldAlert className="h-4 w-4 text-amber-600" />
-                  3. Emergency Contact Person
-                </h3>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <div>
-                    <label className="block mb-1 text-xs font-bold text-slate-700">Contact Name *</label>
-                    <input
-                      type="text"
-                      name="emergencyName"
-                      required
-                      value={formData.emergencyName}
-                      onChange={handleChange}
-                      placeholder="Kin / Guardian Name"
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block mb-1 text-xs font-bold text-slate-700">Contact Phone *</label>
-                    <input
-                      type="tel"
-                      name="emergencyPhone"
-                      required
-                      value={formData.emergencyPhone}
-                      onChange={handleChange}
-                      placeholder="Emergency Mobile No."
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block mb-1 text-xs font-bold text-slate-700">Relationship *</label>
-                    <input
-                      type="text"
-                      name="emergencyRelation"
-                      required
-                      value={formData.emergencyRelation}
-                      onChange={handleChange}
-                      placeholder="e.g. Spouse / Father / Sister"
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 4: Medical History & Insurance */}
-              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-card space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-950 flex items-center gap-2 border-b border-slate-100 pb-2">
-                  <FileText className="h-4 w-4 text-teal-600" />
-                  4. Allergies & Insurance Details (Optional)
-                </h3>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="block mb-1 text-xs font-bold text-slate-700">Known Allergies / Medical Conditions</label>
-                    <input
-                      type="text"
-                      name="allergies"
-                      value={formData.allergies}
-                      onChange={handleChange}
-                      placeholder="e.g. Penicillin, Asthma, Diabetes"
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block mb-1 text-xs font-bold text-slate-700">Insurance Provider</label>
-                    <input
-                      type="text"
-                      name="insuranceProvider"
-                      value={formData.insuranceProvider}
-                      onChange={handleChange}
-                      placeholder="e.g. Star Health / Max Bupa"
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block mb-1 text-xs font-bold text-slate-700">Insurance Policy / Card Number</label>
-                    <input
-                      type="text"
-                      name="insurancePolicyNumber"
-                      value={formData.insurancePolicyNumber}
-                      onChange={handleChange}
-                      placeholder="e.g. POL-987654321"
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
-                    />
                   </div>
                 </div>
               </div>

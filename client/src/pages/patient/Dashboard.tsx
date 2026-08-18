@@ -586,13 +586,13 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
         age: patient.age !== null && patient.age !== undefined ? String(patient.age) : "",
         gender: patient.gender || "Male",
         bloodGroup: patient.bloodGroup || "O+",
-        allergies: patient.allergies || "None",
+        allergies: patient.allergies || "",
         address: patient.address || "",
         emergencyContactName: patient.emergencyContact?.name || (patient as any).emergencyContactName || "",
         emergencyContactPhone: patient.emergencyContact?.phone || (patient as any).emergencyContactPhone || "",
-        emergencyContactRelation: patient.emergencyContact?.relation || "Parent / Spouse",
-        insuranceProvider: patient.insuranceProvider || "Star Health Insurance",
-        insurancePolicyNumber: patient.insurancePolicyNumber || "SH-8892-4410"
+        emergencyContactRelation: patient.emergencyContact?.relation || "",
+        insuranceProvider: patient.insuranceProvider || "",
+        insurancePolicyNumber: patient.insurancePolicyNumber || ""
       });
     }
   }, [patient, user]);
@@ -939,25 +939,58 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
   // Notifications State
   const [notificationFilter, setNotificationFilter] = useState<"all" | "reminders" | "alerts" | "updates">("all");
 
-  // Handlers
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validations
+    if (!profileForm.name || profileForm.name.trim().length < 2) {
+      toast.error("Full Name must be at least 2 characters long.");
+      return;
+    }
+
+    const cleanPhone = (profileForm.phone || "").replace(/\D/g, "");
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      toast.error("Personal Phone Number must be exactly 10 digits.");
+      return;
+    }
+
+    if (profileForm.emergencyContactPhone && profileForm.emergencyContactPhone.trim()) {
+      const cleanEmergencyPhone = profileForm.emergencyContactPhone.replace(/\D/g, "");
+      if (cleanEmergencyPhone.length !== 10) {
+        toast.error("Emergency Contact Phone Number must be exactly 10 digits.");
+        return;
+      }
+    }
+
+    if (profileForm.age) {
+      const ageNum = Number(profileForm.age);
+      if (isNaN(ageNum) || ageNum < 0 || ageNum > 120) {
+        toast.error("Age must be between 0 and 120 years.");
+        return;
+      }
+    }
+
+    if (!profileForm.address || profileForm.address.trim().length < 3) {
+      toast.error("Residential Address must be at least 3 characters long.");
+      return;
+    }
+
     try {
       const payload = {
-        name: profileForm.name,
-        email: profileForm.email,
-        phone: profileForm.phone,
+        name: profileForm.name.trim(),
+        email: profileForm.email.trim(),
+        phone: cleanPhone,
         age: profileForm.age ? Number(profileForm.age) : null,
         gender: profileForm.gender,
         bloodGroup: profileForm.bloodGroup,
-        allergies: profileForm.allergies,
-        address: profileForm.address,
-        insuranceProvider: profileForm.insuranceProvider,
-        insurancePolicyNumber: profileForm.insurancePolicyNumber,
+        allergies: profileForm.allergies.trim(),
+        address: profileForm.address.trim(),
+        insuranceProvider: profileForm.insuranceProvider.trim(),
+        insurancePolicyNumber: profileForm.insurancePolicyNumber.trim(),
         emergencyContact: {
-          name: profileForm.emergencyContactName,
-          phone: profileForm.emergencyContactPhone,
-          relation: profileForm.emergencyContactRelation
+          name: profileForm.emergencyContactName.trim(),
+          phone: profileForm.emergencyContactPhone.replace(/\D/g, "").slice(0, 10),
+          relation: profileForm.emergencyContactRelation.trim()
         }
       };
 
@@ -1907,10 +1940,16 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Phone Number *</label>
                 <input
-                  type="text"
+                  type="tel"
                   disabled={!isEditingProfile}
+                  maxLength={10}
+                  pattern="\d{10}"
                   value={profileForm.phone}
-                  onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                  onChange={(e) => {
+                    const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    setProfileForm({ ...profileForm, phone: digitsOnly });
+                  }}
+                  placeholder="10-digit mobile number"
                   className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${isEditingProfile ? "border-navy-500 bg-white focus:ring-2 focus:ring-navy-200" : "bg-slate-50 text-slate-700"
                     }`}
                 />
@@ -1992,6 +2031,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     disabled={!isEditingProfile}
                     value={profileForm.emergencyContactName}
                     onChange={(e) => setProfileForm({ ...profileForm, emergencyContactName: e.target.value })}
+                    placeholder="Kin / Guardian Name"
                     className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
                       }`}
                   />
@@ -1999,10 +2039,16 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Emergency Phone Number</label>
                   <input
-                    type="text"
+                    type="tel"
                     disabled={!isEditingProfile}
+                    maxLength={10}
+                    pattern="\d{10}"
                     value={profileForm.emergencyContactPhone}
-                    onChange={(e) => setProfileForm({ ...profileForm, emergencyContactPhone: e.target.value })}
+                    onChange={(e) => {
+                      const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
+                      setProfileForm({ ...profileForm, emergencyContactPhone: digitsOnly });
+                    }}
+                    placeholder="10-digit emergency mobile number"
                     className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
                       }`}
                   />
@@ -2035,6 +2081,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     disabled={!isEditingProfile}
                     value={profileForm.insuranceProvider}
                     onChange={(e) => setProfileForm({ ...profileForm, insuranceProvider: e.target.value })}
+                    placeholder="e.g. Star Health / Max Bupa"
                     className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
                       }`}
                   />
@@ -2046,6 +2093,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     disabled={!isEditingProfile}
                     value={profileForm.insurancePolicyNumber}
                     onChange={(e) => setProfileForm({ ...profileForm, insurancePolicyNumber: e.target.value })}
+                    placeholder="e.g. POL-987654321"
                     className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
                       }`}
                   />

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { isElectron } from "../../utils/electron";
 import toast from "react-hot-toast";
 import DepthParallaxWords from "../../components/ui/DepthParallaxWords";
 import GlowHover, { GlowHoverCard, GlowHoverItem } from "../../components/ui/GlowHoverCard";
@@ -82,6 +83,10 @@ function getEmbeddableMapUrl(url: string, fallbackAddress: string): string {
 }
 
 export function LandingPage() {
+  if (isElectron()) {
+    return <Navigate to="/login" replace />;
+  }
+
   const { data: hospital } = usePublicHospital();
   const hospitalName = hospital?.name || "Sunrise General Hospital";
   const logoUrl = hospital?.logoUrl;

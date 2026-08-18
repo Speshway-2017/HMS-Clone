@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { ROLE_HOME_PATH } from "../../types/auth";
 import { usePublicHospital } from "../../features/hospitals";
 import { ShieldCheck, Lock, Mail, Activity, ArrowLeft, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { isElectron } from "../../utils/electron";
 
 export function LoginPage() {
   const { user, login } = useAuth();
@@ -25,6 +26,12 @@ export function LoginPage() {
         document.getElementsByTagName("head")[0].appendChild(favicon);
       }
       favicon.href = logoUrl;
+    }
+
+    const blockedMsg = sessionStorage.getItem("desktop_blocked_message");
+    if (blockedMsg) {
+      setError(blockedMsg);
+      sessionStorage.removeItem("desktop_blocked_message");
     }
   }, [hospitalName, logoUrl]);
 
@@ -81,8 +88,8 @@ export function LoginPage() {
       // Trigger green tick mark animation
       setIsSuccess(true);
 
-      // Wait 2.2 seconds for full spin and green tick mark animation to show
-      await new Promise((resolve) => setTimeout(resolve, 2200));
+      // Short delay for success tick mark animation
+      await new Promise((resolve) => setTimeout(resolve, 1200));
 
       if (sessionStorage.getItem("pendingAppointmentDraft") && loggedInUser.role === "patient") {
         navigate("/patient?tab=appointments", { replace: true });
@@ -91,8 +98,11 @@ export function LoginPage() {
 
       const targetPath = redirectParam || (location.state as { from?: string })?.from || ROLE_HOME_PATH[loggedInUser.role] || "/";
       navigate(targetPath, { replace: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed.");
+    } catch (err: any) {
+      console.error("[HMS Login] Authentication failed:", err);
+      const msg = err?.message || (err instanceof Error ? err.message : "Login failed.");
+      setError(msg);
+    } finally {
       setIsSubmitting(false);
       setIsSuccess(false);
     }
@@ -107,18 +117,33 @@ export function LoginPage() {
         <div className="absolute -left-10 bottom-10 h-48 w-48 rounded-full bg-blue-400/15 blur-2xl pointer-events-none" />
 
         {/* Logo Branding */}
-        <Link to="/" className="flex items-center gap-3 text-lg font-extrabold tracking-tight relative z-10">
-          {logoUrl ? (
-            <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover shadow-sm" />
-          ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-sm shadow-md border border-blue-400/20">
-              <Activity className="h-4 w-4 text-blue-200" />
-            </div>
-          )}
-          <span className="bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
-            {hospitalName}
-          </span>
-        </Link>
+        {isElectron() ? (
+          <div className="flex items-center gap-3 text-lg font-extrabold tracking-tight relative z-10">
+            {logoUrl ? (
+              <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover shadow-sm" />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-sm shadow-md border border-blue-400/20">
+                <Activity className="h-4 w-4 text-blue-200" />
+              </div>
+            )}
+            <span className="bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
+              {hospitalName}
+            </span>
+          </div>
+        ) : (
+          <Link to="/" className="flex items-center gap-3 text-lg font-extrabold tracking-tight relative z-10">
+            {logoUrl ? (
+              <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover shadow-sm" />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-sm shadow-md border border-blue-400/20">
+                <Activity className="h-4 w-4 text-blue-200" />
+              </div>
+            )}
+            <span className="bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
+              {hospitalName}
+            </span>
+          </Link>
+        )}
 
         {/* Marketing rotating text */}
         <div className="my-auto space-y-6 relative z-10 py-4">
@@ -184,12 +209,21 @@ export function LoginPage() {
           <div className="mx-auto w-full max-w-[420px] space-y-8">
             {/* Header branding for mobile / small screen */}
             <div className="text-center space-y-2 lg:text-left">
-              <Link to="/" className="inline-flex lg:hidden items-center gap-2.5 text-xl font-extrabold text-blue-900 justify-center">
-                {logoUrl && (
-                  <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover" />
-                )}
-                <span>{hospitalName}</span>
-              </Link>
+              {isElectron() ? (
+                <div className="inline-flex lg:hidden items-center gap-2.5 text-xl font-extrabold text-blue-900 justify-center">
+                  {logoUrl && (
+                    <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover" />
+                  )}
+                  <span>{hospitalName}</span>
+                </div>
+              ) : (
+                <Link to="/" className="inline-flex lg:hidden items-center gap-2.5 text-xl font-extrabold text-blue-900 justify-center">
+                  {logoUrl && (
+                    <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover" />
+                  )}
+                  <span>{hospitalName}</span>
+                </Link>
+              )}
               <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight block">
                 <SpringScaleIn delay={100} stagger={80}>
                   Sign In to Dashboard
@@ -273,26 +307,30 @@ export function LoginPage() {
                 </div>
               </form>
 
-              {/* Patient Register link */}
-              <div className="mt-4 border-t border-slate-100 pt-4 text-center">
-                <p className="text-xs text-slate-500 font-medium">
-                  New Patient?{" "}
-                  <Link to="/register" className="font-bold text-blue-600 hover:text-blue-800 hover:underline">
-                    Register for Patient Portal & Appointments →
-                  </Link>
-                </p>
-              </div>
+              {/* Patient Register link (web only) */}
+              {!isElectron() && (
+                <div className="mt-4 border-t border-slate-100 pt-4 text-center">
+                  <p className="text-xs text-slate-500 font-medium">
+                    New Patient?{" "}
+                    <Link to="/register" className="font-bold text-blue-600 hover:text-blue-800 hover:underline">
+                      Register for Patient Portal & Appointments →
+                    </Link>
+                  </p>
+                </div>
+              )}
             </motion.div>
 
-            {/* Back button */}
-            <div className="text-center">
-              <Link
-                to="/"
-                className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4" /> Back to Marketing Portal
-              </Link>
-            </div>
+            {/* Back button (web only) */}
+            {!isElectron() && (
+              <div className="text-center">
+                <Link
+                  to="/"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors"
+                >
+                  <ArrowLeft className="h-4 w-4" /> Back to Marketing Portal
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>
