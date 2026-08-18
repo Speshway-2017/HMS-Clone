@@ -74,6 +74,7 @@ function createMainWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      devTools: false,
       preload: path.join(__dirname, "preload.js"),
     },
   });
@@ -127,6 +128,30 @@ function createMainWindow() {
     }
   });
 
+  // ── Security: Disable DevTools Shortcuts, Context Menu & Auto-Close ──
+  mainWindow.webContents.on("before-input-event", (event, input) => {
+    if (input.key === "F12") {
+      event.preventDefault();
+      return;
+    }
+    const ctrlOrCmd = input.control || input.meta;
+    if (ctrlOrCmd && (input.shift || input.alt)) {
+      const key = input.key.toUpperCase();
+      if (key === "I" || key === "J" || key === "C") {
+        event.preventDefault();
+        return;
+      }
+    }
+  });
+
+  mainWindow.webContents.on("context-menu", (e) => {
+    e.preventDefault();
+  });
+
+  mainWindow.webContents.on("devtools-opened", () => {
+    mainWindow.webContents.closeDevTools();
+  });
+
   // ── Fallback: show window after 8s if ready-to-show never fires ───────────
   const showFallbackTimer = setTimeout(() => {
     if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
@@ -144,9 +169,6 @@ function createMainWindow() {
     destroySplash();
     mainWindow.show();
     mainWindow.focus();
-    if (IS_DEV) {
-      mainWindow.webContents.openDevTools({ mode: "detach" });
-    }
   });
 
   mainWindow.on("close", (e) => {
@@ -265,16 +287,6 @@ function buildMenu() {
           accelerator: "CmdOrCtrl+0",
           click: () => mainWindow && mainWindow.webContents.setZoomFactor(1),
         },
-        { type: "separator" },
-        ...(IS_DEV
-          ? [
-              {
-                label: "Developer Tools",
-                accelerator: "CmdOrCtrl+Shift+I",
-                click: () => mainWindow && mainWindow.webContents.toggleDevTools(),
-              },
-            ]
-          : []),
       ],
     },
     {
@@ -332,12 +344,6 @@ function buildMenu() {
                 "Version 1.0.0\n\nA comprehensive hospital management platform.\n\nRoles: Admin · Doctor · Receptionist · Laboratory · Pharmacy · Accountant",
               buttons: ["OK"],
             }),
-        },
-        { type: "separator" },
-        {
-          label: "Open DevTools",
-          accelerator: "CmdOrCtrl+Shift+I",
-          click: () => mainWindow && mainWindow.webContents.toggleDevTools(),
         },
       ],
     },
