@@ -10,6 +10,8 @@ import {
   markNoShow,
   getInpatients,
   addInpatientNotes,
+  addInpatientLabOrders,
+  addInpatientRadiologyOrders,
   getCompletedConsultations,
   getPrescriptions,
   createPrescription,
@@ -73,6 +75,8 @@ router.get("/inpatients/:id/details", getInpatientDetails);
 router.post("/inpatients/:id/medications", addInpatientMedication);
 router.put("/inpatients/:id/medications", updateInpatientMedication);
 router.post("/inpatients/:id/vitals", saveInpatientVitals);
+router.post("/inpatients/:id/lab-orders", addInpatientLabOrders);
+router.post("/inpatients/:id/radiology-orders", addInpatientRadiologyOrders);
 
 router.get("/consultations/completed", getCompletedConsultations);
 

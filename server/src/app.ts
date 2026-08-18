@@ -143,6 +143,7 @@ app.use("/api/v1/uploads", uploadLimiter, uploadRoutes);
 
 // Register doctor dashboard first to prevent prefix matching collision on /api/v1/doctors
 app.use("/api/v1/doctors/dashboard", doctorDashboardRoutes);
+app.use("/api/v1/doctor-dashboard", doctorDashboardRoutes);
 app.use("/api/v1/doctors", doctorRoutes);
 
 app.use("/api/v1/staff", staffRoutes);
