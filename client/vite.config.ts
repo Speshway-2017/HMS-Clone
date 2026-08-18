@@ -15,6 +15,11 @@ export default defineConfig(({ mode }) => {
           target: apiUrl,
           changeOrigin: true,
         },
+        "/socket.io": {
+          target: apiUrl,
+          ws: true,
+          changeOrigin: true,
+        },
       },
     },
   };

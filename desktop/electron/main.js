@@ -74,6 +74,7 @@ function createMainWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      devTools: false,
       preload: path.join(__dirname, "preload.js"),
     },
   });
@@ -107,7 +108,7 @@ function createMainWindow() {
     console.log(`[HMS] Retrying load in ${delay}ms (attempt ${loadRetryCount}/${MAX_RETRIES})...`);
     setTimeout(() => {
       if (pageLoaded || !mainWindow || mainWindow.isDestroyed()) return;
-      mainWindow.loadURL(VITE_URL).catch((err) =>
+      mainWindow.loadURL(`${VITE_URL}/login`).catch((err) =>
         console.error("[HMS] Retry loadURL failed:", err.message)
       );
     }, delay);
@@ -127,6 +128,30 @@ function createMainWindow() {
     }
   });
 
+  // ── Security: Disable DevTools Shortcuts, Context Menu & Auto-Close ──
+  mainWindow.webContents.on("before-input-event", (event, input) => {
+    if (input.key === "F12") {
+      event.preventDefault();
+      return;
+    }
+    const ctrlOrCmd = input.control || input.meta;
+    if (ctrlOrCmd && (input.shift || input.alt)) {
+      const key = input.key.toUpperCase();
+      if (key === "I" || key === "J" || key === "C") {
+        event.preventDefault();
+        return;
+      }
+    }
+  });
+
+  mainWindow.webContents.on("context-menu", (e) => {
+    e.preventDefault();
+  });
+
+  mainWindow.webContents.on("devtools-opened", () => {
+    mainWindow.webContents.closeDevTools();
+  });
+
   // ── Fallback: show window after 8s if ready-to-show never fires ───────────
   const showFallbackTimer = setTimeout(() => {
     if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
@@ -144,15 +169,25 @@ function createMainWindow() {
     destroySplash();
     mainWindow.show();
     mainWindow.focus();
-    if (IS_DEV) {
-      mainWindow.webContents.openDevTools({ mode: "detach" });
-    }
   });
 
   mainWindow.on("close", (e) => {
-    if (!isQuitting) {
-      e.preventDefault();
-      mainWindow.hide();
+    if (isQuitting) return;
+
+    e.preventDefault();
+
+    const choice = dialog.showMessageBoxSync(mainWindow, {
+      type: "question",
+      buttons: ["Cancel", "Yes, Exit"],
+      defaultId: 1,
+      cancelId: 0,
+      title: "Exit HMS",
+      message: "Are you sure you want to close Hospital Management System?",
+      noLink: true,
+    });
+
+    if (choice === 1) {
+      quitApp();
     }
   });
 
@@ -252,16 +287,6 @@ function buildMenu() {
           accelerator: "CmdOrCtrl+0",
           click: () => mainWindow && mainWindow.webContents.setZoomFactor(1),
         },
-        { type: "separator" },
-        ...(IS_DEV
-          ? [
-              {
-                label: "Developer Tools",
-                accelerator: "CmdOrCtrl+Shift+I",
-                click: () => mainWindow && mainWindow.webContents.toggleDevTools(),
-              },
-            ]
-          : []),
       ],
     },
     {
@@ -319,12 +344,6 @@ function buildMenu() {
                 "Version 1.0.0\n\nA comprehensive hospital management platform.\n\nRoles: Admin · Doctor · Receptionist · Laboratory · Pharmacy · Accountant",
               buttons: ["OK"],
             }),
-        },
-        { type: "separator" },
-        {
-          label: "Open DevTools",
-          accelerator: "CmdOrCtrl+Shift+I",
-          click: () => mainWindow && mainWindow.webContents.toggleDevTools(),
         },
       ],
     },
@@ -562,25 +581,64 @@ function pollUntilReady(url, label, timeout = 60000, interval = 800) {
   return new Promise((resolve) => {
     const start = Date.now();
     function check() {
-      http.get(url, (res) => {
-        console.log(`[HMS] ${label} ready (HTTP ${res.statusCode})`);
-        resolve(true);
-      }).on("error", () => {
+      const req = http.get(url, { timeout: 2000 }, (res) => {
+        let body = "";
+        res.on("data", (chunk) => { body += chunk; });
+        res.on("end", () => {
+          if (res.statusCode === 200) {
+            console.log(`[HMS] ✓ ${label} ready (HTTP 200)`);
+            resolve(true);
+          } else {
+            retry();
+          }
+        });
+      });
+      req.on("error", retry);
+      req.on("timeout", () => { req.destroy(); retry(); });
+
+      function retry() {
         if (Date.now() - start > timeout) {
-          console.warn(`[HMS] ${label} timed out — proceeding anyway`);
+          console.warn(`[HMS] ⚠️ ${label} timed out — proceeding anyway`);
           resolve(false);
         } else {
           setTimeout(check, interval);
         }
-      });
+      }
     }
     check();
   });
 }
 
+function isBackendHealthy() {
+  return new Promise((resolve) => {
+    const req = http.get(`http://127.0.0.1:${SERVER_PORT}/api/v1/health`, { timeout: 2500 }, (res) => {
+      let data = "";
+      res.on("data", (chunk) => { data += chunk; });
+      res.on("end", () => {
+        resolve(res.statusCode === 200 && data.includes("ok"));
+      });
+    });
+    req.on("error", () => resolve(false));
+    req.on("timeout", () => { req.destroy(); resolve(false); });
+  });
+}
+
 function isPortOpen(port) {
   return new Promise((resolve) => {
-    http.get(`http://localhost:${port}`, (res) => resolve(true)).on("error", () => resolve(false));
+    const req = http.get(`http://127.0.0.1:${port}`, { timeout: 1500 }, () => resolve(true));
+    req.on("error", () => resolve(false));
+    req.on("timeout", () => { req.destroy(); resolve(false); });
+  });
+}
+
+function clearStalePort(port) {
+  return new Promise((resolve) => {
+    if (process.platform === "win32") {
+      const cmd = `for /f "tokens=5" %a in ('netstat -aon ^| findstr :${port} ^| findstr LISTENING') do taskkill /f /pid %a`;
+      spawn("cmd.exe", ["/c", cmd], { shell: true }).on("exit", () => setTimeout(resolve, 800));
+    } else {
+      spawn("fuser", ["-k", `${port}/tcp`], { shell: true }).on("exit", () => setTimeout(resolve, 800));
+    }
   });
 }
 
@@ -647,30 +705,37 @@ app.whenReady().then(async () => {
 
   createSplashWindow();
 
-  const [serverRunning, clientRunning] = await Promise.all([
-    isPortOpen(SERVER_PORT),
+  const [serverHealthy, clientRunning] = await Promise.all([
+    isBackendHealthy(),
     isPortOpen(CLIENT_PORT),
   ]);
 
-  console.log(`[HMS] Server (port ${SERVER_PORT}): ${serverRunning ? "already running" : "not running"}`);
-  console.log(`[HMS] Client (port ${CLIENT_PORT}): ${clientRunning ? "already running" : "not running"}`);
+  console.log(`[HMS] Server Health Endpoint (http://127.0.0.1:${SERVER_PORT}/api/v1/health): ${serverHealthy ? "HEALTHY" : "NOT HEALTHY"}`);
+  console.log(`[HMS] Client Frontend (port ${CLIENT_PORT}): ${clientRunning ? "already running" : "not running"}`);
 
   try {
-    if (!serverRunning) {
-      console.log("[HMS] Spawning backend server...");
+    if (!serverHealthy) {
+      console.log(`[HMS] Clearing any stale process on port ${SERVER_PORT}...`);
+      await clearStalePort(SERVER_PORT);
+      console.log("[HMS] Spawning fresh Express backend server process...");
       await startBackendServer();
-      await pollUntilReady(`${SERVER_URL}/api/v1/health`, "Backend");
     } else {
-      console.log("[HMS] Backend already running — skipping spawn.");
+      console.log("[HMS] Express backend is already running and healthy.");
+    }
+
+    console.log("[HMS] Polling backend health endpoint until fully ready...");
+    const backendReady = await pollUntilReady(`http://127.0.0.1:${SERVER_PORT}/api/v1/health`, "Backend Express API");
+    if (backendReady) {
+      console.log("[HMS] ✓ Express Backend started & health check verified! API Base URL: http://127.0.0.1:5000/api/v1");
     }
 
     if (IS_DEV) {
       if (!clientRunning) {
-        console.log("[HMS] Spawning frontend dev server...");
+        console.log("[HMS] Spawning Vite frontend dev server...");
         await startFrontendDevServer();
         await pollUntilReady(VITE_URL, "Frontend Vite");
       } else {
-        console.log("[HMS] Frontend dev server already running — skipping spawn.");
+        console.log("[HMS] Frontend dev server already running.");
       }
     } else {
       // PRODUCTION MODE: Start embedded static client HTTP server for client/dist
@@ -685,11 +750,11 @@ app.whenReady().then(async () => {
 
   const win = createMainWindow();
 
-  const loadDelay = (serverRunning && clientRunning) ? 0 : 1500;
-  console.log(`[HMS] Loading URL in ${loadDelay}ms: ${VITE_URL}`);
+  const loadDelay = (serverHealthy && clientRunning) ? 0 : 800;
+  console.log(`[HMS] Loading URL in ${loadDelay}ms: ${VITE_URL}/login`);
   setTimeout(() => {
     if (win && !win.isDestroyed()) {
-      win.loadURL(VITE_URL).catch((err) => {
+      win.loadURL(`${VITE_URL}/login`).catch((err) => {
         console.error("[HMS] Initial loadURL failed:", err.message);
       });
     }

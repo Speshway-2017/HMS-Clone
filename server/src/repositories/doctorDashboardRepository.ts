@@ -98,12 +98,34 @@ export class DoctorDashboardRepository {
       doctor: { $in: docIds },
       status: { $in: ["waiting", "called"] },
     });
-    return await Queue.find(query)
+    const queueItems = await Queue.find(query)
       .populate("patient", "name uhid age gender phone")
       .populate("doctor", "name")
       .populate("department", "name")
       .populate("appointment")
       .sort({ createdAt: 1 });
+
+    if (queueItems.length > 0) {
+      return queueItems;
+    }
+
+    // Fallback: If Queue collection is empty, automatically construct live queue items from checked_in / waiting / scheduled today's appointments
+    const todayAppts = await this.getTodayAppointments(filterOrId, doctorId);
+    const activeAppts = todayAppts.filter((a: any) =>
+      ["checked_in", "waiting", "called", "in_consultation", "scheduled"].includes(a.status)
+    );
+
+    return activeAppts.map((a: any, idx: number) => ({
+      _id: a._id,
+      hospital: a.hospital,
+      patient: a.patient,
+      doctor: a.doctor,
+      department: a.department,
+      appointment: a,
+      tokenNumber: a.referenceId?.slice(-3) || `00${idx + 1}`,
+      status: a.status === "checked_in" ? "called" : (a.status === "in_consultation" ? "called" : "waiting"),
+      createdAt: a.createdAt || a.date || new Date(),
+    }));
   }
 
   // 3. Current Inpatients
