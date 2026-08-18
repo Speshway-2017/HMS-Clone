@@ -339,7 +339,10 @@ class _PatientRecordDetailScreenState extends State<PatientRecordDetailScreen> w
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(item['diagnosis']?.toString() ?? 'OPD Visit', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: AppColors.navy900)),
+                    Expanded(
+                      child: Text(item['diagnosis']?.toString() ?? 'OPD Visit', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: AppColors.navy900)),
+                    ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(color: AppColors.navy100, borderRadius: BorderRadius.circular(4)),
@@ -367,7 +370,10 @@ class _PatientRecordDetailScreenState extends State<PatientRecordDetailScreen> w
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(appt['diagnosis']?.toString() ?? 'OP Consultation', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: AppColors.navy900)),
+                    Expanded(
+                      child: Text(appt['diagnosis']?.toString() ?? 'OP Consultation', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: AppColors.navy900)),
+                    ),
+                    const SizedBox(width: 8),
                     Text(dateStr, style: const TextStyle(fontSize: 10.5, color: AppColors.slate500, fontWeight: FontWeight.bold)),
                   ],
                 ),
@@ -455,17 +461,24 @@ class _PatientRecordDetailScreenState extends State<PatientRecordDetailScreen> w
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.receipt_long_rounded, size: 18, color: AppColors.emerald600),
-                      const SizedBox(width: 6),
-                      Text('Prescription #$rxNo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.emerald600)),
-                    ],
+                  Expanded(
+                    child: Row(
+                      children: [
+                        const Icon(Icons.receipt_long_rounded, size: 18, color: AppColors.emerald600),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text('Prescription #$rxNo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.emerald600)),
+                        ),
+                      ],
+                    ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(color: AppColors.emerald50, borderRadius: BorderRadius.circular(6)),
-                    child: Text(diagnosis, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppColors.emerald600)),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: AppColors.emerald50, borderRadius: BorderRadius.circular(6)),
+                      child: Text(diagnosis, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppColors.emerald600)),
+                    ),
                   ),
                 ],
               ),
@@ -498,16 +511,18 @@ class _PatientRecordDetailScreenState extends State<PatientRecordDetailScreen> w
                             children: [
                               const Icon(Icons.medication_rounded, size: 16, color: AppColors.navy700),
                               const SizedBox(width: 8),
-                              Text(strength.isNotEmpty ? '$name ($strength)' : name, style: const TextStyle(fontSize: 13, color: AppColors.navy900, fontWeight: FontWeight.bold)),
+                              Expanded(
+                                child: Text(strength.isNotEmpty ? '$name ($strength)' : name, style: const TextStyle(fontSize: 13, color: AppColors.navy900, fontWeight: FontWeight.bold)),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 6),
-                          Row(
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
                             children: [
                               _buildPillChip('Dosage: $dosage', AppColors.navy100, AppColors.navy800),
-                              const SizedBox(width: 6),
                               _buildPillChip('Freq: $freq', AppColors.emerald50, AppColors.emerald600),
-                              const SizedBox(width: 6),
                               _buildPillChip('Dur: $dur', AppColors.slate200, AppColors.slate700),
                             ],
                           ),

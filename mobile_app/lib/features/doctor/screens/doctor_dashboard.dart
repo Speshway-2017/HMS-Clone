@@ -26,11 +26,13 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
   List<Map<String, dynamic>> _inpatients = [];
   List<Map<String, dynamic>> _myPatients = [];
   List<Map<String, dynamic>> _notifications = [];
+  List<Map<String, dynamic>> _completedConsultations = [];
 
   // Tab sub-filtering
-  int _opSubTab = 0; // 0: Queue, 1: Appointments
+  int _opSubTab = 0; // 0: Queue, 1: Appointments, 2: Completed
   int _patientSubTab = 0; // 0: Ledger, 1: Notifications
   String _searchQuery = '';
+  String _opSearchQuery = '';
 
   @override
   void initState() {
@@ -45,11 +47,58 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
 
     try {
       final metrics = await _apiService.fetchMetrics();
-      final queue = await _apiService.fetchQueue();
-      final appointments = await _apiService.fetchTodayAppointments();
+      var queue = await _apiService.fetchQueue();
+      var appointments = await _apiService.fetchTodayAppointments();
       final inpatients = await _apiService.fetchInpatients();
       final patients = await _apiService.fetchMyPatients();
       final notifications = await _apiService.fetchNotifications();
+      final completed = await _apiService.fetchCompletedConsultations();
+
+      // Combine backend completed consultations with any completed appointments
+      final completedMap = <String, Map<String, dynamic>>{};
+      for (final c in completed) {
+        final id = c['_id']?.toString() ?? c['id']?.toString() ?? '';
+        if (id.isNotEmpty) completedMap[id] = c;
+      }
+      for (final a in appointments) {
+        final st = (a['status']?.toString() ?? '').toLowerCase();
+        if (st == 'completed' || st == 'consulted') {
+          final id = a['_id']?.toString() ?? a['id']?.toString() ?? '';
+          if (id.isNotEmpty && !completedMap.containsKey(id)) {
+            completedMap[id] = a;
+          }
+        }
+      }
+      final completedList = completedMap.values.toList();
+
+      // If queue is empty but appointments exist, synthesize queue items from appointments
+      if (queue.isEmpty && appointments.isNotEmpty) {
+        queue = appointments.map((a) {
+          final patient = a['patient'] as Map<String, dynamic>? ?? {};
+          final status = a['status']?.toString() ?? 'waiting';
+          return {
+            '_id': a['_id'] ?? a['id'],
+            'patient': patient,
+            'tokenNumber': a['referenceId'] != null ? a['referenceId'].toString().substring(a['referenceId'].toString().length - 3) : 'Q-01',
+            'status': status == 'checked_in' ? 'called' : (status == 'in_consultation' ? 'called' : 'waiting'),
+            'appointment': a,
+          };
+        }).toList();
+      }
+
+      // If appointments is empty but queue has items, synthesize appointments from queue items
+      if (appointments.isEmpty && queue.isNotEmpty) {
+        appointments = queue.map((q) {
+          final patient = q['patient'] as Map<String, dynamic>? ?? {};
+          return {
+            '_id': q['_id'] ?? q['id'],
+            'patient': patient,
+            'time': q['time'] ?? 'Today',
+            'type': q['type'] ?? 'OP Consultation',
+            'status': q['status'] ?? 'scheduled',
+          };
+        }).toList();
+      }
 
       if (!mounted) return;
 
@@ -60,6 +109,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
         _inpatients = inpatients;
         _myPatients = patients;
         _notifications = notifications;
+        _completedConsultations = completedList;
         _isLoading = false;
       });
     } catch (_) {
@@ -611,7 +661,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                     child: Text(
                       'Live Queue (${_queueList.length})',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.white, fontWeight: _opSubTab == 0 ? FontWeight.bold : FontWeight.normal, fontSize: 13),
+                      style: TextStyle(color: AppColors.white, fontWeight: _opSubTab == 0 ? FontWeight.bold : FontWeight.normal, fontSize: 12),
                     ),
                   ),
                 ),
@@ -625,9 +675,25 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                       border: Border(bottom: BorderSide(color: _opSubTab == 1 ? AppColors.white : Colors.transparent, width: 3)),
                     ),
                     child: Text(
-                      'Today\'s Appointments (${_todayAppointments.length})',
+                      'Appointments (${_todayAppointments.length})',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.white, fontWeight: _opSubTab == 1 ? FontWeight.bold : FontWeight.normal, fontSize: 13),
+                      style: TextStyle(color: AppColors.white, fontWeight: _opSubTab == 1 ? FontWeight.bold : FontWeight.normal, fontSize: 12),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _opSubTab = 2),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: _opSubTab == 2 ? AppColors.white : Colors.transparent, width: 3)),
+                    ),
+                    child: Text(
+                      'Completed (${_completedConsultations.length})',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.white, fontWeight: _opSubTab == 2 ? FontWeight.bold : FontWeight.normal, fontSize: 12),
                     ),
                   ),
                 ),
@@ -636,25 +702,73 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
           ),
         ),
 
+        // Find OPs Search Bar
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+          child: TextField(
+            onChanged: (val) => setState(() => _opSearchQuery = val),
+            style: const TextStyle(fontSize: 12.5),
+            decoration: InputDecoration(
+              hintText: _opSubTab == 0
+                  ? 'Find OP by patient name, UHID, or token number...'
+                  : (_opSubTab == 1
+                      ? 'Find OP appointment by patient name or UHID...'
+                      : 'Find completed consultation record by name, UHID, or diagnosis...'),
+              prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.slate400),
+              isDense: true,
+              filled: true,
+              fillColor: AppColors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.slate200)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            ),
+          ),
+        ),
+
         Expanded(
-          child: _opSubTab == 0 ? _buildQueueListView() : _buildAppointmentsListView(),
+          child: _opSubTab == 0
+              ? _buildQueueListView()
+              : (_opSubTab == 1 ? _buildAppointmentsListView() : _buildCompletedConsultationsListView()),
         ),
       ],
     );
   }
 
   Widget _buildQueueListView() {
-    if (_queueList.isEmpty) {
-      return const Center(
-        child: Text('No active patients in today\'s OP queue.', style: TextStyle(color: AppColors.slate500)),
+    final filtered = _queueList.where((item) {
+      if (_opSearchQuery.trim().isEmpty) return true;
+      final query = _opSearchQuery.toLowerCase().trim();
+      final patient = item['patient'] as Map<String, dynamic>? ?? {};
+      final pName = patient['name']?.toString().toLowerCase() ?? '';
+      final uhid = patient['uhid']?.toString().toLowerCase() ?? '';
+      final token = (item['tokenNumber']?.toString() ?? item['queueNumber']?.toString() ?? '').toLowerCase();
+      return pName.contains(query) || uhid.contains(query) || token.contains(query);
+    }).toList();
+
+    if (filtered.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.person_search_outlined, size: 44, color: AppColors.slate400),
+              const SizedBox(height: 12),
+              Text(
+                _opSearchQuery.isNotEmpty ? 'No OP patients matching "$_opSearchQuery"' : 'No active patients in today\'s OP queue.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 14, color: AppColors.slate600, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
     return ListView.builder(
       padding: const EdgeInsets.all(12),
-      itemCount: _queueList.length,
+      itemCount: filtered.length,
       itemBuilder: (context, idx) {
-        final item = _queueList[idx];
+        final item = filtered[idx];
         final patient = item['patient'] as Map<String, dynamic>? ?? {};
         final pName = patient['name']?.toString() ?? 'Patient';
         final token = item['tokenNumber']?.toString() ?? item['queueNumber']?.toString() ?? 'Q-${idx + 1}';
@@ -727,7 +841,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
                       child: ElevatedButton(
                         onPressed: () => _openConsultationWorkspace(item),
                         style: ElevatedButton.styleFrom(backgroundColor: AppColors.emerald600, padding: const EdgeInsets.symmetric(vertical: 8)),
-                        child: const Text('Consult Workspace', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white)),
+                        child: const Text('OP Workspace', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white)),
                       ),
                     ),
                   ],
@@ -741,17 +855,40 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
   }
 
   Widget _buildAppointmentsListView() {
-    if (_todayAppointments.isEmpty) {
-      return const Center(
-        child: Text('No appointments scheduled for today.', style: TextStyle(color: AppColors.slate500)),
+    final filtered = _todayAppointments.where((item) {
+      if (_opSearchQuery.trim().isEmpty) return true;
+      final query = _opSearchQuery.toLowerCase().trim();
+      final patient = item['patient'] as Map<String, dynamic>? ?? {};
+      final pName = patient['name']?.toString().toLowerCase() ?? '';
+      final uhid = patient['uhid']?.toString().toLowerCase() ?? '';
+      return pName.contains(query) || uhid.contains(query);
+    }).toList();
+
+    if (filtered.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.event_busy_outlined, size: 44, color: AppColors.slate400),
+              const SizedBox(height: 12),
+              Text(
+                _opSearchQuery.isNotEmpty ? 'No OP appointments matching "$_opSearchQuery"' : 'No appointments scheduled for today.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 14, color: AppColors.slate600, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
     return ListView.builder(
       padding: const EdgeInsets.all(12),
-      itemCount: _todayAppointments.length,
+      itemCount: filtered.length,
       itemBuilder: (context, idx) {
-        final item = _todayAppointments[idx];
+        final item = filtered[idx];
         final patient = item['patient'] as Map<String, dynamic>? ?? {};
         final pName = patient['name']?.toString() ?? 'Patient';
 
@@ -768,7 +905,141 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
             trailing: ElevatedButton(
               onPressed: () => _openConsultationWorkspace(item),
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.emerald600, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
-              child: const Text('Workspace', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+              child: const Text('OP Workspace', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCompletedConsultationsListView() {
+    final filtered = _completedConsultations.where((item) {
+      if (_opSearchQuery.trim().isEmpty) return true;
+      final query = _opSearchQuery.toLowerCase().trim();
+      final patient = item['patient'] as Map<String, dynamic>? ?? {};
+      final pName = (patient['name']?.toString() ?? item['patientName']?.toString() ?? '').toLowerCase();
+      final uhid = (patient['uhid']?.toString() ?? item['uhid']?.toString() ?? '').toLowerCase();
+      final diag = (item['diagnosis']?.toString() ?? '').toLowerCase();
+      return pName.contains(query) || uhid.contains(query) || diag.contains(query);
+    }).toList();
+
+    if (filtered.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.assignment_turned_in_outlined, size: 44, color: AppColors.emerald600),
+              const SizedBox(height: 12),
+              Text(
+                _opSearchQuery.isNotEmpty
+                    ? 'No completed consultations matching "$_opSearchQuery"'
+                    : 'No consultations completed yet today.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 14, color: AppColors.slate600, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: filtered.length,
+      itemBuilder: (context, idx) {
+        final item = filtered[idx];
+        final patient = item['patient'] as Map<String, dynamic>? ?? {};
+        final pName = patient['name']?.toString() ?? item['patientName']?.toString() ?? 'Patient';
+        final uhid = patient['uhid']?.toString() ?? item['uhid']?.toString() ?? 'UHID-893321';
+        final age = patient['age']?.toString() ?? '45';
+        final gender = patient['gender']?.toString() ?? 'Male';
+        final diag = item['diagnosis']?.toString() ?? 'Completed Visit';
+        final completedDate = item['completedAt'] != null || item['updatedAt'] != null
+            ? (item['completedAt'] ?? item['updatedAt']).toString().substring(0, 10)
+            : 'Today';
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: AppColors.slate200)),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: AppColors.emerald50,
+                      child: Text(
+                        pName.isNotEmpty ? pName[0].toUpperCase() : 'P',
+                        style: const TextStyle(color: AppColors.emerald700, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(pName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.navy900)),
+                          Text('$uhid • $gender, $age yrs', style: const TextStyle(fontSize: 11, color: AppColors.slate600)),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(color: AppColors.emerald50, borderRadius: BorderRadius.circular(6)),
+                      child: const Text('COMPLETED', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: AppColors.emerald700)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(color: AppColors.slate50, borderRadius: BorderRadius.circular(6)),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.medical_information_outlined, size: 14, color: AppColors.navy700),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Diagnosis: $diag',
+                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.navy900),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text('• $completedDate', style: const TextStyle(fontSize: 10.5, color: AppColors.slate500)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _openConsultationWorkspace(item),
+                        icon: const Icon(Icons.receipt_long_outlined, size: 15, color: Colors.white),
+                        label: const Text('View Record', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy800, padding: const EdgeInsets.symmetric(vertical: 8)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _openPatientDetailSheet(patient.isNotEmpty ? patient : item),
+                        icon: const Icon(Icons.folder_shared_outlined, size: 15, color: AppColors.navy700),
+                        label: const Text('Patient Record', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.navy700)),
+                        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 8)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         );
