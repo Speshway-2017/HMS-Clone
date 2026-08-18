@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useRegisterPatientUser } from "../../features/auth";
+import { isElectron } from "../../utils/electron";
 import { usePublicHospital } from "../../features/hospitals";
 import { useAuth } from "../../context/AuthContext";
 import { tokenStorage } from "../../lib/tokenStorage";
@@ -27,6 +28,10 @@ import toast from "react-hot-toast";
 import { api } from "../../lib/api";
 
 export function RegisterPage() {
+  if (isElectron()) {
+    return <Navigate to="/login" replace />;
+  }
+
   const { data: hospital } = usePublicHospital();
   const hospitalName = hospital?.name || "HMS Enterprise";
   const logoUrl = hospital?.logoUrl;
