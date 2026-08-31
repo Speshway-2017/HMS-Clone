@@ -1,11 +1,26 @@
 import axios from "axios";
 import { tokenStorage } from "./tokenStorage";
 
-const getBaseUrl = (): string => {
+export const getBaseUrl = (): string => {
+  if (typeof window !== "undefined") {
+    const customUrl = localStorage.getItem("hms_custom_api_url");
+    if (customUrl && typeof customUrl === "string" && customUrl.trim()) {
+      const trimmed = customUrl.trim();
+      return trimmed.endsWith("/api/v1") ? trimmed : `${trimmed.replace(/\/$/, "")}/api/v1`;
+    }
+    const hmsConfigUrl = (window as any).HMS_CONFIG?.apiUrl;
+    if (hmsConfigUrl && typeof hmsConfigUrl === "string" && hmsConfigUrl.trim()) {
+      const trimmed = hmsConfigUrl.trim();
+      return trimmed.endsWith("/api/v1") ? trimmed : `${trimmed.replace(/\/$/, "")}/api/v1`;
+    }
+  }
+
   const envUrl = (import.meta as any).env?.VITE_API_URL;
   if (envUrl && typeof envUrl === "string" && envUrl.trim() !== "") {
-    return envUrl.endsWith("/api/v1") ? envUrl : `${envUrl.replace(/\/$/, "")}/api/v1`;
+    const trimmed = envUrl.trim();
+    return trimmed.endsWith("/api/v1") ? trimmed : `${trimmed.replace(/\/$/, "")}/api/v1`;
   }
+
   return "http://127.0.0.1:5000/api/v1";
 };
 
@@ -15,6 +30,24 @@ export const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
 });
+
+export function setCustomApiUrl(rawUrl: string): string {
+  let cleanUrl = rawUrl.trim();
+  if (cleanUrl) {
+    if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+      cleanUrl = `http://${cleanUrl}`;
+    }
+    const fullApiUrl = cleanUrl.endsWith("/api/v1") ? cleanUrl : `${cleanUrl.replace(/\/$/, "")}/api/v1`;
+    localStorage.setItem("hms_custom_api_url", fullApiUrl);
+    api.defaults.baseURL = fullApiUrl;
+    return fullApiUrl;
+  } else {
+    localStorage.removeItem("hms_custom_api_url");
+    const defaultUrl = getBaseUrl();
+    api.defaults.baseURL = defaultUrl;
+    return defaultUrl;
+  }
+}
 
 api.interceptors.request.use((config) => {
   if (config.url?.includes("/auth/login")) {
