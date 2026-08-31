@@ -14,6 +14,16 @@ const fs = require("fs");
 const userDataPath = path.join(app.getPath("appData"), "HMS-Desktop-App");
 app.setPath("userData", userDataPath);
 
+// ─── Logging to File ──────────────────────────────────────────────────────────
+const logFilePath = path.join(userDataPath, "hms-app.log");
+function logToFile(...args) {
+  const line = `[${new Date().toISOString()}] ${args.map(a => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" ")}\n`;
+  try {
+    fs.appendFileSync(logFilePath, line);
+  } catch (_) {}
+  console.log(...args);
+}
+
 // ─── Configuration ────────────────────────────────────────────────────────────
 const IS_DEV = process.env.NODE_ENV === "development" || !app.isPackaged;
 const SERVER_PORT = 5000;
@@ -74,7 +84,7 @@ function createMainWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      devTools: false,
+      devTools: true,
       preload: path.join(__dirname, "preload.js"),
     },
   });
@@ -128,29 +138,10 @@ function createMainWindow() {
     }
   });
 
-  // ── Security: Disable DevTools Shortcuts, Context Menu & Auto-Close ──
-  mainWindow.webContents.on("before-input-event", (event, input) => {
-    if (input.key === "F12") {
-      event.preventDefault();
-      return;
-    }
-    const ctrlOrCmd = input.control || input.meta;
-    if (ctrlOrCmd && (input.shift || input.alt)) {
-      const key = input.key.toUpperCase();
-      if (key === "I" || key === "J" || key === "C") {
-        event.preventDefault();
-        return;
-      }
-    }
-  });
-
-  mainWindow.webContents.on("context-menu", (e) => {
-    e.preventDefault();
-  });
-
-  mainWindow.webContents.on("devtools-opened", () => {
-    mainWindow.webContents.closeDevTools();
-  });
+  // Developer tools enabled
+  if (IS_DEV) {
+    mainWindow.webContents.openDevTools({ mode: "detach" });
+  }
 
   // ── Fallback: show window after 8s if ready-to-show never fires ───────────
   const showFallbackTimer = setTimeout(() => {
@@ -286,6 +277,12 @@ function buildMenu() {
           label: "Reset Zoom",
           accelerator: "CmdOrCtrl+0",
           click: () => mainWindow && mainWindow.webContents.setZoomFactor(1),
+        },
+        { type: "separator" },
+        {
+          label: "Toggle Developer Tools",
+          accelerator: "F12",
+          click: () => mainWindow && mainWindow.webContents.toggleDevTools(),
         },
       ],
     },
@@ -427,12 +424,30 @@ function startStaticClientServer(clientDistDir, port) {
         const ext = path.extname(filePath).toLowerCase();
         const contentType = mimeTypes[ext] || "application/octet-stream";
         res.writeHead(200, { "Content-Type": contentType });
-        fs.createReadStream(filePath).pipe(res);
+        const stream = fs.createReadStream(filePath);
+        stream.on("error", (sErr) => {
+          console.error("[HMS] Error streaming static file:", sErr.message);
+          if (!res.headersSent) res.writeHead(500, { "Content-Type": "text/plain" });
+          res.end("Internal Server Error");
+        });
+        stream.pipe(res);
       } else {
         // SPA Fallback: serve index.html for all React Router routes
         const indexPath = path.join(clientDistDir, "index.html");
-        res.writeHead(200, { "Content-Type": "text/html" });
-        fs.createReadStream(indexPath).pipe(res);
+        if (fs.existsSync(indexPath)) {
+          res.writeHead(200, { "Content-Type": "text/html" });
+          const stream = fs.createReadStream(indexPath);
+          stream.on("error", (sErr) => {
+            console.error("[HMS] Error streaming index.html:", sErr.message);
+            if (!res.headersSent) res.writeHead(500, { "Content-Type": "text/plain" });
+            res.end("Internal Server Error");
+          });
+          stream.pipe(res);
+        } else {
+          console.error("[HMS] index.html missing at:", indexPath);
+          res.writeHead(404, { "Content-Type": "text/html" });
+          res.end(`<h1>404 Not Found</h1><p>Client build index.html missing at <code>${indexPath}</code></p>`);
+        }
       }
     });
   });
@@ -492,48 +507,84 @@ function startBackendServer() {
 
       setTimeout(resolveOnce, 4000);
     } else {
-      // PRODUCTION MODE: Use utilityProcess.fork to execute packaged server/dist/server.js
-      const serverDir = path.join(process.resourcesPath, "server");
-      const serverEntry = path.join(serverDir, "dist", "server.js");
-      console.log("[HMS] Starting backend server in PROD from:", serverDir);
-      console.log("[HMS] Server entry script:", serverEntry);
+      // PRODUCTION MODE: Spawn backend using process.execPath with ELECTRON_RUN_AS_NODE=1
+      let serverDir = path.join(process.resourcesPath, "server");
+      let serverEntry = path.join(serverDir, "dist", "server.js");
+      if (!fs.existsSync(serverEntry)) {
+        const altServerDir = path.join(process.resourcesPath, "..", "server");
+        const altServerEntry = path.join(altServerDir, "dist", "server.js");
+        if (fs.existsSync(altServerEntry)) {
+          logToFile("[HMS] Found server entry in fallback root path:", altServerEntry);
+          serverDir = altServerDir;
+          serverEntry = altServerEntry;
+        }
+      }
+      logToFile("[HMS] Starting backend server in PROD from:", serverDir);
+      logToFile("[HMS] Server entry script:", serverEntry);
 
       if (!fs.existsSync(serverEntry)) {
-        console.error("[HMS] Packaged server entry not found at:", serverEntry);
+        logToFile("[HMS] ❌ Packaged server entry not found at:", serverEntry);
         reject(new Error(`Server entry file missing: ${serverEntry}`));
         return;
       }
 
+      const nodeModulesPaths = [
+        path.join(serverDir, "node_modules"),
+        path.join(process.resourcesPath, "server", "node_modules"),
+        path.join(process.resourcesPath, "node_modules"),
+        path.join(app.getAppPath(), "node_modules"),
+        path.join(app.getAppPath(), "..", "server", "node_modules"),
+      ].filter(p => fs.existsSync(p)).join(path.delimiter);
+
+      const resPath = process.resourcesPath || path.dirname(app.getAppPath());
+
+      const envVars = {
+        ...process.env,
+        NODE_ENV: "production",
+        PORT: String(SERVER_PORT),
+        ELECTRON_RUN_AS_NODE: "1",
+        NODE_PATH: nodeModulesPaths,
+        ELECTRON_RESOURCES_PATH: resPath,
+      };
+
       try {
-        serverProcess = utilityProcess.fork(serverEntry, [], {
+        serverProcess = spawn(process.execPath, [serverEntry], {
           cwd: serverDir,
-          env: { ...process.env, NODE_ENV: "production", PORT: String(SERVER_PORT) },
-          stdio: "pipe",
+          env: envVars,
+          stdio: ["ignore", "pipe", "pipe"],
+          windowsHide: true,
         });
 
-        if (serverProcess.stdout) {
-          serverProcess.stdout.on("data", (data) => {
-            const msg = data.toString();
-            console.log("[PROD SERVER]", msg.trim());
-            if (msg.includes("listening") || msg.includes("Server listening")) resolveOnce();
-          });
-        }
-
-        if (serverProcess.stderr) {
-          serverProcess.stderr.on("data", (data) => {
-            const msg = data.toString();
-            console.log("[PROD SERVER STDERR]", msg.trim());
-            if (msg.includes("listening") || msg.includes("Server listening")) resolveOnce();
-          });
-        }
-
-        serverProcess.on("exit", (code) => {
-          console.log(`[HMS] Prod Server utilityProcess exited with code ${code}`);
+        serverProcess.stdout.on("data", (data) => {
+          const msg = data.toString().trim();
+          logToFile("[PROD SERVER]", msg);
+          if (msg.includes("listening") || msg.includes("Server listening") || msg.includes("Health check")) {
+            resolveOnce();
+          }
         });
 
-        setTimeout(resolveOnce, 3000);
+        serverProcess.stderr.on("data", (data) => {
+          const msg = data.toString().trim();
+          logToFile("[PROD SERVER STDERR]", msg);
+          if (msg.includes("listening") || msg.includes("Server listening") || msg.includes("Health check")) {
+            resolveOnce();
+          }
+        });
+
+        serverProcess.on("error", (err) => {
+          logToFile("[HMS] ❌ Prod Server spawn error:", err.message);
+          serverExitedEarly = true;
+          if (!resolved) { resolved = true; reject(err); }
+        });
+
+        serverProcess.on("exit", (code, signal) => {
+          logToFile(`[HMS] ⚠️ Prod Server process exited with code ${code}, signal ${signal}`);
+          serverExitedEarly = true;
+        });
+
+        setTimeout(resolveOnce, 5000);
       } catch (err) {
-        console.error("[HMS] Failed to fork server utilityProcess:", err.message);
+        logToFile("[HMS] ❌ Failed to spawn server process:", err.message);
         reject(err);
       }
     }
@@ -577,16 +628,23 @@ function startFrontendDevServer() {
 }
 
 // ─── Health / Readiness Polling ───────────────────────────────────────────────
-function pollUntilReady(url, label, timeout = 60000, interval = 800) {
+let serverExitedEarly = false;
+
+function pollUntilReady(url, label, maxAttempts = 24, interval = 500) {
   return new Promise((resolve) => {
-    const start = Date.now();
+    let attempts = 0;
     function check() {
+      if (serverExitedEarly) {
+        logToFile(`[HMS] ${label} polling stopped early because server process exited.`);
+        resolve(false);
+        return;
+      }
       const req = http.get(url, { timeout: 2000 }, (res) => {
         let body = "";
         res.on("data", (chunk) => { body += chunk; });
         res.on("end", () => {
           if (res.statusCode === 200) {
-            console.log(`[HMS] ✓ ${label} ready (HTTP 200)`);
+            logToFile(`[HMS] ✓ ${label} ready (HTTP 200)`);
             resolve(true);
           } else {
             retry();
@@ -597,8 +655,9 @@ function pollUntilReady(url, label, timeout = 60000, interval = 800) {
       req.on("timeout", () => { req.destroy(); retry(); });
 
       function retry() {
-        if (Date.now() - start > timeout) {
-          console.warn(`[HMS] ⚠️ ${label} timed out — proceeding anyway`);
+        attempts++;
+        if (attempts >= maxAttempts) {
+          logToFile(`[HMS] ⚠️ ${label} polling timeout after ${maxAttempts} attempts — proceeding`);
           resolve(false);
         } else {
           setTimeout(check, interval);
@@ -739,7 +798,14 @@ app.whenReady().then(async () => {
       }
     } else {
       // PRODUCTION MODE: Start embedded static client HTTP server for client/dist
-      const clientDistDir = path.join(process.resourcesPath, "client", "dist");
+      let clientDistDir = path.join(process.resourcesPath, "client", "dist");
+      if (!fs.existsSync(path.join(clientDistDir, "index.html"))) {
+        const altClientDistDir = path.join(process.resourcesPath, "..", "client", "dist");
+        if (fs.existsSync(path.join(altClientDistDir, "index.html"))) {
+          console.log("[HMS] Found client/dist in fallback root path:", altClientDistDir);
+          clientDistDir = altClientDistDir;
+        }
+      }
       console.log("[HMS] Production mode: serving client/dist from:", clientDistDir);
       staticClientServer = await startStaticClientServer(clientDistDir, CLIENT_PORT);
       await pollUntilReady(VITE_URL, "Static Client Server");

@@ -37,7 +37,7 @@
       "electron/**/*",
       "node_modules/**/*"
     ],
-    "extraFiles": [
+    "extraResources": [
       {
         "from": "../server/dist",
         "to": "server/dist"
