@@ -1,5 +1,5 @@
 import { Schema, model, Document, Types } from "mongoose";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { ROLES, Role } from "../utils/roles";
 
 export interface UserDocument extends Document {
