@@ -41,10 +41,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   isElectron: true,
   platform: process.platform,
 
-  // Server info
+  // Server & Config info
   getServerPort: () => ipcRenderer.invoke("get-server-port"),
   getClientPort: () => ipcRenderer.invoke("get-client-port"),
   isDev: () => ipcRenderer.invoke("is-dev"),
+  getConfig: () => ipcRenderer.invoke("get-config"),
+  saveConfig: (cfg) => ipcRenderer.invoke("save-config", cfg),
 
   // App control
   quitApp: () => ipcRenderer.send("quit-app"),

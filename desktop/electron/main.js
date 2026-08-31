@@ -14,7 +14,7 @@ const fs = require("fs");
 const userDataPath = path.join(app.getPath("appData"), "HMS-Desktop-App");
 app.setPath("userData", userDataPath);
 
-// ─── Logging to File ──────────────────────────────────────────────────────────
+// ─── Logging & Config Persistence ─────────────────────────────────────────────
 const logFilePath = path.join(userDataPath, "hms-app.log");
 function logToFile(...args) {
   const line = `[${new Date().toISOString()}] ${args.map(a => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" ")}\n`;
@@ -22,6 +22,23 @@ function logToFile(...args) {
     fs.appendFileSync(logFilePath, line);
   } catch (_) {}
   console.log(...args);
+}
+
+const configFilePath = path.join(userDataPath, "config.json");
+function loadAppConfig() {
+  try {
+    if (fs.existsSync(configFilePath)) {
+      const data = JSON.parse(fs.readFileSync(configFilePath, "utf-8"));
+      return data || {};
+    }
+  } catch (_) {}
+  return {};
+}
+
+function saveAppConfig(cfg) {
+  try {
+    fs.writeFileSync(configFilePath, JSON.stringify(cfg, null, 2), "utf-8");
+  } catch (_) {}
 }
 
 // ─── Configuration ────────────────────────────────────────────────────────────
@@ -752,6 +769,11 @@ function quitApp() {
 ipcMain.handle("get-server-port", () => SERVER_PORT);
 ipcMain.handle("get-client-port", () => CLIENT_PORT);
 ipcMain.handle("is-dev", () => IS_DEV);
+ipcMain.handle("get-config", () => loadAppConfig());
+ipcMain.handle("save-config", (event, cfg) => {
+  saveAppConfig(cfg);
+  return true;
+});
 ipcMain.on("quit-app", () => quitApp());
 
 // ─── App Lifecycle ────────────────────────────────────────────────────────────

@@ -128,17 +128,11 @@ async function main() {
     // Step 2: Connect to MongoDB
     await connectDB();
 
-    // Step 3: Ensure super admin exists
+    // Step 4: Ensure super admin exists
     await ensureSuperAdmin();
     console.log("✓ Super admin ensured");
 
-    // Step 4: Run migrations & branch sync
-    await migrateInvoices();
-    await syncAllBranchDepartments();
-    await backfillLabBranchData();
-    console.log("✓ System-wide multi-branch data scoping and alignment complete");
-
-    // Step 5: Create HTTP server & register Express routes (app already has routes)
+    // Step 5: Create HTTP server & register Express routes
     httpServer = createServer(app);
     console.log("✓ Express routes registered");
 
@@ -149,12 +143,25 @@ async function main() {
     startNotificationWorker();
     console.log("✓ Notification worker started");
 
-    // Step 8: Start listening
+    // Step 8: Start listening immediately so server accepts connections right away
     httpServer.listen(env.port, "0.0.0.0", () => {
       console.log(`\n✓ Server listening on http://localhost:${env.port}`);
       console.log(`✓ Health check available at http://localhost:${env.port}/api/v1/health`);
       console.log(`✓ LAN access available at http://[your-local-ip]:${env.port}`);
     });
+
+    // Step 9: Run migrations & branch sync asynchronously in background without blocking server startup
+    setTimeout(() => {
+      Promise.all([
+        migrateInvoices(),
+        syncAllBranchDepartments(),
+        backfillLabBranchData(),
+      ]).then(() => {
+        console.log("✓ System-wide multi-branch data scoping and alignment complete");
+      }).catch((err) => {
+        console.error("Background migration error:", err);
+      });
+    }, 100);
 
     // Handle server errors (like EADDRINUSE, EACCES)
     httpServer.on("error", (err: NodeJS.ErrnoException) => {
