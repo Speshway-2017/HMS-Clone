@@ -186,7 +186,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 autofocus: true,
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                 decoration: InputDecoration(
-                  hintText: 'http://192.168.x.x:5000/api/v1',
+                  hintText: 'https://cms.speshway.site/api/v1',
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 ),
@@ -203,16 +203,20 @@ class _LoginScreenState extends State<LoginScreen> {
                 var url = controller.text.trim();
                 if (url.isNotEmpty) {
                   if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                    url = 'http://$url';
+                    url = 'https://$url';
                   }
 
                   final hostPart = url.replaceFirst('http://', '').replaceFirst('https://', '');
-                  final hasPort = RegExp(r':\d+').hasMatch(hostPart.split('/').first);
+                  final domainOrHost = hostPart.split('/').first;
+                  final hasPort = RegExp(r':\d+').hasMatch(domainOrHost);
                   if (!hasPort) {
-                    if (url.contains('/api/v1')) {
-                      url = url.replaceFirst('/api/v1', ':5000/api/v1');
-                    } else {
-                      url = '$url:5000';
+                    final isIpOrLocal = RegExp(r'^(localhost|127\.0\.0\.1|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})').hasMatch(domainOrHost);
+                    if (isIpOrLocal) {
+                      if (url.contains('/api/v1')) {
+                        url = url.replaceFirst('/api/v1', ':5000/api/v1');
+                      } else {
+                        url = '$url:5000';
+                      }
                     }
                   }
 
