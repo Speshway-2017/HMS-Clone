@@ -2,7 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiConfig {
   static const String _keyBaseUrl = 'backend_base_url';
-  static const String defaultUrl = 'http://10.0.2.2:5000/api/v1';
+  static const String defaultUrl = 'https://cms.speshway.site/api/v1';
 
   static String _baseUrl = defaultUrl;
 
