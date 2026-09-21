@@ -1,0 +1,537 @@
+import { Patient } from "../models/Patient";
+import { Appointment } from "../models/Appointment";
+import { OPVisit } from "../models/OPVisit";
+import { Admission } from "../models/Admission";
+import { Room } from "../models/Room";
+import { Bed } from "../models/Bed";
+import { Ward } from "../models/Ward";
+import { Invoice } from "../models/Invoice";
+import { Payment } from "../models/Payment";
+import { Queue } from "../models/Queue";
+import { AuditLog } from "../models/AuditLog";
+import { DbNotification } from "../models/DbNotification";
+import { Types } from "mongoose";
+import { AppointmentSlotService } from "../services/appointmentSlotService";
+import { buildBranchQuery, combineBranchQuery } from "../utils/branchQueryHelper";
+
+function toFilter(filterOrId: any, additionalQuery: Record<string, any> = {}): any {
+  return combineBranchQuery(filterOrId, additionalQuery);
+}
+
+export class ReceptionRepository {
+  // ── Patient Operations ──
+  static async createPatient(data: any) {
+    return await Patient.create(data);
+  }
+
+  static async findPatientById(hospitalId: any, id: string) {
+    return await Patient.findOne({ _id: id, ...toFilter(hospitalId) }).populate("assignedDoctor", "name");
+  }
+
+  static async searchPatients(hospitalId: any, queryStr: string) {
+    const baseFilter = toFilter(hospitalId);
+    let patientIds: any[] = [];
+    if (queryStr && queryStr.trim()) {
+      const regex = new RegExp(queryStr.trim(), "i");
+
+      // Find any appointments matching referenceId
+      const matchedAppts = await Appointment.find({
+        ...baseFilter,
+        referenceId: regex
+      }).select("patient");
+      if (matchedAppts.length > 0) {
+        patientIds = patientIds.concat(matchedAppts.map(a => a.patient));
+      }
+
+      // Find any queue tokens matching tokenNumber
+      const matchedTokens = await Queue.find({
+        ...baseFilter,
+        tokenNumber: regex
+      }).select("patient");
+      if (matchedTokens.length > 0) {
+        patientIds = patientIds.concat(matchedTokens.map(q => q.patient));
+      }
+
+      const matchConditions: any[] = [
+        { name: regex },
+        { phone: regex },
+        { uhid: regex },
+        { patientCode: regex }
+      ];
+      if (patientIds.length > 0) {
+        matchConditions.push({ _id: { $in: patientIds } });
+      }
+
+      return await Patient.find(toFilter(hospitalId, {
+        $or: matchConditions
+      })).sort({ name: 1 }).limit(50);
+    }
+
+    return await Patient.find(baseFilter).sort({ name: 1 }).limit(50);
+  }
+
+  static async listPatients(hospitalId: any, page: number, limit: number, search?: string) {
+    let extraFilter: Record<string, any> = {};
+    if (search && search.trim()) {
+      const regex = new RegExp(search.trim(), "i");
+      extraFilter.$or = [
+        { name: regex },
+        { phone: regex },
+        { uhid: regex },
+        { patientCode: regex }
+      ];
+    }
+    const filter = toFilter(hospitalId, extraFilter);
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      Patient.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Patient.countDocuments(filter)
+    ]);
+    return { data, total };
+  }
+
+  // ── Appointment Operations ──
+  // ── Canonical status filter ──
+  // A slot is BOOKED (unavailable) when ANY appointment for that doctor+date+time
+  // has a status that is NOT "cancelled" or "no_show".
+  // This MUST match AppointmentSlotService.RELEASED_STATUSES so the display and
+  // the booking guard are always consistent.
+  static readonly SLOT_RELEASED_STATUSES = ["cancelled", "no_show"] as const;
+
+  static async checkDoctorSlotOverlap(hospitalId: any, doctorId: string, date: Date, time: string) {
+    return await AppointmentSlotService.checkSlotConflict(doctorId, date, time, toFilter(hospitalId));
+  }
+
+  static async createAppointment(data: any) {
+    return await Appointment.create(data);
+  }
+
+  static async findAppointmentById(hospitalId: any, id: string) {
+    return await Appointment.findOne({ _id: id, ...toFilter(hospitalId) })
+      .populate("patient", "name uhid age gender phone email")
+      .populate("doctor", "name specialization")
+      .populate("department", "name");
+  }
+
+  static async listAppointments(hospitalId: any, date: Date) {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    return await Appointment.find({
+      ...toFilter(hospitalId),
+      date: { $gte: startOfDay, $lte: endOfDay }
+    })
+      .populate("patient", "name uhid age gender phone email")
+      .populate("doctor", "name specialization")
+      .populate("department", "name")
+      .sort({ time: 1 });
+  }
+
+  // ── OP Visit Operations ──
+  static async createOPVisit(data: any) {
+    return await OPVisit.create(data);
+  }
+
+  static async findOPVisitById(hospitalId: any, id: string) {
+    return await OPVisit.findOne({ _id: id, ...toFilter(hospitalId) })
+      .populate("patient", "name uhid phone age gender bloodGroup address emergencyContact insurance allergies medicalHistory photoUrl")
+      .populate("doctor", "name specialization")
+      .populate("department", "name");
+  }
+
+  static async getOPHistory(hospitalId: any, page: number, limit: number, search?: string) {
+    const targetHospital = typeof hospitalId === "object" ? (hospitalId.hospital || hospitalId) : hospitalId;
+    const filter: any = { ...toFilter(hospitalId) };
+    if (search) {
+      const regex = new RegExp(search, "i");
+      // Search on populated patient fields would require aggregation, but we can search patient IDs
+      const patients = await Patient.find({ hospital: targetHospital, name: regex }).select("_id");
+      filter.patient = { $in: patients.map(p => p._id) };
+    }
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      OPVisit.find(filter)
+        .populate("patient", "name uhid phone")
+        .populate("doctor", "name")
+        .populate("department", "name")
+        .sort({ visitDate: -1 })
+        .skip(skip)
+        .limit(limit),
+      OPVisit.countDocuments(filter)
+    ]);
+    return { data, total };
+  }
+
+  // ── Room & Bed Operations ──
+  static async listRooms(hospitalId: any) {
+    return await Room.find({ ...toFilter(hospitalId), status: { $in: ["active", "Active"] } }).sort({ wardName: 1, roomNumber: 1 });
+  }
+
+  static async listBedsByRoom(hospitalId: any, roomId: string) {
+    return await Bed.find({ ...toFilter(hospitalId), room: roomId }).sort({ bedNumber: 1 });
+  }
+
+  static async findBedById(hospitalId: any, id: string) {
+    return await Bed.findOne({ _id: id, ...toFilter(hospitalId) }).populate("room");
+  }
+
+  static async getRoomsAvailability(hospitalId: any) {
+    let filter = toFilter(hospitalId);
+
+    let rooms = await Room.find({ ...filter, status: { $ne: "Inactive" } }).populate("ward").lean();
+
+    if (!rooms || rooms.length === 0) {
+      return [];
+    }
+
+    const beds = await Bed.find(filter).lean();
+    const bedsByRoom: Record<string, any[]> = {};
+    beds.forEach((b: any) => {
+      const rId = String(b.room);
+      if (!bedsByRoom[rId]) bedsByRoom[rId] = [];
+      bedsByRoom[rId].push(b);
+    });
+
+    return rooms.map((r: any) => {
+      const roomBeds = bedsByRoom[String(r._id)] || [];
+      const occupiedCount = roomBeds.filter((b: any) => b.isOccupied || b.status === "Occupied").length;
+      const totalCount = roomBeds.length || r.capacity || 1;
+      const availableCount = Math.max(0, totalCount - occupiedCount);
+
+      return {
+        ...r,
+        _id: r._id,
+        roomNumber: r.roomNumber,
+        roomName: r.roomName || `Room ${r.roomNumber}`,
+        roomType: r.roomType || "General",
+        acType: r.acType || "Non AC",
+        wardName: (r.ward as any)?.name || r.wardName || "General Ward",
+        wardId: (r.ward as any)?._id || r.ward,
+        floor: r.floor || 1,
+        capacity: r.capacity || totalCount,
+        totalBeds: totalCount,
+        occupiedBeds: occupiedCount,
+        availableBeds: availableCount,
+        tariff: r.tariff || { roomChargePerDay: 500, admissionDeposit: 1000 },
+        beds: roomBeds.map((b: any) => ({
+          _id: b._id,
+          bedNumber: b.bedNumber,
+          bedCode: b.bedCode || b.bedNumber,
+          bedType: b.bedType || "Standard",
+          isOccupied: !!(b.isOccupied || b.status === "Occupied"),
+          status: b.status || (b.isOccupied ? "Occupied" : "Available"),
+          patient: b.patient || null,
+          admission: b.admission || null
+        }))
+      };
+    });
+  }
+
+  static async updateBedOccupancy(hospitalId: any, bedId: string, isOccupied: boolean, patientId: any = null, admissionId: any = null) {
+    const status = isOccupied ? "Occupied" : "Available";
+    const updateData: any = {
+      isOccupied,
+      status,
+      patient: isOccupied ? patientId : null,
+      admission: isOccupied ? admissionId : null
+    };
+    return await Bed.findOneAndUpdate({ _id: bedId, ...toFilter(hospitalId) }, updateData, { new: true });
+  }
+
+  static async getQueueByDate(hospitalId: any, targetDate: Date) {
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const queueTokens = await Queue.find(toFilter(hospitalId, {
+      $or: [
+        { date: { $gte: startOfDay, $lte: endOfDay } },
+        { createdAt: { $gte: startOfDay, $lte: endOfDay } }
+      ]
+    }))
+      .populate("patient", "name uhid phone age gender")
+      .populate("doctor", "name specialization department")
+      .populate("department", "name")
+      .populate("appointment")
+      .sort({ createdAt: 1 });
+
+    if (queueTokens.length > 0) {
+      const apptIds = queueTokens.map((q: any) => q.appointment?._id || q.appointment).filter(Boolean);
+
+      // Look up appointments by explicit _id without branch filter — _id is globally unique
+      // and branch scoping here would incorrectly exclude appointments from different branches,
+      // causing completed consultations to appear as "waiting" in the queue.
+      const apptsByIds = apptIds.length > 0
+        ? await Appointment.find({ hospital: (typeof hospitalId === "object" && hospitalId?.hospital) ? hospitalId.hospital : hospitalId, _id: { $in: apptIds } })
+        : [];
+
+      const apptStatusMap = new Map<string, string>();
+      apptsByIds.forEach((a: any) => {
+        apptStatusMap.set(a._id.toString(), a.status);
+      });
+
+      return queueTokens.map((q: any) => {
+        const plain = q.toObject ? q.toObject() : q;
+        const apptId = q.appointment?._id ? q.appointment._id.toString() : (q.appointment ? q.appointment.toString() : null);
+
+        // Prefer the queue's own persisted status (set by doctor actions), then fall back
+        // to appointment status for cases where the queue record was not explicitly updated.
+        const queueStatus = plain.status; // already-persisted queue status
+        const statusFromAppt = apptId ? apptStatusMap.get(apptId) : undefined;
+
+        if (queueStatus === "completed" || statusFromAppt === "completed") {
+          plain.status = "completed";
+        } else if (queueStatus === "skipped" || statusFromAppt === "cancelled" || statusFromAppt === "no_show") {
+          plain.status = "skipped";
+        } else if (queueStatus === "called" || statusFromAppt === "in_consultation") {
+          plain.status = "called";
+        }
+        // else: leave as "waiting" (queue's own status)
+
+        return plain;
+      });
+    }
+
+    const todayAppts = await Appointment.find({
+      ...toFilter(hospitalId),
+      date: { $gte: startOfDay, $lte: endOfDay }
+    })
+      .populate("patient", "name uhid phone age gender")
+      .populate("doctor", "name specialization department")
+      .populate("department", "name")
+      .sort({ time: 1 });
+
+    return todayAppts.map((appt: any, idx: number) => ({
+      _id: appt._id,
+      tokenNumber: appt.tokenNumber || appt.appointmentNumber || appt.referenceId || `T-${String(idx + 1).padStart(3, "0")}`,
+      type: appt.type === "Emergency" ? "emergency" : appt.type === "Walk-in" ? "priority" : "regular",
+      status: appt.status === "completed" ? "completed" : appt.status === "in_consultation" ? "called" : appt.status === "cancelled" ? "skipped" : "waiting",
+      patient: appt.patient,
+      doctor: appt.doctor,
+      department: appt.department,
+      createdAt: appt.createdAt || appt.date
+    }));
+  }
+
+  // ── Inpatient (Admission) Operations ──
+  static async createAdmission(data: any) {
+    return await Admission.create(data);
+  }
+
+  static async findAdmissionById(hospitalId: Types.ObjectId, id: string) {
+    return await Admission.findOne({ _id: id, hospital: hospitalId })
+      .populate("patient", "name uhid phone age gender bloodGroup address emergencyContact insurance photoUrl")
+      .populate("room")
+      .populate("bed")
+      .populate("admittingDoctor", "name specialization")
+      .populate("assignedNurse", "name role");
+  }
+
+  static async findActiveAdmissionByPatient(hospitalId: Types.ObjectId, patientId: string) {
+    return await Admission.findOne({
+      hospital: hospitalId,
+      patient: patientId,
+      status: {
+        $in: [
+          "admitted",
+          "Admitted",
+          "Bed Allocated",
+          "Under Observation",
+          "Waiting for Bed",
+          "In Ward",
+          "ICU",
+          "Operation Scheduled",
+          "Under Treatment",
+          "Transferred"
+        ]
+      }
+    });
+  }
+
+
+  static async listAdmissions(hospitalId: Types.ObjectId, status: "admitted" | "discharged" | "discharge_requested") {
+    let statusFilter: any;
+    if (status === "admitted") {
+      statusFilter = {
+        $in: [
+          "admitted",
+          "Admitted",
+          "Bed Allocated",
+          "Under Observation",
+          "Waiting for Bed",
+          "In Ward",
+          "ICU",
+          "Operation Scheduled",
+          "Under Treatment",
+          "Transferred"
+        ]
+      };
+    } else if (status === "discharge_requested") {
+      statusFilter = { $in: ["discharge_requested"] };
+    } else {
+      statusFilter = {
+        $in: [
+          "discharged",
+          "Discharged",
+          "Cancelled",
+          "Expired",
+          "Against Medical Advice (AMA)",
+          "Transferred Out (Final)"
+        ]
+      };
+    }
+
+    return await Admission.find({ ...toFilter(hospitalId), status: statusFilter })
+      .populate("patient", "name uhid phone age gender bloodGroup")
+      .populate("room")
+      .populate("bed")
+      .populate("admittingDoctor", "name specialization")
+      .populate("dischargeRequestedBy", "name specialization")
+      .populate("assignedNurse", "name role")
+      .sort({ admissionDate: -1 });
+  }
+
+  static async updateAdmissionStatus(hospitalId: any, id: string, status: "admitted" | "discharged", updateData: any) {
+    return await Admission.findOneAndUpdate({ _id: id, ...toFilter(hospitalId) }, { status, ...updateData }, { new: true });
+  }
+
+  // ── Billing & Payment Operations ──
+  static async createInvoice(data: any) {
+    return await Invoice.create(data);
+  }
+
+  static async findInvoiceById(hospitalId: any, id: string) {
+    return await Invoice.findOne({ _id: id, ...toFilter(hospitalId) }).populate("patient", "name uhid phone age gender");
+  }
+
+  static async updateInvoiceStatus(hospitalId: any, id: string, status: string) {
+    return await Invoice.findOneAndUpdate({ _id: id, ...toFilter(hospitalId) }, { status }, { new: true });
+  }
+
+  static async createPayment(data: any) {
+    return await Payment.create(data);
+  }
+
+  static async getPaymentHistory(hospitalId: any) {
+    return await Payment.find(toFilter(hospitalId))
+      .populate("patient", "name uhid phone")
+      .populate({
+        path: "invoice",
+        select: "items status"
+      })
+      .sort({ paidAt: -1 });
+  }
+
+  static async getPendingInvoices(hospitalId: any) {
+    return await Invoice.find({ ...toFilter(hospitalId), status: "pending" })
+      .populate("patient", "name uhid phone")
+      .sort({ createdAt: -1 });
+  }
+
+
+
+  // ── Queue (Token) Operations ──
+  static async getQueueTokensByDate(hospitalId: Types.ObjectId, date: Date) {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const appointments = await Appointment.find({
+      ...toFilter(hospitalId),
+      date: { $gte: startOfDay, $lte: endOfDay },
+      status: { $nin: ["completed", "cancelled", "no_show"] }
+    })
+      .populate("patient", "name uhid phone age gender")
+      .populate("doctor", "name specialization")
+      .populate("department", "name")
+      .sort({ time: 1 });
+
+    const enrichedAppointments = await Promise.all(
+      appointments.map(async (appt) => {
+        const queueObj = await Queue.findOne({
+          ...toFilter(hospitalId),
+          appointment: appt._id
+        });
+
+        if (queueObj) {
+          return {
+            ...appt.toObject(),
+            tokenNumber: queueObj.tokenNumber,
+            status: queueObj.status
+          };
+        }
+        return appt.toObject();
+      })
+    );
+
+    return enrichedAppointments;
+  }
+
+  static async getDoctorQueueByDate(hospitalId: Types.ObjectId, doctorId: string, date: Date) {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    return await Queue.find({
+      ...toFilter(hospitalId),
+      doctor: doctorId,
+      createdAt: { $gte: startOfDay, $lte: endOfDay }
+    })
+      .populate("patient", "name uhid phone age gender")
+      .sort({ createdAt: 1 });
+  }
+
+  static async createQueueToken(data: any) {
+    return await Queue.create(data);
+  }
+
+  static async updateQueueTokenStatus(hospitalId: Types.ObjectId, id: string, status: "waiting" | "called" | "completed" | "skipped") {
+    return await Queue.findOneAndUpdate({ _id: id, hospital: hospitalId }, { status }, { new: true });
+  }
+
+  static async getNextWaitingToken(hospitalId: Types.ObjectId, doctorId: string, date: Date) {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    return await Queue.findOne({
+      ...toFilter(hospitalId),
+      doctor: doctorId,
+      status: "waiting",
+      createdAt: { $gte: startOfDay, $lte: endOfDay }
+    }).sort({ createdAt: 1 });
+  }
+
+  // ── DbNotification Operations ──
+  static async createNotification(data: any) {
+    return await DbNotification.create(data);
+  }
+
+  static async getNotificationsByRole(filterOrId: any, role: string) {
+    return await DbNotification.find({ ...toFilter(filterOrId), recipientRole: role })
+      .sort({ createdAt: -1 })
+      .limit(50);
+  }
+
+  static async markNotificationRead(filterOrId: any, id: string) {
+    return await DbNotification.findOneAndUpdate({ _id: id, ...toFilter(filterOrId) }, { isRead: true }, { new: true });
+  }
+
+  // ── Logging Operations ──
+  static async createAuditLog(data: any) {
+    return await AuditLog.create(data);
+  }
+
+  static async getAuditLogs(hospitalId: Types.ObjectId) {
+    return await AuditLog.find(toFilter(hospitalId))
+      .populate("user", "name role")
+      .sort({ createdAt: -1 })
+      .limit(100);
+  }
+}

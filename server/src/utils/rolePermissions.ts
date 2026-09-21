@@ -16,4 +16,35 @@ export const ROLE_PERMISSIONS: Record<Role, { label: string; description: string
     description: "Handles billing, payroll, claims, and financial reporting for an assigned hospital.",
     permissions: ["Billing Operations", "Payroll Processing", "Insurance Claims", "Financial Reports"],
   },
+  doctor: {
+    label: "Doctor",
+    description: "Provides medical care, creates prescriptions, manages IP/OP records, and orders lab tests.",
+    permissions: ["Patient Consultation", "Electronic Prescriptions", "Clinical Notes", "IP/OP Management"],
+  },
+  receptionist: {
+    label: "Receptionist",
+    description: "Manages patient onboarding, schedules appointments, and handles clinic front desk operations.",
+    permissions: ["Patient Registration", "Appointment Scheduling", "Visitor Log", "Billing Intake", "Patient Management", "Appointment Booking", "Billing Operations", "Queue Management"],
+  },
+  pharmacist: {
+    label: "Pharmacist",
+    description: "Verifies prescriptions, dispenses medicines, manages inventory, and handles pharmacy billing.",
+    permissions: ["Verify Prescriptions", "Dispense Medicines", "Inventory Management", "Pharmacy Billing"],
+  },
+  laboratory: {
+    label: "Laboratory",
+    description: "The Laboratory role manages lab test requests, sample collections, test processing, quality control, laboratory inventory, and report delivery.",
+    permissions: ["Manage Test Requests", "Collect Samples", "Process Tests", "Quality Control", "Lab Inventory", "Report Delivery"],
+  },
+  nurse: {
+    label: "Nurse",
+    description: "Provides direct patient care, records vital signs, administers medications, and manages ward workflows.",
+    permissions: ["Record Vitals", "Administer Medications", "Ward Management", "Patient Care"],
+  },
+  patient: {
+    label: "Patient",
+    description: "Accesses own medical records, prescriptions, billing summaries, and appointments scheduler.",
+    permissions: ["View Personal Records", "View Prescriptions", "Book Appointments", "View Billing"],
+  },
 };
+

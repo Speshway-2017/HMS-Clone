@@ -1,7 +1,12 @@
 node_modules/
 dist/
+dist-electron/
 build/
 .env
 *.local
 .DS_Store
 npm-debug.log*
+*.tsbuildinfo
+*.exe
+*.blockmap
+c l i e n t / t s c o n f i g . t s b u i l d i n f o  

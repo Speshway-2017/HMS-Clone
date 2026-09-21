@@ -1,2 +1,3 @@
-export const ROLES = ["super_admin", "hospital_admin", "accountant"] as const;
+export const ROLES = ["super_admin", "hospital_admin", "accountant", "doctor", "receptionist", "pharmacist", "laboratory", "nurse", "patient"] as const;
 export type Role = (typeof ROLES)[number];
+

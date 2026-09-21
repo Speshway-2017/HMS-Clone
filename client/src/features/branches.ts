@@ -2,8 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { Branch, Paginated } from "../types/domain";
 
+export type { Branch };
+
 interface BranchListParams {
   page?: number;
+  limit?: number;
   hospitalId?: string;
 }
 
@@ -11,9 +14,10 @@ interface BranchListResponse extends Paginated<Branch> {
   summary: { totalBranches: number; totalStaff: number };
 }
 
-export function useBranches(params: BranchListParams) {
+export function useBranches(params: BranchListParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["branches", params],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<BranchListResponse>("/branches", { params });
       return res.data;

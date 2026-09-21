@@ -1,20 +1,23 @@
 import { Router } from "express";
 import { protect, restrictTo } from "../middleware/auth";
+import { scopeToHospital } from "../middleware/scopeToHospital";
 import {
   listDepartments,
   createDepartment,
   getDepartment,
   updateDepartment,
+  toggleDepartmentStatus,
   deleteDepartment,
   getDepartmentMetrics,
 } from "../controllers/departmentController";
 
 const router = Router();
 
-router.use(protect, restrictTo("super_admin"));
+router.use(protect, restrictTo("super_admin", "hospital_admin", "receptionist"), scopeToHospital);
 
 router.route("/").get(listDepartments).post(createDepartment);
 router.get("/:id/metrics", getDepartmentMetrics);
+router.patch("/:id/toggle-status", toggleDepartmentStatus);
 router.route("/:id").get(getDepartment).patch(updateDepartment).delete(deleteDepartment);
 
 export default router;

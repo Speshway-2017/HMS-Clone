@@ -4,6 +4,7 @@ import { Hospital, Paginated } from "../types/domain";
 
 interface HospitalListParams {
   page?: number;
+  limit?: number;
   search?: string;
   status?: string;
 }
@@ -12,9 +13,10 @@ interface HospitalListResponse extends Paginated<Hospital> {
   counts: { total: number; active: number; inactive: number };
 }
 
-export function useHospitals(params: HospitalListParams) {
+export function useHospitals(params: HospitalListParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["hospitals", params],
+    enabled: options?.enabled ?? true,
     queryFn: async () => {
       const res = await api.get<HospitalListResponse>("/hospitals", { params });
       return res.data;
@@ -72,5 +74,40 @@ export function useDeleteHospital() {
       await api.delete(`/hospitals/${id}`);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["hospitals"] }),
+  });
+}
+
+export function useMyHospital(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ["hospitals", "me"],
+    enabled: options?.enabled ?? true,
+    queryFn: async () => {
+      const res = await api.get("/hospitals/me");
+      return res.data.data.hospital as Hospital;
+    },
+  });
+}
+
+export function usePublicHospital() {
+  return useQuery({
+    queryKey: ["hospitals", "public"],
+    queryFn: async () => {
+      const res = await api.get("/hospitals/public");
+      return (res.data.data.hospital ?? null) as Hospital | null;
+    },
+  });
+}
+
+export function useUpdateMyHospital() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: Partial<Hospital>) => {
+      const res = await api.patch("/hospitals/me", payload);
+      return res.data.data.hospital as Hospital;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["hospitals", "me"] });
+      queryClient.invalidateQueries({ queryKey: ["hospitals", "public"] });
+    },
   });
 }

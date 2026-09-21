@@ -7,6 +7,8 @@ import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { DataTable, Column } from "../../components/ui/DataTable";
 import { Pagination } from "../../components/ui/Pagination";
+import toast from "react-hot-toast";
+import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
 import { Hospital } from "../../types/domain";
 
 const STATUS_TABS = [
@@ -21,6 +23,19 @@ export function HospitalsPage() {
   const [page, setPage] = useState(1);
   const { data, isLoading } = useHospitals({ page, search, status });
   const deleteHospital = useDeleteHospital();
+  const [deleteTargetHospital, setDeleteTargetHospital] = useState<{ id: string; name: string } | null>(null);
+
+  const confirmDeleteHospital = async () => {
+    if (!deleteTargetHospital) return;
+    try {
+      await deleteHospital.mutateAsync(deleteTargetHospital.id);
+      toast.success(`Hospital ${deleteTargetHospital.name} deleted successfully!`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to delete hospital");
+    } finally {
+      setDeleteTargetHospital(null);
+    }
+  };
 
   const columns: Column<Hospital>[] = [
     {
@@ -49,12 +64,9 @@ export function HospitalsPage() {
             <Pencil className="h-4 w-4" />
           </Link>
           <button
-            onClick={() => {
-              if (confirm(`Delete ${h.name}? This cannot be undone.`)) {
-                deleteHospital.mutate(h._id);
-              }
-            }}
-            className="hover:text-red-600"
+            onClick={() => setDeleteTargetHospital({ id: h._id, name: h.name })}
+            className="hover:text-red-600 cursor-pointer"
+            title="Delete Facility"
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -65,13 +77,13 @@ export function HospitalsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Hospitals Registry</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Hospitals Registry</h1>
           <p className="text-sm text-slate-500">Manage and monitor health facility performance across the enterprise network.</p>
         </div>
-        <Link to="/super-admin/hospitals/new">
-          <Button variant="primary">
+        <Link to="/super-admin/hospitals/new" className="shrink-0">
+          <Button variant="primary" className="w-full sm:w-auto">
             <Plus className="h-4 w-4" /> Add Hospital
           </Button>
         </Link>
@@ -121,6 +133,15 @@ export function HospitalsPage() {
           <Pagination page={page} totalPages={data?.pagination.totalPages ?? 1} onPageChange={setPage} />
         </div>
       </Card>
+
+      <ConfirmDeleteModal
+        isOpen={Boolean(deleteTargetHospital)}
+        title="Confirm Deletion"
+        message={`Are you sure you want to delete facility ${deleteTargetHospital?.name || ""}? This action cannot be undone.`}
+        isLoading={deleteHospital.isPending}
+        onClose={() => setDeleteTargetHospital(null)}
+        onConfirm={confirmDeleteHospital}
+      />
     </div>
   );
 }

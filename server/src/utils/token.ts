@@ -1,32 +1,30 @@
 import jwt from "jsonwebtoken";
-import { Response } from "express";
-import { env, isProduction } from "../config/env";
+import { env } from "../config/env";
 import { Role } from "./roles";
-
-export const AUTH_COOKIE_NAME = "hms_token";
 
 export interface TokenPayload {
   id: string;
   role: Role;
 }
 
+export function signAccessToken(payload: TokenPayload): string {
+  // Access Token — short-lived access token (e.g. 15m or configured jwtExpiresIn)
+  return jwt.sign(payload, env.jwtSecret, { 
+    expiresIn: (env.jwtExpiresIn || "15m") as jwt.SignOptions["expiresIn"] 
+  });
+}
+
+export function signRefreshToken(payload: TokenPayload): string {
+  // Refresh Token — long-lived refresh token (7 days)
+  return jwt.sign(payload, env.jwtSecret + "_refresh", { 
+    expiresIn: "7d" 
+  });
+}
+
+export function verifyRefreshToken(token: string): TokenPayload {
+  return jwt.verify(token, env.jwtSecret + "_refresh") as TokenPayload;
+}
+
 export function signToken(payload: TokenPayload): string {
-  return jwt.sign(payload, env.jwtSecret, { expiresIn: env.jwtExpiresIn as jwt.SignOptions["expiresIn"] });
-}
-
-export function setAuthCookie(res: Response, token: string): void {
-  res.cookie(AUTH_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: "lax",
-    maxAge: 8 * 60 * 60 * 1000,
-  });
-}
-
-export function clearAuthCookie(res: Response): void {
-  res.clearCookie(AUTH_COOKIE_NAME, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: "lax",
-  });
+  return signAccessToken(payload);
 }

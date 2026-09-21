@@ -1,0 +1,676 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "../lib/api";
+
+// ── Types ──
+export interface ReceptionStats {
+  todayRegistrations: number;
+  todayOP: number;
+  todayIP: number;
+  pendingPayments: number;
+  completedPayments: number;
+  todayCollections: number;
+  todayAppointments: number;
+  waitingQueue: number;
+  emergencyQueue: number;
+  doctorsAvailable: number;
+  doctorsBusy: number;
+  roomsAvailable: number;
+  bedsAvailable: number;
+}
+
+export interface PatientSearchResult {
+  _id: string;
+  name: string;
+  uhid: string;
+  patientCode: string;
+  phone: string;
+  age: number;
+  gender: string;
+  bloodGroup: string;
+  allergies?: string;
+  insuranceProvider?: string;
+  insurancePolicyNumber?: string;
+  status?: string;
+  emergencyContact?: {
+    name?: string;
+    phone?: string;
+    relation?: string;
+  };
+}
+
+export interface QueueToken {
+  _id: string;
+  tokenNumber: string;
+  type: "regular" | "priority" | "emergency";
+  status: "waiting" | "called" | "completed" | "skipped";
+  patient: {
+    _id: string;
+    name: string;
+    uhid: string;
+    phone: string;
+    age: number;
+    gender: string;
+  };
+  doctor: {
+    _id: string;
+    name: string;
+    specialization: string;
+  };
+  department: {
+    _id: string;
+    name: string;
+  };
+  createdAt: string;
+}
+
+export interface RoomAvailability {
+  _id: string;
+  roomNumber: string;
+  roomType: string;
+  acType?: string;
+  wardName: string;
+  totalBeds: number;
+  occupiedBeds: number;
+  availableBeds: number;
+  tariff?: {
+    roomChargePerDay?: number;
+    admissionDeposit?: number;
+  };
+  beds: {
+    _id: string;
+    bedNumber: string;
+    isOccupied: boolean;
+    status?: string;
+  }[];
+}
+
+export interface AdmissionRequest {
+  _id: string;
+  requestNumber?: string;
+  patient?: any;
+  doctor?: any;
+  department?: any;
+  priority?: "Routine" | "Urgent" | "Emergency";
+  preferredWard?: string;
+  preferredBedType?: string;
+  expectedStay?: string;
+  primaryDiagnosis?: string;
+  clinicalNotes?: string;
+  admissionReason?: string;
+  specialInstructions?: string;
+  status?: "Admission Requested" | "Approved" | "Admitted" | "Rejected";
+  title?: string;
+  message?: string;
+  type?: string;
+  isRead?: boolean;
+  data?: {
+    patientId: string;
+    opVisitId: string;
+    diagnosis: string;
+    suggestedWard?: string;
+    suggestedRoomType?: string;
+    requestId?: string;
+    requestNumber?: string;
+  };
+  createdAt: string;
+}
+
+export interface InpatientAdmission {
+  _id: string;
+  patient: {
+    _id: string;
+    name: string;
+    uhid: string;
+    phone: string;
+    age: number;
+    gender: string;
+  };
+  admissionDate: string;
+  ward: string;
+  room: {
+    _id: string;
+    roomNumber: string;
+    roomType: string;
+  };
+  bed: {
+    _id: string;
+    bedNumber: string;
+  };
+  attenderName: string;
+  attenderPhone: string;
+  insuranceProvider: string;
+  insurancePolicyNumber: string;
+  advanceAmount: number;
+  admissionNotes: string;
+  status: "admitted" | "discharged";
+}
+
+// ── Dashboard Statistics Hook ──
+export function useReceptionStats() {
+  return useQuery({
+    queryKey: ["reception", "stats"],
+    queryFn: async () => {
+      const res = await api.get<{ data: ReceptionStats }>("/reception/dashboard/stats");
+      return res.data.data;
+    },
+    refetchInterval: 15000 // refresh stats every 15 seconds
+  });
+}
+
+// ── Patient Hooks ──
+export function usePatientsSearch(query: string) {
+  return useQuery({
+    queryKey: ["reception", "patients", "search", query],
+    enabled: query.length >= 2,
+    queryFn: async () => {
+      const res = await api.get<{ data: { patients: PatientSearchResult[] } }>("/reception/patients/search", {
+        params: { query }
+      });
+      return res.data.data.patients;
+    }
+  });
+}
+
+export function usePatientsList(params: { page: number; limit: number; search?: string }) {
+  return useQuery({
+    queryKey: ["reception", "patients", "list", params],
+    queryFn: async () => {
+      const res = await api.get<{ data: PatientSearchResult[]; pagination: { total: number; totalPages: number } }>("/reception/patients/list", {
+        params
+      });
+      return res.data;
+    }
+  });
+}
+
+export function useRegisterPatient() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: any) => {
+      const res = await api.post<any>("/reception/patients", payload);
+      return res.data.patient;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reception", "patients"] });
+      queryClient.invalidateQueries({ queryKey: ["reception", "stats"] });
+    }
+  });
+}
+
+// ── Appointment Hooks ──
+export function useBookAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: any) => {
+      const mappedPayload = {
+        ...payload,
+        type: payload.type === "Appointment" ? "Consultation" : payload.type,
+      };
+      const res = await api.post("/reception/appointments", mappedPayload);
+      return res.data.data; // returns appointment & invoice
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reception"] });
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      // Invalidate the shared slot cache so Patient Dashboard immediately
+      // sees slots booked by the Receptionist as unavailable.
+      queryClient.invalidateQueries({ queryKey: ["appointment-slots"] });
+    }
+  });
+}
+
+export function useCheckDuplicateAppointment(
+  patientId: string,
+  doctorId: string,
+  date: string,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: ["reception", "duplicate-check", patientId, doctorId, date],
+    queryFn: async () => {
+      const res = await api.get<{ data: { isDuplicate: boolean; message?: string; existingAppointment?: any } }>(
+        "/reception/appointments/check-duplicate",
+        { params: { patientId, doctorId, date } }
+      );
+      return res.data.data;
+    },
+    enabled: enabled && !!patientId && !!doctorId && !!date,
+    staleTime: 0,           // Always fresh — booking-critical data
+    gcTime: 0,
+    retry: false,
+  });
+}
+
+// ── Billing Hooks ──
+export function usePayBilling() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { invoiceId: string; amount: number; paymentMethod: string; mixedDetails?: any }) => {
+      const res = await api.post("/reception/billing/pay", payload);
+      return res.data.data; // returns payment, invoice, receipt, token
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["reception"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["queues"] });
+
+      // Sub-10ms direct in-memory cache mutation for pending invoices
+      const invId = data?.invoice?._id || data?.payment?.invoice;
+      if (invId) {
+        queryClient.setQueryData(["reception", "billing", "pending-invoices"], (old: any) => {
+          if (!old || !old.invoices || !Array.isArray(old.invoices)) return old;
+          const filtered = old.invoices.filter((inv: any) => inv._id !== invId);
+          return { ...old, invoices: filtered, total: Math.max(0, filtered.length) };
+        });
+      }
+    }
+  });
+}
+
+// ── Queue Hooks ──
+export function useReceptionQueue(date?: string) {
+  return useQuery({
+    queryKey: ["reception", "queues", date],
+    queryFn: async () => {
+      const res = await api.get<{ data: { tokens: QueueToken[] } }>("/reception/queues/today", {
+        params: { date }
+      });
+      return res.data.data.tokens;
+    },
+    refetchInterval: 10000 // Poll queue every 10 seconds for TV updates
+  });
+}
+
+// ── Doctors Hooks ──
+export function useDoctorsAvailability() {
+  return useQuery({
+    queryKey: ["reception", "doctors"],
+    queryFn: async () => {
+      const res = await api.get<{ data: { doctors: any[] } }>("/reception/doctors/availability");
+      return res.data.data.doctors;
+    }
+  });
+}
+
+export function useBookedSlots(doctorId?: string, date?: string, patientId?: string) {
+  return useQuery({
+    queryKey: ["reception", "appointments", "booked-slots", doctorId, date, patientId],
+    // Slot availability data is booking-critical: never serve from cache.
+    staleTime: 0,           // Always re-fetch from server
+    gcTime: 0,              // Evict immediately when component unmounts
+    refetchInterval: 30_000, // Auto-refresh every 30s while booking panel is open
+    queryFn: async () => {
+      if (!doctorId || !date) return [] as string[];
+      const res = await api.get<{ data: { bookedSlots: string[] } }>("/reception/appointments/booked-slots", {
+        params: { doctorId, date, patientId }
+      });
+      return res.data.data.bookedSlots;
+    },
+    enabled: !!doctorId && !!date
+  });
+}
+
+// ── Rooms Hooks ──
+export function useRoomsAvailability() {
+  return useQuery({
+    queryKey: ["reception", "rooms"],
+    queryFn: async () => {
+      const res = await api.get<{ data: { availability: RoomAvailability[] } }>("/reception/rooms/availability");
+      return res.data.data.availability;
+    }
+  });
+}
+
+// ── Inpatient (IP) Hooks ──
+export function useAdmissionRequests() {
+  return useQuery({
+    queryKey: ["reception", "admissions", "requests"],
+    queryFn: async () => {
+      const res = await api.get<{ data: { requests: AdmissionRequest[] } }>("/admission-requests", {
+        params: { status: "Pending" }
+      });
+      return res.data.data.requests;
+    },
+    refetchInterval: 10000 // Poll for new admission alerts
+  });
+}
+
+export function useAdmissions(params?: string | { status?: string; patientId?: string }, options?: { enabled?: boolean }) {
+  const queryParams = typeof params === "string" ? { status: params } : params;
+  const status = queryParams?.status || "admitted";
+  return useQuery({
+    queryKey: ["reception", "admissions", "list", queryParams],
+    enabled: options?.enabled ?? true,
+    queryFn: async () => {
+      const res = await api.get<{ data: { admissions: InpatientAdmission[] } }>("/reception/admissions", {
+        params: queryParams
+      });
+      return res.data.data.admissions;
+    },
+    refetchInterval: status === "discharge_requested" ? 10000 : undefined
+  });
+}
+
+export function useDischargeRequests() {
+  return useQuery({
+    queryKey: ["reception", "admissions", "list", "discharge_requested"],
+    queryFn: async () => {
+      const res = await api.get<{ data: { admissions: any[] } }>("/reception/admissions", {
+        params: { status: "discharge_requested" }
+      });
+      return res.data.data.admissions;
+    },
+    refetchInterval: 10000
+  });
+}
+
+export function useConfirmDischarge() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { admissionId: string; notes?: string }) => {
+      const res = await api.post(`/reception/admissions/${payload.admissionId}/discharge`, { notes: payload.notes || "" });
+      return res.data.data.admission;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reception", "admissions"] });
+      queryClient.invalidateQueries({ queryKey: ["reception", "rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["reception", "stats"] });
+    }
+  });
+}
+
+export function useRejectAdmissionRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.post(`/admission-requests/${id}/reject`);
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reception", "admissions", "requests"] });
+    }
+  });
+}
+
+export function useAdmitPatient() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: any) => {
+      const res = await api.post("/reception/admissions", payload);
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reception", "admissions"] });
+      queryClient.invalidateQueries({ queryKey: ["reception", "rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["reception", "stats"] });
+    }
+  });
+}
+
+export function useTransferPatient() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { admissionId: string; newRoomId: string; newBedId: string; notes?: string }) => {
+      const res = await api.post("/reception/admissions/transfer", payload);
+      return res.data.data.admission;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reception", "admissions"] });
+      queryClient.invalidateQueries({ queryKey: ["reception", "rooms"] });
+    }
+  });
+}
+
+export function useRequestDischarge() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { admissionId: string; notes: string }) => {
+      const res = await api.post(`/reception/admissions/${payload.admissionId}/discharge`, { notes: payload.notes });
+      return res.data.data.admission;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reception", "admissions"] });
+      queryClient.invalidateQueries({ queryKey: ["reception", "rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["reception", "stats"] });
+    }
+  });
+}
+
+
+// ── Notifications Hooks ──
+export function useReceptionNotifications() {
+  return useQuery({
+    queryKey: ["reception", "notifications"],
+    queryFn: async () => {
+      const res = await api.get<{ data: { notifications: any[] } }>("/reception/notifications");
+      return res.data.data.notifications;
+    },
+    refetchInterval: 10000
+  });
+}
+
+export function useMarkNotificationRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.post(`/reception/notifications/${id}/read`);
+      return res.data.data.notification;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reception", "notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["reception", "admissions", "requests"] });
+    }
+  });
+}
+// ── Reports Hooks ──
+export function useExportReports() {
+  return useQuery({
+    queryKey: ["reception", "reports"],
+    enabled: false, // only run manually on click
+    queryFn: async () => {
+      const res = await api.get<{ data: any }>("/reception/reports/summary");
+      return res.data.data;
+    }
+  });
+}
+
+// ── Audit Log Hooks ──
+export function useAuditLogs() {
+  return useQuery({
+    queryKey: ["reception", "audit-logs"],
+    queryFn: async () => {
+      const res = await api.get<{ data: { logs: any[] } }>("/reception/audit-logs");
+      return res.data.data.logs;
+    }
+  });
+}
+
+export function useOPHistory(params: { page: number; limit: number; search?: string }) {
+  return useQuery({
+    queryKey: ["reception", "op-history", params],
+    queryFn: async () => {
+      const res = await api.get<{ data: any[]; pagination: { total: number; totalPages: number } }>("/reception/op/history", {
+        params
+      });
+      return res.data;
+    }
+  });
+}
+
+export function usePatientDetails(id: string | undefined) {
+  return useQuery({
+    queryKey: ["reception", "patients", "one", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const res = await api.get<{ data: { patient: any; activeAdmission?: any } }>(`/patients/${id}`);
+      return {
+        ...res.data.data.patient,
+        activeAdmission: res.data.data.activeAdmission
+      };
+    }
+  });
+}
+
+// ──────────────────────────────────────────────────────────────
+// Data-Consistent Hooks (same queries as dashboard stats)
+// Dashboard count ALWAYS equals table row count
+// ──────────────────────────────────────────────────────────────
+
+/**
+ * Pending invoices — mirrors getStats pendingPayments count.
+ * GET /reception/billing/pending-invoices
+ */
+export function usePendingInvoices() {
+  return useQuery({
+    queryKey: ["reception", "billing", "pending-invoices"],
+    queryFn: async () => {
+      const res = await api.get<{ data: { invoices: any[]; total: number } }>("/reception/billing/pending-invoices");
+      return res.data.data;
+    },
+    refetchInterval: 30000
+  });
+}
+
+/**
+ * Payment history — optionally filtered to today.
+ * GET /reception/billing/payment-history?date=today
+ * Mirrors getStats todayCollections when date=today.
+ */
+export function usePaymentHistory(filter?: "today" | "all") {
+  return useQuery({
+    queryKey: ["reception", "billing", "payment-history", filter],
+    queryFn: async () => {
+      const params: any = {};
+      if (filter === "today") params.date = "today";
+      const res = await api.get<{ data: { payments: any[]; total: number; totalAmount: number } }>("/reception/billing/payment-history", { params });
+      return res.data.data;
+    },
+    refetchInterval: 30000
+  });
+}
+
+/**
+ * Completed (paid) invoices — mirrors getStats completedPayments count.
+ * GET /reception/billing/completed-invoices
+ */
+export function useCompletedInvoices() {
+  return useQuery({
+    queryKey: ["reception", "billing", "completed-invoices"],
+    queryFn: async () => {
+      const res = await api.get<{ data: { invoices: any[]; total: number } }>("/reception/billing/completed-invoices");
+      return res.data.data;
+    },
+    refetchInterval: 30000
+  });
+}
+
+/**
+ * Today's patient registrations — mirrors getStats todayRegistrations count.
+ * GET /reception/patients/today
+ */
+export function useTodayRegistrations() {
+  return useQuery({
+    queryKey: ["reception", "patients", "today"],
+    queryFn: async () => {
+      const res = await api.get<{ data: { patients: any[]; total: number } }>("/reception/patients/today");
+      return res.data.data;
+    },
+    refetchInterval: 30000
+  });
+}
+
+export function useCancelAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ appointmentId, reason, remarks, refundRequired }: { appointmentId: string; reason: string; remarks: string; refundRequired: string }) => {
+      const res = await api.post(`/reception/appointments/${appointmentId}/cancel`, {
+        reason,
+        remarks,
+        refundRequired
+      });
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reception"] });
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      // Releasing a slot: invalidate both cache keys so both dashboards
+      // immediately show the slot as available again.
+      queryClient.invalidateQueries({ queryKey: ["appointment-slots"] });
+    }
+  });
+}
+
+export function useRescheduleAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      appointmentId,
+      newDate,
+      newTime,
+      doctorId,
+      departmentId,
+      reason,
+      remarks
+    }: {
+      appointmentId: string;
+      newDate: string;
+      newTime: string;
+      doctorId: string;
+      departmentId: string;
+      reason: string;
+      remarks: string;
+    }) => {
+      const res = await api.post(`/reception/appointments/${appointmentId}/reschedule`, {
+        newDate,
+        newTime,
+        doctorId,
+        departmentId,
+        reason,
+        remarks
+      });
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reception"] });
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      // Old slot released, new slot booked: invalidate both cache keys so
+      // both dashboards immediately reflect the updated availability.
+      queryClient.invalidateQueries({ queryKey: ["appointment-slots"] });
+    }
+  });
+}
+
+export function usePatientDetail(patientId: string) {
+  return useQuery({
+    queryKey: ["reception", "patient-detail", patientId],
+    queryFn: async () => {
+      const res = await api.get<{ data: { patient: any, currentConsultation: any, activeAdmission?: any, hasExistingAppointments?: boolean } }>(`/reception/patients/${patientId}`);
+      return res.data.data;
+    },
+    enabled: !!patientId && patientId !== "undefined" && patientId !== "null",
+    retry: false
+  });
+}
+
+export interface QueueDetails {
+  upcomingAppointments: any[];
+  currentWalkInQueue: any[];
+  checkedInPatients: any[];
+  waitingPatients: any[];
+  currentlyConsulting: any[];
+  missedAppointments: any[];
+  completedVisits: any[];
+}
+
+export function useQueueDetails() {
+  return useQuery({
+    queryKey: ["reception", "queue-details"],
+    queryFn: async () => {
+      const res = await api.get<{ data: QueueDetails }>("/reception/dashboard/queue-details");
+      return res.data.data;
+    },
+  });
+}
+

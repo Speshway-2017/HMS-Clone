@@ -22,6 +22,10 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     return res.status(400).json({ status: "error", message });
   }
 
+  if (err && typeof err === "object" && (err as any).name === "CastError") {
+    return res.status(404).json({ status: "error", message: "Resource or patient ID not found." });
+  }
+
   if (err && typeof err === "object" && "code" in err && (err as { code: number }).code === 11000) {
     return res.status(409).json({ status: "error", message: "A record with these details already exists." });
   }

@@ -15,10 +15,10 @@ export function SuperAdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Total Hospitals" value={data?.counts.totalHospitals ?? 0} icon={<Building2 className="h-5 w-5" />} emphasis trend={{ direction: "up", text: `${data?.counts.activeHospitals ?? 0} active` }} />
-        <KpiCard label="Total Branches" value={data?.counts.totalBranches ?? 0} icon={<Network className="h-5 w-5" />} />
-        <KpiCard label="Total Departments" value={data?.counts.totalDepartments ?? 0} icon={<FolderTree className="h-5 w-5" />} />
-        <KpiCard label="Total Admins" value={data?.counts.totalAdmins ?? 0} icon={<Users2 className="h-5 w-5" />} />
+        <KpiCard label="Total Hospitals" value={data?.counts.totalHospitals ?? 0} icon={<Building2 className="h-5 w-5" />} emphasis trend={{ direction: "up", text: `${data?.counts.activeHospitals ?? 0} active` }} to="/super-admin/hospitals" />
+        <KpiCard label="Total Branches" value={data?.counts.totalBranches ?? 0} icon={<Network className="h-5 w-5" />} to="/super-admin/branches" />
+        <KpiCard label="Total Departments" value={data?.counts.totalDepartments ?? 0} icon={<FolderTree className="h-5 w-5" />} to="/super-admin/departments" />
+        <KpiCard label="Total Admins" value={data?.counts.totalAdmins ?? 0} icon={<Users2 className="h-5 w-5" />} to="/super-admin/admins" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

@@ -4,11 +4,12 @@ import { env } from "../config/env";
 import { User } from "../models/User";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
-import { AUTH_COOKIE_NAME, TokenPayload } from "../utils/token";
+import { TokenPayload } from "../utils/token";
 import { Role } from "../utils/roles";
 
 export const protect = catchAsync(async (req: Request, _res: Response, next: NextFunction) => {
-  const token = req.cookies?.[AUTH_COOKIE_NAME];
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : undefined;
   if (!token) {
     throw new AppError("You are not logged in.", 401);
   }
@@ -16,8 +17,11 @@ export const protect = catchAsync(async (req: Request, _res: Response, next: Nex
   let payload: TokenPayload;
   try {
     payload = jwt.verify(token, env.jwtSecret) as TokenPayload;
-  } catch {
-    throw new AppError("Invalid or expired session. Please log in again.", 401);
+  } catch (err: any) {
+    if (err?.name === "TokenExpiredError") {
+      throw new AppError("Token expired. Please refresh your session.", 401);
+    }
+    throw new AppError("Invalid session token. Please log in again.", 401);
   }
 
   const user = await User.findById(payload.id);
@@ -26,6 +30,26 @@ export const protect = catchAsync(async (req: Request, _res: Response, next: Nex
   }
 
   req.user = user;
+  next();
+});
+
+export const protectOptional = catchAsync(async (req: Request, _res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : undefined;
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const payload = jwt.verify(token, env.jwtSecret) as TokenPayload;
+    const user = await User.findById(payload.id);
+    if (user && user.status === "active") {
+      req.user = user;
+    }
+  } catch {
+    // Optional token parsing — proceed silently if token is invalid or expired
+  }
+
   next();
 });
 
