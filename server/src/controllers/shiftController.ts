@@ -4,6 +4,22 @@ import { Staff } from "../models/Staff";
 import { Doctor } from "../models/Doctor";
 import { AuditLog } from "../models/AuditLog";
 import { AppError } from "../utils/AppError";
+import { z } from "zod";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+  numberValidator,
+} from "../utils/validators";
+
+const createShiftSchema = z.object({
+  name: requiredTrimmedString("Shift name", 2, 50),
+  startTime: requiredTrimmedString("Start time", 1, 20),
+  endTime: requiredTrimmedString("End time", 1, 20),
+  gracePeriodMinutes: numberValidator("Grace period", 0, 120, false, 15),
+  halfDayHours: numberValidator("Half day hours", 0, 24, false, 4),
+  fullDayHours: numberValidator("Full day hours", 0, 24, false, 8),
+  crossesMidnight: z.boolean().optional().default(false),
+});
 import { catchAsync } from "../utils/catchAsync";
 import { emitToHospital } from "../config/socket";
 

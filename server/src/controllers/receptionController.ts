@@ -19,6 +19,13 @@ import { IPBillPayment } from "../models/IPBillPayment";
 import { Appointment } from "../models/Appointment";
 import { getIPBillItemsSummary } from "./ipBillController";
 import { AppointmentSlotService } from "../services/appointmentSlotService";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+  emailValidator,
+  phoneValidator,
+  numberValidator,
+} from "../utils/validators";
 
 
 
@@ -48,16 +55,16 @@ const appointmentBookingSchema = z.object({
   date: z.string().min(1, "Date is required"),
   time: z.string().min(1, "Time is required"),
   type: z.enum(["Consultation", "Walk-in", "Emergency"]).default("Consultation"),
-  notes: z.string().optional().default(""),
+  notes: optionalTrimmedString("Notes", 500),
   // Follow-up booking fields
   followUp: z.boolean().optional().default(false),
   parentAppointmentId: z.string().optional().nullable(),
-  followUpReason: z.string().optional().default(""),
+  followUpReason: optionalTrimmedString("Follow-up reason", 500),
 });
 
 const paymentSchema = z.object({
   invoiceId: z.string().min(1, "Invoice ID is required"),
-  amount: z.coerce.number().positive("Amount must be positive"),
+  amount: z.coerce.number().positive("Amount must be positive").max(10000000, "Amount cannot exceed 10,000,000"),
   paymentMethod: z.enum(["UPI", "Cash", "Card", "Net Banking", "Cheque", "Mixed"]),
   mixedDetails: z.object({
     upiAmount: z.coerce.number().default(0),
@@ -75,8 +82,8 @@ const admissionSchema = z.object({
   ward: z.string().min(1, "Ward is required"),
   roomId: z.string().min(1, "Room ID is required"),
   bedId: z.string().min(1, "Bed ID is required"),
-  attenderName: z.string().optional().default(""),
-  attenderPhone: z.string().optional().default(""),
+  attenderName: optionalTrimmedString("Attender name", 100),
+  attenderPhone: phoneValidator("Attender phone", false),
   assignedNurse: z.string().min(1, "Assigned nurse is required"),
   insuranceProvider: z.string().optional().default(""),
   insurancePolicyNumber: z.string().optional().default(""),

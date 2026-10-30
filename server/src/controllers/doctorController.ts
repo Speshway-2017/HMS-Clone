@@ -16,6 +16,14 @@ import { syncDoctorStaffRecords } from "./staffController";
 import { Department } from "../models/Department";
 import { Feedback } from "../models/Feedback";
 import { emitToHospital } from "../config/socket";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+  emailValidator,
+  phoneValidator,
+  urlValidator,
+  numberValidator,
+} from "../utils/validators";
 
 const doctorSchema = z.object({
   department: z.string().optional().nullable(),

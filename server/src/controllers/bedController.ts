@@ -4,7 +4,19 @@ import { AppError } from "../utils/AppError";
 import { Bed } from "../models/Bed";
 import { Room } from "../models/Room";
 import { Admission } from "../models/Admission";
-import { buildBranchQuery } from "../utils/branchQueryHelper";
+import { z } from "zod";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+  codeValidator,
+} from "../utils/validators";
+
+const bedSchema = z.object({
+  bedNumber: codeValidator("Bed number", 1, 20, true),
+  roomId: requiredTrimmedString("Room ID", 1, 50),
+  bedType: optionalTrimmedString("Bed type", 50, "Standard"),
+  status: z.enum(["Available", "Occupied", "Maintenance", "Reserved"]).optional().default("Available"),
+});
 
 export const listBeds = catchAsync(async (req: Request, res: Response) => {
   const { search, ward, room, status, page = 1, limit = 10 } = req.query;

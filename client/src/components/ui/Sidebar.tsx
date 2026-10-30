@@ -35,7 +35,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         <div className="shrink-0 h-16 px-6 border-b border-slate-200 flex items-center gap-3">
           {hospital?.logoUrl ? (
-            <img src={hospital.logoUrl} alt={hospital.name} className="h-10 w-10 rounded-lg object-contain bg-slate-50 p-0.5 border" />
+            <img src={hospital.logoUrl || "/hospital-logo.svg"} alt="" className="h-10 w-10 rounded-lg object-contain bg-slate-50 p-0.5 border" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/hospital-logo.svg"; }} />
           ) : (
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-navy-100 text-navy-700 font-bold text-lg">
               {hospital?.name ? hospital.name.charAt(0).toUpperCase() : "H"}

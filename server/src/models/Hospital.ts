@@ -2,11 +2,11 @@ import { Schema, model, InferSchemaType, Types } from "mongoose";
 
 const hospitalSchema = new Schema(
   {
-    name: { type: String, required: true, trim: true },
-    code: { type: String, required: true, unique: true, trim: true, uppercase: true },
-    address: { type: String, default: "" },
-    contactEmail: { type: String, default: "" },
-    contactPhone: { type: String, default: "" },
+    name: { type: String, required: true, trim: true, maxlength: 100 },
+    code: { type: String, required: true, unique: true, trim: true, uppercase: true, maxlength: 20 },
+    address: { type: String, default: "", maxlength: 250 },
+    contactEmail: { type: String, default: "", maxlength: 100 },
+    contactPhone: { type: String, default: "", maxlength: 20 },
     logoUrl: { type: String, default: "" },
     licenseUrl: { type: String, default: "" },
     bedCapacity: { type: Number, default: 0 },

@@ -8,6 +8,33 @@ const ALLOWED_FOLDERS = new Set(["hospital-logos", "hospital-licenses", "admin-a
 
 export const uploadFile = catchAsync(async (req: Request, res: Response) => {
   const folder = typeof req.body.folder === "string" && ALLOWED_FOLDERS.has(req.body.folder) ? req.body.folder : "patient-photos";
+
+  // Validate folder-specific file type and size constraints
+  if (req.file) {
+    const mime = (req.file.mimetype || "").toLowerCase();
+    const origName = (req.file.originalname || "").toLowerCase();
+    const size = req.file.size;
+
+    if (folder === "hospital-logos") {
+      const allowedImageMimes = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+      const allowedImageExts = [".png", ".jpg", ".jpeg", ".webp", ".svg"];
+      const isImage = allowedImageMimes.includes(mime) || allowedImageExts.some((ext) => origName.endsWith(ext));
+      if (!isImage) {
+        throw new AppError("Unsupported file format. Hospital logo must be a PNG, JPEG, WEBP, or SVG image.", 400);
+      }
+      if (size > 2 * 1024 * 1024) {
+        throw new AppError("Hospital logo exceeds the maximum allowed file size of 2MB.", 400);
+      }
+    } else if (folder === "hospital-licenses") {
+      const isPdf = mime === "application/pdf" || origName.endsWith(".pdf");
+      if (!isPdf) {
+        throw new AppError("Unsupported file format. License credentials must be a PDF file (.pdf).", 400);
+      }
+      if (size > 5 * 1024 * 1024) {
+        throw new AppError("License file exceeds the maximum allowed file size of 5MB.", 400);
+      }
+    }
+  }
   let result: { secure_url: string; public_id: string; resource_type: string };
 
   const rawFileStr = typeof req.body.file === "string" ? req.body.file : (typeof req.body.image === "string" ? req.body.image : null);

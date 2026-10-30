@@ -8,6 +8,12 @@ import { AuditLog } from "../models/AuditLog";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { emitToHospital } from "../config/socket";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+  codeValidator,
+  numberValidator,
+} from "../utils/validators";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Validation schemas

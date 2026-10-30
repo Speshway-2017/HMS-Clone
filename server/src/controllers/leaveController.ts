@@ -5,6 +5,21 @@ import { Staff } from "../models/Staff";
 import { Doctor } from "../models/Doctor";
 import { AuditLog } from "../models/AuditLog";
 import { AppError } from "../utils/AppError";
+import { z } from "zod";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+} from "../utils/validators";
+
+const applyLeaveSchema = z.object({
+  employeeId: requiredTrimmedString("Employee ID", 1, 50),
+  employeeType: optionalTrimmedString("Employee type", 20, "Staff"),
+  leaveType: requiredTrimmedString("Leave type", 1, 50),
+  fromDate: requiredTrimmedString("From date", 1, 30),
+  toDate: requiredTrimmedString("To date", 1, 30),
+  totalDays: z.coerce.number().min(1).max(365).optional(),
+  reason: optionalTrimmedString("Reason", 500),
+});
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 import { markPayrollNeedsRecalculation } from "./payrollController";

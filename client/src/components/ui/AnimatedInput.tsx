@@ -16,6 +16,8 @@ export interface AnimatedInputProps {
   required?: boolean;
   autoComplete?: string;
   id?: string;
+  maxLength?: number;
+  error?: string | null;
 }
 
 export default function AnimatedInput({
@@ -34,6 +36,8 @@ export default function AnimatedInput({
   required = false,
   autoComplete,
   id,
+  maxLength,
+  error,
 }: AnimatedInputProps) {
   const [internalValue, setInternalValue] = useState(defaultValue);
   const isControlled = value !== undefined;
@@ -44,8 +48,11 @@ export default function AnimatedInput({
   const inputId = id || `animated-input-${reactId.replace(/:/g, "")}`;
   const isVisible = !!val || isFocused;
 
+  const isOverLimit = maxLength !== undefined && val !== undefined && val.length > maxLength;
+  const activeError = error || (isOverLimit ? `Maximum ${maxLength} characters allowed` : null);
   return (
-    <div className={`w-full flex flex-col ${className}`}>
+    <div className="w-full">
+      <div className={`relative flex items-center ${className}`}>
       <style>{`
         @keyframes drawPath {
           0% {
@@ -100,52 +107,58 @@ export default function AnimatedInput({
               : "opacity-0 translate-y-2 pointer-events-none"
           } ${labelClassName}`}
         >
-          {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
-        </label>
+          {icon}
+        </span>
+      ) : null}
+      <input
+        aria-label={label}
+        className={`peer w-full rounded-xl border ${activeError ? "border-red-500 text-red-900 focus:border-red-500" : "border-slate-200 text-slate-900"} bg-white px-3.5 py-3 text-sm outline-none transition-all duration-200 focus:ring-4 focus:ring-blue-500/10 ${
+          icon ? "pl-10" : ""
+        } ${endIcon ? "pr-10" : ""} ${inputClassName}`}
+        disabled={disabled}
+        id={inputId}
+        type={type}
+        required={required}
+        maxLength={maxLength}
+        autoComplete={autoComplete}
+        onBlur={() => setIsFocused(false)}
+        onChange={(e) => {
+          const valStr = e.target.value;
+          if (!isControlled) {
+            setInternalValue(valStr);
+          }
+          onChange?.(valStr);
+        }}
+        onFocus={() => setIsFocused(true)}
+        placeholder={isFloating ? placeholder : ""}
+        ref={inputRef}
+        value={val}
+      />
+      {endIcon ? (
+        <div className="absolute top-1/2 right-3.5 -translate-y-1/2 z-10 flex h-4 items-center justify-center">
+          {endIcon}
+        </div>
+      ) : null}
+      <motion.label
+        animate={getLabelAnimation()}
+        className={`pointer-events-none absolute top-1/2 origin-left rounded-md bg-white px-1 text-sm font-medium leading-none flex items-center transition-all ${
+          icon ? "left-10" : "left-3.5"
+        } ${labelClassName}`}
+        htmlFor={inputId}
+        style={{
+          zIndex: 2,
+          ...getLabelStyle(),
+        }}
+        transition={shouldReduceMotion ? { duration: 0 } : LABEL_TRANSITION}
+      >
+        {label}
+      </motion.label>
       </div>
-
-      <div className="relative flex items-center w-full">
-        {icon ? (
-          <span
-            aria-hidden="true"
-            className={`absolute top-1/2 left-3.5 -translate-y-1/2 z-10 pointer-events-none flex h-4 w-4 items-center justify-center transition-colors duration-200 ${
-              isFocused ? "text-blue-600" : "text-slate-400"
-            }`}
-          >
-            {icon}
-          </span>
-        ) : null}
-        <input
-          className={`peer w-full rounded-xl border bg-white px-3.5 py-3 text-sm outline-none transition-all duration-300 text-slate-900 ${
-            isFocused
-              ? "border-blue-600 ring-4 ring-blue-500/10 shadow-sm"
-              : "border-slate-200 hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5"
-          } ${icon ? "pl-10" : ""} ${endIcon ? "pr-10" : ""} ${inputClassName}`}
-          disabled={disabled}
-          id={inputId}
-          type={type}
-          required={required}
-          autoComplete={autoComplete}
-          onBlur={() => setIsFocused(false)}
-          onChange={(e) => {
-            const valStr = e.target.value;
-            if (!isControlled) {
-              setInternalValue(valStr);
-            }
-            onChange?.(valStr);
-          }}
-          onFocus={() => setIsFocused(true)}
-          placeholder={isFocused ? "" : (placeholder || label)}
-          ref={inputRef}
-          value={val}
-        />
-        {endIcon ? (
-          <div className="absolute top-1/2 right-3.5 -translate-y-1/2 z-10 flex h-4 items-center justify-center">
-            {endIcon}
-          </div>
-        ) : null}
-      </div>
+      {activeError && (
+        <p className="mt-1 text-xs font-medium text-red-600" role="alert">
+          {activeError}
+        </p>
+      )}
     </div>
   );
 }
