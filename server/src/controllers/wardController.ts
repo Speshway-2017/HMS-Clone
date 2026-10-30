@@ -25,7 +25,7 @@ const wardSchema = z.object({
 export const listWards = catchAsync(async (req: Request, res: Response) => {
   const { search, wardType, status, page = 1, limit = 10 } = req.query;
 
-  const query: any = { ...req.hospitalFilter };
+  const query: any = buildBranchQuery(req.hospitalFilter);
 
   if (search) {
     query.$or = [
@@ -77,7 +77,7 @@ export const getWard = catchAsync(async (req: Request, res: Response) => {
 export const createWard = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital;
   const branchId = req.hospitalFilter?.branch ?? null;
-  const { name, code, wardType, floorNumber, description, status } = req.body;
+  const { name, code, wardType, floorNumber, maxRooms, nurseStation, description, status } = req.body;
 
   if (!name || !code || !wardType || floorNumber === undefined) {
     throw new AppError("Name, Code, Ward Type, and Floor Number are required.", 400);
@@ -104,6 +104,8 @@ export const createWard = catchAsync(async (req: Request, res: Response) => {
     code: code.trim().toUpperCase(),
     wardType,
     floorNumber: Number(floorNumber),
+    maxRooms: maxRooms !== undefined ? Number(maxRooms) : 20,
+    nurseStation: nurseStation || "",
     description: description || "",
     status: status || "Active"
   });
@@ -113,7 +115,7 @@ export const createWard = catchAsync(async (req: Request, res: Response) => {
 
 export const updateWard = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { name, code, wardType, floorNumber, description, status } = req.body;
+  const { name, code, wardType, floorNumber, maxRooms, nurseStation, description, status } = req.body;
 
   const ward = await Ward.findOne({ _id: id, ...req.hospitalFilter });
   if (!ward) {
@@ -141,6 +143,8 @@ export const updateWard = catchAsync(async (req: Request, res: Response) => {
 
   if (wardType) ward.wardType = wardType;
   if (floorNumber !== undefined) ward.floorNumber = Number(floorNumber);
+  if (maxRooms !== undefined) ward.maxRooms = Number(maxRooms);
+  if (nurseStation !== undefined) ward.nurseStation = nurseStation;
   if (description !== undefined) ward.description = description;
   if (status) ward.status = status;
 

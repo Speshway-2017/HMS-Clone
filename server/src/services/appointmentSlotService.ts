@@ -144,9 +144,18 @@ export class AppointmentSlotService {
     }
 
     const appointments = await Appointment.find(filter).select("time");
-    const bookedTimes = new Set(
-      appointments.map((appt) => appt.time?.trim()).filter(Boolean) as string[]
-    );
+    const bookedTimes = new Set<string>();
+
+    appointments.forEach((appt) => {
+      if (appt.time) {
+        const t = appt.time.trim();
+        if (t) {
+          bookedTimes.add(t);
+          bookedTimes.add(normalizeSlotTime(t));
+          bookedTimes.add(formatSlot12Hour(t));
+        }
+      }
+    });
 
     // If patientId is provided, also block time slots where this patient already has an active appointment with ANY doctor
     if (patientId) {
@@ -167,7 +176,12 @@ export class AppointmentSlotService {
 
       patientAppts.forEach((appt) => {
         if (appt.time) {
-          bookedTimes.add(appt.time.trim());
+          const t = appt.time.trim();
+          if (t) {
+            bookedTimes.add(t);
+            bookedTimes.add(normalizeSlotTime(t));
+            bookedTimes.add(formatSlot12Hour(t));
+          }
         }
       });
     }

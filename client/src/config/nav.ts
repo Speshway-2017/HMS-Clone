@@ -125,7 +125,6 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "Test Processing", path: "/laboratory/processing", icon: Activity },
     { label: "Completed Reports", path: "/laboratory/completed-reports", icon: CheckCircle2 },
     { label: "Lab Inventory", path: "/laboratory/inventory", icon: Boxes },
-    { label: "Report Delivery", path: "/laboratory/reports", icon: FileText },
     { label: "Billing", path: "/laboratory/billing", icon: Receipt },
     { label: "Settings", path: "/laboratory/settings", icon: Settings },
   ],

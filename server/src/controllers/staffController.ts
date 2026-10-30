@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { Staff, STAFF_DUTY_STATUSES } from "../models/Staff";
 import { User } from "../models/User";

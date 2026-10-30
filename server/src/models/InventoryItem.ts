@@ -7,6 +7,7 @@ const inventoryItemSchema = new Schema(
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
     branch: { type: Schema.Types.ObjectId, ref: "Branch", default: null },
     name: { type: String, required: true, trim: true },
+    strength: { type: String, default: "", trim: true },
     sku: { type: String, required: true },
     category: { type: String, enum: INVENTORY_CATEGORIES, default: "medicines" },
     description: { type: String, default: "" },

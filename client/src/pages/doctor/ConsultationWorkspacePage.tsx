@@ -15,7 +15,7 @@ import {
   useCancelConsultationSession,
   useConsultationDraft,
 } from "../../features/doctorDashboard";
-import { useInventory } from "../../features/inventory";
+import { useInventory, useMedicineNames, useMedicineVariants } from "../../features/inventory";
 import { useMyHospital } from "../../features/hospitals";
 import { useWards } from "../../features/wards";
 import { useRooms } from "../../features/rooms";
@@ -166,6 +166,101 @@ interface ConsultationWorkspaceProps {
   isEmbedded?: boolean;
 }
 
+function MedicineStrengthSelect({
+  medicineName,
+  value,
+  onChange,
+}: {
+  medicineName: string;
+  value: string;
+  onChange: (val: string) => void;
+}) {
+  const { data: variants } = useMedicineVariants(medicineName);
+  const [isCustom, setIsCustom] = useState(false);
+
+  // Reset custom mode when medicine name changes
+  useEffect(() => {
+    setIsCustom(false);
+  }, [medicineName]);
+
+  const hasVariants = variants && variants.length > 0;
+
+  // If user previously selected "Other" or value doesn't match any variant
+  if (isCustom || (!hasVariants && value)) {
+    return (
+      <div>
+        <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+          Strength
+        </label>
+        <div className="flex gap-1">
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="e.g. 500mg"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100"
+          />
+          {hasVariants && (
+            <button
+              type="button"
+              onClick={() => { setIsCustom(false); onChange(""); }}
+              className="text-[9px] text-navy-700 hover:underline whitespace-nowrap font-bold"
+              title="Switch back to dropdown"
+            >
+              ↩ List
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasVariants) {
+    return (
+      <div>
+        <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+          Strength
+        </label>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="e.g. 500mg"
+          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+        Strength
+      </label>
+      <select
+        value={value}
+        onChange={(e) => {
+          if (e.target.value === "__other__") {
+            setIsCustom(true);
+            onChange("");
+          } else {
+            onChange(e.target.value);
+          }
+        }}
+        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100 cursor-pointer"
+      >
+        <option value="">— Select Strength —</option>
+        {variants.map((v) => (
+          <option key={v._id} value={v.strength}>
+            {v.strength || "N/A"} (Stock: {v.stockQty})
+          </option>
+        ))}
+        <option value="__other__">✏️ Other (Custom)</option>
+      </select>
+    </div>
+  );
+}
+
 export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = false }: ConsultationWorkspaceProps = {}) {
   const { id: paramId } = useParams<{ id: string }>();
   const appointmentId = appointmentIdOverride || paramId;
@@ -187,6 +282,8 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
   const cancelDraftMutation = useCancelConsultationSession();
   const { data: inventoryData } = useInventory({ category: "medicines" });
   const rawMeds = inventoryData?.data || [];
+  const { data: medicineNames } = useMedicineNames();
+  const uniqueMedNames = medicineNames || [];
 
   const { data: hospitalData } = useMyHospital();
 
@@ -280,6 +377,8 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
   const [admitExpectedStay, setAdmitExpectedStay] = useState("");
   const [admitReason, setAdmitReason] = useState("");
   const [admitSpecialInstructions, setAdmitSpecialInstructions] = useState("");
+  // Explicit flag — ONLY true when the doctor deliberately clicks "Recommend Admission"
+  const [admitRecommended, setAdmitRecommended] = useState(false);
 
   // Sync ward & room/bed type with Admin DB when fetched
   useEffect(() => {
@@ -372,6 +471,8 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
           setAdmitNotes(rec.clinicalNotes || "");
           setAdmitReason(rec.admissionReason || "");
           setAdmitSpecialInstructions(rec.specialInstructions || "");
+          // Restore the explicit recommended flag from the saved draft
+          setAdmitRecommended(!!(rec as any).recommended);
         }
       } else {
         setTemperature(appt.vitals?.temperature || "");
@@ -443,7 +544,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
         clinicalNotes: admitNotes,
         admissionReason: admitReason,
         specialInstructions: admitSpecialInstructions,
-        recommended: !!(admitDiagnosis || admitWard !== "General" || admitReason),
+        recommended: admitRecommended,
       }
     };
 
@@ -489,6 +590,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
     admitNotes,
     admitReason,
     admitSpecialInstructions,
+    admitRecommended,
   ]);
 
   if (isLoading) {
@@ -621,7 +723,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
           clinicalNotes: admitNotes,
           admissionReason: admitReason,
           specialInstructions: admitSpecialInstructions,
-          recommended: !!(admitDiagnosis || admitWard !== "General" || admitReason),
+          recommended: admitRecommended,
         }
       };
 
@@ -832,6 +934,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
         },
         appointmentId: appointment._id,
       });
+      setAdmitRecommended(true);
       toast.success("Admission recommendation saved to draft!");
     } catch (err: any) {
       const errMsg = err.response?.data?.message || err.message || "Failed to recommend admission";
@@ -1312,21 +1415,20 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                             />
                             <datalist id={`med-datalist-${index}`}>
                               {med.name.trim().length > 0 &&
-                                rawMeds
-                                  .filter((m: any) =>
-                                    m.name.toLowerCase().includes(med.name.toLowerCase())
+                                uniqueMedNames
+                                  .filter((n: string) =>
+                                    n.toLowerCase().includes(med.name.toLowerCase())
                                   )
-                                  .map((m: any) => (
-                                    <option key={m._id} value={m.name} />
+                                  .map((n: string) => (
+                                    <option key={n} value={n} />
                                   ))}
                             </datalist>
                           </div>
-                          <div className="w-28 shrink-0">
-                            <InputField
-                              label="Strength"
+                          <div className="w-36 shrink-0">
+                            <MedicineStrengthSelect
+                              medicineName={med.name}
                               value={med.strength || ""}
-                              onChange={(e) => handleMedChange(index, "strength", e.target.value)}
-                              placeholder="e.g. 500mg"
+                              onChange={(val) => handleMedChange(index, "strength", val)}
                             />
                           </div>
                           <div className="w-24 shrink-0">

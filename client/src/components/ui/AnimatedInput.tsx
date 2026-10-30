@@ -1,20 +1,4 @@
-import { motion, useReducedMotion } from "motion/react";
-import React, { useId, useRef, useState } from "react";
-
-const EASE_IN_OUT_CUBIC_X1 = 0.4;
-const EASE_IN_OUT_CUBIC_Y1 = 0;
-const EASE_IN_OUT_CUBIC_X2 = 0.2;
-const EASE_IN_OUT_CUBIC_Y2 = 1;
-
-const LABEL_TRANSITION = {
-  duration: 0.28,
-  ease: [
-    EASE_IN_OUT_CUBIC_X1,
-    EASE_IN_OUT_CUBIC_Y1,
-    EASE_IN_OUT_CUBIC_X2,
-    EASE_IN_OUT_CUBIC_Y2,
-  ] as [number, number, number, number], // cubic-bezier tuple
-};
+import { useState, useRef, useId } from "react";
 
 export interface AnimatedInputProps {
   className?: string;
@@ -60,43 +44,9 @@ export default function AnimatedInput({
   const val = isControlled ? value : internalValue;
   const inputRef = useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = useState(false);
-  const isFloating = !!val || isFocused;
-  const shouldReduceMotion = useReducedMotion();
   const reactId = useId();
   const inputId = id || `animated-input-${reactId.replace(/:/g, "")}`;
-
-  const getLabelAnimation = () => {
-    if (shouldReduceMotion) {
-      return {};
-    }
-    if (isFloating) {
-      return {
-        borderColor: "transparent",
-        color: "#2563eb", // Blue color
-        scale: 0.85,
-        y: -22,
-        x: icon ? -24 : 0,
-      };
-    }
-    return { color: "#6b7280", scale: 1, y: "-50%", x: 0 };
-  };
-
-  const getLabelStyle = () => {
-    if (!shouldReduceMotion) {
-      return {};
-    }
-    if (isFloating) {
-      return {
-        borderColor: "transparent",
-        color: "#2563eb", // Blue color
-        transform: `translateY(-22px) scale(0.85) ${icon ? "translateX(-24px)" : ""}`,
-      };
-    }
-    return {
-      color: "#6b7280",
-      transform: "translateY(-50%) scale(1)",
-    };
-  };
+  const isVisible = !!val || isFocused;
 
   const isOverLimit = maxLength !== undefined && val !== undefined && val.length > maxLength;
   const activeError = error || (isOverLimit ? `Maximum ${maxLength} characters allowed` : null);
@@ -145,10 +95,17 @@ export default function AnimatedInput({
           animation: drawPath 500ms ease-in forwards;
         }
       `}</style>
-      {icon ? (
-        <span
-          aria-hidden="true"
-          className="absolute top-1/2 left-3.5 -translate-y-1/2 text-slate-400 z-10 pointer-events-none flex h-4 w-4 items-center justify-center transition-colors duration-200 peer-focus:text-blue-600"
+
+      <div className="h-5 overflow-hidden mb-1">
+        <label
+          htmlFor={inputId}
+          className={`block text-xs font-bold uppercase tracking-wider transition-all duration-500 ease-in-out ${
+            isFocused ? "text-blue-600" : "text-slate-500"
+          } ${
+            isVisible
+              ? "opacity-100 translate-y-0"
+              : "opacity-0 translate-y-2 pointer-events-none"
+          } ${labelClassName}`}
         >
           {icon}
         </span>

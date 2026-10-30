@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
   AlertTriangle, AlertCircle, TrendingUp, Users, IndianRupee,
@@ -53,13 +54,13 @@ function SummaryKpi({ label, value, sub, icon, accentClass }: {
 function PatientSidePanel({ item, onClose }: { item: PendingOverdueItem; onClose: () => void }) {
   const statusConf = STATUS_CONFIG[item.status] || STATUS_CONFIG.pending;
   return (
-    <div className="fixed inset-0 z-50 flex">
+    <>
       {/* Backdrop */}
-      <div className="flex-1 bg-black/40" onClick={onClose} />
+      <div className="fixed inset-0 bg-transparent z-40" onClick={onClose} />
       {/* Panel */}
-      <div className="w-full max-w-md bg-white shadow-2xl flex flex-col overflow-hidden animate-slide-in-right">
+      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl flex flex-col border-l border-slate-200 animate-slide-in-right overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-5 text-white">
+        <div className="bg-gradient-to-br from-slate-800 to-slate-900 pt-7 pb-5 px-5 text-white">
           <div className="flex items-start justify-between gap-3 mb-4">
             <div>
               <h2 className="text-lg font-black">{item.patient?.name || "Patient"}</h2>
@@ -274,7 +275,7 @@ function PatientSidePanel({ item, onClose }: { item: PendingOverdueItem; onClose
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -392,6 +393,7 @@ export function PendingOverduePage() {
 
   return (
     <div className="space-y-5">
+      <div className="print:hidden space-y-5">
       {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -604,7 +606,6 @@ export function PendingOverduePage() {
                   <th className="px-4 py-3 text-right">Paid</th>
                   <th className="px-4 py-3 text-right">Pending</th>
                   <th className="px-4 py-3">Due Date</th>
-                  <th className="px-4 py-3">Overdue</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Actions</th>
                 </tr>
@@ -653,15 +654,6 @@ export function PendingOverduePage() {
                         {item.dueDate
                           ? new Date(item.dueDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
                           : "—"}
-                      </td>
-                      <td className="px-4 py-3">
-                        {item.daysOverdue > 0 ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-black text-red-700 bg-red-100 px-2 py-0.5 rounded-full">
-                            <Clock className="h-3 w-3" /> {item.daysOverdue}d
-                          </span>
-                        ) : (
-                          <span className="text-xs text-slate-400">—</span>
-                        )}
                       </td>
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <Badge tone={conf.tone}>{conf.label}</Badge>
@@ -745,18 +737,21 @@ export function PendingOverduePage() {
           </div>
         )}
       </div>
+      </div>
 
       {/* Patient Side Panel */}
-      {selectedItem && (
-        <PatientSidePanel item={selectedItem} onClose={() => setSelectedItem(null)} />
-      )}
+      {selectedItem &&
+        createPortal(
+          <PatientSidePanel item={selectedItem} onClose={() => setSelectedItem(null)} />,
+          document.body
+        )}
 
       <style>{`
         @keyframes slide-in-right {
           from { transform: translateX(100%); }
           to { transform: translateX(0); }
         }
-        .animate-slide-in-right { animation: slide-in-right 0.25s ease-out; }
+        .animate-slide-in-right { animation: slide-in-right 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
       `}</style>
     </div>
   );

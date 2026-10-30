@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
@@ -33,6 +33,66 @@ interface ReceiptInfo {
   issuedAt: string;
 }
 
+export function findMatchingTestPrice(testName: string, prices: Record<string, number>): number {
+  if (!testName || !prices) return 0;
+  
+  // 1. Direct exact match
+  if (prices[testName] !== undefined) return prices[testName];
+
+  const clean = (str: string) => {
+    return str
+      .toLowerCase()
+      .replace(/\s+/g, "") // remove all whitespace
+      .replace(/\([^)]*\)/g, "") // remove parentheses content
+      .replace(/[^a-z0-9]/g, ""); // remove special characters
+  };
+
+  const nameClean = clean(testName);
+  if (!nameClean) return 0;
+
+  // 2. Exact match after cleaning
+  for (const [key, value] of Object.entries(prices)) {
+    if (clean(key) === nameClean) {
+      return value;
+    }
+  }
+
+  // 3. Substring match (e.g., "Ultrasound" matches "Ultrasound Abdomen & Pelvis", or "MRI" matches "MRI Lumbar Spine")
+  for (const [key, value] of Object.entries(prices)) {
+    const keyClean = clean(key);
+    if (keyClean.includes(nameClean) || nameClean.includes(keyClean)) {
+      return value;
+    }
+  }
+
+  // 4. Common Medical Abbreviation Mapping
+  const ABBREVIATIONS: Record<string, string> = {
+    cbc: "completebloodcount",
+    lft: "liverfunction",
+    kft: "kidneyfunction",
+    rft: "kidneyfunction",
+    renal: "kidneyfunction",
+    fbs: "fastingbloodsugar",
+    tsh: "thyroid",
+    hba1c: "hba1c",
+    ecg: "ecg",
+    mri: "mri",
+    ct: "ctbrain",
+  };
+
+  for (const [abbr, fullNamePart] of Object.entries(ABBREVIATIONS)) {
+    if (nameClean.includes(abbr)) {
+      for (const [key, value] of Object.entries(prices)) {
+        if (clean(key).includes(fullNamePart)) {
+          return value;
+        }
+      }
+    }
+  }
+
+  return 0;
+}
+
 export function NewLabBillPage() {
   const { data: patientData } = usePatients({});
   const { data: hospitalData } = useMyHospital();
@@ -60,8 +120,52 @@ export function NewLabBillPage() {
   const [receiptInfo, setReceiptInfo] = useState<ReceiptInfo | null>(null);
 
   // Hospital test catalog
-  const availableTests: string[] = (hospitalData as any)?.availableLabTests || [];
-  const prices: Record<string, number> = (hospitalData as any)?.investigationPrices || {};
+  const availableTests: string[] = useMemo(() => {
+    const savedLab = localStorage.getItem("hms_available_lab_tests");
+    const savedRadio = localStorage.getItem("hms_available_radiology_tests");
+    let lab = savedLab ? JSON.parse(savedLab) : (hospitalData as any)?.availableLabTests;
+    let radio = savedRadio ? JSON.parse(savedRadio) : (hospitalData as any)?.availableRadiologyTests;
+    
+    if (!lab || lab.length === 0) lab = [
+      "Complete Blood Count (CBC)",
+      "Lipid Profile",
+      "Liver Function Test (LFT)",
+      "Kidney Function Test (KFT)",
+      "Thyroid Profile (T3, T4, TSH)",
+      "Fasting Blood Sugar (FBS)",
+      "HbA1c",
+      "Urine Routine & Microscopy",
+    ];
+    if (!radio || radio.length === 0) radio = [
+      "Chest X-Ray PA View",
+      "Ultrasound Abdomen & Pelvis",
+      "CT Brain Non-Contrast",
+      "MRI Lumbar Spine",
+      "ECG 12 Lead",
+    ];
+    return [...lab, ...radio];
+  }, [hospitalData]);
+
+  const prices: Record<string, number> = useMemo(() => {
+    const savedPrices = localStorage.getItem("hms_investigation_prices");
+    let pr = savedPrices ? JSON.parse(savedPrices) : (hospitalData as any)?.investigationPrices;
+    if (!pr || Object.keys(pr).length === 0) pr = {
+      "Complete Blood Count (CBC)": 350,
+      "Lipid Profile": 650,
+      "Liver Function Test (LFT)": 550,
+      "Kidney Function Test (KFT)": 500,
+      "Thyroid Profile (T3, T4, TSH)": 750,
+      "Fasting Blood Sugar (FBS)": 150,
+      "HbA1c": 450,
+      "Urine Routine & Microscopy": 200,
+      "Chest X-Ray PA View": 400,
+      "Ultrasound Abdomen & Pelvis": 1200,
+      "CT Brain Non-Contrast": 2500,
+      "MRI Lumbar Spine": 4500,
+      "ECG 12 Lead": 300,
+    };
+    return pr;
+  }, [hospitalData]);
 
   const allPatients: any[] = patientData?.data || [];
   const filteredPatients = patientSearch.trim() && !selectedPatientId
@@ -106,7 +210,7 @@ export function NewLabBillPage() {
       if (state.tests && state.tests.length > 0) {
         const items: LabBillItem[] = (state.tests as string[]).map(t => ({
           testName: t,
-          price: prices[t] || 0,
+          price: findMatchingTestPrice(t, prices),
         }));
         setBillItems(items);
       }
@@ -125,7 +229,7 @@ export function NewLabBillPage() {
       toast.error("Test already added.");
       return;
     }
-    const price = prices[testName] || 0;
+    const price = findMatchingTestPrice(testName, prices);
     setBillItems((prev) => [...prev, { testName, price }]);
   };
 

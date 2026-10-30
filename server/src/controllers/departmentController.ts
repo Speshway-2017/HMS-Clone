@@ -104,6 +104,7 @@ export const listDepartments = catchAsync(async (req: Request, res: Response) =>
 
   const departments = await Department.find(filter)
     .populate("hospital", "name")
+    .populate("branch", "name")
     .populate("departmentHead", "name specialization")
     .sort({ displayOrder: 1, createdAt: -1 });
 
@@ -207,6 +208,7 @@ export const createDepartment = catchAsync(async (req: Request, res: Response) =
 export const getDepartment = catchAsync(async (req: Request, res: Response) => {
   const department = await Department.findOne({ _id: req.params.id, ...req.hospitalFilter })
     .populate("hospital", "name")
+    .populate("branch", "name")
     .populate("departmentHead", "name specialization");
   if (!department) {
     throw new AppError("Department not found.", 404);
@@ -285,7 +287,9 @@ export const updateDepartment = catchAsync(async (req: Request, res: Response) =
     { _id: req.params.id, ...req.hospitalFilter },
     cleanBody,
     { new: true, runValidators: true },
-  ).populate("departmentHead", "name specialization");
+  )
+    .populate("branch", "name")
+    .populate("departmentHead", "name specialization");
 
   if (!updated) {
     throw new AppError("Department not found.", 404);
@@ -448,6 +452,7 @@ export const deleteDepartment = catchAsync(async (req: Request, res: Response) =
 export const getDepartmentMetrics = catchAsync(async (req: Request, res: Response) => {
   const department = await Department.findOne({ _id: req.params.id, ...req.hospitalFilter })
     .populate("hospital", "name")
+    .populate("branch", "name")
     .populate("departmentHead", "name specialization");
   if (!department) {
     throw new AppError("Department not found.", 404);

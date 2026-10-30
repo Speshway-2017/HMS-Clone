@@ -3,6 +3,7 @@ import { Schema, model, InferSchemaType, Types } from "mongoose";
 const admissionRequestSchema = new Schema(
   {
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
+    branch: { type: Schema.Types.ObjectId, ref: "Branch", default: null },
     requestNumber: { type: String, required: true, unique: true },
     patient: { type: Schema.Types.ObjectId, ref: "Patient", required: true },
     doctor: { type: Schema.Types.ObjectId, ref: "Doctor", required: true },

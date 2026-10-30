@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { UserPlus, Users2, BedDouble, Activity } from "lucide-react";
 import { usePatients } from "../../features/patients";
+import { useBranchContext } from "../../context/BranchContext";
+import { AllBranchesNoticeBanner } from "../../components/common/AllBranchesNoticeBanner";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { KpiCard } from "../../components/ui/KpiCard";
@@ -17,6 +19,7 @@ const STATUS_TONE: Record<Patient["status"], "success" | "info" | "neutral"> = {
 };
 
 export function PatientsPage() {
+  const { isAllBranches } = useBranchContext();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
@@ -67,6 +70,7 @@ export function PatientsPage() {
 
   return (
     <div className="space-y-6">
+      <AllBranchesNoticeBanner />
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Patient Management</h1>

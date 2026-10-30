@@ -179,13 +179,11 @@ export class ReceptionRepository {
 
   static async getRoomsAvailability(hospitalId: any) {
     let filter = toFilter(hospitalId);
-    let hId = filter.hospital || filter._id || hospitalId;
 
     let rooms = await Room.find({ ...filter, status: { $ne: "Inactive" } }).populate("ward").lean();
 
     if (!rooms || rooms.length === 0) {
-      await ReceptionRepository.seedDefaultWardsAndRooms(hId);
-      rooms = await Room.find({ ...filter, status: { $ne: "Inactive" } }).populate("ward").lean();
+      return [];
     }
 
     const beds = await Bed.find(filter).lean();
@@ -262,34 +260,37 @@ export class ReceptionRepository {
 
     if (queueTokens.length > 0) {
       const apptIds = queueTokens.map((q: any) => q.appointment?._id || q.appointment).filter(Boolean);
-      const appts = await Appointment.find(toFilter(hospitalId, {
-        $or: [
-          { _id: { $in: apptIds } },
-          { date: { $gte: startOfDay, $lte: endOfDay } }
-        ]
-      }));
+
+      // Look up appointments by explicit _id without branch filter — _id is globally unique
+      // and branch scoping here would incorrectly exclude appointments from different branches,
+      // causing completed consultations to appear as "waiting" in the queue.
+      const apptsByIds = apptIds.length > 0
+        ? await Appointment.find({ hospital: (typeof hospitalId === "object" && hospitalId?.hospital) ? hospitalId.hospital : hospitalId, _id: { $in: apptIds } })
+        : [];
+
       const apptStatusMap = new Map<string, string>();
-      const patientApptStatusMap = new Map<string, string>();
-      appts.forEach((a: any) => {
+      apptsByIds.forEach((a: any) => {
         apptStatusMap.set(a._id.toString(), a.status);
-        if (a.patient) {
-          patientApptStatusMap.set(a.patient.toString(), a.status);
-        }
       });
 
       return queueTokens.map((q: any) => {
         const plain = q.toObject ? q.toObject() : q;
         const apptId = q.appointment?._id ? q.appointment._id.toString() : (q.appointment ? q.appointment.toString() : null);
-        const patId = q.patient?._id ? q.patient._id.toString() : (q.patient ? q.patient.toString() : null);
-        const statusFromAppt = (apptId && apptStatusMap.get(apptId)) || (patId && patientApptStatusMap.get(patId));
 
-        if (statusFromAppt === "completed") {
+        // Prefer the queue's own persisted status (set by doctor actions), then fall back
+        // to appointment status for cases where the queue record was not explicitly updated.
+        const queueStatus = plain.status; // already-persisted queue status
+        const statusFromAppt = apptId ? apptStatusMap.get(apptId) : undefined;
+
+        if (queueStatus === "completed" || statusFromAppt === "completed") {
           plain.status = "completed";
-        } else if (statusFromAppt === "in_consultation") {
-          plain.status = "called";
-        } else if (statusFromAppt === "cancelled" || statusFromAppt === "no_show") {
+        } else if (queueStatus === "skipped" || statusFromAppt === "cancelled" || statusFromAppt === "no_show") {
           plain.status = "skipped";
+        } else if (queueStatus === "called" || statusFromAppt === "in_consultation") {
+          plain.status = "called";
         }
+        // else: leave as "waiting" (queue's own status)
+
         return plain;
       });
     }
@@ -393,8 +394,8 @@ export class ReceptionRepository {
       .sort({ admissionDate: -1 });
   }
 
-  static async updateAdmissionStatus(hospitalId: Types.ObjectId, id: string, status: "admitted" | "discharged", updateData: any) {
-    return await Admission.findOneAndUpdate({ _id: id, hospital: hospitalId }, { status, ...updateData }, { new: true });
+  static async updateAdmissionStatus(hospitalId: any, id: string, status: "admitted" | "discharged", updateData: any) {
+    return await Admission.findOneAndUpdate({ _id: id, ...toFilter(hospitalId) }, { status, ...updateData }, { new: true });
   }
 
   // ── Billing & Payment Operations ──
@@ -402,20 +403,20 @@ export class ReceptionRepository {
     return await Invoice.create(data);
   }
 
-  static async findInvoiceById(hospitalId: Types.ObjectId, id: string) {
-    return await Invoice.findOne({ _id: id, hospital: hospitalId }).populate("patient", "name uhid phone age gender");
+  static async findInvoiceById(hospitalId: any, id: string) {
+    return await Invoice.findOne({ _id: id, ...toFilter(hospitalId) }).populate("patient", "name uhid phone age gender");
   }
 
-  static async updateInvoiceStatus(hospitalId: Types.ObjectId, id: string, status: string) {
-    return await Invoice.findOneAndUpdate({ _id: id, hospital: hospitalId }, { status }, { new: true });
+  static async updateInvoiceStatus(hospitalId: any, id: string, status: string) {
+    return await Invoice.findOneAndUpdate({ _id: id, ...toFilter(hospitalId) }, { status }, { new: true });
   }
 
   static async createPayment(data: any) {
     return await Payment.create(data);
   }
 
-  static async getPaymentHistory(hospitalId: Types.ObjectId) {
-    return await Payment.find({ hospital: hospitalId })
+  static async getPaymentHistory(hospitalId: any) {
+    return await Payment.find(toFilter(hospitalId))
       .populate("patient", "name uhid phone")
       .populate({
         path: "invoice",
@@ -424,119 +425,13 @@ export class ReceptionRepository {
       .sort({ paidAt: -1 });
   }
 
-  static async getPendingInvoices(hospitalId: Types.ObjectId) {
-    return await Invoice.find({ hospital: hospitalId, status: "pending" })
+  static async getPendingInvoices(hospitalId: any) {
+    return await Invoice.find({ ...toFilter(hospitalId), status: "pending" })
       .populate("patient", "name uhid phone")
       .sort({ createdAt: -1 });
   }
 
-  // ── Wards, Rooms & Beds Availability ──
-  static async seedDefaultWardsAndRooms(hospitalId: Types.ObjectId) {
-    let generalWard = await Ward.findOne({ hospital: hospitalId, name: "General Ward" });
-    if (!generalWard) {
-      generalWard = await Ward.create({
-        hospital: hospitalId,
-        name: "General Ward",
-        code: "GW",
-        wardType: "General Ward",
-        floorNumber: 1,
-        status: "Active"
-      });
-    }
 
-    let semiPrivateWard = await Ward.findOne({ hospital: hospitalId, name: "Semi-Private Ward" });
-    if (!semiPrivateWard) {
-      semiPrivateWard = await Ward.create({
-        hospital: hospitalId,
-        name: "Semi-Private Ward",
-        code: "SPW",
-        wardType: "Semi-Private Ward",
-        floorNumber: 2,
-        status: "Active"
-      });
-    }
-
-    let privateWard = await Ward.findOne({ hospital: hospitalId, name: "Private Ward" });
-    if (!privateWard) {
-      privateWard = await Ward.create({
-        hospital: hospitalId,
-        name: "Private Ward",
-        code: "PW",
-        wardType: "Private Ward",
-        floorNumber: 3,
-        status: "Active"
-      });
-    }
-
-    let icuWard = await Ward.findOne({ hospital: hospitalId, name: "ICU" });
-    if (!icuWard) {
-      icuWard = await Ward.create({
-        hospital: hospitalId,
-        name: "ICU",
-        code: "ICU",
-        wardType: "ICU",
-        floorNumber: 2,
-        status: "Active"
-      });
-    }
-
-    const createRoomWithBeds = async (
-      roomNum: string,
-      wardDoc: any,
-      roomType: string,
-      acType: string,
-      floor: number,
-      capacity: number,
-      roomCharge: number
-    ) => {
-      let room = await Room.findOne({ hospital: hospitalId, roomNumber: roomNum });
-      if (!room) {
-        room = await Room.create({
-          hospital: hospitalId,
-          roomNumber: roomNum,
-          roomName: `Room ${roomNum}`,
-          ward: wardDoc._id,
-          wardName: wardDoc.name,
-          floor,
-          roomType,
-          acType,
-          capacity,
-          tariff: {
-            roomChargePerDay: roomCharge,
-            admissionDeposit: roomCharge * 2,
-            effectiveFrom: new Date(),
-            status: "Active"
-          },
-          status: "Active"
-        });
-
-        for (let i = 0; i < capacity; i++) {
-          const letter = String.fromCharCode(65 + i);
-          const bedNum = `${roomNum}-${letter}`;
-          const bedCode = `BED-${roomNum}-${letter}`;
-
-          await Bed.create({
-            hospital: hospitalId,
-            ward: wardDoc._id,
-            room: room._id,
-            bedNumber: bedNum,
-            bedCode,
-            bedType: roomType === "ICU" ? "ICU Bed" : "Standard",
-            status: "Available",
-            isOccupied: false
-          });
-        }
-      }
-    };
-
-    await createRoomWithBeds("101", generalWard, "General", "Non AC", 1, 4, 500);
-    await createRoomWithBeds("102", generalWard, "General", "AC", 1, 4, 800);
-    await createRoomWithBeds("201", semiPrivateWard, "Semi Private", "Non AC", 2, 2, 1200);
-    await createRoomWithBeds("202", semiPrivateWard, "Semi Private", "AC", 2, 2, 1800);
-    await createRoomWithBeds("301", privateWard, "Private", "AC", 3, 1, 3000);
-    await createRoomWithBeds("302", privateWard, "Private", "AC", 3, 1, 3500);
-    await createRoomWithBeds("ICU-1", icuWard, "ICU", "AC", 2, 2, 5000);
-  }
 
   // ── Queue (Token) Operations ──
   static async getQueueTokensByDate(hospitalId: Types.ObjectId, date: Date) {
@@ -618,14 +513,14 @@ export class ReceptionRepository {
     return await DbNotification.create(data);
   }
 
-  static async getNotificationsByRole(hospitalId: Types.ObjectId, role: string) {
-    return await DbNotification.find({ ...toFilter(hospitalId), recipientRole: role })
+  static async getNotificationsByRole(filterOrId: any, role: string) {
+    return await DbNotification.find({ ...toFilter(filterOrId), recipientRole: role })
       .sort({ createdAt: -1 })
       .limit(50);
   }
 
-  static async markNotificationRead(hospitalId: Types.ObjectId, id: string) {
-    return await DbNotification.findOneAndUpdate({ _id: id, hospital: hospitalId }, { isRead: true }, { new: true });
+  static async markNotificationRead(filterOrId: any, id: string) {
+    return await DbNotification.findOneAndUpdate({ _id: id, ...toFilter(filterOrId) }, { isRead: true }, { new: true });
   }
 
   // ── Logging Operations ──

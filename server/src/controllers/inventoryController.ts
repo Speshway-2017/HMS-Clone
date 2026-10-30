@@ -14,6 +14,7 @@ import {
 
 const inventoryItemSchema = z.object({
   name: z.string().min(1),
+  strength: z.string().optional().default(""),
   sku: z.string().min(1),
   category: z.enum(INVENTORY_CATEGORIES).optional(),
   description: z.string().optional().default(""),
@@ -67,13 +68,13 @@ export const createInventoryItem = catchAsync(async (req: Request, res: Response
     emitToHospital(req.hospitalFilter.hospital, "inventory_updated", { itemId: item._id, name: item.name });
   }
 
-  await logAudit({
+  logAudit({
     req,
     action: "CREATE_INVENTORY_ITEM",
     entity: "InventoryItem",
     entityId: item._id.toString(),
-    details: { name: item.name, sku: item.sku, stockQty: item.stockQty }
-  });
+    details: { name: item.name, sku: item.sku, stockQty: item.stockQty },
+  }).catch((err) => console.error("Audit log error:", err));
 
   res.status(201).json({ status: "success", data: { item: withComputedStatus(item) } });
 });
@@ -100,13 +101,13 @@ export const updateInventoryItem = catchAsync(async (req: Request, res: Response
     emitToHospital(req.hospitalFilter.hospital, "inventory_updated", { itemId: item._id, name: item.name });
   }
 
-  await logAudit({
+  logAudit({
     req,
     action: "UPDATE_INVENTORY_ITEM",
     entity: "InventoryItem",
     entityId: item._id.toString(),
-    details: body
-  });
+    details: body,
+  }).catch((err) => console.error("Audit log error:", err));
 
   res.json({ status: "success", data: { item: withComputedStatus(item) } });
 });
@@ -121,13 +122,54 @@ export const deleteInventoryItem = catchAsync(async (req: Request, res: Response
     emitToHospital(req.hospitalFilter.hospital, "inventory_updated", { itemId: req.params.id });
   }
 
-  await logAudit({
+  logAudit({
     req,
     action: "DELETE_INVENTORY_ITEM",
     entity: "InventoryItem",
     entityId: req.params.id,
-    details: { name: item.name, sku: item.sku }
-  });
+    details: { name: item.name, sku: item.sku },
+  }).catch((err) => console.error("Audit log error:", err));
 
   res.status(204).send();
+});
+
+export const listMedicineNames = catchAsync(async (req: Request, res: Response) => {
+  const filter: Record<string, unknown> = { ...req.hospitalFilter, category: "medicines" };
+  const { search } = req.query as Record<string, string | undefined>;
+  if (search) filter.name = new RegExp(search, "i");
+
+  const names = await InventoryItem.distinct("name", filter);
+  res.json({ status: "success", data: names.sort() });
+});
+
+export const listMedicineVariants = catchAsync(async (req: Request, res: Response) => {
+  const { name } = req.query as Record<string, string | undefined>;
+  if (!name) {
+    throw new AppError("Medicine name is required.", 400);
+  }
+
+  const filter: Record<string, unknown> = {
+    ...req.hospitalFilter,
+    category: "medicines",
+    name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"),
+  };
+
+  const items = await InventoryItem.find(filter)
+    .select("name strength stockQty unitCost sku storageCondition description")
+    .sort({ strength: 1 });
+
+  res.json({
+    status: "success",
+    data: items.map((item) => {
+      const obj = item.toObject();
+      return {
+        _id: obj._id,
+        name: obj.name,
+        strength: obj.strength || "",
+        stockQty: obj.stockQty,
+        unitCost: obj.unitCost,
+        sku: obj.sku,
+      };
+    }),
+  });
 });

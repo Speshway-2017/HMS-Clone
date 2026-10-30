@@ -578,15 +578,23 @@ export const getInvoiceByAppointmentId = catchAsync(async (req: Request, res: Re
  * Frontend must NEVER cache these results between doctor/date changes.
  */
 export const getAvailableSlots = catchAsync(async (req: Request, res: Response) => {
-  const { doctorId, date } = req.query as Record<string, string>;
+  let { doctorId, date, patientId } = req.query as Record<string, string>;
   if (!doctorId || !date) {
     throw new AppError("doctorId and date are required query parameters.", 400);
+  }
+
+  if (!patientId && req.user && req.user.role === "patient") {
+    const patientDoc = await Patient.findOne({ user: req.user._id }).select("_id");
+    if (patientDoc) {
+      patientId = patientDoc._id.toString();
+    }
   }
 
   const bookedSlots = await AppointmentSlotService.getBookedSlots(
     doctorId,
     date,
-    req.hospitalFilter?.hospital
+    req.hospitalFilter?.hospital,
+    patientId
   );
 
   res.json({ status: "success", data: { bookedSlots } });

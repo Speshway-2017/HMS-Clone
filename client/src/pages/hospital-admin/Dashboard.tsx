@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { useBranchContext } from "../../context/BranchContext";
 import { 
   CalendarClock, 
   BedDouble, 
@@ -55,6 +56,7 @@ import { LiveActivityPanel } from "../../components/admin-dashboard/LiveActivity
 type ActiveTabOption = "overview" | "patient_flow" | "dept_doctors" | "revenue" | "diagnostics";
 
 export function HospitalAdminDashboard() {
+  const { isAllBranches } = useBranchContext();
   const queryClient = useQueryClient();
 
   // Filter States
@@ -386,14 +388,16 @@ export function HospitalAdminDashboard() {
         </div>
 
         {/* Header Action Shortcuts */}
-        <div className="flex items-center gap-2">
-          <Link
-            to="/admin/doctors/new"
-            className="flex items-center gap-1.5 rounded-lg bg-navy-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-navy-800"
-          >
-            <Plus className="h-3.5 w-3.5" /> Add Doctor
-          </Link>
-        </div>
+        {!isAllBranches && (
+          <div className="flex items-center gap-2">
+            <Link
+              to="/admin/doctors/new"
+              className="flex items-center gap-1.5 rounded-lg bg-navy-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-navy-800"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Doctor
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* 2. Global Filter & Socket Controls Bar */}
@@ -451,9 +455,13 @@ export function HospitalAdminDashboard() {
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Quick Actions</h4>
             <p className="text-xs font-semibold text-slate-700 mt-1">Management Shortcuts</p>
           </div>
-          <Link to="/admin/doctors/new" className="flex items-center gap-1.5 rounded-lg bg-navy-50 px-2.5 py-1.5 text-xs font-bold text-navy-700 hover:bg-navy-100">
-            <Plus className="h-3.5 w-3.5" /> Doctor
-          </Link>
+          {!isAllBranches ? (
+            <Link to="/admin/doctors/new" className="flex items-center gap-1.5 rounded-lg bg-navy-50 px-2.5 py-1.5 text-xs font-bold text-navy-700 hover:bg-navy-100">
+              <Plus className="h-3.5 w-3.5" /> Doctor
+            </Link>
+          ) : (
+            <span className="text-xs font-semibold text-slate-400 italic">Read-Only View</span>
+          )}
         </Card>
       </div>
 

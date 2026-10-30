@@ -28,6 +28,8 @@ const roomSchema = z.object({
   tariff: z.any().optional(),
 });
 
+import { buildBranchQuery } from "../utils/branchQueryHelper";
+
 // Helper function to convert integer index (0, 1, 2...) into Letter suffix (A, B, C...)
 function getBedLetter(index: number): string {
   let label = "";
@@ -42,7 +44,8 @@ function getBedLetter(index: number): string {
 export const listRooms = catchAsync(async (req: Request, res: Response) => {
   const { search, ward, status, page = 1, limit = 10 } = req.query;
 
-  const query: any = { ...req.hospitalFilter };
+  const baseFilter = buildBranchQuery(req.hospitalFilter);
+  const query: any = { ...baseFilter };
 
   if (search) {
     query.$or = [
@@ -70,7 +73,7 @@ export const listRooms = catchAsync(async (req: Request, res: Response) => {
 
   // Fetch bed statistics for these rooms
   const roomIds = rooms.map((r) => r._id);
-  const beds = await Bed.find({ ...req.hospitalFilter, room: { $in: roomIds } }).select("room status isOccupied").lean();
+  const beds = await Bed.find({ ...baseFilter, room: { $in: roomIds } }).select("room status isOccupied").lean();
 
   const bedsMap: Record<string, { totalBeds: number; occupiedBeds: number; availableBeds: number }> = {};
   for (const b of beds) {

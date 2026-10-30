@@ -40,6 +40,7 @@ import laboratoryRoutes from "./routes/laboratoryRoutes";
 import consultationRoutes from "./routes/consultationRoutes";
 import diagnosticReportRoutes from "./routes/diagnosticReportRoutes";
 
+import supplierRoutes from "./routes/supplierRoutes";
 import blogRoutes from "./routes/blogRoutes";
 import attendanceRoutes from "./routes/attendanceRoutes";
 import leaveRoutes from "./routes/leaveRoutes";
@@ -75,15 +76,30 @@ app.use(
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, postman) or matching clientUrl / localhost
-      if (!origin || origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1") || origin === env.clientUrl) {
+      // Allow requests with no origin (Electron, mobile apps, curl) or matching localhost/127.0.0.1
+      if (
+        !origin ||
+        origin.startsWith("http://localhost") ||
+        origin.startsWith("http://127.0.0.1") ||
+        origin.startsWith("file://") ||
+        origin === "null" ||
+        origin === env.clientUrl
+      ) {
         callback(null, true);
       } else {
-        callback(null, true); // Permissive in dev, valid domain matching
+        callback(null, true);
       }
     },
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization", "x-refresh-token", "X-Requested-With"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "x-refresh-token",
+      "X-Requested-With",
+      "X-Branch-ID",
+      "x-branch-id",
+      "Accept",
+    ],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   })
 );
@@ -127,6 +143,7 @@ app.use("/api/v1/uploads", uploadLimiter, uploadRoutes);
 
 // Register doctor dashboard first to prevent prefix matching collision on /api/v1/doctors
 app.use("/api/v1/doctors/dashboard", doctorDashboardRoutes);
+app.use("/api/v1/doctor-dashboard", doctorDashboardRoutes);
 app.use("/api/v1/doctors", doctorRoutes);
 
 app.use("/api/v1/staff", staffRoutes);
@@ -134,6 +151,7 @@ app.use("/api/v1/nurse", nurseRoutes);
 app.use("/api/v1/patients", patientRoutes);
 app.use("/api/v1/appointments", appointmentRoutes);
 app.use("/api/v1/inventory", inventoryRoutes);
+app.use("/api/v1/suppliers", supplierRoutes);
 app.use("/api/v1/invoices", invoiceRoutes);
 app.use("/api/v1/ip-billing", ipBillingRoutes);
 app.use("/api/v1/ip-bills", ipBillRoutes);

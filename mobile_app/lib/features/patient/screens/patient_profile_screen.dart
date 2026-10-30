@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/config/user_session.dart';
 import '../../../core/constants/app_colors.dart';
@@ -547,13 +548,6 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
             color: Color(0xFF0F172A),
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-            tooltip: 'Log Out',
-            onPressed: _handleLogout,
-          ),
-        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
@@ -608,10 +602,13 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                             label: 'Phone Number',
                             controller: _phoneController,
                             icon: Icons.phone_outlined,
-                            keyboardType: TextInputType.phone,
+                            keyboardType: TextInputType.number,
+                            maxLength: 10,
+                            counterText: '',
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                             validator: (val) {
                               if (val == null || val.trim().isEmpty) return 'Please enter phone number';
-                              if (!RegExp(r'^\d{10}$').hasMatch(val.trim())) return 'Phone must be 10 digits';
+                              if (val.trim().replaceAll(RegExp(r'\D'), '').length != 10) return 'Phone must be 10 digits';
                               return null;
                             },
                           ),
@@ -628,10 +625,11 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                                   controller: _ageController,
                                   icon: Icons.cake_outlined,
                                   keyboardType: TextInputType.number,
+                                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                                   validator: (val) {
                                     if (val == null || val.trim().isEmpty) return 'Enter age';
                                     final age = int.tryParse(val.trim());
-                                    if (age == null || age < 1 || age > 120) return 'Valid age (1-120)';
+                                    if (age == null || age < 0 || age > 120) return 'Valid age (0-120)';
                                     return null;
                                   },
                                 ),
@@ -676,6 +674,11 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                                   label: 'City / Location',
                                   controller: _addressController,
                                   icon: Icons.location_city_outlined,
+                                  validator: (val) {
+                                    if (val == null || val.trim().isEmpty) return 'Please enter address';
+                                    if (val.trim().length < 3) return 'Must be at least 3 chars';
+                                    return null;
+                                  },
                                 ),
                               ),
                             ],
@@ -713,9 +716,12 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                                   label: 'Nominee Phone Number',
                                   controller: _nomineePhoneController,
                                   icon: Icons.phone_forwarded_outlined,
-                                  keyboardType: TextInputType.phone,
+                                  keyboardType: TextInputType.number,
+                                  maxLength: 10,
+                                  counterText: '',
+                                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                                   validator: (val) {
-                                    if (val != null && val.trim().isNotEmpty && !RegExp(r'^\d{10}$').hasMatch(val.trim())) {
+                                    if (val != null && val.trim().isNotEmpty && val.trim().replaceAll(RegExp(r'\D'), '').length != 10) {
                                       return 'Must be 10 digits';
                                     }
                                     return null;
@@ -813,6 +819,39 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                                   ),
                                 ],
                               ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Log Out Account Red Card Button (Matching Profile & Settings Screenshot)
+                    SizedBox(
+                      width: double.infinity,
+                      child: InkWell(
+                        onTap: _handleLogout,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF2F2),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFFEE2E2), width: 1.5),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Icons.logout_rounded, color: Colors.redAccent, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Log Out Patient Account',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.redAccent,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 30),
@@ -1003,14 +1042,20 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
     FormFieldValidator<String>? validator,
+    int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
+    String? counterText,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
+      maxLength: maxLength,
+      inputFormatters: inputFormatters,
       validator: validator,
       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
       decoration: InputDecoration(
         labelText: label,
+        counterText: counterText,
         labelStyle: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
         errorStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.redAccent),
         prefixIcon: Icon(icon, size: 16, color: const Color(0xFF2563EB)),
