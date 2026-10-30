@@ -14,38 +14,57 @@ import { Patient } from "../models/Patient";
 import { Staff } from "../models/Staff";
 import { sendEmail } from "../services/emailService";
 import { handleAutoAttendanceOnLogin, handleAutoCheckoutOnLogout } from "../services/attendanceAutoService";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+  emailValidator,
+  phoneValidator,
+  numberValidator,
+  nameValidator,
+  addressValidator,
+  passwordValidator,
+} from "../utils/validators";
 
 const loginSchema = z.object({
-  identifier: z.string().optional(),
-  email: z.string().optional(),
-  password: z.string().min(1, "Password is required"),
+  identifier: z.string().trim().max(254, "Identifier cannot exceed 254 characters").optional(),
+  email: z.string().trim().max(254, "Email cannot exceed 254 characters").optional(),
+  password: z.string().min(1, "Password is required").max(64, "Password cannot exceed 64 characters"),
 });
 
-const registerSchema = z.object({
-  // Section 1: Account & Security (Mandatory)
-  name: z.string().min(2, "Full Name is required"),
-  email: z.string().email("Valid email is required"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+const registerSchema = z
+  .object({
+    // Section 1: Account & Security (Mandatory)
+    name: nameValidator("Full Name", 2, 50, true),
+    email: emailValidator("Email", true, 254),
+    password: passwordValidator("Password", 8, 64),
+    confirmPassword: z.string().max(64, "Confirm Password cannot exceed 64 characters").optional(),
 
-  // Section 2: Demographics & Contact (Mandatory)
-  phone: z.string().min(5, "Phone Number is required"),
-  age: z.coerce.number({ invalid_type_error: "Age is required" }).min(0, "Age must be valid").max(120, "Age must be valid"),
-  gender: z.string().min(1, "Gender is required"),
-  bloodGroup: z.string().min(1, "Blood Group is required"),
-  address: z.string().min(3, "Residential Address is required"),
+    // Section 2: Demographics & Contact (Mandatory)
+    phone: phoneValidator("Phone Number", true),
+    age: z.coerce
+      .number({ invalid_type_error: "Age is required" })
+      .min(0, "Age must be valid")
+      .max(150, "Age must be valid"),
+    gender: requiredTrimmedString("Gender", 1, 30),
+    bloodGroup: requiredTrimmedString("Blood Group", 1, 10),
+    address: addressValidator("Residential Address", 5, 250, true),
 
-  // Section 3: Emergency Contact (Mandatory)
-  emergencyContact: z.object({
-    name: z.string().min(1, "Emergency Contact Name is required"),
-    phone: z.string().min(1, "Emergency Contact Phone is required"),
-    relation: z.string().min(1, "Emergency Contact Relationship is required"),
-  }),
+    // Section 3: Emergency Contact (Mandatory)
+    emergencyContact: z.object({
+      name: nameValidator("Emergency Contact Name", 2, 50, true),
+      phone: phoneValidator("Emergency Contact Phone", true),
+      relation: requiredTrimmedString("Emergency Contact Relationship", 1, 50),
+    }),
 
-  // Section 4: Allergies & Insurance Details (Optional)
-  allergies: z.string().optional().default(""),
-  insuranceProvider: z.string().optional().default(""),
-  insurancePolicyNumber: z.string().optional().default(""),
-});
+    // Section 4: Allergies & Insurance Details (Optional)
+    allergies: optionalTrimmedString("Allergies", 500),
+    insuranceProvider: optionalTrimmedString("Insurance Provider", 100),
+    insurancePolicyNumber: optionalTrimmedString("Insurance Policy Number", 100),
+  })
+  .refine((data) => !data.confirmPassword || data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 async function sanitizeUser(user: UserDocument) {
   let name = user.name;
@@ -473,8 +492,11 @@ export const getMe = catchAsync(async (req: Request, res: Response) => {
 });
 
 const changePasswordSchema = z.object({
-  newPassword: z.string().min(1, "New password is required."),
-  confirmPassword: z.string().min(1, "Please confirm your new password."),
+  newPassword: passwordValidator("New Password", 8, 64),
+  confirmPassword: z.string().min(1, "Please confirm your new password.").max(64, "Confirm password cannot exceed 64 characters"),
+}).refine(data => data.newPassword === data.confirmPassword, {
+  message: "New password and confirmation do not match.",
+  path: ["confirmPassword"]
 });
 
 export const changePassword = catchAsync(async (req: Request, res: Response) => {
@@ -504,7 +526,7 @@ export const changePassword = catchAsync(async (req: Request, res: Response) => 
 });
 
 const forgotPasswordSchema = z.object({
-  email: z.string().email(),
+  email: emailValidator("Email", true, 254),
 });
 
 export const forgotPassword = catchAsync(async (req: Request, res: Response) => {
@@ -604,9 +626,9 @@ export const forgotPassword = catchAsync(async (req: Request, res: Response) => 
 });
 
 const resetPasswordSchema = z.object({
-  token: z.string().min(1),
-  password: z.string().min(8, "Password must be at least 8 characters long"),
-  confirmPassword: z.string(),
+  token: requiredTrimmedString("Token", 1, 256),
+  password: passwordValidator("Password", 8, 64),
+  confirmPassword: z.string().max(64, "Confirm Password cannot exceed 64 characters"),
 }).refine(data => data.password === data.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"]
@@ -684,10 +706,10 @@ export const resetPassword = catchAsync(async (req: Request, res: Response) => {
 });
 
 const updateProfileSchema = z.object({
-  name: z.string().min(2).optional(),
-  phone: z.string().optional(),
-  email: z.string().email().optional(),
-  avatarUrl: z.string().optional(),
+  name: nameValidator("Name", 2, 50, false).optional(),
+  phone: phoneValidator("Phone", false).optional(),
+  email: emailValidator("Email", false, 254).optional(),
+  avatarUrl: optionalTrimmedString("Avatar URL", 500).optional(),
 });
 
 export const updateProfile = catchAsync(async (req: Request, res: Response) => {

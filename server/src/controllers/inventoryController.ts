@@ -6,6 +6,11 @@ import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 import { emitToHospital } from "../config/socket";
 import { logAudit } from "../utils/auditLogger";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+  numberValidator,
+} from "../utils/validators";
 
 const inventoryItemSchema = z.object({
   name: z.string().min(1),

@@ -670,7 +670,7 @@ export const savePayrollAdjustments = catchAsync(async (req: Request, res: Respo
     netSalary: calc.netSalary,
 
     status: nextStatus,
-    remarks: remarks || "",
+    remarks: remarks ? String(remarks).trim().slice(0, 1000) : "",
     lastSyncTimestamp: new Date(),
     processedBy: userId || null,
   };

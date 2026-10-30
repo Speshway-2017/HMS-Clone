@@ -36,14 +36,14 @@ export function formatAndSanitizeMedications(rawMeds: any[]) {
   if (!Array.isArray(rawMeds)) return [];
   return rawMeds
     .map((m: any) => {
-      const name = String(m.name || m.medicineName || "").trim();
+      const name = String(m.name || m.medicineName || "").trim().slice(0, 200);
       if (!name) return null;
 
-      const strength = String(m.strength || "").trim();
-      const dosage = String(m.dosage || "").trim();
-      const frequency = String(m.frequency || "").trim();
-      const duration = String(m.duration || "").trim();
-      const instructions = String(m.instructions || "").trim();
+      const strength = String(m.strength || "").trim().slice(0, 100);
+      const dosage = String(m.dosage || "").trim().slice(0, 100);
+      const frequency = String(m.frequency || "").trim().slice(0, 100);
+      const duration = String(m.duration || "").trim().slice(0, 100);
+      const instructions = String(m.instructions || "").trim().slice(0, 500);
 
       // Compute total recommended quantity if missing
       let qty = Number(m.quantity);
@@ -125,10 +125,10 @@ export async function createOrUpdatePrescriptionCore(
   let prescription = await Prescription.findOne({ appointment: appointmentId, hospital: hospitalId }).session(session);
   const isNew = !prescription;
 
-  const diagnosisVal = data.diagnosis || appointment.diagnosis || "Consultation visit";
-  const chiefComplaintVal = data.chiefComplaint || appointment.chiefComplaint || "";
-  const clinicalNotesVal = data.clinicalNotes || appointment.clinicalNotes || "";
-  const adviceVal = data.advice || appointment.advice || "";
+  const diagnosisVal = String(data.diagnosis || appointment.diagnosis || "Consultation visit").trim().slice(0, 500);
+  const chiefComplaintVal = String(data.chiefComplaint || appointment.chiefComplaint || "").trim().slice(0, 1000);
+  const clinicalNotesVal = String(data.clinicalNotes || appointment.clinicalNotes || "").trim().slice(0, 5000);
+  const adviceVal = String(data.advice || appointment.advice || "").trim().slice(0, 2000);
   const followUpDateVal = data.followUpDate !== undefined ? data.followUpDate : (appointment.followUpDate || null);
 
   if (!prescription) {

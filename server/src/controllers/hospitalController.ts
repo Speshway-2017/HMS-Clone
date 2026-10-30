@@ -16,15 +16,57 @@ import { getPagination, paginatedResponse } from "../utils/pagination";
 import { AppointmentSlotService } from "../services/appointmentSlotService";
 
 import { generateUniqueHospitalCode } from "../utils/idGenerator";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+  emailValidator,
+  phoneValidator,
+  urlValidator,
+  codeValidator,
+  numberValidator,
+  nameValidator,
+} from "../utils/validators";
 
 const hospitalSchema = z.object({
-  name: z.string().min(1),
-  code: z.string().optional().default(""),
-  address: z.string().optional().default(""),
-  contactEmail: z.string().email().optional().or(z.literal("")).default(""),
-  contactPhone: z.string().optional().default(""),
-  logoUrl: z.string().optional().default(""),
-  licenseUrl: z.string().optional().default(""),
+  name: requiredTrimmedString("Hospital Name", 1, 100),
+  code: z.string().max(20, "Hospital Code cannot exceed 20 characters").optional().default(""),
+  address: optionalTrimmedString("Address", 250),
+  contactEmail: emailValidator("Contact Email", false, 100),
+  contactPhone: phoneValidator("Primary Phone", false),
+  logoUrl: z
+    .string()
+    .optional()
+    .default("")
+    .refine(
+      (val) => {
+        if (!val) return true;
+        const lower = val.toLowerCase();
+        return (
+          lower.startsWith("data:image/") ||
+          lower.endsWith(".png") ||
+          lower.endsWith(".jpg") ||
+          lower.endsWith(".jpeg") ||
+          lower.endsWith(".webp") ||
+          lower.endsWith(".svg") ||
+          lower.includes(".png?") ||
+          lower.includes(".jpg?") ||
+          lower.includes(".jpeg?") ||
+          lower.includes(".webp?") ||
+          lower.includes(".svg?") ||
+          lower.includes("/image/upload/")
+        );
+      },
+      {
+        message: "Hospital Logo must be a valid image file (PNG, JPEG, WEBP, or SVG)",
+      }
+    ),
+  licenseUrl: z
+    .string()
+    .optional()
+    .default("")
+    .refine((val) => !val || val.toLowerCase().endsWith(".pdf") || val.toLowerCase().includes(".pdf?"), {
+      message: "License Credentials must be a PDF file (.pdf)",
+    }),
   bedCapacity: z.coerce.number().min(0).optional().default(0),
   opExpiryLimit: z.coerce.number().min(0).optional().default(10),
   availableLabTests: z.array(z.string()).optional(),
@@ -97,6 +139,22 @@ export const createHospital = catchAsync(async (req: Request, res: Response) => 
   const body = hospitalSchema.parse(req.body);
   let { code, primaryAdminId, ...hospitalFields } = body;
 
+  // Validate Primary Admin eligibility if specified
+  if (primaryAdminId) {
+    if (!Types.ObjectId.isValid(primaryAdminId)) {
+      throw new AppError("Invalid Primary Admin ID.", 400);
+    }
+    const eligibleAdmin = await User.findOne({
+      _id: primaryAdminId,
+      role: "hospital_admin",
+      hospital: null,
+      status: "active",
+    });
+    if (!eligibleAdmin) {
+      throw new AppError("Selected administrator is invalid, inactive, or already assigned to a hospital.", 400);
+    }
+  }
+
   let generatedCode = code?.trim();
   if (!generatedCode) {
     generatedCode = await generateUniqueHospitalCode(body.name);
@@ -111,7 +169,7 @@ export const createHospital = catchAsync(async (req: Request, res: Response) => 
   });
 
   if (primaryAdminId) {
-    await User.findOneAndUpdate({ _id: primaryAdminId, role: "hospital_admin", hospital: null }, { hospital: hospital._id });
+    await User.findByIdAndUpdate(primaryAdminId, { hospital: hospital._id });
   }
 
   res.status(201).json({ status: "success", data: { hospital } });
@@ -153,7 +211,19 @@ export const updateHospital = catchAsync(async (req: Request, res: Response) => 
   }
 
   if (primaryAdminId) {
-    await User.findOneAndUpdate({ _id: primaryAdminId, role: "hospital_admin" }, { hospital: hospital._id });
+    if (!Types.ObjectId.isValid(primaryAdminId)) {
+      throw new AppError("Invalid Primary Admin ID.", 400);
+    }
+    const eligibleAdmin = await User.findOne({
+      _id: primaryAdminId,
+      role: "hospital_admin",
+      status: "active",
+      $or: [{ hospital: null }, { hospital: hospital._id }],
+    });
+    if (!eligibleAdmin) {
+      throw new AppError("Selected administrator is invalid, inactive, or already assigned to another hospital.", 400);
+    }
+    await User.findByIdAndUpdate(primaryAdminId, { hospital: hospital._id });
   }
 
   emitToHospital(hospital._id, "hospital:updated", hospital);
@@ -171,7 +241,9 @@ export const deleteHospital = catchAsync(async (req: Request, res: Response) => 
 });
 
 export const listUnassignedHospitalAdmins = catchAsync(async (_req: Request, res: Response) => {
-  const admins = await User.find({ role: "hospital_admin", hospital: null }).select("name email");
+  const admins = await User.find({ role: "hospital_admin", hospital: null, status: "active" })
+    .select("name email status")
+    .sort({ name: 1 });
   res.json({ status: "success", data: { admins } });
 });
 
@@ -353,16 +425,20 @@ export const createPublicAppointment = catchAsync(async (req: Request, res: Resp
   res.status(201).json({ status: "success", data: { appointment } });
 });
 
-export const createPublicEnquiry = catchAsync(async (req: Request, res: Response) => {
-  const { name, email, subject, message } = req.body;
-  
-  const nameStr = name?.trim() || "";
-  const emailStr = email?.trim() || "";
-  const messageStr = message?.trim() || "";
+const publicEnquirySchema = z.object({
+  name: nameValidator("Full Name", 2, 50, true),
+  email: emailValidator("Email Address", true, 254),
+  subject: optionalTrimmedString("Subject", 100, "General Enquiry"),
+  message: requiredTrimmedString("Your Message", 10, 1000),
+});
 
-  if (!nameStr || !emailStr || !messageStr) {
-    throw new AppError("Name, email, and message are required fields.", 400);
+export const createPublicEnquiry = catchAsync(async (req: Request, res: Response) => {
+  const parsed = publicEnquirySchema.safeParse(req.body);
+  if (!parsed.success) {
+    const firstIssue = parsed.error.issues[0]?.message || "Please enter valid data";
+    throw new AppError(firstIssue, 400);
   }
+  const { name, email, subject, message } = parsed.data;
 
   let hospital = await Hospital.findOne({ status: "active" }).sort({ createdAt: 1 });
   if (!hospital) {
@@ -379,10 +455,10 @@ export const createPublicEnquiry = catchAsync(async (req: Request, res: Response
   
   const enquiry = await Enquiry.create({
     hospital: hospital._id,
-    name: nameStr,
-    email: emailStr,
-    subject: subject?.trim() || "General Enquiry",
-    message: messageStr,
+    name,
+    email: email.toLowerCase(),
+    subject: subject || "General Enquiry",
+    message,
     status: "pending"
   });
   
@@ -422,4 +498,3 @@ export const updateEnquiryStatus = catchAsync(async (req: Request, res: Response
   emitToHospital(hospitalId, "enquiry:updated", enquiry);
   res.json({ status: "success", data: { enquiry } });
 });
-

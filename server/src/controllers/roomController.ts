@@ -5,6 +5,28 @@ import { Room } from "../models/Room";
 import { Ward } from "../models/Ward";
 import { Bed } from "../models/Bed";
 import { RoomTariff } from "../models/RoomTariff";
+import { z } from "zod";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+  codeValidator,
+  numberValidator,
+} from "../utils/validators";
+
+const roomSchema = z.object({
+  roomNumber: codeValidator("Room number", 1, 20, true),
+  roomName: optionalTrimmedString("Room name", 100),
+  wardId: requiredTrimmedString("Ward", 1, 50),
+  floor: optionalTrimmedString("Floor", 20),
+  roomType: requiredTrimmedString("Room type", 1, 50),
+  acType: optionalTrimmedString("AC type", 50),
+  acSubTypes: z.array(z.string().trim().max(50)).optional().default([]),
+  capacity: z.coerce.number().min(1, "Room bed capacity must be at least 1").max(500, "Room capacity cannot exceed 500"),
+  description: optionalTrimmedString("Description", 500),
+  status: optionalTrimmedString("Status", 50, "Available"),
+  autoGenerateBeds: z.boolean().optional().default(true),
+  tariff: z.any().optional(),
+});
 
 // Helper function to convert integer index (0, 1, 2...) into Letter suffix (A, B, C...)
 function getBedLetter(index: number): string {

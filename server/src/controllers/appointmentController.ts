@@ -14,6 +14,11 @@ import { logAudit } from "../utils/auditLogger";
 import { validateAppointmentTimeRestriction } from "../utils/appointmentTimeValidation";
 import { AppointmentSlotService } from "../services/appointmentSlotService";
 import { createDoctorNotification } from "../utils/notificationHelper";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+  urlValidator,
+} from "../utils/validators";
 
 async function generateReferenceId(hospitalId: string, bookingDate: Date): Promise<string> {
   const dateStr = bookingDate.toISOString().split("T")[0].replace(/-/g, "");

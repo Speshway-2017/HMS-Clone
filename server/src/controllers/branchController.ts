@@ -8,6 +8,13 @@ import { getPagination, paginatedResponse } from "../utils/pagination";
 
 import { syncBranchDepartmentsForBranch } from "../utils/branchDepartmentSync";
 import { emitToHospital } from "../config/socket";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+  emailValidator,
+  phoneValidator,
+  numberValidator,
+} from "../utils/validators";
 
 const branchSchema = z.object({
   hospital: z.string().min(1),

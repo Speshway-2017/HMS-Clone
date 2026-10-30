@@ -15,6 +15,13 @@ import { RadiologyOrder } from "../models/RadiologyOrder";
 import { emitToHospital } from "../config/socket";
 import { logAudit } from "../utils/auditLogger";
 import { buildBranchQuery } from "../utils/branchQueryHelper";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+  emailValidator,
+  phoneValidator,
+  urlValidator,
+} from "../utils/validators";
 
 async function getLoggedDoctor(req: Request) {
   const doctor = await Doctor.findOne({ email: req.user!.email, isActive: { $ne: false } });

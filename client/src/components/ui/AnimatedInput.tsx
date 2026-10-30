@@ -32,6 +32,8 @@ export interface AnimatedInputProps {
   required?: boolean;
   autoComplete?: string;
   id?: string;
+  maxLength?: number;
+  error?: string | null;
 }
 
 export default function AnimatedInput({
@@ -50,6 +52,8 @@ export default function AnimatedInput({
   required = false,
   autoComplete,
   id,
+  maxLength,
+  error,
 }: AnimatedInputProps) {
   const [internalValue, setInternalValue] = useState(defaultValue);
   const isControlled = value !== undefined;
@@ -94,8 +98,11 @@ export default function AnimatedInput({
     };
   };
 
+  const isOverLimit = maxLength !== undefined && val !== undefined && val.length > maxLength;
+  const activeError = error || (isOverLimit ? `Maximum ${maxLength} characters allowed` : null);
   return (
-    <div className={`relative flex items-center ${className}`}>
+    <div className="w-full">
+      <div className={`relative flex items-center ${className}`}>
       <style>{`
         @keyframes drawPath {
           0% {
@@ -148,13 +155,14 @@ export default function AnimatedInput({
       ) : null}
       <input
         aria-label={label}
-        className={`peer w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm outline-none transition-all duration-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 text-slate-900 ${
+        className={`peer w-full rounded-xl border ${activeError ? "border-red-500 text-red-900 focus:border-red-500" : "border-slate-200 text-slate-900"} bg-white px-3.5 py-3 text-sm outline-none transition-all duration-200 focus:ring-4 focus:ring-blue-500/10 ${
           icon ? "pl-10" : ""
         } ${endIcon ? "pr-10" : ""} ${inputClassName}`}
         disabled={disabled}
         id={inputId}
         type={type}
         required={required}
+        maxLength={maxLength}
         autoComplete={autoComplete}
         onBlur={() => setIsFocused(false)}
         onChange={(e) => {
@@ -188,6 +196,12 @@ export default function AnimatedInput({
       >
         {label}
       </motion.label>
+      </div>
+      {activeError && (
+        <p className="mt-1 text-xs font-medium text-red-600" role="alert">
+          {activeError}
+        </p>
+      )}
     </div>
   );
 }

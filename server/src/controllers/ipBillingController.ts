@@ -655,7 +655,10 @@ export const getIPAdmissionBillingDetails = catchAsync(async (req: Request, res:
 export const addCustomCharge = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital;
   const admissionId = req.params.id;
-  const { category, serviceName, quantity, unitPrice, discount, tax, remarks } = req.body;
+  const category = String(req.body.category || "").trim().slice(0, 100);
+  const serviceName = String(req.body.serviceName || "").trim().slice(0, 200);
+  const remarks = req.body.remarks ? String(req.body.remarks).trim().slice(0, 1000) : "";
+  const { quantity, unitPrice, discount, tax } = req.body;
 
   const admission = await Admission.findOne({ _id: admissionId, hospital: hospitalId });
   if (!admission) {
@@ -744,7 +747,9 @@ export const deleteCustomCharge = catchAsync(async (req: Request, res: Response)
 export const postIPAdvancePayment = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital;
   const admissionId = req.params.id;
-  const { amount, paymentMethod, transactionId, type } = req.body;
+  const transactionId = req.body.transactionId ? String(req.body.transactionId).trim().slice(0, 100) : "";
+  const paymentMethod = req.body.paymentMethod ? String(req.body.paymentMethod).trim().slice(0, 50) : "Cash";
+  const { amount, type } = req.body;
 
   const amt = Number(amount) || 0;
   const isRefund = type === "refund";

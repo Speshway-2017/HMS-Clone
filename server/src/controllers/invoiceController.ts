@@ -17,6 +17,11 @@ import { getPagination, paginatedResponse } from "../utils/pagination";
 import { emitToHospital } from "../config/socket";
 import { logAudit } from "../utils/auditLogger";
 import { buildBranchQuery } from "../utils/branchQueryHelper";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+  numberValidator,
+} from "../utils/validators";
 
 const invoiceItemSchema = z.object({
   description: z.string().min(1),

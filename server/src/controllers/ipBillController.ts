@@ -671,7 +671,9 @@ export const getIPBillDetails = catchAsync(async (req: Request, res: Response) =
 export const addBillChargeItem = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital;
   const billId = req.params.id;
-  const { category, description, quantity, days, unitPrice, discount, tax } = req.body;
+  const category = String(req.body.category || "").trim().slice(0, 100);
+  const description = String(req.body.description || "").trim().slice(0, 500);
+  const { quantity, days, unitPrice, discount, tax } = req.body;
 
   const bill = await IPBill.findOne({ _id: billId, hospital: hospitalId });
   if (!bill) {
@@ -969,7 +971,9 @@ export const generateIPBillInvoice = catchAsync(async (req: Request, res: Respon
 export const postIPBillPayment = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital;
   const billId = req.params.id;
-  const { amount, paymentMethod, mixedDetails, transactionId } = req.body;
+  const transactionId = req.body.transactionId ? String(req.body.transactionId).trim().slice(0, 100) : "";
+  const paymentMethod = req.body.paymentMethod ? String(req.body.paymentMethod).trim().slice(0, 50) : "Cash";
+  const { amount, mixedDetails } = req.body;
 
   const session = await mongoose.startSession();
   session.startTransaction();

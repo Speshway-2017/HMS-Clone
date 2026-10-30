@@ -3,6 +3,11 @@ import { z } from "zod";
 import { BlogPost } from "../models/BlogPost";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+  urlValidator,
+} from "../utils/validators";
 import { logAudit } from "../utils/auditLogger";
 
 const blogSchema = z.object({

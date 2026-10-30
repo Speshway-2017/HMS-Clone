@@ -10,6 +10,20 @@ import { Expense } from "../models/Expense";
 import { InsuranceClaim } from "../models/InsuranceClaim";
 import { User } from "../models/User";
 import { emitToHospital } from "../config/socket";
+import { z } from "zod";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+} from "../utils/validators";
+
+const expenseSchema = z.object({
+  category: requiredTrimmedString("Category", 1, 50),
+  amount: z.coerce.number({ invalid_type_error: "Amount must be a number" }).positive("Amount must be positive").max(100000000, "Amount cannot exceed 100,000,000"),
+  recipient: requiredTrimmedString("Recipient", 1, 100),
+  description: optionalTrimmedString("Description", 500),
+  paymentMethod: optionalTrimmedString("Payment method", 50, "Cash"),
+  date: z.coerce.date().optional(),
+});
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 

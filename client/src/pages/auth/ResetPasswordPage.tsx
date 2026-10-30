@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { Button } from "../../components/ui/Button";
 import { usePublicHospital } from "../../features/hospitals";
 import { api } from "../../lib/api";
+import { MAX_LENGTHS } from "../../lib/validation";
 import { ShieldCheck, Activity, ArrowLeft, CheckCircle2, Eye, EyeOff, XCircle, CheckCircle } from "lucide-react";
 
 export function ResetPasswordPage() {
@@ -41,6 +42,10 @@ export function ResetPasswordPage() {
     setError(null);
 
     // Validate client-side password criteria
+    if (password.length > MAX_LENGTHS.PASSWORD) {
+      setError(`Password cannot exceed ${MAX_LENGTHS.PASSWORD} characters.`);
+      return;
+    }
     if (!isMinLength || !hasLetter || !hasNumber) {
       setError("Please ensure your new password meets all security criteria.");
       return;
@@ -81,13 +86,15 @@ export function ResetPasswordPage() {
 
           {/* Logo Branding */}
           <Link to="/" className="flex items-center gap-3 text-lg font-extrabold tracking-tight relative z-10">
-            {logoUrl ? (
-              <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover shadow-sm" />
-            ) : (
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-white font-bold text-sm shadow-md border border-white/10">
-                <Activity className="h-4 w-4 text-emerald-400" />
-              </div>
-            )}
+            <img
+              src={logoUrl || "/hospital-logo.svg"}
+              alt=""
+              className="h-8 w-8 rounded-lg object-cover shadow-sm bg-white/10"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = "/hospital-logo.svg";
+              }}
+            />
             <span className="bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">
               {hospitalName}
             </span>
