@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, Navigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRegisterPatientUser } from "../../features/auth";
@@ -22,6 +22,8 @@ import {
   UserPlus,
   Loader2,
   ArrowLeft,
+  ShieldAlert,
+  FileText,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "../../lib/api";
