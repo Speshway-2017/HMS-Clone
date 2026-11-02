@@ -4,6 +4,7 @@ import { AppError } from "../utils/AppError";
 import { Bed } from "../models/Bed";
 import { Room } from "../models/Room";
 import { Admission } from "../models/Admission";
+import { buildBranchQuery } from "../utils/branchQueryHelper";
 import { z } from "zod";
 import {
   requiredTrimmedString,

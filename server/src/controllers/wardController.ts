@@ -3,6 +3,7 @@ import { catchAsync } from "../utils/catchAsync";
 import { AppError } from "../utils/AppError";
 import { Ward } from "../models/Ward";
 import { Room } from "../models/Room";
+import { buildBranchQuery } from "../utils/branchQueryHelper";
 import { z } from "zod";
 import {
   requiredTrimmedString,
