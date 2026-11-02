@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
 import { 
   Receipt, 
@@ -9,7 +11,9 @@ import {
   CheckCircle, 
   Search, 
   User, 
-  Calendar 
+  Calendar,
+  RefreshCw,
+  Copy
 } from "lucide-react";
 import { useInvoices } from "../../features/invoices";
 import { usePatients } from "../../features/patients";
@@ -41,7 +45,27 @@ interface VisitGroup {
 }
 
 export function FinancePage() {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"overview" | "pending" | "statement">("overview");
+  const [isRefreshingOverview, setIsRefreshingOverview] = useState(false);
+  const [selectedMetric, setSelectedMetric] = useState<{
+    label: string;
+    value: string;
+    numeric?: number | string;
+    description: string;
+  } | null>(null);
+
+  const handleRefreshOverview = async () => {
+    setIsRefreshingOverview(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      toast.success("Revenue analytics data refreshed successfully", { id: "revenue-refreshed" });
+    } catch {
+      toast.error("Failed to refresh revenue data", { id: "revenue-refresh-err" });
+    } finally {
+      setIsRefreshingOverview(false);
+    }
+  };
 
   // Invoices & Overview state
   const [page, setPage] = useState(1);
@@ -268,12 +292,26 @@ export function FinancePage() {
           <h1 className="text-2xl font-bold text-slate-900">Revenue Analytics</h1>
           <p className="text-sm text-slate-500">Real revenue, billing overview, and consolidated patient statements.</p>
         </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleRefreshOverview}
+            disabled={isRefreshingOverview || isLoading}
+            aria-label="Refresh Revenue Analytics"
+            className="flex items-center gap-1.5 text-xs font-semibold"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isRefreshingOverview || isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Navigation Sub-Tabs */}
       <div className="flex border-b border-slate-200 overflow-x-auto">
         <button
           onClick={() => setActiveTab("overview")}
+          aria-label="All Invoices Overview"
           className={`border-b-2 px-4 py-2.5 text-sm font-semibold capitalize transition-all whitespace-nowrap ${
             activeTab === "overview"
               ? "border-navy-700 text-navy-700 font-bold"
@@ -284,13 +322,14 @@ export function FinancePage() {
         </button>
         <button
           onClick={() => setActiveTab("pending")}
+          aria-label="Pending and Overdue"
           className={`border-b-2 px-4 py-2.5 text-sm font-semibold capitalize transition-all whitespace-nowrap flex items-center gap-1.5 ${
             activeTab === "pending"
               ? "border-amber-500 text-amber-700 font-bold"
               : "border-transparent text-slate-500 hover:text-slate-700"
           }`}
         >
-          <AlertCircle className="h-4 w-4" /> Pending &amp; Overdue
+          <AlertCircle className="h-4 w-4" /> Pending and Overdue
           {data?.counts?.pendingCount != null && data.counts.pendingCount > 0 && (
             <span className="ml-1 bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
               {data.counts.pendingCount}
@@ -299,6 +338,7 @@ export function FinancePage() {
         </button>
         <button
           onClick={() => setActiveTab("statement")}
+          aria-label="Patient Consolidated Statement"
           className={`border-b-2 px-4 py-2.5 text-sm font-semibold capitalize transition-all whitespace-nowrap ${
             activeTab === "statement"
               ? "border-navy-700 text-navy-700 font-bold"
@@ -313,32 +353,80 @@ export function FinancePage() {
       {activeTab === "overview" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <KpiCard label="Total Billing" value={`₹${(data?.counts.totalBilling ?? 0).toFixed(2)}`} icon={<Receipt className="h-5 w-5" />} emphasis />
-            <KpiCard label="Net Revenue (Paid)" value={`₹${(data?.counts.netRevenue ?? 0).toFixed(2)}`} icon={<TrendingUp className="h-5 w-5" />} />
-            <KpiCard label="Pending / Overdue" value={data?.counts.pendingCount ?? 0} icon={<AlertCircle className="h-5 w-5" />} />
+            <div className="min-w-0">
+              <KpiCard
+                label="Total Billing"
+                value={formatINR(Number(data?.counts?.totalBilling) || 0)}
+                icon={<Receipt className="h-5 w-5" />}
+                emphasis
+                onClick={() =>
+                  setSelectedMetric({
+                    label: "Total Billing",
+                    value: formatINR(Number(data?.counts?.totalBilling) || 0),
+                    numeric: Number(data?.counts?.totalBilling) || 0,
+                    description: "Cumulative billing generated across all OP consultations and IP admissions.",
+                  })
+                }
+              />
+            </div>
+            <div className="min-w-0">
+              <KpiCard
+                label="Net Revenue (Paid)"
+                value={formatINR(Number(data?.counts?.netRevenue) || 0)}
+                icon={<TrendingUp className="h-5 w-5" />}
+                onClick={() =>
+                  setSelectedMetric({
+                    label: "Net Revenue (Paid)",
+                    value: formatINR(Number(data?.counts?.netRevenue) || 0),
+                    numeric: Number(data?.counts?.netRevenue) || 0,
+                    description: "Total payments collected and verified from patients across all hospital services.",
+                  })
+                }
+              />
+            </div>
+            <div className="min-w-0">
+              <KpiCard
+                label="Pending / Overdue"
+                value={String(data?.counts?.pendingCount ?? 0)}
+                icon={<AlertCircle className="h-5 w-5" />}
+                onClick={() =>
+                  setSelectedMetric({
+                    label: "Pending / Overdue Invoices",
+                    value: `${data?.counts?.pendingCount ?? 0} Invoices`,
+                    numeric: data?.counts?.pendingCount ?? 0,
+                    description: "Total number of invoices with unpaid balance dues or overdue payment status.",
+                  })
+                }
+              />
+            </div>
           </div>
 
           <Card>
             {/* Status filter tabs */}
             <div className="mb-4 flex flex-wrap gap-2">
-              {(["", "pending", "partially_paid", "paid", "overdue"] as const).map((s) => (
+              {[
+                { key: "", label: "All Invoices" },
+                { key: "pending", label: "Pending" },
+                { key: "partially_paid", label: "Partially Paid" },
+                { key: "paid", label: "Paid" },
+                { key: "overdue", label: "Overdue" },
+              ].map(({ key, label }) => (
                 <button
-                  key={s}
+                  key={key}
                   onClick={() => {
-                    setStatus(s);
+                    setStatus(key);
                     setPage(1);
                   }}
+                  aria-label={label}
                   className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                    status === s
-                      ? s === "pending"
+                    status === key
+                      ? key === "pending"
                         ? "bg-amber-50 text-amber-700 font-bold border border-amber-300"
                         : "bg-navy-50 text-navy-700 font-bold"
                       : "text-slate-500 hover:bg-slate-50"
                   }`}
                 >
-                  {s === "" ? "All Invoices"
-                    : s === "pending" ? "Pending (All Unpaid)"
-                    : s.replace("_", " ").replace(/\b\w/g, c => c.toUpperCase())}
+                  {label}
                 </button>
               ))}
             </div>
@@ -876,6 +964,54 @@ export function FinancePage() {
           </div>
         )}
       </Modal>
+      {/* Complete Amount Details Modal */}
+      <Modal
+        isOpen={!!selectedMetric}
+        onClose={() => setSelectedMetric(null)}
+        title={selectedMetric?.label || "Complete Amount Details"}
+        size="md"
+      >
+        {selectedMetric && (
+          <div className="space-y-4">
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                Complete {selectedMetric.label}
+              </span>
+              <p className="text-2xl sm:text-3xl font-black text-slate-900 break-all select-all font-mono">
+                {selectedMetric.value}
+              </p>
+            </div>
+
+            <p className="text-xs text-slate-500">
+              {selectedMetric.description}
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(selectedMetric.value);
+                  toast.success("Complete amount copied to clipboard", { id: "copied-amount" });
+                }}
+                className="flex items-center gap-1.5 text-xs"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                Copy Amount
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setSelectedMetric(null)}
+                className="text-xs"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
     </div>
   );
 }

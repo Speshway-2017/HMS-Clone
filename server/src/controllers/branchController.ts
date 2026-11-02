@@ -5,21 +5,73 @@ import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { generateBranchId } from "../utils/idGenerator";
 import { getPagination, paginatedResponse } from "../utils/pagination";
-
+<<<<<<< HEAD
+=======
+import { getRealtimeStaffCountsForBranches } from "../utils/branchStaffHelper";
+>>>>>>> origin/development
 import { syncBranchDepartmentsForBranch } from "../utils/branchDepartmentSync";
 import { emitToHospital } from "../config/socket";
-import { getRealtimeStaffCountsForBranches } from "../utils/branchStaffHelper";
+
+const CITY_REGEX = /^[a-zA-Z\s\.\-']+$/;
+const STATE_REGEX = /^[a-zA-Z\s\.\-']+$/;
+const HEAD_REGEX = /^[a-zA-Z\s\.\-']+$/;
+const ZIP_REGEX = /^[a-zA-Z0-9\s\-]+$/;
+const STREET_REGEX = /^[a-zA-Z0-9\s,.\-#/'()]+$/;
 
 const branchSchema = z.object({
-  hospital: z.string().min(1),
-  name: z.string().min(1),
+  hospital: z.string().trim().min(1, "Please enter valid data"),
+  name: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .min(1, "Please enter valid data")
+    .max(100, "Branch Name cannot exceed 100 characters. Please enter valid data"),
   category: z.string().optional().default("General Hospital"),
-  street: z.string().optional().default(""),
-  city: z.string().optional().default(""),
-  state: z.string().optional().default(""),
-  zip: z.string().optional().default(""),
-  headName: z.string().optional().default(""),
-  totalStaff: z.coerce.number().min(0).optional().default(0),
+  street: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .max(250, "Full Street Address cannot exceed 250 characters. Please enter valid data")
+    .refine((val) => !val || STREET_REGEX.test(val), {
+      message: "Please enter valid data",
+    })
+    .optional()
+    .default(""),
+  city: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .max(100, "City cannot exceed 100 characters. Please enter valid data")
+    .refine((val) => !val || (CITY_REGEX.test(val) && val.length >= 2), {
+      message: "Please enter valid data",
+    })
+    .optional()
+    .default(""),
+  state: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .max(100, "State cannot exceed 100 characters. Please enter valid data")
+    .refine((val) => !val || (STATE_REGEX.test(val) && val.length >= 2), {
+      message: "Please enter valid data",
+    })
+    .optional()
+    .default(""),
+  zip: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .max(20, "ZIP Code cannot exceed 20 characters. Please enter valid data")
+    .refine((val) => !val || ZIP_REGEX.test(val), {
+      message: "Please enter valid data",
+    })
+    .optional()
+    .default(""),
+  headName: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .max(100, "Branch Head cannot exceed 100 characters. Please enter valid data")
+    .refine((val) => !val || (HEAD_REGEX.test(val) && val.length >= 2), {
+      message: "Please enter valid data",
+    })
+    .optional()
+    .default(""),
+  totalStaff: z.coerce.number().min(0, "Total Staff cannot be negative. Please enter valid data").optional().default(0),
   status: z.enum(BRANCH_STATUSES).optional(),
 });
 

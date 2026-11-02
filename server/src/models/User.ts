@@ -25,15 +25,15 @@ export interface UserDocument extends Document {
 
 const userSchema = new Schema<UserDocument>(
   {
-    name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    name: { type: String, required: true, trim: true, maxlength: 100 },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 100 },
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, required: true },
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", default: null },
     branch: { type: Schema.Types.ObjectId, ref: "Branch", default: null },
-    title: { type: String, default: "" },
-    phone: { type: String, default: "" },
-    employeeId: { type: String, default: "" },
+    title: { type: String, default: "", maxlength: 100 },
+    phone: { type: String, default: "", maxlength: 10 },
+    employeeId: { type: String, default: "", maxlength: 50 },
     avatarUrl: { type: String, default: "" },
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     lastLogin: { type: Date, default: null },

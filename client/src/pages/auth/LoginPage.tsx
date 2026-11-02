@@ -85,6 +85,23 @@ export function LoginPage() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    const cleanId = identifier.trim();
+    if (!cleanId) {
+      setError("Email address or phone number is required.");
+      return;
+    }
+    if (cleanId.length > 100) {
+      setError("Email or phone number cannot exceed 100 characters.");
+      return;
+    }
+    if (!password) {
+      setError("Password is required.");
+      return;
+    }
+    if (password.length > 100) {
+      setError("Password cannot exceed 100 characters.");
+      return;
+    }
     setIsSubmitting(true);
     setIsSuccess(false);
 
@@ -123,33 +140,20 @@ export function LoginPage() {
         <div className="absolute -left-10 bottom-10 h-48 w-48 rounded-full bg-blue-400/15 blur-2xl pointer-events-none" />
 
         {/* Logo Branding */}
-        {isElectron() ? (
-          <div className="flex items-center gap-3 text-lg font-extrabold tracking-tight relative z-10">
-            {logoUrl ? (
-              <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover shadow-sm" />
-            ) : (
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-sm shadow-md border border-blue-400/20">
-                <Activity className="h-4 w-4 text-blue-200" />
-              </div>
-            )}
-            <span className="bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
-              {hospitalName}
-            </span>
-          </div>
-        ) : (
-          <Link to="/" className="flex items-center gap-3 text-lg font-extrabold tracking-tight relative z-10">
-            {logoUrl ? (
-              <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover shadow-sm" />
-            ) : (
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-sm shadow-md border border-blue-400/20">
-                <Activity className="h-4 w-4 text-blue-200" />
-              </div>
-            )}
-            <span className="bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
-              {hospitalName}
-            </span>
-          </Link>
-        )}
+        <Link to="/" className="flex items-center gap-3 text-lg font-extrabold tracking-tight relative z-10">
+          <img
+            src={logoUrl || "/hospital-logo.svg"}
+            alt=""
+            className="h-8 w-8 rounded-lg object-cover shadow-sm bg-white/10"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = "/hospital-logo.svg";
+            }}
+          />
+          <span className="bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
+            {hospitalName}
+          </span>
+        </Link>
 
         {/* Marketing rotating text */}
         <div className="my-auto space-y-6 relative z-10 py-4">
@@ -257,6 +261,7 @@ export function LoginPage() {
                     icon={<Mail className="h-4 w-4 text-blue-500" />}
                     label="Email Address or Phone Number"
                     value={identifier}
+                    maxLength={100}
                     onChange={setIdentifier}
                     required
                     autoComplete="username"
@@ -264,30 +269,38 @@ export function LoginPage() {
                 </div>
 
                 {/* Password input with AnimatedInput */}
-                <AnimatedInput
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  icon={<Lock className="h-4 w-4 text-blue-500" />}
-                  label="Security Password"
-                  value={password}
-                  onChange={setPassword}
-                  required
-                  autoComplete="current-password"
-                  endIcon={
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="svg-button text-slate-400 hover:text-blue-600 focus:outline-none transition-colors"
-                      title={showPassword ? "Hide Password" : "Show Password"}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
-                  }
-                />
+                <div className="space-y-1">
+                  <div className="flex items-center justify-end">
+                    <Link to="/forgot-password" className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline">
+                      Forgot Password?
+                    </Link>
+                  </div>
+                  <AnimatedInput
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    icon={<Lock className="h-4 w-4 text-blue-500" />}
+                    label="Security Password"
+                    value={password}
+                    maxLength={100}
+                    onChange={setPassword}
+                    required
+                    autoComplete="current-password"
+                    endIcon={
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="svg-button text-slate-400 hover:text-blue-600 focus:outline-none transition-colors"
+                        title={showPassword ? "Hide Password" : "Show Password"}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    }
+                  />
+                </div>
 
                 {/* Error Banner */}
                 {error && (

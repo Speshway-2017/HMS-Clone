@@ -7,15 +7,15 @@ const doctorSchema = new Schema(
     user: { type: Schema.Types.ObjectId, ref: "User", default: null },
     hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
     department: { type: Schema.Types.ObjectId, ref: "Department", default: null },
-    name: { type: String, required: true, trim: true },
+    name: { type: String, required: true, trim: true, maxlength: 100 },
     gender: { type: String, enum: ["Male", "Female", "Other", "male", "female", "other"], default: "Male", required: true },
-    email: { type: String, default: "" },
-    phone: { type: String, default: "" },
-    photoUrl: { type: String, default: "" },
-    specialization: { type: String, default: "" },
-    qualification: { type: String, default: "" },
-    licenseNo: { type: String, default: "" },
-    bio: { type: String, default: "" },
+    email: { type: String, default: "", maxlength: 100 },
+    phone: { type: String, default: "", maxlength: 10 },
+    photoUrl: { type: String, default: "", maxlength: 500 },
+    specialization: { type: String, default: "", maxlength: 100 },
+    qualification: { type: String, default: "", maxlength: 100 },
+    licenseNo: { type: String, default: "", maxlength: 50 },
+    bio: { type: String, default: "", maxlength: 500 },
     workingHours: {
       type: [
         {

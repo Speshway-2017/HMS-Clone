@@ -2,17 +2,17 @@ import { Schema, model, InferSchemaType, Types } from "mongoose";
 
 const customRoleSchema = new Schema(
   {
-    hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: true },
-    role: { type: String, required: true },
-    label: { type: String, required: true },
-    description: { type: String, default: "" },
+    hospital: { type: Schema.Types.ObjectId, ref: "Hospital", required: false, default: null },
+    role: { type: String, required: true, maxlength: 50 },
+    label: { type: String, required: true, maxlength: 50 },
+    description: { type: String, default: "", maxlength: 500 },
     permissions: { type: [String], default: [] },
   },
   { timestamps: true }
 );
 
-// Add compound index to guarantee unique role keys within the same hospital
-customRoleSchema.index({ hospital: 1, role: 1 }, { unique: true });
+// Compound index for role keys
+customRoleSchema.index({ hospital: 1, role: 1 }, { unique: true, sparse: true });
 
 export type CustomRole = InferSchemaType<typeof customRoleSchema> & { _id: Types.ObjectId };
 export const CustomRole = model<CustomRole>("Role", customRoleSchema);

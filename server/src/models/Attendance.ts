@@ -24,6 +24,10 @@ export const SHIFTS = [
   "Evening",
   "Night",
   "Custom Shift",
+  "General Shift",
+  "Morning Shift",
+  "Evening Shift",
+  "Night Shift",
 ] as const;
 
 const auditHistorySchema = new Schema(
@@ -67,29 +71,25 @@ const attendanceSchema = new Schema(
     leaveRef: { type: Schema.Types.ObjectId, ref: "LeaveRequest", default: null },
     markedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     remarks: { type: String, default: "" },
-
-    // ── Audit History Log (Every manual entry & modification) ──────────────────
-    auditHistory: [auditHistorySchema],
-
-    // ── Manual Correction Fields ──────────────────
     isManuallyCorrected: { type: Boolean, default: false },
+    previousStatus: { type: String, default: null },
+    previousCheckIn: { type: String, default: null },
+    previousCheckOut: { type: String, default: null },
+    previousWorkingHours: { type: Number, default: null },
     correctionReason: { type: String, default: "" },
     correctionNote: { type: String, default: "" },
     correctedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     correctedAt: { type: Date, default: null },
-    previousStatus: { type: String, default: "" },
-    previousCheckIn: { type: String, default: "" },
-    previousCheckOut: { type: String, default: "" },
-    previousWorkingHours: { type: Number, default: null },
+    auditHistory: [auditHistorySchema],
   },
   { timestamps: true }
 );
 
-attendanceSchema.index({ hospital: 1, date: 1 });
+// Compound index to ensure uniqueness of employee attendance per date within a hospital
 attendanceSchema.index({ hospital: 1, employeeId: 1, date: 1 }, { unique: true });
-attendanceSchema.index({ hospital: 1, department: 1, date: 1 });
-attendanceSchema.index({ hospital: 1, branch: 1, date: 1 });
-attendanceSchema.index({ hospital: 1, isManuallyCorrected: 1, date: 1 });
+attendanceSchema.index({ hospital: 1, date: 1, status: 1 });
+attendanceSchema.index({ hospital: 1, date: 1, department: 1 });
+attendanceSchema.index({ hospital: 1, date: 1, shift: 1 });
 
 export type Attendance = InferSchemaType<typeof attendanceSchema> & { _id: Types.ObjectId };
 export const Attendance = model("Attendance", attendanceSchema);

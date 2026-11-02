@@ -42,7 +42,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         {/* Mobile-only hospital branding */}
         <div className="flex items-center gap-2 md:hidden min-w-0">
           {hospital?.logoUrl ? (
-            <img src={hospital.logoUrl} alt={hospital.name} className="h-8 w-8 shrink-0 rounded-lg object-contain bg-slate-50 p-0.5 border" />
+            <img src={hospital.logoUrl || "/hospital-logo.svg"} alt="" className="h-8 w-8 shrink-0 rounded-lg object-contain bg-slate-50 p-0.5 border" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/hospital-logo.svg"; }} />
           ) : (
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-navy-100 text-navy-700 font-bold text-sm">
               {hospital?.name ? hospital.name.charAt(0).toUpperCase() : "H"}

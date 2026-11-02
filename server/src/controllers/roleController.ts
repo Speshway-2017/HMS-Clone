@@ -8,9 +8,23 @@ import { catchAsync } from "../utils/catchAsync";
 import { AppError } from "../utils/AppError";
 
 const createRoleSchema = z.object({
-  role: z.string().min(2).max(30).regex(/^[a-z_]+$/, "Role key must be lowercase and contain only letters and underscores"),
-  label: z.string().min(2).max(50),
-  description: z.string().optional().default(""),
+  role: z
+    .string({ invalid_type_error: "Role Key must be a string" })
+    .trim()
+    .min(2, "Role Key must be at least 2 characters")
+    .max(50, "Role Key cannot exceed 50 characters")
+    .regex(/^[a-z0-9_]+$/, "Role Key must contain only lowercase characters and underscores"),
+  label: z
+    .string({ invalid_type_error: "Role Label must be a string" })
+    .trim()
+    .min(2, "Role Label must be at least 2 characters")
+    .max(50, "Role Label cannot exceed 50 characters")
+    .regex(/^[a-zA-Z][a-zA-Z0-9\s\.\-/'&]*$/, "Role Label contains invalid characters"),
+  description: z
+    .string()
+    .max(500, "Description cannot exceed 500 characters")
+    .optional()
+    .default(""),
   permissions: z.array(z.string()).default([]),
 });
 
@@ -91,38 +105,61 @@ export const listRoles = catchAsync(async (req: Request, res: Response) => {
       description: r.description,
       permissions: r.permissions,
       assignedUsers: countByRole.get(r.role) ?? 0,
-      isCustom: true, // Mark all as custom/editable since they are now in the DB!
+      isCustom: true,
     }));
   } else {
-    // For super admins (system-wide standard roles view)
+    // For super admins (system-wide standard roles view + custom system roles)
     const visibleRoles = ROLES;
-    roles = visibleRoles.map((role) => ({
+    const staticRoles = visibleRoles.map((role) => ({
       role,
       ...ROLE_PERMISSIONS[role],
       assignedUsers: countByRole.get(role) ?? 0,
       isCustom: false,
     }));
+
+    const dbCustomRoles = await CustomRole.find({});
+    const customRoles = dbCustomRoles
+      .filter((r) => !visibleRoles.includes(r.role as any))
+      .map((r) => ({
+        _id: r._id,
+        role: r.role,
+        label: r.label,
+        description: r.description,
+        permissions: r.permissions,
+        assignedUsers: countByRole.get(r.role) ?? 0,
+        isCustom: true,
+      }));
+
+    roles = [...staticRoles, ...customRoles];
   }
 
   res.json({ status: "success", data: { roles } });
 });
 
 const updateRoleSchema = z.object({
-  label: z.string().min(2).max(50).optional(),
-  description: z.string().optional(),
+  label: z
+    .string()
+    .trim()
+    .min(2, "Role Label must be at least 2 characters")
+    .max(50, "Role Label cannot exceed 50 characters")
+    .regex(/^[a-zA-Z][a-zA-Z0-9\s\.\-/'&]*$/, "Role Label contains invalid characters")
+    .optional(),
+  description: z
+    .string()
+    .max(500, "Description cannot exceed 500 characters")
+    .optional(),
   permissions: z.array(z.string()).optional(),
 });
 
 export const updateRole = catchAsync(async (req: Request, res: Response) => {
   const body = updateRoleSchema.parse(req.body);
-  const hospitalId = req.user!.hospital;
+  const isSuperAdmin = req.user!.role === "super_admin";
+  const hospitalId = isSuperAdmin ? null : req.user!.hospital;
 
-  if (!hospitalId) {
-    throw new AppError("Hospital context required to update a custom role.", 400);
-  }
+  const filter = hospitalId ? { _id: req.params.id, hospital: hospitalId } : { _id: req.params.id };
 
   const role = await CustomRole.findOneAndUpdate(
-    { _id: req.params.id, hospital: hospitalId },
+    filter,
     body,
     { new: true, runValidators: true }
   );
@@ -135,19 +172,19 @@ export const updateRole = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const deleteRole = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.user!.hospital;
+  const isSuperAdmin = req.user!.role === "super_admin";
+  const hospitalId = isSuperAdmin ? null : req.user!.hospital;
 
-  if (!hospitalId) {
-    throw new AppError("Hospital context required to delete a custom role.", 400);
-  }
+  const filter = hospitalId ? { _id: req.params.id, hospital: hospitalId } : { _id: req.params.id };
 
-  const role = await CustomRole.findOne({ _id: req.params.id, hospital: hospitalId });
+  const role = await CustomRole.findOne(filter);
   if (!role) {
     throw new AppError("Custom role not found.", 404);
   }
 
   // Prevent deleting custom role if users are assigned to it
-  const assignedUsersCount = await User.countDocuments({ role: role.role, hospital: hospitalId });
+  const userFilter = hospitalId ? { role: role.role, hospital: hospitalId } : { role: role.role };
+  const assignedUsersCount = await User.countDocuments(userFilter);
   if (assignedUsersCount > 0) {
     throw new AppError("Cannot delete this role because users are currently assigned to it.", 400);
   }
@@ -157,12 +194,12 @@ export const deleteRole = catchAsync(async (req: Request, res: Response) => {
   res.status(204).send();
 });
 
-
 export const createRole = catchAsync(async (req: Request, res: Response) => {
   const body = createRoleSchema.parse(req.body);
-  const hospitalId = req.user!.hospital;
+  const isSuperAdmin = req.user!.role === "super_admin";
+  const hospitalId = isSuperAdmin ? null : req.user!.hospital;
 
-  if (!hospitalId) {
+  if (!isSuperAdmin && !hospitalId) {
     throw new AppError("Hospital context required to create a custom role.", 400);
   }
 
@@ -171,10 +208,12 @@ export const createRole = catchAsync(async (req: Request, res: Response) => {
     throw new AppError("A system role with this name already exists.", 400);
   }
 
-  // Check if role key already exists for this hospital
-  const existing = await CustomRole.findOne({ hospital: hospitalId, role: body.role });
+  // Check if role key already exists
+  const existing = await CustomRole.findOne(
+    hospitalId ? { hospital: hospitalId, role: body.role } : { role: body.role }
+  );
   if (existing) {
-    throw new AppError("A custom role with this name already exists in this hospital.", 400);
+    throw new AppError("A role with this key already exists.", 400);
   }
 
   const role = await CustomRole.create({
@@ -184,4 +223,3 @@ export const createRole = catchAsync(async (req: Request, res: Response) => {
 
   res.status(201).json({ status: "success", data: { role } });
 });
-

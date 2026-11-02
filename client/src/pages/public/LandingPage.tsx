@@ -36,7 +36,8 @@ import {
   Search,
   Star,
   HelpCircle,
-  MessageSquare
+  MessageSquare,
+  AlertCircle
 } from "lucide-react";
 import GooeyPopoverComponent from "../../components/ui/GooeyPopover";
 import { Button } from "../../components/ui/Button";
@@ -44,6 +45,7 @@ import { Modal } from "../../components/ui/Modal";
 import { usePublicHospital } from "../../features/hospitals";
 import { useBlogs, BlogPost } from "../../features/blogs";
 import { api } from "../../lib/api";
+import { isValidEmail } from "../../lib/validation";
 
 function getEmbeddableMapUrl(url: string, fallbackAddress: string): string {
   if (!url) {
@@ -370,14 +372,62 @@ export function LandingPage() {
     ? doctors.filter((doc) => doc.department?._id === bookingForm.departmentId)
     : doctors;
 
-  // --- CONTACT FORM STATE ---
+  // --- CONTACT FORM STATE & VALIDATION ---
   const [contactForm, setContactForm] = useState({
     name: "",
     email: "",
     subject: "",
     message: ""
   });
+  const [contactErrors, setContactErrors] = useState<{ [key: string]: string }>({});
+  const [contactTouched, setContactTouched] = useState<{ [key: string]: boolean }>({});
   const [contactSubmitted, setContactSubmitted] = useState(false);
+
+  const validateContactField = (field: string, value: string): string => {
+    const val = (value || "").trim();
+    if (field === "name") {
+      if (!val || val.length < 2 || val.length > 50 || !/^[a-zA-Z\s'-]+$/.test(val)) {
+        return "Please enter valid data";
+      }
+      return "";
+    }
+    if (field === "email") {
+      if (!val || val.length > 254 || !isValidEmail(val)) {
+        return "Please enter valid data";
+      }
+      return "";
+    }
+    if (field === "subject") {
+      if (!val || val.length < 3 || val.length > 100) {
+        return "Please enter valid data";
+      }
+      return "";
+    }
+    if (field === "message") {
+      if (!val || val.length < 10 || val.length > 1000) {
+        return "Please enter valid data";
+      }
+      return "";
+    }
+    return "";
+  };
+
+  const handleContactChange = (field: string, value: string) => {
+    setContactForm((prev) => ({ ...prev, [field]: value }));
+    const errorMsg = validateContactField(field, value);
+    if (contactTouched[field] || (value.length > 0 && errorMsg)) {
+      setContactTouched((prev) => ({ ...prev, [field]: true }));
+      setContactErrors((prev) => ({ ...prev, [field]: errorMsg }));
+    } else if (!errorMsg) {
+      setContactErrors((prev) => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  const handleContactBlur = (field: string) => {
+    setContactTouched((prev) => ({ ...prev, [field]: true }));
+    const errorMsg = validateContactField(field, contactForm[field as keyof typeof contactForm]);
+    setContactErrors((prev) => ({ ...prev, [field]: errorMsg }));
+  };
 
   // --- HASH ROUTER SYNC ---
   useEffect(() => {
@@ -482,8 +532,25 @@ export function LandingPage() {
     e.preventDefault();
     if (isSubmittingContact || isSubmittedContact) return;
 
-    if (!contactForm.name.trim() || !contactForm.email.trim() || !contactForm.message.trim()) {
-      toast.error("Please fill in your full name, email, and message.");
+    // Validate all 4 fields on submit
+    const touchedAll = { name: true, email: true, subject: true, message: true };
+    setContactTouched(touchedAll);
+
+    const nameErr = validateContactField("name", contactForm.name);
+    const emailErr = validateContactField("email", contactForm.email);
+    const subjectErr = validateContactField("subject", contactForm.subject);
+    const messageErr = validateContactField("message", contactForm.message);
+
+    const errorsObj = {
+      name: nameErr,
+      email: emailErr,
+      subject: subjectErr,
+      message: messageErr,
+    };
+    setContactErrors(errorsObj);
+
+    if (nameErr || emailErr || subjectErr || messageErr) {
+      toast.error("Please enter valid data");
       return;
     }
 
@@ -491,8 +558,60 @@ export function LandingPage() {
     try {
       await api.post("/hospitals/public/enquiries", {
         name: contactForm.name.trim(),
-        email: contactForm.email.trim(),
-        subject: "General Enquiry",
+        email: contactForm.email.trim().toLowerCase(),
+        subject: contactForm.subject.trim(),
+        message: contactForm.message.trim(),
+      });
+
+      setIsSubmittingContact(false);
+      setIsSubmittedContact(true);
+      setContactSubmitted(true);
+      toast.success("Thank you! Your contact message has been sent successfully.");
+
+      setContactForm({ name: "", email: "", subject: "", message: "" });
+      setContactErrors({});
+      setContactTouched({});
+
+      setTimeout(() => {
+        setIsSubmittedContact(false);
+        setIsFloatingContactOpen(false);
+      }, 2000);
+    } catch (err: any) {
+      console.error("Error submitting contact message:", err);
+      setIsSubmittingContact(false);
+      toast.error(err?.response?.data?.message || "Failed to send message. Please try again.");
+    }
+  };
+
+  const handleFloatingContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSubmittingContact || isSubmittedContact) return;
+
+    const touchedAll = { name: true, email: true, message: true };
+    setContactTouched((prev) => ({ ...prev, ...touchedAll }));
+
+    const nameErr = validateContactField("name", contactForm.name);
+    const emailErr = validateContactField("email", contactForm.email);
+    const messageErr = validateContactField("message", contactForm.message);
+
+    setContactErrors((prev) => ({
+      ...prev,
+      name: nameErr,
+      email: emailErr,
+      message: messageErr,
+    }));
+
+    if (nameErr || emailErr || messageErr) {
+      toast.error("Please enter valid data");
+      return;
+    }
+
+    setIsSubmittingContact(true);
+    try {
+      await api.post("/hospitals/public/enquiries", {
+        name: contactForm.name.trim(),
+        email: contactForm.email.trim().toLowerCase(),
+        subject: (contactForm.subject || "General Enquiry").trim(),
         message: contactForm.message.trim(),
       });
 
@@ -500,10 +619,13 @@ export function LandingPage() {
       setIsSubmittedContact(true);
       toast.success("Thank you! Your contact message has been sent successfully.");
 
+      setContactForm({ name: "", email: "", subject: "", message: "" });
+      setContactErrors({});
+      setContactTouched({});
+
       setTimeout(() => {
         setIsSubmittedContact(false);
         setIsFloatingContactOpen(false);
-        setContactForm({ name: "", email: "", subject: "", message: "" });
       }, 1800);
     } catch (err: any) {
       console.error("Error submitting contact message:", err);
@@ -535,13 +657,15 @@ export function LandingPage() {
             onClick={() => changeTab("home")}
             className="flex cursor-pointer items-center gap-3 text-lg lg:text-xl font-extrabold tracking-tight text-navy-900 shrink-0"
           >
-            {logoUrl ? (
-              <img src={logoUrl} alt={hospitalName} className="h-9 w-9 rounded-lg object-cover shadow-sm" />
-            ) : (
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-tr from-navy-700 to-navy-900 text-white shadow-md">
-                <Activity className="h-5 w-5" />
-              </div>
-            )}
+            <img
+              src={logoUrl || "/hospital-logo.svg"}
+              alt=""
+              className="h-9 w-9 rounded-lg object-cover shadow-sm"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = "/hospital-logo.svg";
+              }}
+            />
             <span className="bg-gradient-to-r from-navy-900 to-navy-700 bg-clip-text text-transparent">
               {hospitalName}
             </span>
@@ -1603,60 +1727,143 @@ export function LandingPage() {
                     </button>
                   </div>
                 ) : (
-                  <form onSubmit={handleContactSubmit} className="space-y-4 text-xs font-medium text-slate-700">
+                  <form onSubmit={handleContactSubmit} noValidate className="space-y-4 text-xs font-medium text-slate-700">
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div>
-                        <label className="block mb-1">Your Full Name <span className="text-rose-500">*</span></label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-semibold text-slate-700">
+                            Your Full Name <span className="text-rose-500">*</span>
+                          </label>
+                          <span className={`text-[10px] font-mono ${contactForm.name.length >= 45 ? "text-amber-600 font-bold" : "text-slate-400"}`}>
+                            {contactForm.name.length}/50
+                          </span>
+                        </div>
                         <input
                           type="text"
-                          required
+                          maxLength={50}
                           value={contactForm.name}
-                          onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
-                          className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+                          onChange={(e) => handleContactChange("name", e.target.value)}
+                          onBlur={() => handleContactBlur("name")}
+                          className={`w-full rounded-lg border px-3 py-2 outline-none transition-all ${
+                            contactTouched.name && contactErrors.name
+                              ? "border-rose-400 bg-rose-50/20 text-slate-900 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
+                              : "border-slate-300 focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+                          }`}
                           placeholder="Rahul Sharma"
                         />
+                        {contactTouched.name && contactErrors.name && (
+                          <p className="mt-1.5 text-[11px] font-semibold text-rose-600 flex items-center gap-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                            <span>{contactErrors.name}</span>
+                          </p>
+                        )}
                       </div>
+
                       <div>
-                        <label className="block mb-1">Your Email <span className="text-rose-500">*</span></label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-semibold text-slate-700">
+                            Your Email <span className="text-rose-500">*</span>
+                          </label>
+                          <span className={`text-[10px] font-mono ${contactForm.email.length >= 240 ? "text-amber-600 font-bold" : "text-slate-400"}`}>
+                            {contactForm.email.length}/254
+                          </span>
+                        </div>
                         <input
                           type="email"
-                          required
+                          maxLength={254}
                           value={contactForm.email}
-                          onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                          className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+                          onChange={(e) => handleContactChange("email", e.target.value)}
+                          onBlur={() => handleContactBlur("email")}
+                          className={`w-full rounded-lg border px-3 py-2 outline-none transition-all ${
+                            contactTouched.email && contactErrors.email
+                              ? "border-rose-400 bg-rose-50/20 text-slate-900 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
+                              : "border-slate-300 focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+                          }`}
                           placeholder="you@example.com"
                         />
+                        {contactTouched.email && contactErrors.email && (
+                          <p className="mt-1.5 text-[11px] font-semibold text-rose-600 flex items-center gap-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                            <span>{contactErrors.email}</span>
+                          </p>
+                        )}
                       </div>
                     </div>
+
                     <div>
-                      <label className="block mb-1">Subject <span className="text-rose-500">*</span></label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-semibold text-slate-700">
+                          Subject <span className="text-rose-500">*</span>
+                        </label>
+                        <span className={`text-[10px] font-mono ${contactForm.subject.length >= 90 ? "text-amber-600 font-bold" : "text-slate-400"}`}>
+                          {contactForm.subject.length}/100
+                        </span>
+                      </div>
                       <input
                         type="text"
-                        required
+                        maxLength={100}
                         value={contactForm.subject}
-                        onChange={(e) => setContactForm({ ...contactForm, subject: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+                        onChange={(e) => handleContactChange("subject", e.target.value)}
+                        onBlur={() => handleContactBlur("subject")}
+                        className={`w-full rounded-lg border px-3 py-2 outline-none transition-all ${
+                          contactTouched.subject && contactErrors.subject
+                            ? "border-rose-400 bg-rose-50/20 text-slate-900 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
+                            : "border-slate-300 focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+                        }`}
                         placeholder="e.g. Consultation query, medical records request"
                       />
+                      {contactTouched.subject && contactErrors.subject && (
+                        <p className="mt-1.5 text-[11px] font-semibold text-rose-600 flex items-center gap-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                          <span>{contactErrors.subject}</span>
+                        </p>
+                      )}
                     </div>
+
                     <div>
-                      <label className="block mb-1">Your Message <span className="text-rose-500">*</span></label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-semibold text-slate-700">
+                          Your Message <span className="text-rose-500">*</span>
+                        </label>
+                        <span className={`text-[10px] font-mono ${contactForm.message.length >= 950 ? "text-amber-600 font-bold" : "text-slate-400"}`}>
+                          {contactForm.message.length}/1000
+                        </span>
+                      </div>
                       <textarea
                         rows={5}
-                        required
+                        maxLength={1000}
                         value={contactForm.message}
-                        onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+                        onChange={(e) => handleContactChange("message", e.target.value)}
+                        onBlur={() => handleContactBlur("message")}
+                        className={`w-full rounded-lg border px-3 py-2 outline-none transition-all ${
+                          contactTouched.message && contactErrors.message
+                            ? "border-rose-400 bg-rose-50/20 text-slate-900 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
+                            : "border-slate-300 focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+                        }`}
                         placeholder="Write your message here..."
                       />
+                      {contactTouched.message && contactErrors.message && (
+                        <p className="mt-1.5 text-[11px] font-semibold text-rose-600 flex items-center gap-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                          <span>{contactErrors.message}</span>
+                        </p>
+                      )}
                     </div>
+
                     <Button
                       type="submit"
                       variant="primary"
-                      className="w-full py-3 bg-navy-700 transition-all duration-300 hover:bg-navy-800"
-                      disabled={enquiryMutation.isPending}
+                      className="w-full py-3 bg-navy-700 transition-all duration-300 hover:bg-navy-800 flex items-center justify-center gap-2 shadow-sm font-bold"
+                      disabled={isSubmittingContact}
                     >
-                      {enquiryMutation.isPending ? "Sending Enquiry..." : "Send Contact Message"}
+                      {isSubmittingContact ? (
+                        <>
+                          <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Sending Contact Message...</span>
+                        </>
+                      ) : (
+                        "Send Contact Message"
+                      )}
                     </Button>
                   </form>
                 )}
@@ -1738,13 +1945,15 @@ export function LandingPage() {
               onClick={() => changeTab("home")}
               className="flex cursor-pointer items-center gap-2.5 text-lg font-extrabold text-navy-900"
             >
-              {logoUrl ? (
-                <img src={logoUrl} alt={hospitalName} className="h-7 w-7 rounded object-cover" />
-              ) : (
-                <div className="flex h-7 w-7 items-center justify-center rounded bg-navy-700 text-white font-bold text-xs shadow-sm">
-                  <Activity className="h-4 w-4" />
-                </div>
-              )}
+              <img
+                src={logoUrl || "/hospital-logo.svg"}
+                alt=""
+                className="h-7 w-7 rounded object-cover"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/hospital-logo.svg";
+                }}
+              />
               <span>{hospitalName}</span>
             </div>
             <p className="text-xs leading-relaxed text-slate-500 max-w-sm">
@@ -1966,47 +2175,95 @@ export function LandingPage() {
               </p>
             </div>
 
-            <form onSubmit={handleContactSubmit} className="space-y-3">
+            <form onSubmit={handleFloatingContactSubmit} noValidate className="space-y-3">
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700">
-                  Full Name <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-slate-700">
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[9px] text-slate-400 font-mono">
+                    {contactForm.name.length}/50
+                  </span>
+                </div>
                 <input
                   type="text"
-                  required
+                  maxLength={50}
                   value={contactForm.name}
-                  onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                  onChange={(e) => handleContactChange("name", e.target.value)}
+                  onBlur={() => handleContactBlur("name")}
                   placeholder="Rahul Sharma"
-                  className="w-full rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-[#0505a9] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0505a9]/20 transition-all shadow-sm"
+                  className={`w-full rounded-xl border px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all shadow-sm ${
+                    contactTouched.name && contactErrors.name
+                      ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
+                      : "bg-slate-50 border-slate-200 focus:border-[#0505a9] focus:bg-white focus:ring-2 focus:ring-[#0505a9]/20"
+                  }`}
                 />
+                {contactTouched.name && contactErrors.name && (
+                  <p className="text-[10px] font-medium text-rose-600 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3 shrink-0" />
+                    <span>{contactErrors.name}</span>
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700">
-                  Email Address <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-slate-700">
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[9px] text-slate-400 font-mono">
+                    {contactForm.email.length}/254
+                  </span>
+                </div>
                 <input
                   type="email"
-                  required
+                  maxLength={254}
                   value={contactForm.email}
-                  onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                  onChange={(e) => handleContactChange("email", e.target.value)}
+                  onBlur={() => handleContactBlur("email")}
                   placeholder="you@example.com"
-                  className="w-full rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-[#0505a9] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0505a9]/20 transition-all shadow-sm"
+                  className={`w-full rounded-xl border px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all shadow-sm ${
+                    contactTouched.email && contactErrors.email
+                      ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
+                      : "bg-slate-50 border-slate-200 focus:border-[#0505a9] focus:bg-white focus:ring-2 focus:ring-[#0505a9]/20"
+                  }`}
                 />
+                {contactTouched.email && contactErrors.email && (
+                  <p className="text-[10px] font-medium text-rose-600 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3 shrink-0" />
+                    <span>{contactErrors.email}</span>
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700">
-                  Your Message <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-slate-700">
+                    Your Message <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[9px] text-slate-400 font-mono">
+                    {contactForm.message.length}/1000
+                  </span>
+                </div>
                 <textarea
                   rows={3}
-                  required
+                  maxLength={1000}
                   value={contactForm.message}
-                  onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
+                  onChange={(e) => handleContactChange("message", e.target.value)}
+                  onBlur={() => handleContactBlur("message")}
                   placeholder="Write your message here..."
-                  className="w-full rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-[#0505a9] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0505a9]/20 transition-all resize-none shadow-sm"
+                  className={`w-full rounded-xl border px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all resize-none shadow-sm ${
+                    contactTouched.message && contactErrors.message
+                      ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
+                      : "bg-slate-50 border-slate-200 focus:border-[#0505a9] focus:bg-white focus:ring-2 focus:ring-[#0505a9]/20"
+                  }`}
                 />
+                {contactTouched.message && contactErrors.message && (
+                  <p className="text-[10px] font-medium text-rose-600 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3 shrink-0" />
+                    <span>{contactErrors.message}</span>
+                  </p>
+                )}
               </div>
 
               <div className="pt-2">

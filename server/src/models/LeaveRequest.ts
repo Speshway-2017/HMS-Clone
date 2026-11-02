@@ -8,6 +8,13 @@ export const LEAVE_TYPES = [
   "Paternity Leave",
   "Compensatory Leave",
   "Unpaid Leave",
+  "Unpaid Leave (LOP)",
+  "Emergency Leave",
+  "Paid Leave",
+  "Medical Leave",
+  "Annual Leave",
+  "Holiday",
+  "Weekly Off",
 ] as const;
 
 export const LEAVE_STATUSES = ["Pending", "Approved", "Rejected", "Cancelled"] as const;

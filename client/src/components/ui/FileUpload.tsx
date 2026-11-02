@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from "react";
-import { UploadCloud, FileText, X, Camera, Loader2 } from "lucide-react";
+import { UploadCloud, FileText, X, Camera, Loader2, AlertCircle } from "lucide-react";
+import toast from "react-hot-toast";
 import { api, getApiErrorMessage } from "../../lib/api";
 
 type UploadFolder = "hospital-logos" | "hospital-licenses" | "admin-avatars" | "doctor-photos" | "staff-photos" | "patient-photos" | "blog-covers";
@@ -11,13 +12,27 @@ interface FileUploadProps {
   onChange: (url: string) => void;
   accept?: string;
   hint?: string;
+  maxSizeMB?: number;
+  error?: string | null;
+  onError?: (err: string | null) => void;
 }
 
-export function FileUpload({ label, folder, value, onChange, accept = "image/png,image/jpeg,image/webp", hint }: FileUploadProps) {
+export function FileUpload({
+  label,
+  folder,
+  value,
+  onChange,
+  accept = "image/png,image/jpeg,image/webp,image/svg+xml",
+  hint,
+  maxSizeMB,
+  error: propError,
+  onError,
+}: FileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const isPdf = value.toLowerCase().endsWith(".pdf");
+  const [localError, setLocalError] = useState<string | null>(null);
+  const activeError = propError || localError;
+  const isPdf = value.toLowerCase().endsWith(".pdf") || value.toLowerCase().includes(".pdf?");
 
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -32,7 +47,8 @@ export function FileUpload({ label, folder, value, onChange, accept = "image/png
   }, [stream]);
 
   async function startCamera() {
-    setError(null);
+    setLocalError(null);
+    onError?.(null);
     setIsCameraActive(true);
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -48,7 +64,9 @@ export function FileUpload({ label, folder, value, onChange, accept = "image/png
         }
       }, 100);
     } catch (err) {
-      setError("Could not access camera. Please check permissions.");
+      const errMsg = "Could not access camera. Please check permissions.";
+      setLocalError(errMsg);
+      onError?.(errMsg);
       setIsCameraActive(false);
     }
   }
@@ -64,7 +82,8 @@ export function FileUpload({ label, folder, value, onChange, accept = "image/png
   async function capturePhoto() {
     if (!videoRef.current || !stream) return;
     setIsUploading(true);
-    setError(null);
+    setLocalError(null);
+    onError?.(null);
     try {
       const video = videoRef.current;
       const canvas = document.createElement("canvas");
@@ -90,13 +109,19 @@ export function FileUpload({ label, folder, value, onChange, accept = "image/png
             headers: { "Content-Type": "multipart/form-data" },
           });
           onChange(res.data.data.url);
+          setLocalError(null);
+          onError?.(null);
           stopCamera();
         } else {
-          setError("Failed to capture image blob.");
+          const errMsg = "Failed to capture image blob.";
+          setLocalError(errMsg);
+          onError?.(errMsg);
         }
       }
     } catch (err) {
-      setError("Failed to upload captured image.");
+      const errMsg = "Failed to upload captured image.";
+      setLocalError(errMsg);
+      onError?.(errMsg);
     } finally {
       setIsUploading(false);
     }
@@ -106,7 +131,69 @@ export function FileUpload({ label, folder, value, onChange, accept = "image/png
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setError(null);
+    setLocalError(null);
+    onError?.(null);
+
+    // 1. File Size Validation
+    const effectiveMaxSizeMB =
+      maxSizeMB ||
+      (folder === "hospital-logos" ||
+       folder === "admin-avatars" ||
+       folder.endsWith("-avatars") ||
+       folder.endsWith("-photos") ||
+       folder === "blog-covers"
+        ? 2
+        : folder === "hospital-licenses"
+        ? 5
+        : 5);
+    const maxBytes = effectiveMaxSizeMB * 1024 * 1024;
+    if (file.size > maxBytes) {
+      const sizeErr = `${label} exceeds the allowed file size of ${effectiveMaxSizeMB}MB. The maximum file size is ${effectiveMaxSizeMB}MB. Invalid file is not accepted.`;
+      setLocalError(sizeErr);
+      onError?.(sizeErr);
+      toast.error(sizeErr, { id: `${folder}-size-error` });
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+
+    // 2. File Format / Extension / MIME Validation
+    const fileName = file.name.toLowerCase();
+    const fileType = file.type.toLowerCase();
+
+    if (folder === "hospital-licenses" || accept === "application/pdf" || accept.includes("pdf")) {
+      const isPdfFile = fileType === "application/pdf" || fileName.endsWith(".pdf");
+      if (!isPdfFile) {
+        const formatErr = "Unsupported file format. Only PDF files should be accepted. Invalid file is not accepted.";
+        setLocalError(formatErr);
+        onError?.(formatErr);
+        toast.error(formatErr, { id: `${folder}-format-error` });
+        if (inputRef.current) inputRef.current.value = "";
+        return;
+      }
+    } else if (
+      folder === "hospital-logos" ||
+      folder === "admin-avatars" ||
+      folder.endsWith("-avatars") ||
+      folder.endsWith("-photos") ||
+      folder === "blog-covers" ||
+      accept.includes("image/")
+    ) {
+      const allowedImageExts = [".png", ".jpg", ".jpeg", ".webp", ".svg"];
+      const allowedImageMimes = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml"];
+      const isImageFile = allowedImageMimes.includes(fileType) || allowedImageExts.some((ext) => fileName.endsWith(ext));
+      if (!isImageFile) {
+        const formatErr =
+          folder === "hospital-logos"
+            ? `Unsupported file format. ${label} accepts only PNG, JPEG, WEBP, or SVG images. Invalid file is not accepted.`
+            : `Unsupported file format. Only supported image formats (PNG, JPG, JPEG, WEBP, SVG) can be uploaded. The uploaded file is invalid or unsupported, and the invalid file is not accepted.`;
+        setLocalError(formatErr);
+        onError?.(formatErr);
+        toast.error(formatErr, { id: `${folder}-format-error` });
+        if (inputRef.current) inputRef.current.value = "";
+        return;
+      }
+    }
+
     setIsUploading(true);
     try {
       const formData = new FormData();
@@ -114,8 +201,13 @@ export function FileUpload({ label, folder, value, onChange, accept = "image/png
       formData.append("folder", folder);
       const res = await api.post("/uploads", formData, { headers: { "Content-Type": "multipart/form-data" } });
       onChange(res.data.data.url);
+      setLocalError(null);
+      onError?.(null);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const errMsg = getApiErrorMessage(err);
+      setLocalError(errMsg);
+      onError?.(errMsg);
+      toast.error(errMsg, { id: `${folder}-upload-error` });
     } finally {
       setIsUploading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -173,7 +265,16 @@ export function FileUpload({ label, folder, value, onChange, accept = "image/png
           <a href={value} target="_blank" rel="noreferrer" className="flex-1 truncate text-sm text-navy-700 hover:underline">
             {value}
           </a>
-          <button type="button" onClick={() => onChange("")} className="text-slate-400 hover:text-red-600" aria-label="Remove file">
+          <button
+            type="button"
+            onClick={() => {
+              onChange("");
+              setLocalError(null);
+              onError?.(null);
+            }}
+            className="text-slate-400 hover:text-red-600"
+            aria-label="Remove file"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -205,7 +306,12 @@ export function FileUpload({ label, folder, value, onChange, accept = "image/png
 
       <input ref={inputRef} type="file" accept={accept} onChange={handleFileChange} className="hidden" />
       {hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {activeError && (
+        <p className="mt-1 text-xs font-semibold text-red-600 flex items-center gap-1.5" role="alert">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          <span>{activeError}</span>
+        </p>
+      )}
     </div>
   );
 }

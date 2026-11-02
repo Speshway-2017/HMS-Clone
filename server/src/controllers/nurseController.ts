@@ -177,7 +177,7 @@ export const saveNurseInpatientVitals = catchAsync(async (req: Request, res: Res
 export const addNurseInpatientNotes = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const patientId = req.params.id;
-  const { notes } = req.body;
+  const notes = req.body.notes ? String(req.body.notes).trim().slice(0, 5000) : "";
   const staff = await Staff.findOne({ email: req.user!.email });
   const recordedByName = staff?.name || req.user!.name || "Nurse";
 

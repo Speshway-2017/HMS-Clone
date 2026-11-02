@@ -17,6 +17,11 @@ import { getPagination, paginatedResponse } from "../utils/pagination";
 import { emitToHospital } from "../config/socket";
 import { logAudit } from "../utils/auditLogger";
 import { buildBranchQuery } from "../utils/branchQueryHelper";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+  numberValidator,
+} from "../utils/validators";
 
 const invoiceItemSchema = z.object({
   description: z.string().min(1),
@@ -158,7 +163,7 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
   allPayments.forEach((p: any) => {
     if (p.invoice) {
       const invId = p.invoice.toString();
-      paymentsMap[invId] = (paymentsMap[invId] || 0) + (p.amount || 0);
+      paymentsMap[invId] = (paymentsMap[invId] || 0) + (Number(p.amount) || 0);
     }
   });
 
@@ -243,9 +248,9 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
   );
 
   const netRevenue = r2(
-    allPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) +
+    allPayments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0) +
     allIPPaymentsForHospital.reduce(
-      (sum: number, p: any) => sum + (p.amount || 0),
+      (sum: number, p: any) => sum + (Number(p.amount) || 0),
       0
     )
   );
@@ -266,8 +271,8 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
   });
 
   const todayCollection = r2(
-    todayPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) +
-    todayIPPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+    todayPayments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0) +
+    todayIPPayments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0)
   );
 
   // ── Pharmacy revenue today ────────────────────────────────────────────────
@@ -281,7 +286,7 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
         (p: any) =>
           invoiceBillingTypeMap[p.invoice?.toString()] === "PHARMACY"
       )
-      .reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+      .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0)
   );
 
   // ── Payment method breakdown — TODAY only (matches todayCollection) ───────
@@ -323,13 +328,13 @@ export const listInvoices = catchAsync(async (req: Request, res: Response) => {
           const pd = new Date(p.paidAt || p.createdAt);
           return pd >= monthStart && pd <= monthEnd;
         })
-        .reduce((sum: number, p: any) => sum + (p.amount || 0), 0) +
+        .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0) +
       allIPPaymentsForHospital
         .filter((p: any) => {
           const pd = new Date(p.paidAt || p.createdAt);
           return pd >= monthStart && pd <= monthEnd;
         })
-        .reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+        .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0)
     );
 
     monthlySeries.push({ month: label, revenue: monthRevenue, payments: monthRevenue });
@@ -412,7 +417,7 @@ export const getInvoice = catchAsync(async (req: Request, res: Response) => {
     throw new AppError("Invoice not found.", 404);
   }
   const payments = await Payment.find({ invoice: invoice._id, hospital: invoice.hospital });
-  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+  const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   res.json({ status: "success", data: { invoice: { ...invoice.toObject(), totals: computeTotals(invoice, totalPaid) } } });
 });
 
@@ -431,7 +436,7 @@ export const updateInvoice = catchAsync(async (req: Request, res: Response) => {
     throw new AppError("Invoice not found.", 404);
   }
   const payments = await Payment.find({ invoice: invoice._id, hospital: hospitalId });
-  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+  const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
   if (hospitalId) {
     emitToHospital(hospitalId.toString(), "dashboard_update", {
