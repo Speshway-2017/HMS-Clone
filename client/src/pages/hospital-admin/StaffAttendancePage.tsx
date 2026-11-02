@@ -28,6 +28,7 @@ import { InputField, SelectField } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
 import { socket } from "../../lib/socket";
 import { AttendanceCorrectionDialog } from "../../components/admin-dashboard/AttendanceCorrectionDialog";
+import toast from "react-hot-toast";
 
 export function StaffAttendancePage() {
   const [activeTab, setActiveTab] = useState<"daily" | "monthly" | "history">("daily");
@@ -44,7 +45,7 @@ export function StaffAttendancePage() {
   // Modals
   const [isBulkOpen, setIsBulkOpen] = useState(false);
   const [bulkStatus, setBulkStatus] = useState<string>("Present");
-  const [bulkShift, setBulkShift] = useState<string>("General");
+  const [bulkShift, setBulkShift] = useState<string>("General Shift");
 
   // Manual Correction Dialog
   const [correctionRecord, setCorrectionRecord] = useState<AttendanceRecord | null>(null);
@@ -145,7 +146,7 @@ export function StaffAttendancePage() {
     const rec = recordMap.get(emp.employeeId);
     const matchesSearch = emp.name.toLowerCase().includes(search.toLowerCase()) || emp.employeeId.toLowerCase().includes(search.toLowerCase());
     const matchesDept = !selectedDept || emp.departmentId === selectedDept;
-    const matchesShift = !selectedShift || emp.shift === selectedShift;
+    const matchesShift = !selectedShift || emp.shift === selectedShift || (selectedShift.includes('General') && (emp.shift || '').includes('General')) || (selectedShift.includes('Morning') && (emp.shift || '').includes('Morning')) || (selectedShift.includes('Evening') && (emp.shift || '').includes('Evening')) || (selectedShift.includes('Night') && (emp.shift || '').includes('Night'));
     const matchesRole = !selectedRole || (emp.role && emp.role.toLowerCase().includes(selectedRole.toLowerCase())) || (emp.designation && emp.designation.toLowerCase().includes(selectedRole.toLowerCase())) || (emp.type && emp.type.toLowerCase() === selectedRole.toLowerCase());
 
     let matchesKpi = true;
@@ -220,6 +221,10 @@ export function StaffAttendancePage() {
 
   const handleBulkSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (filteredEmployees.length === 0) {
+      toast.error("No targeted employees found to apply bulk attendance.");
+      return;
+    }
     const bulkRecords = filteredEmployees.map((emp) => ({
       employeeId: emp.employeeId,
       employeeType: emp.type as "Staff" | "Doctor",
@@ -231,8 +236,13 @@ export function StaffAttendancePage() {
       overtimeHours: 0,
     }));
 
-    await markBulk.mutateAsync({ date: selectedDate, records: bulkRecords });
-    setIsBulkOpen(false);
+    try {
+      await markBulk.mutateAsync({ date: selectedDate, records: bulkRecords });
+      toast.success("Bulk attendance applied successfully!");
+      setIsBulkOpen(false);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to apply bulk attendance");
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -278,6 +288,43 @@ export function StaffAttendancePage() {
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
             <Zap className="h-3.5 w-3.5" /> Socket.IO Real-time Sync Active
           </span>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              const targetEmp = filteredEmployees[0] || allEmployees[0];
+              if (!targetEmp) {
+                toast.error("No staff available for correction.");
+                return;
+              }
+              const existing = recordMap.get(targetEmp.employeeId);
+              if (existing) {
+                setCorrectionRecord(existing as AttendanceRecord);
+              } else {
+                setCorrectionRecord({
+                  hospital: "",
+                  employeeRef: targetEmp._id,
+                  employeeType: targetEmp.type,
+                  employeeId: targetEmp.employeeId,
+                  employeeName: targetEmp.name,
+                  designation: targetEmp.role || targetEmp.designation,
+                  shift: targetEmp.shift || "General",
+                  date: selectedDate,
+                  checkInTime: "09:00 AM",
+                  checkOutTime: "05:00 PM",
+                  workingHours: 8,
+                  overtimeHours: 0,
+                  status: "Present",
+                  isLate: false,
+                  isEarlyExit: false,
+                } as any);
+              }
+              setIsCorrectionOpen(true);
+            }}
+            className="flex items-center gap-2"
+            aria-label="Manual Attendance Correction"
+          >
+            <ShieldCheck className="h-4 w-4" /> Manual Attendance Correction
+          </Button>
           <Button onClick={() => setIsBulkOpen(true)} className="flex items-center gap-2">
             <CheckSquare className="h-4 w-4" /> Bulk Attendance
           </Button>
@@ -483,9 +530,13 @@ export function StaffAttendancePage() {
             onChange={(e) => setSelectedShift(e.target.value)}
           >
             <option value="">All Shifts</option>
+            <option value="General Shift">General Shift (09:00 AM - 05:00 PM)</option>
             <option value="General">General (09:00 AM - 05:00 PM)</option>
+            <option value="Morning Shift">Morning Shift (07:00 AM - 03:00 PM)</option>
             <option value="Morning">Morning (07:00 AM - 03:00 PM)</option>
+            <option value="Evening Shift">Evening Shift (03:00 PM - 11:00 PM)</option>
             <option value="Evening">Evening (03:00 PM - 11:00 PM)</option>
+            <option value="Night Shift">Night Shift (11:00 PM - 07:00 AM)</option>
             <option value="Night">Night (11:00 PM - 07:00 AM)</option>
             <option value="Custom Shift">Custom Shift</option>
           </SelectField>
@@ -651,11 +702,12 @@ export function StaffAttendancePage() {
                                 setCorrectionRecord(record as AttendanceRecord);
                                 setIsCorrectionOpen(true);
                               }}
-                              title="Manually edit / correct this attendance record"
-                              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded-md hover:bg-amber-100 transition-colors"
+                              title="Manual Attendance Correction"
+                              aria-label="Manual Attendance Correction"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded-md hover:bg-amber-100 transition-colors cursor-pointer"
                             >
-                              <PencilLine className="h-3 w-3" />
-                              Edit
+                              <PencilLine className="h-3.5 w-3.5" />
+                              Edit / Correct
                             </button>
                           ) : (
                             <button
@@ -680,9 +732,12 @@ export function StaffAttendancePage() {
                                 setCorrectionRecord(newDraft);
                                 setIsCorrectionOpen(true);
                               }}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-navy-700 bg-navy-50 border border-navy-300 rounded-md hover:bg-navy-100 transition-colors"
+                              title="Manual Attendance Correction"
+                              aria-label="Manual Attendance Correction"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-navy-700 bg-navy-50 border border-navy-300 rounded-md hover:bg-navy-100 transition-colors cursor-pointer"
                             >
-                              + Mark
+                              <PencilLine className="h-3.5 w-3.5" />
+                              Manual Correction
                             </button>
                           )}
                         </td>
@@ -913,10 +968,14 @@ export function StaffAttendancePage() {
             value={bulkShift}
             onChange={(e) => setBulkShift(e.target.value as any)}
           >
-            <option value="General">General Shift</option>
-            <option value="Morning">Morning Shift</option>
-            <option value="Evening">Evening Shift</option>
-            <option value="Night">Night Shift</option>
+            <option value="General Shift">General Shift</option>
+            <option value="General">General</option>
+            <option value="Morning Shift">Morning Shift</option>
+            <option value="Morning">Morning</option>
+            <option value="Evening Shift">Evening Shift</option>
+            <option value="Evening">Evening</option>
+            <option value="Night Shift">Night Shift</option>
+            <option value="Night">Night</option>
             <option value="Custom Shift">Custom Shift</option>
           </SelectField>
 

@@ -126,6 +126,28 @@ export const phoneValidator = (fieldName = "Phone number", required = false) => 
     .default("");
 };
 
+export const tenDigitPhoneValidator = (fieldName = "Primary Phone", required = false) => {
+  const schema = z
+    .string({ invalid_type_error: `${fieldName} must be a string` })
+    .trim()
+    .max(10, `${fieldName} cannot exceed 10 digits`);
+
+  if (required) {
+    return schema
+      .min(1, `${fieldName} is required`)
+      .refine((val) => /^[0-9]{10}$/.test(val) && !/^(\d)\1{9}$/.test(val), {
+        message: `Please enter a valid 10-digit ${fieldName.toLowerCase()}`,
+      });
+  }
+
+  return schema
+    .optional()
+    .refine((val) => !val || (/^[0-9]{10}$/.test(val) && !/^(\d)\1{9}$/.test(val)), {
+      message: `Please enter a valid 10-digit ${fieldName.toLowerCase()}`,
+    })
+    .default("");
+};
+
 export const urlValidator = (fieldName = "URL", max = 500) =>
   z
     .string({ invalid_type_error: `${fieldName} must be a string` })

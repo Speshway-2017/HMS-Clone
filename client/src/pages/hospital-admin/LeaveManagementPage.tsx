@@ -25,8 +25,9 @@ import { Card } from "../../components/ui/Card";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { InputField, SelectField } from "../../components/ui/Field";
+import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { Modal } from "../../components/ui/Modal";
+import toast from "react-hot-toast";
 import { socket } from "../../lib/socket";
 
 export function LeaveManagementPage() {
@@ -41,6 +42,14 @@ export function LeaveManagementPage() {
   const [fromDate, setFromDate] = useState(new Date().toISOString().split("T")[0]);
   const [toDate, setToDate] = useState(new Date().toISOString().split("T")[0]);
   const [reason, setReason] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{
+    employeeId?: string;
+    leaveType?: string;
+    fromDate?: string;
+    toDate?: string;
+    reason?: string;
+  }>({});
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Reject Modal State
   const [isRejectOpen, setIsRejectOpen] = useState(false);
@@ -99,39 +108,92 @@ export function LeaveManagementPage() {
 
   const handleApplySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedEmployeeId) return;
+    setFormError(null);
+
+    const errs: Record<string, string> = {};
+    if (!selectedEmployeeId) {
+      errs.employeeId = "Please select an employee. Please enter valid data";
+    }
+    if (!fromDate) {
+      errs.fromDate = "From Date is required. Please enter valid data";
+    }
+    if (!toDate) {
+      errs.toDate = "To Date is required. Please enter valid data";
+    }
+    if (fromDate && toDate && fromDate > toDate) {
+      errs.toDate = "To Date cannot be earlier than From Date. Please enter valid data";
+    }
+    if (reason && reason.length > 500) {
+      errs.reason = "Reason cannot exceed 500 characters. Please enter valid data";
+    }
+
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      const firstErr = Object.values(errs)[0];
+      setFormError("Please enter valid data");
+      toast.error(firstErr || "Please enter valid data", { id: "leave-val-err" });
+      return;
+    }
 
     const emp = allEmployees.find((e) => e.employeeId === selectedEmployeeId || e._id === selectedEmployeeId);
-    if (!emp) return;
+    if (!emp) {
+      toast.error("Selected employee not found. Please enter valid data");
+      return;
+    }
 
-    await applyLeave.mutateAsync({
-      employeeId: emp.employeeId,
-      employeeType: emp.type,
-      leaveType,
-      fromDate,
-      toDate,
-      reason,
-    });
+    try {
+      await applyLeave.mutateAsync({
+        employeeId: emp._id || emp.employeeId,
+        employeeType: emp.type,
+        leaveType,
+        fromDate,
+        toDate,
+        reason: reason.trim(),
+      });
 
-    setIsApplyOpen(false);
-    setReason("");
+      toast.success("Staff leave applied successfully!");
+      setIsApplyOpen(false);
+      setSelectedEmployeeId("");
+      setReason("");
+      setFieldErrors({});
+      setFormError(null);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Failed to submit leave request. Please enter valid data";
+      setFormError("Please enter valid data");
+      toast.error(msg, { id: "apply-leave-err" });
+    }
   };
 
   const handleApprove = async (id: string) => {
-    await approveLeave.mutateAsync(id);
+    try {
+      await approveLeave.mutateAsync(id);
+      toast.success("Leave request approved successfully!");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to approve leave");
+    }
   };
 
   const handleRejectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!rejectingLeaveId) return;
-    await rejectLeave.mutateAsync({ id: rejectingLeaveId, rejectionReason });
-    setIsRejectOpen(false);
-    setRejectingLeaveId(null);
-    setRejectionReason("");
+    try {
+      await rejectLeave.mutateAsync({ id: rejectingLeaveId, rejectionReason });
+      toast.success("Leave request rejected successfully.");
+      setIsRejectOpen(false);
+      setRejectingLeaveId(null);
+      setRejectionReason("");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to reject leave");
+    }
   };
 
   const handleCancel = async (id: string) => {
-    await cancelLeave.mutateAsync(id);
+    try {
+      await cancelLeave.mutateAsync(id);
+      toast.success("Leave request cancelled successfully.");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to cancel leave");
+    }
   };
 
   const leaves: LeaveRequest[] = leavesRes?.data || [];
@@ -159,8 +221,8 @@ export function LeaveManagementPage() {
             Process staff leave applications with automatic real-time attendance sync and LOP calculations.
           </p>
         </div>
-        <Button onClick={() => setIsApplyOpen(true)} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" /> Apply Leave
+        <Button onClick={() => { setIsApplyOpen(true); setFieldErrors({}); setFormError(null); }} className="flex items-center gap-2" aria-label="Apply Staff Leave">
+          <Plus className="h-4 w-4" /> Apply Staff Leave
         </Button>
       </div>
 
@@ -347,11 +409,16 @@ export function LeaveManagementPage() {
         onClose={() => setIsApplyOpen(false)}
         title="Apply Staff Leave"
       >
-        <form onSubmit={handleApplySubmit} className="space-y-4">
+        <form onSubmit={handleApplySubmit} noValidate className="space-y-4">
           <SelectField
             label="Select Employee"
             value={selectedEmployeeId}
-            onChange={(e) => setSelectedEmployeeId(e.target.value)}
+            error={fieldErrors.employeeId}
+            onChange={(e) => {
+              setSelectedEmployeeId(e.target.value);
+              setFieldErrors((prev) => ({ ...prev, employeeId: undefined }));
+              if (formError === "Please enter valid data") setFormError(null);
+            }}
             required
           >
             <option value="">Select Employee...</option>
@@ -375,6 +442,9 @@ export function LeaveManagementPage() {
             <option value="Paternity Leave">Paternity Leave (Paid)</option>
             <option value="Compensatory Leave">Compensatory Leave (Paid)</option>
             <option value="Unpaid Leave">Unpaid Leave (Loss of Pay - LOP)</option>
+            <option value="Unpaid Leave (LOP)">Unpaid Leave (LOP)</option>
+            <option value="Emergency Leave">Emergency Leave</option>
+            <option value="Paid Leave">Paid Leave</option>
           </SelectField>
 
           <div className="grid grid-cols-2 gap-4">
@@ -382,28 +452,50 @@ export function LeaveManagementPage() {
               label="From Date"
               type="date"
               value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
+              error={fieldErrors.fromDate}
+              onChange={(e) => {
+                setFromDate(e.target.value);
+                setFieldErrors((prev) => ({ ...prev, fromDate: undefined }));
+                if (formError === "Please enter valid data") setFormError(null);
+              }}
               required
             />
             <InputField
               label="To Date"
               type="date"
               value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
+              error={fieldErrors.toDate}
+              onChange={(e) => {
+                setToDate(e.target.value);
+                setFieldErrors((prev) => ({ ...prev, toDate: undefined }));
+                if (formError === "Please enter valid data") setFormError(null);
+              }}
               required
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Reason for Leave</label>
-            <textarea
-              rows={3}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Provide reason for leave request..."
-              className="w-full text-sm border border-slate-300 rounded-md p-2 focus:ring-2 focus:ring-navy-500"
-            />
-          </div>
+          <TextareaField
+            label="Reason for Leave"
+            rows={3}
+            value={reason}
+            error={fieldErrors.reason}
+            maxLength={500}
+            showCharCount
+            onChange={(e) => {
+              setReason(e.target.value);
+              if (e.target.value.length <= 500) {
+                setFieldErrors((prev) => ({ ...prev, reason: undefined }));
+              }
+            }}
+            placeholder="Provide reason for leave request..."
+          />
+
+          {formError && (
+            <div className="p-2.5 bg-red-50 text-red-700 text-xs rounded-lg border border-red-200 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+              <span>{formError}</span>
+            </div>
+          )}
 
           <div className="p-3 bg-amber-50 rounded-md text-xs text-amber-800 flex items-start gap-2">
             <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />

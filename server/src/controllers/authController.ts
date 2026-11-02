@@ -706,7 +706,7 @@ export const resetPassword = catchAsync(async (req: Request, res: Response) => {
 });
 
 const updateProfileSchema = z.object({
-  name: nameValidator("Name", 2, 50, false).optional(),
+  name: nameValidator("Full Display Name", 2, 100, false).optional(),
   phone: phoneValidator("Phone", false).optional(),
   email: emailValidator("Email", false, 254).optional(),
   avatarUrl: optionalTrimmedString("Avatar URL", 500).optional(),

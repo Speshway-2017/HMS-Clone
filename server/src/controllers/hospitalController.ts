@@ -21,6 +21,7 @@ import {
   optionalTrimmedString,
   emailValidator,
   phoneValidator,
+  tenDigitPhoneValidator,
   urlValidator,
   codeValidator,
   numberValidator,
@@ -28,11 +29,11 @@ import {
 } from "../utils/validators";
 
 const hospitalSchema = z.object({
-  name: requiredTrimmedString("Hospital Name", 1, 100),
+  name: requiredTrimmedString("Hospital Name", 2, 100),
   code: z.string().max(20, "Hospital Code cannot exceed 20 characters").optional().default(""),
   address: optionalTrimmedString("Address", 250),
   contactEmail: emailValidator("Contact Email", false, 100),
-  contactPhone: phoneValidator("Primary Phone", false),
+  contactPhone: tenDigitPhoneValidator("Primary Phone", false),
   logoUrl: z
     .string()
     .optional()
@@ -65,7 +66,7 @@ const hospitalSchema = z.object({
     .optional()
     .default("")
     .refine((val) => !val || val.toLowerCase().endsWith(".pdf") || val.toLowerCase().includes(".pdf?"), {
-      message: "License Credentials must be a PDF file (.pdf)",
+      message: "Only PDF files should be accepted. Remaining files are not accepted.",
     }),
   bedCapacity: z.coerce.number().min(0).optional().default(0),
   opExpiryLimit: z.coerce.number().min(0).optional().default(10),
@@ -142,7 +143,7 @@ export const createHospital = catchAsync(async (req: Request, res: Response) => 
   // Validate Primary Admin eligibility if specified
   if (primaryAdminId) {
     if (!Types.ObjectId.isValid(primaryAdminId)) {
-      throw new AppError("Invalid Primary Admin ID.", 400);
+      throw new AppError("Invalid or ineligible administrator should not be accepted.", 400);
     }
     const eligibleAdmin = await User.findOne({
       _id: primaryAdminId,
@@ -151,7 +152,7 @@ export const createHospital = catchAsync(async (req: Request, res: Response) => 
       status: "active",
     });
     if (!eligibleAdmin) {
-      throw new AppError("Selected administrator is invalid, inactive, or already assigned to a hospital.", 400);
+      throw new AppError("Invalid or ineligible administrator should not be accepted.", 400);
     }
   }
 
@@ -212,7 +213,7 @@ export const updateHospital = catchAsync(async (req: Request, res: Response) => 
 
   if (primaryAdminId) {
     if (!Types.ObjectId.isValid(primaryAdminId)) {
-      throw new AppError("Invalid Primary Admin ID.", 400);
+      throw new AppError("Invalid or ineligible administrator should not be accepted.", 400);
     }
     const eligibleAdmin = await User.findOne({
       _id: primaryAdminId,
@@ -221,7 +222,7 @@ export const updateHospital = catchAsync(async (req: Request, res: Response) => 
       $or: [{ hospital: null }, { hospital: hospital._id }],
     });
     if (!eligibleAdmin) {
-      throw new AppError("Selected administrator is invalid, inactive, or already assigned to another hospital.", 400);
+      throw new AppError("Invalid or ineligible administrator should not be accepted.", 400);
     }
     await User.findByIdAndUpdate(primaryAdminId, { hospital: hospital._id });
   }

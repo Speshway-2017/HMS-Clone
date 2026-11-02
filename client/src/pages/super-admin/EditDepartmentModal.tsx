@@ -16,12 +16,26 @@ import { useUpdateDepartment } from "../../features/departments";
 import { useDoctors } from "../../features/doctors";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
+import toast from "react-hot-toast";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DEPT_CODE_RE = /^[A-Za-z0-9\-_]{0,20}$/;
+const DEPT_LIMITS = {
+  NAME: 50,
+  CODE: 20,
+  DESCRIPTION: 500,
+  SPECIALIZATION: 100,
+  FLOOR: 50,
+  BUILDING: 50,
+  FEE_MAX: 100000,
+  ORDER_MAX: 9999,
+} as const;
+
+const DEPT_NAME_REGEX = /^[a-zA-Z\s\.\-&/()]+$/;
+const DEPT_CODE_RE = /^[A-Za-z0-9\-_]{1,20}$/;
+const SPECIALIZATION_REGEX = /^[a-zA-Z\s\.\-&/(),]+$/;
 
 const STATUS_OPTIONS = [
   { value: "operational", label: "Operational" },
@@ -143,30 +157,153 @@ export function EditDepartmentModal({ department, isOpen, onClose }: EditDepartm
 
   function set<K extends keyof DeptFormState>(field: K, value: DeptFormState[K]) {
     setForm((f) => ({ ...f, [field]: value }));
-    setErrors((e) => ({ ...e, [field]: undefined }));
+    const err = validateField(field, value);
+    setErrors((e) => ({ ...e, [field]: err }));
+    if (!err && feedback?.type === "error") setFeedback(null);
   }
 
   // ── Validation ─────────────────────────────────────────────────────────
 
+  function validateField(field: keyof DeptFormState, value: any): string | undefined {
+    if (field === "name") {
+      const str = typeof value === "string" ? value : String(value ?? "");
+      const trimmed = str.trim();
+      if (!trimmed) {
+        return "Department Name is required. Please fill out this field";
+      }
+      if (str.length > DEPT_LIMITS.NAME) {
+        return `Department Name cannot exceed ${DEPT_LIMITS.NAME} characters. Please enter valid data`;
+      }
+      if (trimmed.length < 2 || !DEPT_NAME_REGEX.test(trimmed)) {
+        return "Department Name contains invalid data. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    if (field === "code") {
+      const str = typeof value === "string" ? value : String(value ?? "");
+      const trimmed = str.trim();
+      if (!trimmed) return undefined;
+      if (str.length > DEPT_LIMITS.CODE) {
+        return `Department Code cannot exceed ${DEPT_LIMITS.CODE} characters. Please enter valid data`;
+      }
+      if (!DEPT_CODE_RE.test(trimmed)) {
+        return "Department Code contains invalid data. Must be alphanumeric with dashes or underscores. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    if (field === "description") {
+      const str = typeof value === "string" ? value : String(value ?? "");
+      if (str.length > DEPT_LIMITS.DESCRIPTION) {
+        return `Description cannot exceed ${DEPT_LIMITS.DESCRIPTION} characters. Please enter valid data`;
+      }
+      return undefined;
+    }
+
+    if (field === "specialization") {
+      const str = typeof value === "string" ? value : String(value ?? "");
+      const trimmed = str.trim();
+      if (!trimmed) return undefined;
+      if (str.length > DEPT_LIMITS.SPECIALIZATION) {
+        return `Specialization cannot exceed ${DEPT_LIMITS.SPECIALIZATION} characters. Please enter valid data`;
+      }
+      if (!SPECIALIZATION_REGEX.test(trimmed)) {
+        return "Specialization contains invalid data. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    if (field === "floor") {
+      const str = typeof value === "string" ? value : String(value ?? "");
+      if (str.length > DEPT_LIMITS.FLOOR) {
+        return `Floor cannot exceed ${DEPT_LIMITS.FLOOR} characters. Please enter valid data`;
+      }
+      return undefined;
+    }
+
+    if (field === "building") {
+      const str = typeof value === "string" ? value : String(value ?? "");
+      if (str.length > DEPT_LIMITS.BUILDING) {
+        return `Building cannot exceed ${DEPT_LIMITS.BUILDING} characters. Please enter valid data`;
+      }
+      return undefined;
+    }
+
+    if (field === "consultationFee") {
+      const num = parseFloat(value);
+      if (isNaN(num)) return "Consultation fee must be a valid number. Please enter valid data";
+      if (num < 0) return "Consultation fee cannot be negative. Please enter valid data";
+      if (num > DEPT_LIMITS.FEE_MAX) return `Consultation fee cannot exceed ${DEPT_LIMITS.FEE_MAX.toLocaleString()}. Please enter valid data`;
+      return undefined;
+    }
+
+    if (field === "displayOrder") {
+      const num = parseInt(value, 10);
+      if (isNaN(num)) return "Display order must be a whole number. Please enter valid data";
+      if (num < 0) return "Display order cannot be negative. Please enter valid data";
+      if (num > DEPT_LIMITS.ORDER_MAX) return `Display order cannot exceed ${DEPT_LIMITS.ORDER_MAX}. Please enter valid data`;
+      return undefined;
+    }
+
+    return undefined;
+  }
+
+  const handleKeyGuard = (
+    e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+    field: keyof DeptFormState,
+    currentLen: number,
+    limit: number,
+    label: string
+  ) => {
+    const allowed = ["Backspace", "Delete", "Tab", "Escape", "Enter", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"];
+    if (allowed.includes(e.key) || e.ctrlKey || e.metaKey || e.altKey) return;
+    const input = e.currentTarget;
+    const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
+    if (!hasSelection && currentLen >= limit) {
+      e.preventDefault();
+      const msg = `${label} cannot exceed ${limit} characters. Please enter valid data`;
+      setErrors((prev) => ({ ...prev, [field]: msg }));
+      toast.error(msg, { id: `edit-dept-${String(field)}-limit` });
+    }
+  };
+
   function validate(): boolean {
     const errs: Partial<Record<keyof DeptFormState, string>> = {};
 
-    const trimmedName = form.name.trim();
-    if (!trimmedName) errs.name = "Department name is required.";
-    else if (trimmedName.length < 2) errs.name = "Name must be at least 2 characters.";
+    const nameErr = validateField("name", form.name);
+    if (nameErr) errs.name = nameErr;
 
-    if (form.code.trim() && !DEPT_CODE_RE.test(form.code.trim())) {
-      errs.code = "Code must be 1–20 alphanumeric/dash/underscore characters.";
-    }
+    const codeErr = validateField("code", form.code);
+    if (codeErr) errs.code = codeErr;
 
-    const fee = parseFloat(form.consultationFee);
-    if (isNaN(fee) || fee < 0) errs.consultationFee = "Consultation fee cannot be negative.";
+    const descErr = validateField("description", form.description);
+    if (descErr) errs.description = descErr;
 
-    const order = parseInt(form.displayOrder, 10);
-    if (isNaN(order)) errs.displayOrder = "Display order must be a whole number.";
+    const specErr = validateField("specialization", form.specialization);
+    if (specErr) errs.specialization = specErr;
+
+    const floorErr = validateField("floor", form.floor);
+    if (floorErr) errs.floor = floorErr;
+
+    const bldErr = validateField("building", form.building);
+    if (bldErr) errs.building = bldErr;
+
+    const feeErr = validateField("consultationFee", form.consultationFee);
+    if (feeErr) errs.consultationFee = feeErr;
+
+    const orderErr = validateField("displayOrder", form.displayOrder);
+    if (orderErr) errs.displayOrder = orderErr;
 
     setErrors(errs);
-    return Object.keys(errs).length === 0;
+    if (Object.keys(errs).length > 0) {
+      const first = Object.values(errs)[0];
+      setFeedback({ type: "error", message: first || "Please fill out this field" });
+      toast.error(first || "Please enter valid data", { id: "edit-dept-err" });
+      return false;
+    }
+
+    return true;
   }
 
   // ── Submit ─────────────────────────────────────────────────────────────
@@ -201,24 +338,22 @@ export function EditDepartmentModal({ department, isOpen, onClose }: EditDepartm
     try {
       await updateDept.mutateAsync(payload);
       setFeedback({ type: "success", message: "Department updated successfully." });
-      setOriginalForm(form); // reset baseline so subsequent edits are tracked correctly
+      toast.success("Department updated successfully!");
+      setOriginalForm(form);
       setTimeout(() => {
         onClose();
-      }, 1400);
+      }, 1200);
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        "Could not update department. Please try again.";
+        "Could not update department. Please enter valid data.";
       setFeedback({ type: "error", message: msg });
+      toast.error(msg, { id: "edit-dept-submit-err" });
     }
   }
 
   const isSaving = updateDept.isPending;
   const doctors = doctorsData?.data ?? [];
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     /* Backdrop */
@@ -243,7 +378,7 @@ export function EditDepartmentModal({ department, isOpen, onClose }: EditDepartm
             type="button"
             onClick={onClose}
             aria-label="Close modal"
-            className="rounded-lg p-1.5 text-white/70 transition hover:bg-white/10 hover:text-white"
+            className="rounded-lg p-1.5 text-white/70 transition hover:bg-white/10 hover:text-white cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
@@ -270,7 +405,7 @@ export function EditDepartmentModal({ department, isOpen, onClose }: EditDepartm
         )}
 
         {/* ── Form ───────────────────────────────────────────────────── */}
-        <form onSubmit={handleSubmit} className="divide-y divide-slate-100">
+        <form onSubmit={handleSubmit} noValidate className="divide-y divide-slate-100">
 
           {/* Section: Department Identity */}
           <div className="space-y-4 px-6 py-5">
@@ -285,29 +420,46 @@ export function EditDepartmentModal({ department, isOpen, onClose }: EditDepartm
                   id="edit-dept-name"
                   label="Department Name"
                   required
+                  maxLength={DEPT_LIMITS.NAME}
+                  showCharCount
                   value={form.name}
+                  error={errors.name}
                   onChange={(e) => set("name", e.target.value)}
+                  onKeyDown={(e) => handleKeyGuard(e, "name", form.name.length, DEPT_LIMITS.NAME, "Department Name")}
+                  onBlur={() => {
+                    const err = validateField("name", form.name);
+                    setErrors((prev) => ({ ...prev, name: err }));
+                  }}
                   placeholder="e.g. Cardiology"
                 />
-                {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
               </div>
               <div>
                 <InputField
                   id="edit-dept-code"
                   label="Department Code"
+                  maxLength={DEPT_LIMITS.CODE}
+                  showCharCount
                   value={form.code}
+                  error={errors.code}
                   onChange={(e) => set("code", e.target.value.toUpperCase())}
+                  onKeyDown={(e) => handleKeyGuard(e, "code", form.code.length, DEPT_LIMITS.CODE, "Department Code")}
+                  onBlur={() => {
+                    const err = validateField("code", form.code);
+                    setErrors((prev) => ({ ...prev, code: err }));
+                  }}
                   placeholder="e.g. CARD-001"
-                  maxLength={20}
                 />
-                {errors.code && <p className="mt-1 text-xs text-red-500">{errors.code}</p>}
               </div>
               <div className="sm:col-span-2">
                 <TextareaField
                   id="edit-dept-description"
                   label="Description"
+                  maxLength={DEPT_LIMITS.DESCRIPTION}
+                  showCharCount
                   value={form.description}
+                  error={errors.description}
                   onChange={(e) => set("description", e.target.value)}
+                  onKeyDown={(e) => handleKeyGuard(e, "description", form.description.length, DEPT_LIMITS.DESCRIPTION, "Description")}
                   placeholder="Brief description of the department's purpose"
                   rows={2}
                 />
@@ -315,8 +467,16 @@ export function EditDepartmentModal({ department, isOpen, onClose }: EditDepartm
               <InputField
                 id="edit-dept-specialization"
                 label="Specialization"
+                maxLength={DEPT_LIMITS.SPECIALIZATION}
+                showCharCount
                 value={form.specialization}
+                error={errors.specialization}
                 onChange={(e) => set("specialization", e.target.value)}
+                onKeyDown={(e) => handleKeyGuard(e, "specialization", form.specialization.length, DEPT_LIMITS.SPECIALIZATION, "Specialization")}
+                onBlur={() => {
+                  const err = validateField("specialization", form.specialization);
+                  setErrors((prev) => ({ ...prev, specialization: err }));
+                }}
                 placeholder="e.g. Interventional Cardiology"
               />
               <SelectField
@@ -363,15 +523,23 @@ export function EditDepartmentModal({ department, isOpen, onClose }: EditDepartm
               <InputField
                 id="edit-dept-floor"
                 label="Floor"
+                maxLength={DEPT_LIMITS.FLOOR}
+                showCharCount
                 value={form.floor}
+                error={errors.floor}
                 onChange={(e) => set("floor", e.target.value)}
+                onKeyDown={(e) => handleKeyGuard(e, "floor", form.floor.length, DEPT_LIMITS.FLOOR, "Floor")}
                 placeholder="e.g. 3rd Floor"
               />
               <InputField
                 id="edit-dept-building"
                 label="Building"
+                maxLength={DEPT_LIMITS.BUILDING}
+                showCharCount
                 value={form.building}
+                error={errors.building}
                 onChange={(e) => set("building", e.target.value)}
+                onKeyDown={(e) => handleKeyGuard(e, "building", form.building.length, DEPT_LIMITS.BUILDING, "Building")}
                 placeholder="e.g. Block A"
               />
               <InputField
@@ -398,14 +566,13 @@ export function EditDepartmentModal({ department, isOpen, onClose }: EditDepartm
                   label="Consultation Fee (₹)"
                   type="number"
                   min={0}
+                  max={DEPT_LIMITS.FEE_MAX}
                   step={0.01}
                   value={form.consultationFee}
+                  error={errors.consultationFee}
                   onChange={(e) => set("consultationFee", e.target.value)}
                   placeholder="e.g. 500"
                 />
-                {errors.consultationFee && (
-                  <p className="mt-1 text-xs text-red-500">{errors.consultationFee}</p>
-                )}
               </div>
               <div className="flex items-end">
                 <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 transition hover:bg-slate-100 w-full">
@@ -449,14 +616,13 @@ export function EditDepartmentModal({ department, isOpen, onClose }: EditDepartm
                   label="Display Order"
                   type="number"
                   min={0}
+                  max={DEPT_LIMITS.ORDER_MAX}
                   value={form.displayOrder}
+                  error={errors.displayOrder}
                   onChange={(e) => set("displayOrder", e.target.value)}
                   placeholder="0"
                   hint="Lower number = appears first"
                 />
-                {errors.displayOrder && (
-                  <p className="mt-1 text-xs text-red-500">{errors.displayOrder}</p>
-                )}
               </div>
               <div>
                 <div className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 flex items-center gap-1.5">

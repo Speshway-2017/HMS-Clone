@@ -2,7 +2,7 @@ export const MAX_LENGTHS = {
   NAME: 100,
   CODE: 20,
   EMAIL: 100,
-  PHONE: 20,
+  PHONE: 10,
   PASSWORD: 100,
   ADDRESS: 250,
   TITLE: 150,
@@ -28,7 +28,7 @@ export const MAX_LENGTHS = {
 
 export const PATTERNS = {
   EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
-  PHONE: /^\+?[0-9]{10,15}$/,
+  PHONE: /^[0-9]{10}$/,
   CLEAN_PHONE: /[\s\-\(\)\.]/g,
   CODE: /^[A-Za-z0-9\-_]+$/,
   URL: /^https?:\/\/.+/i,
@@ -46,8 +46,10 @@ export const isValidEmail = (email: string): boolean => {
 
 export const isValidPhone = (phone: string): boolean => {
   if (!phone || !phone.trim()) return false;
-  const cleaned = cleanPhone(phone);
-  return PATTERNS.PHONE.test(cleaned);
+  const digitsOnly = phone.replace(/\D/g, "");
+  if (digitsOnly.length !== 10) return false;
+  if (/^(\d)\1{9}$/.test(digitsOnly)) return false;
+  return PATTERNS.PHONE.test(digitsOnly);
 };
 
 export const isValidUrl = (url: string): boolean => {
@@ -102,7 +104,7 @@ export function validateValue(value: any, rules: ValidationRule, fieldLabel = "F
     if (rules.isPhone) {
       const clean = strVal.replace(PATTERNS.CLEAN_PHONE, "");
       if (!PATTERNS.PHONE.test(clean)) {
-        return "Please enter a valid phone number (10-15 digits)";
+        return "Please enter a valid 10-digit phone number";
       }
     }
     if (rules.isUrl && !PATTERNS.URL.test(strVal)) {

@@ -1,3 +1,4 @@
+import { Types } from "mongoose";
 import { Request, Response } from "express";
 import { Attendance, ATTENDANCE_STATUSES, SHIFTS } from "../models/Attendance";
 import { Staff } from "../models/Staff";
@@ -144,13 +145,16 @@ export const markSingleAttendance = catchAsync(async (req: Request, res: Respons
   const empType = employeeType === "Doctor" ? "Doctor" : "Staff";
   let empObj: any = null;
 
+  const isObjId = Types.ObjectId.isValid(employeeId);
   if (empType === "Doctor") {
-    empObj = await Doctor.findOne({ _id: employeeId, hospital: hospitalId }) || await Doctor.findOne({ licenseNo: employeeId, hospital: hospitalId });
+    empObj = isObjId ? await Doctor.findOne({ _id: employeeId, hospital: hospitalId }) : null;
+    if (!empObj) empObj = await Doctor.findOne({ licenseNo: employeeId, hospital: hospitalId });
     if (empObj && (empObj.doctorType === "Visiting" || empObj.doctorType === "On-Call")) {
       throw new AppError("Visiting Consultants and On-Call Doctors must NOT appear in Staff Attendance.", 400);
     }
   } else {
-    empObj = await Staff.findOne({ _id: employeeId, hospital: hospitalId }) || await Staff.findOne({ employeeId: employeeId, hospital: hospitalId });
+    empObj = isObjId ? await Staff.findOne({ _id: employeeId, hospital: hospitalId }) : null;
+    if (!empObj) empObj = await Staff.findOne({ employeeId: employeeId, hospital: hospitalId });
   }
 
   if (!empObj) {
@@ -302,11 +306,14 @@ export const bulkMarkAttendance = catchAsync(async (req: Request, res: Response)
     const empType = item.employeeType === "Doctor" ? "Doctor" : "Staff";
     let empObj: any = null;
 
+    const isItemObjId = Types.ObjectId.isValid(item.employeeId);
     if (empType === "Doctor") {
-      empObj = await Doctor.findOne({ _id: item.employeeId, hospital: hospitalId }) || await Doctor.findOne({ licenseNo: item.employeeId, hospital: hospitalId });
+      empObj = isItemObjId ? await Doctor.findOne({ _id: item.employeeId, hospital: hospitalId }) : null;
+      if (!empObj) empObj = await Doctor.findOne({ licenseNo: item.employeeId, hospital: hospitalId });
       if (empObj && (empObj.doctorType === "Visiting" || empObj.doctorType === "On-Call")) continue;
     } else {
-      empObj = await Staff.findOne({ _id: item.employeeId, hospital: hospitalId }) || await Staff.findOne({ employeeId: item.employeeId, hospital: hospitalId });
+      empObj = isItemObjId ? await Staff.findOne({ _id: item.employeeId, hospital: hospitalId }) : null;
+      if (!empObj) empObj = await Staff.findOne({ employeeId: item.employeeId, hospital: hospitalId });
     }
 
     if (!empObj) continue;

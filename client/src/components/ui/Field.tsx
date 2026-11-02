@@ -6,6 +6,7 @@ import {
   forwardRef,
   useState,
 } from "react";
+import toast from "react-hot-toast";
 import { MAX_LENGTHS, isValidEmail, isValidPhone } from "../../lib/validation";
 
 const fieldClasses =
@@ -78,6 +79,7 @@ export interface InputFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   hint?: string;
   error?: string | null;
   rightElement?: ReactNode;
+  inputRightElement?: ReactNode;
   showCharCount?: boolean;
 }
 
@@ -89,6 +91,7 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
       error: propError,
       required,
       rightElement,
+      inputRightElement,
       className = "",
       maxLength,
       onKeyDown,
@@ -119,6 +122,7 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
         : undefined;
 
     const [touched, setTouched] = useState(false);
+    const [keyLimitError, setKeyLimitError] = useState<string | null>(null);
     const [internalValue, setInternalValue] = useState(
       value !== undefined ? String(value) : defaultValue !== undefined ? String(defaultValue) : ""
     );
@@ -126,52 +130,80 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
     const currentVal = value !== undefined ? String(value) : internalValue;
     const charCount = currentVal.length;
 
+    const cleanLabel = (label || "").replace(/[\s\*\^]+$/, "").trim();
+
     let autoError: string | null = null;
     if (effectiveMaxLength && charCount > effectiveMaxLength) {
-      autoError = `Cannot exceed ${effectiveMaxLength} characters (${charCount}/${effectiveMaxLength})`;
+      autoError = isPhoneField
+        ? `${cleanLabel} cannot exceed ${effectiveMaxLength} digits. Please enter valid data`
+        : `${cleanLabel} cannot exceed ${effectiveMaxLength} characters. Please enter valid data`;
     } else if (touched) {
       if (required && !currentVal.trim()) {
-        autoError = `${label.replace(/[\s\*\^]+$/, "").trim()} is required`;
+        autoError = `${cleanLabel} is required. Please fill out this field`;
       } else if (isEmailField && currentVal.trim() && !isValidEmail(currentVal)) {
-        autoError = "Please enter a valid email address";
+        autoError = "Please enter a valid email address. Please enter valid data";
       } else if (isPhoneField && currentVal.trim() && !isValidPhone(currentVal)) {
-        autoError = "Please enter a valid 10-15 digit phone number";
+        autoError = "Please enter a valid 10-digit phone number. Please enter valid data";
       }
     }
 
-    const activeError = propError !== undefined ? propError : autoError;
+    const activeError = propError !== undefined ? (propError || keyLimitError) : (keyLimitError || autoError);
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      const allowedNavKeys = [
+        "Backspace",
+        "Delete",
+        "Tab",
+        "Escape",
+        "Enter",
+        "ArrowLeft",
+        "ArrowRight",
+        "ArrowUp",
+        "ArrowDown",
+        "Home",
+        "End",
+      ];
+
       if (isPhoneField) {
-        const allowedKeys = [
-          "Backspace",
-          "Delete",
-          "Tab",
-          "Escape",
-          "Enter",
-          "ArrowLeft",
-          "ArrowRight",
-          "ArrowUp",
-          "ArrowDown",
-          "Home",
-          "End",
-          "+",
-        ];
-        if (!allowedKeys.includes(e.key) && !e.ctrlKey && !e.metaKey && !/^[0-9]$/.test(e.key)) {
+        if (!allowedNavKeys.includes(e.key) && !e.ctrlKey && !e.metaKey && !/^[0-9]$/.test(e.key)) {
           e.preventDefault();
+          const digitOnlyMsg = "Invalid phone number. Phone Number should accept 10 digits only. Please enter valid data";
+          setKeyLimitError(digitOnlyMsg);
+          toast.error(digitOnlyMsg, { id: `${cleanLabel}-digit-only` });
+          if (onKeyDown) onKeyDown(e);
+          return;
         }
       }
+
+      if (effectiveMaxLength && !allowedNavKeys.includes(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const input = e.currentTarget;
+        const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
+        if (!hasSelection && currentVal.length >= effectiveMaxLength) {
+          e.preventDefault();
+          const limitMsg = isPhoneField
+            ? `${cleanLabel} cannot exceed ${effectiveMaxLength} digits. Please enter valid data`
+            : `${cleanLabel} cannot exceed ${effectiveMaxLength} characters. Please enter valid data`;
+          setKeyLimitError(limitMsg);
+          toast.error(limitMsg, { id: `${cleanLabel}-limit-exceeded` });
+          if (onKeyDown) onKeyDown(e);
+          return;
+        }
+      }
+
       if (onKeyDown) onKeyDown(e);
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       let val = e.target.value;
       if (isPhoneField) {
-        const cleanValue = val.replace(/(?!^\+)[^\d]/g, "");
+        const cleanValue = val.replace(/\D/g, "");
         if (val !== cleanValue) {
           val = cleanValue;
           e.target.value = cleanValue;
         }
+      }
+      if (effectiveMaxLength && val.length <= effectiveMaxLength) {
+        setKeyLimitError(null);
       }
       if (value === undefined) {
         setInternalValue(val);
@@ -202,18 +234,24 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
         }
         rightElement={rightElement}
       >
-        <input
-          ref={ref}
-          className={`${fieldClasses} ${borderStyle} ${className}`}
-          required={required}
-          maxLength={effectiveMaxLength}
-          value={value}
-          defaultValue={defaultValue}
-          onKeyDown={handleKeyDown}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          {...props}
-        />
+        <div className="relative flex items-center">
+          <input
+            ref={ref}
+            className={`${fieldClasses} ${borderStyle} ${inputRightElement ? "pr-8" : ""} ${className}`}
+            required={required}
+            value={value}
+            defaultValue={defaultValue}
+            onKeyDown={handleKeyDown}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            {...props}
+          />
+          {inputRightElement && (
+            <div className="absolute right-1.5 flex items-center z-10">
+              {inputRightElement}
+            </div>
+          )}
+        </div>
       </FieldWrapper>
     );
   }
@@ -268,6 +306,7 @@ export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>
       rightElement,
       className = "",
       maxLength = MAX_LENGTHS.LONG_TEXT,
+      onKeyDown,
       onChange,
       onBlur,
       value,
@@ -278,25 +317,62 @@ export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>
     ref
   ) => {
     const [touched, setTouched] = useState(false);
+    const [keyLimitError, setKeyLimitError] = useState<string | null>(null);
     const [internalValue, setInternalValue] = useState(
       value !== undefined ? String(value) : defaultValue !== undefined ? String(defaultValue) : ""
     );
 
     const currentVal = value !== undefined ? String(value) : internalValue;
     const charCount = currentVal.length;
+    const cleanLabel = (label || "").replace(/[\s\*\^]+$/, "").trim();
 
     let autoError: string | null = null;
     if (maxLength && charCount > maxLength) {
-      autoError = `Cannot exceed ${maxLength} characters (${charCount}/${maxLength})`;
+      autoError = `${cleanLabel} cannot exceed ${maxLength} characters. Please enter valid data`;
     } else if (touched && required && !currentVal.trim()) {
-      autoError = `${label.replace(/[\s\*\^]+$/, "").trim()} is required`;
+      autoError = `${cleanLabel} is required. Please fill out this field`;
     }
 
-    const activeError = propError !== undefined ? propError : autoError;
+    const activeError = propError !== undefined ? (propError || keyLimitError) : (keyLimitError || autoError);
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      const allowedNavKeys = [
+        "Backspace",
+        "Delete",
+        "Tab",
+        "Escape",
+        "Enter",
+        "ArrowLeft",
+        "ArrowRight",
+        "ArrowUp",
+        "ArrowDown",
+        "Home",
+        "End",
+      ];
+
+      if (maxLength && !allowedNavKeys.includes(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const input = e.currentTarget;
+        const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
+        if (!hasSelection && currentVal.length >= maxLength) {
+          e.preventDefault();
+          const limitMsg = `${cleanLabel} cannot exceed ${maxLength} characters. Please enter valid data`;
+          setKeyLimitError(limitMsg);
+          toast.error(limitMsg, { id: `${cleanLabel}-limit-exceeded` });
+          if (onKeyDown) onKeyDown(e);
+          return;
+        }
+      }
+
+      if (onKeyDown) onKeyDown(e);
+    };
 
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      let val = e.target.value;
+      if (maxLength && val.length <= maxLength) {
+        setKeyLimitError(null);
+      }
       if (value === undefined) {
-        setInternalValue(e.target.value);
+        setInternalValue(val);
       }
       if (onChange) onChange(e);
     };
@@ -324,9 +400,9 @@ export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>
           ref={ref}
           className={`${fieldClasses} ${borderStyle} ${className}`}
           required={required}
-          maxLength={maxLength}
           value={value}
           defaultValue={defaultValue}
+          onKeyDown={handleKeyDown}
           onChange={handleChange}
           onBlur={handleBlur}
           {...props}

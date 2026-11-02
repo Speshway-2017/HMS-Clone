@@ -11,9 +11,7 @@ import {
   Eye,
   EyeOff,
   Save,
-  Smartphone,
-  Globe,
-  Mail
+  AlertCircle,
 } from "lucide-react";
 import { useChangePassword, useUpdateProfile } from "../../features/auth";
 import { useAuth } from "../../context/AuthContext";
@@ -21,6 +19,7 @@ import { useMyHospital, useUpdateMyHospital } from "../../features/hospitals";
 import { FileUpload } from "../../components/ui/FileUpload";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
+import { InputField } from "../../components/ui/Field";
 import toast from "react-hot-toast";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -114,6 +113,8 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
 
 // ─── Main Restructured Settings Page ─────────────────────────────────────────
 
+const NAME_REGEX = /^[a-zA-Z\s\.\-']+$/;
+
 export function SettingsPage() {
   const { user, refreshUser } = useAuth();
   const { mutate: changePassword, isPending: isChangingPassword } = useChangePassword();
@@ -124,6 +125,8 @@ export function SettingsPage() {
   // Profile form state
   const [fullName, setFullName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
+  const [nameError, setNameError] = useState<string | undefined>();
+  const [avatarError, setAvatarError] = useState<string | null>(null);
 
   // Password state
   const [newPassword, setNewPassword] = useState("");
@@ -142,13 +145,66 @@ export function SettingsPage() {
     }
   }, [user]);
 
+  const validateName = (val: string): string | undefined => {
+    const trimmed = (val || "").trim();
+    if (!trimmed) {
+      return "Full Display Name is required. Please fill out this field";
+    }
+    if (val.length > 100) {
+      return "Full Display Name cannot exceed 100 characters. Please enter valid data";
+    }
+    if (trimmed.length < 2 || !NAME_REGEX.test(trimmed)) {
+      return "Full Display Name contains invalid characters. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const handleKeyGuard = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    currentLen: number,
+    limit: number,
+    label: string
+  ) => {
+    const allowedNavKeys = [
+      "Backspace",
+      "Delete",
+      "Tab",
+      "Escape",
+      "Enter",
+      "ArrowLeft",
+      "ArrowRight",
+      "ArrowUp",
+      "ArrowDown",
+      "Home",
+      "End",
+    ];
+    if (allowedNavKeys.includes(e.key) || e.ctrlKey || e.metaKey || e.altKey) {
+      return;
+    }
+
+    const input = e.currentTarget;
+    const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
+    if (!hasSelection && currentLen >= limit) {
+      e.preventDefault();
+      const msg = `${label} cannot exceed ${limit} characters. Please enter valid data`;
+      setNameError(msg);
+      toast.error(msg, { id: `${label}-limit` });
+    }
+  };
+
   const passwordsMatch = newPassword !== "" && newPassword === confirmPassword;
   const passwordsMismatch = confirmPassword !== "" && newPassword !== confirmPassword;
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
+    const err = validateName(fullName);
+    if (err) {
+      setNameError(err);
+      toast.error(err, { id: "profile-name-error" });
+      return;
+    }
     updateProfileMutation.mutate(
-      { name: fullName },
+      { name: fullName.trim() },
       {
         onSuccess: () => {
           refreshUser();
@@ -162,6 +218,8 @@ export function SettingsPage() {
   };
 
   const handleAvatarChange = async (url: string) => {
+    if (!url) return;
+    setAvatarError(null);
     updateProfileMutation.mutate(
       { avatarUrl: url },
       {
@@ -278,28 +336,40 @@ export function SettingsPage() {
       {activeSection === "profile" && (
         <div className="space-y-5">
           <Section title="Personal Information" subtitle="Your basic personal and account identity details." icon={<User className="h-5 w-5 text-navy-700" />}>
-            <form onSubmit={handleSaveProfile} className="space-y-5">
+            <form onSubmit={handleSaveProfile} noValidate className="space-y-5">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold uppercase text-slate-400">Full Display Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
-                  />
-                </div>
+                <InputField
+                  label="Full Display Name"
+                  required
+                  maxLength={100}
+                  showCharCount
+                  value={fullName}
+                  error={nameError}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFullName(val);
+                    const err = validateName(val);
+                    setNameError(err);
+                  }}
+                  onKeyDown={(e) => handleKeyGuard(e, fullName.length, 100, "Full Display Name")}
+                  onBlur={() => {
+                    const err = validateName(fullName);
+                    setNameError(err);
+                    if (err) {
+                      toast.error(err, { id: "profile-name-error" });
+                    }
+                  }}
+                  placeholder="e.g. Johnathan Smith"
+                />
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold uppercase text-slate-400">Email Address (ReadOnly)</label>
-                  <input
-                    type="email"
-                    disabled
-                    value={email}
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-500 cursor-not-allowed"
-                  />
-                </div>
+                <InputField
+                  label="Email Address (ReadOnly)"
+                  type="email"
+                  disabled
+                  value={email}
+                  readOnly
+                  className="bg-slate-50 text-slate-500 cursor-not-allowed"
+                />
               </div>
 
               <div className="mt-4 border-t border-slate-100 pt-4">
@@ -309,6 +379,10 @@ export function SettingsPage() {
                   value={user?.avatarUrl || ""}
                   onChange={handleAvatarChange}
                   hint="PNG, JPG or WEBP (Max 2MB)"
+                  maxSizeMB={2}
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  error={avatarError}
+                  onError={(err) => setAvatarError(err || null)}
                 />
               </div>
 

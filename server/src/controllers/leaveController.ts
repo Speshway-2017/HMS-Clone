@@ -1,3 +1,4 @@
+import { Types } from "mongoose";
 import { Request, Response } from "express";
 import { LeaveRequest, LEAVE_TYPES, LEAVE_STATUSES } from "../models/LeaveRequest";
 import { Attendance } from "../models/Attendance";
@@ -106,13 +107,32 @@ export const applyLeave = catchAsync(async (req: Request, res: Response) => {
     throw new AppError("Employee ID, leave type, from date, and to date are required.", 400);
   }
 
-  const empType = employeeType === "Doctor" ? "Doctor" : "Staff";
+  let empType = employeeType === "Doctor" ? "Doctor" : "Staff";
   let empObj: any = null;
+  const isValidId = Types.ObjectId.isValid(employeeId);
 
   if (empType === "Doctor") {
-    empObj = await Doctor.findOne({ _id: employeeId, hospital: hospitalId }) || await Doctor.findOne({ licenseNo: employeeId, hospital: hospitalId });
+    empObj = isValidId ? await Doctor.findOne({ _id: employeeId, hospital: hospitalId }) : null;
+    if (!empObj) {
+      empObj = await Doctor.findOne({ licenseNo: employeeId, hospital: hospitalId });
+    }
   } else {
-    empObj = await Staff.findOne({ _id: employeeId, hospital: hospitalId }) || await Staff.findOne({ employeeId: employeeId, hospital: hospitalId });
+    empObj = isValidId ? await Staff.findOne({ _id: employeeId, hospital: hospitalId }) : null;
+    if (!empObj) {
+      empObj = await Staff.findOne({ employeeId: employeeId, hospital: hospitalId });
+    }
+  }
+
+  // Cross-lookup fallback in case employeeType was unspecified or mismatched
+  if (!empObj) {
+    empObj = isValidId ? await Doctor.findOne({ _id: employeeId, hospital: hospitalId }) : null;
+    if (!empObj) empObj = await Doctor.findOne({ licenseNo: employeeId, hospital: hospitalId });
+    if (empObj) empType = "Doctor";
+  }
+  if (!empObj) {
+    empObj = isValidId ? await Staff.findOne({ _id: employeeId, hospital: hospitalId }) : null;
+    if (!empObj) empObj = await Staff.findOne({ employeeId: employeeId, hospital: hospitalId });
+    if (empObj) empType = "Staff";
   }
 
   if (!empObj) {

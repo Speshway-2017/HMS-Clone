@@ -24,42 +24,55 @@ const DEPT_CODE_RE = /^[A-Za-z0-9\-_]{1,20}$/;
 const departmentSchema = z.object({
   hospital: z.string().optional(),
   branch: z.string().optional().nullable(),
-  name: z.string().min(1),
-  code: z.string().optional().default(""),
-  description: z.string().optional().default(""),
-  specialization: z.string().optional().default(""),
+  name: z.string().trim().min(1, "Department name is required").max(50, "Department name cannot exceed 50 characters"),
+  code: z.string().trim().max(20, "Department code cannot exceed 20 characters").optional().default(""),
+  description: z.string().trim().max(500, "Description cannot exceed 500 characters").optional().default(""),
+  specialization: z.string().trim().max(100, "Specialization cannot exceed 100 characters").optional().default(""),
   category: z.string().optional().default("general"),
-  headName: z.string().optional().default(""),
+  headName: z.string().trim().max(100, "Department Head cannot exceed 100 characters").optional().default(""),
   departmentHead: z.string().optional().nullable(),
-  location: z.string().optional().default(""),
-  floor: z.string().optional().default(""),
-  building: z.string().optional().default(""),
-  totalBeds: z.coerce.number().min(0).optional().default(0),
-  occupiedBeds: z.coerce.number().min(0).optional().default(0),
-  doctors: z.coerce.number().min(0).optional().default(0),
-  nurses: z.coerce.number().min(0).optional().default(0),
-  support: z.coerce.number().min(0).optional().default(0),
+  location: z.string().trim().max(100, "Location cannot exceed 100 characters").optional().default(""),
+  floor: z.string().trim().max(50, "Floor cannot exceed 50 characters").optional().default(""),
+  building: z.string().trim().max(50, "Building cannot exceed 50 characters").optional().default(""),
+  totalBeds: z.coerce.number().min(0, "Total beds cannot be negative").max(9999, "Total beds cannot exceed 9999").optional().default(0),
+  occupiedBeds: z.coerce.number().min(0, "Occupied beds cannot be negative").max(9999, "Occupied beds cannot exceed 9999").optional().default(0),
+  doctors: z.coerce.number().min(0, "Doctors cannot be negative").max(9999, "Doctors cannot exceed 9999").optional().default(0),
+  nurses: z.coerce.number().min(0, "Nurses cannot be negative").max(9999, "Nurses cannot exceed 9999").optional().default(0),
+  support: z.coerce.number().min(0, "Support staff cannot be negative").max(9999, "Support staff cannot exceed 9999").optional().default(0),
   services: z.array(z.string()).optional().default([]),
   rating: z.coerce.number().min(0).max(100).optional(),
   status: z.enum(DEPARTMENT_STATUSES).optional(),
-  consultationFee: z.coerce.number().min(0).optional().default(0),
+  consultationFee: z.coerce.number().min(0, "Consultation fee cannot be negative").max(100000, "Consultation fee cannot exceed 100,000").optional().default(0),
   isEmergency: z.boolean().optional().default(false),
   colorTheme: z.string().optional().default(""),
-  displayOrder: z.coerce.number().optional().default(0),
+  displayOrder: z.coerce.number().min(0, "Display order cannot be negative").max(9999, "Display order cannot exceed 9999").optional().default(0),
 });
 
 const updateDepartmentSchema = departmentSchema.partial().extend({
-  name: z.string().min(1, "Department name is required").trim().optional(),
+  name: z.string().trim().min(1, "Department name is required").max(50, "Department name cannot exceed 50 characters").optional(),
   code: z
     .string()
     .trim()
+    .max(20, "Department code cannot exceed 20 characters")
     .refine((v) => v === "" || DEPT_CODE_RE.test(v), {
       message: "Department code must be 1–20 alphanumeric/dash/underscore characters.",
     })
     .optional(),
+  description: z.string().trim().max(500, "Description cannot exceed 500 characters").optional(),
+  specialization: z.string().trim().max(100, "Specialization cannot exceed 100 characters").optional(),
+  headName: z.string().trim().max(100, "Department Head cannot exceed 100 characters").optional(),
+  location: z.string().trim().max(100, "Location cannot exceed 100 characters").optional(),
+  floor: z.string().trim().max(50, "Floor cannot exceed 50 characters").optional(),
+  building: z.string().trim().max(50, "Building cannot exceed 50 characters").optional(),
   consultationFee: z.coerce
     .number()
     .min(0, "Consultation fee cannot be negative.")
+    .max(100000, "Consultation fee cannot exceed 100,000.")
+    .optional(),
+  displayOrder: z.coerce
+    .number()
+    .min(0, "Display order cannot be negative.")
+    .max(9999, "Display order cannot exceed 9999.")
     .optional(),
 });
 

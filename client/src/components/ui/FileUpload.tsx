@@ -135,10 +135,20 @@ export function FileUpload({
     onError?.(null);
 
     // 1. File Size Validation
-    const effectiveMaxSizeMB = maxSizeMB || (folder === "hospital-logos" ? 2 : folder === "hospital-licenses" ? 5 : 5);
+    const effectiveMaxSizeMB =
+      maxSizeMB ||
+      (folder === "hospital-logos" ||
+       folder === "admin-avatars" ||
+       folder.endsWith("-avatars") ||
+       folder.endsWith("-photos") ||
+       folder === "blog-covers"
+        ? 2
+        : folder === "hospital-licenses"
+        ? 5
+        : 5);
     const maxBytes = effectiveMaxSizeMB * 1024 * 1024;
     if (file.size > maxBytes) {
-      const sizeErr = `File size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds the allowed limit of ${effectiveMaxSizeMB}MB. Please select a smaller file.`;
+      const sizeErr = `${label} exceeds the allowed file size of ${effectiveMaxSizeMB}MB. The maximum file size is ${effectiveMaxSizeMB}MB. Invalid file is not accepted.`;
       setLocalError(sizeErr);
       onError?.(sizeErr);
       toast.error(sizeErr, { id: `${folder}-size-error` });
@@ -150,22 +160,32 @@ export function FileUpload({
     const fileName = file.name.toLowerCase();
     const fileType = file.type.toLowerCase();
 
-    if (folder === "hospital-licenses" || accept === "application/pdf") {
+    if (folder === "hospital-licenses" || accept === "application/pdf" || accept.includes("pdf")) {
       const isPdfFile = fileType === "application/pdf" || fileName.endsWith(".pdf");
       if (!isPdfFile) {
-        const formatErr = "Unsupported file format. License Credentials accepts only PDF files (.pdf).";
+        const formatErr = "Unsupported file format. Only PDF files should be accepted. Invalid file is not accepted.";
         setLocalError(formatErr);
         onError?.(formatErr);
         toast.error(formatErr, { id: `${folder}-format-error` });
         if (inputRef.current) inputRef.current.value = "";
         return;
       }
-    } else if (folder === "hospital-logos" || accept.includes("image/")) {
+    } else if (
+      folder === "hospital-logos" ||
+      folder === "admin-avatars" ||
+      folder.endsWith("-avatars") ||
+      folder.endsWith("-photos") ||
+      folder === "blog-covers" ||
+      accept.includes("image/")
+    ) {
       const allowedImageExts = [".png", ".jpg", ".jpeg", ".webp", ".svg"];
       const allowedImageMimes = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml"];
       const isImageFile = allowedImageMimes.includes(fileType) || allowedImageExts.some((ext) => fileName.endsWith(ext));
       if (!isImageFile) {
-        const formatErr = "Unsupported file format. Hospital Logo accepts only PNG, JPEG, WEBP, or SVG images.";
+        const formatErr =
+          folder === "hospital-logos"
+            ? `Unsupported file format. ${label} accepts only PNG, JPEG, WEBP, or SVG images. Invalid file is not accepted.`
+            : `Unsupported file format. Only supported image formats (PNG, JPG, JPEG, WEBP, SVG) can be uploaded. The uploaded file is invalid or unsupported, and the invalid file is not accepted.`;
         setLocalError(formatErr);
         onError?.(formatErr);
         toast.error(formatErr, { id: `${folder}-format-error` });

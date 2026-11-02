@@ -17,6 +17,8 @@ import {
 } from "../../features/attendance";
 import { Button } from "../ui/Button";
 import { SelectField, TextareaField } from "../ui/Field";
+import { api } from "../../lib/api";
+import toast from "react-hot-toast";
 
 interface Props {
   isOpen: boolean;
@@ -81,15 +83,20 @@ export function AttendanceCorrectionDialog({ isOpen, onClose, record }: Props) {
 
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
-    if (!correctionReason) errs.correctionReason = "Correction reason is required.";
-    if (status === "Present" && !checkInTime) errs.checkInTime = "Check-in time is required for Present status.";
-    if (workingHours < 0) errs.workingHours = "Working hours cannot be negative.";
-    if (overtimeHours < 0) errs.overtimeHours = "Overtime hours cannot be negative.";
-    if (status === "Half Day" && workingHours > 4) errs.workingHours = "Half Day working hours cannot exceed 4 hours.";
+    if (!correctionReason) errs.correctionReason = "Correction reason is required. Please enter valid data";
+    if (status === "Present" && !checkInTime) errs.checkInTime = "Check-in time is required for Present status. Please enter valid data";
+    if (workingHours < 0) errs.workingHours = "Working hours cannot be negative. Please enter valid data";
+    if (workingHours > 24) errs.workingHours = "Working hours cannot exceed 24 hours. Please enter valid data";
+    if (overtimeHours < 0) errs.overtimeHours = "Overtime hours cannot be negative. Please enter valid data";
+    if (overtimeHours > 12) errs.overtimeHours = "Overtime hours cannot exceed 12 hours. Please enter valid data";
+    if (status === "Half Day" && workingHours > 4) errs.workingHours = "Half Day working hours cannot exceed 4 hours. Please enter valid data";
     if (overtimeHours > 0 && status !== "Present" && status !== "Half Day") {
-      errs.overtimeHours = "Overtime can only be recorded for Present or Half Day.";
+      errs.overtimeHours = "Overtime can only be recorded for Present or Half Day. Please enter valid data";
     }
     setErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      toast.error(Object.values(errs)[0], { id: "correction-val-err" });
+    }
     return Object.keys(errs).length === 0;
   };
 
@@ -98,7 +105,6 @@ export function AttendanceCorrectionDialog({ isOpen, onClose, record }: Props) {
   };
 
   const handleConfirm = async () => {
-    if (!record._id) return;
     const payload: AttendanceCorrectionPayload = {
       status,
       checkInTime: checkInTime || undefined,
@@ -111,11 +117,35 @@ export function AttendanceCorrectionDialog({ isOpen, onClose, record }: Props) {
       correctionNote: correctionNote || undefined,
     };
     try {
-      await correctMutation.mutateAsync({ attendanceId: record._id, payload });
+      if (record._id) {
+        await correctMutation.mutateAsync({ attendanceId: record._id, payload });
+      } else {
+        const markRes = await api.post("/attendance/mark", {
+          employeeId: record.employeeId,
+          employeeType: record.employeeType,
+          date: record.date,
+          shift: record.shift || "General",
+          status,
+          checkInTime: checkInTime || (status === "Present" ? "09:00 AM" : ""),
+          checkOutTime: checkOutTime || (status === "Present" ? "05:00 PM" : ""),
+          workingHours,
+          overtimeHours,
+          isLate,
+          isEarlyExit,
+          remarks: correctionNote || correctionReason || "Manual Correction",
+        });
+        const createdId = markRes.data?.data?.attendance?._id;
+        if (createdId) {
+          await correctMutation.mutateAsync({ attendanceId: createdId, payload });
+        }
+      }
+      toast.success("Manual attendance correction saved successfully!");
       setShowConfirm(false);
       onClose();
     } catch (err: any) {
-      setErrors({ submit: err?.response?.data?.message ?? "Correction failed. Please try again." });
+      const msg = err?.response?.data?.message ?? "Correction failed. Please try again.";
+      setErrors({ submit: msg });
+      toast.error(msg, { id: "correction-submit-err" });
       setShowConfirm(false);
     }
   };
@@ -402,8 +432,9 @@ export function AttendanceCorrectionDialog({ isOpen, onClose, record }: Props) {
               <Button
                 size="sm"
                 onClick={handleReviewClick}
-                disabled={!correctionReason || correctMutation.isPending}
+                disabled={correctMutation.isPending}
                 className="bg-amber-600 hover:bg-amber-700 focus-visible:outline-amber-600"
+                aria-label="Review & Save Correction"
               >
                 <ShieldCheck className="h-3.5 w-3.5" />
                 Review & Save Correction
