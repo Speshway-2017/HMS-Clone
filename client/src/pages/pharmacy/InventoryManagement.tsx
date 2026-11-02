@@ -11,6 +11,7 @@ import { ImportExcelModal } from "../../components/ui/ImportExcelModal";
 import { exportToExcel } from "../../lib/excelUtils";
 import { InputField, SelectField } from "../../components/ui/Field";
 import { useInventory, useCreateInventoryItem, useUpdateInventoryItem, useDeleteInventoryItem } from "../../features/inventory";
+import { useSuppliers } from "../../features/suppliers";
 
 function generateAutoSku(medName: string = "", cat: string = "Analgesic"): string {
   const catPrefix = (cat || "MED").substring(0, 3).toUpperCase();
@@ -31,6 +32,7 @@ function generateAutoBatchNo(): string {
 interface Medicine {
   _id: string;
   name: string;
+  strength: string;
   category: string;
   sku: string;
   stockQty: number;
@@ -45,10 +47,11 @@ function mapBackendToMedicine(item: any): Medicine {
   const parts = item.description ? item.description.split(" | ") : [];
   const subcategory = parts[0] || "Analgesic";
   const expiryDate = parts[1] || "";
-  
+
   return {
     _id: item._id,
     name: item.name,
+    strength: item.strength || "",
     sku: item.sku,
     category: subcategory,
     stockQty: item.stockQty,
@@ -71,6 +74,7 @@ export function PharmacyInventoryManagement() {
 
   // Form Fields
   const [name, setName] = useState("");
+  const [medStrength, setMedStrength] = useState("");
   const [category, setCategory] = useState("Analgesic");
   const [sku, setSku] = useState("");
   const [stockQty, setStockQty] = useState(0);
@@ -79,17 +83,9 @@ export function PharmacyInventoryManagement() {
   const [price, setPrice] = useState(0);
   const [batchNo, setBatchNo] = useState("");
   const [supplier, setSupplier] = useState("");
-  const [appSuppliers, setAppSuppliers] = useState<{ _id: string; name: string }[]>([]);
-
-  // Load suppliers from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem("hms_pharmacy_suppliers");
-    if (saved) {
-      setAppSuppliers(JSON.parse(saved));
-    }
-  }, [isAddEditOpen]);
 
   // TanStack Query Hooks
+  const { data: dbSuppliers = [] } = useSuppliers();
   const { data: inventoryData, isLoading } = useInventory({ category: "medicines", search });
   const createMutation = useCreateInventoryItem();
   const updateMutation = useUpdateInventoryItem(selectedMed?._id || "");
@@ -112,6 +108,7 @@ export function PharmacyInventoryManagement() {
     setSelectedMed(null);
     const initialCategory = "Analgesic";
     setName("");
+    setMedStrength("");
     setCategory(initialCategory);
     setSku(generateAutoSku("", initialCategory));
     setBatchNo(generateAutoBatchNo());
@@ -140,6 +137,7 @@ export function PharmacyInventoryManagement() {
   const handleOpenEdit = (med: Medicine) => {
     setSelectedMed(med);
     setName(med.name);
+    setMedStrength(med.strength || "");
     setCategory(med.category);
     setSku(med.sku);
     setStockQty(med.stockQty);
@@ -170,12 +168,17 @@ export function PharmacyInventoryManagement() {
     }
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting || createMutation.isPending || updateMutation.isPending) return;
     if (!name || !sku || !batchNo) return;
 
+    setIsSubmitting(true);
     const payload = {
       name,
+      strength: medStrength,
       sku,
       category: "medicines" as const,
       description: `${category} | ${expiryDate}`,
@@ -190,18 +193,23 @@ export function PharmacyInventoryManagement() {
     try {
       if (selectedMed) {
         await updateMutation.mutateAsync(payload);
+        toast.success("Medicine updated successfully!");
       } else {
         await createMutation.mutateAsync(payload);
+        toast.success("Medicine added successfully!");
       }
       setIsAddEditOpen(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to save medicine", err);
+      toast.error(err?.response?.data?.message || "Failed to save medicine.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const filtered = medicines.filter(m => {
-    const matchesSearch = 
-      m.name.toLowerCase().includes(search.toLowerCase()) || 
+    const matchesSearch =
+      m.name.toLowerCase().includes(search.toLowerCase()) ||
       m.sku.toLowerCase().includes(search.toLowerCase()) ||
       m.batchNo.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = filterCategory === "All" || m.category === filterCategory;
@@ -217,9 +225,10 @@ export function PharmacyInventoryManagement() {
   }
 
   const handleExportExcel = () => {
-    const headers = ["Medicine Name", "SKU", "Category", "Batch No", "Stock Qty", "Reorder Level", "Expiry Date", "Unit Price (INR)", "Supplier"];
+    const headers = ["Medicine Name", "Strength", "SKU", "Category", "Batch No", "Stock Qty", "Reorder Level", "Expiry Date", "Unit Price (INR)", "Supplier"];
     const rows = medicines.map((m) => [
       m.name,
+      m.strength || "",
       m.sku,
       m.category,
       m.batchNo,
@@ -305,9 +314,8 @@ export function PharmacyInventoryManagement() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setFilterCategory("All")}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-              filterCategory === "All" ? "bg-navy-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${filterCategory === "All" ? "bg-navy-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
           >
             All Categories
           </button>
@@ -315,9 +323,8 @@ export function PharmacyInventoryManagement() {
             <button
               key={cat}
               onClick={() => setFilterCategory(cat)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                filterCategory === cat ? "bg-navy-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${filterCategory === cat ? "bg-navy-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
             >
               {cat}
             </button>
@@ -359,6 +366,14 @@ export function PharmacyInventoryManagement() {
                   <div className="font-semibold text-slate-800">{r.name}</div>
                   <div className="text-xs text-slate-400">{r.category}</div>
                 </div>
+              )
+            },
+            {
+              header: "Strength",
+              render: (r) => (
+                <span className="inline-block rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700">
+                  {r.strength || "—"}
+                </span>
               )
             },
             {
@@ -428,9 +443,9 @@ export function PharmacyInventoryManagement() {
       </Card>
 
       {/* Add / Edit Modal */}
-      <Modal 
-        title={selectedMed ? "Edit Medicine" : "Add New Medicine"} 
-        isOpen={isAddEditOpen} 
+      <Modal
+        title={selectedMed ? "Edit Medicine" : "Add New Medicine"}
+        isOpen={isAddEditOpen}
         onClose={() => setIsAddEditOpen(false)}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -438,9 +453,16 @@ export function PharmacyInventoryManagement() {
             <InputField
               label="Medicine Name"
               required
-              placeholder="e.g. Paracetamol 650mg"
+              placeholder="e.g. Paracetamol"
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
+            />
+
+            <InputField
+              label="Strength / Power"
+              placeholder="e.g. 500mg, 100mg, 10ml"
+              value={medStrength}
+              onChange={(e) => setMedStrength(e.target.value)}
             />
 
             <SelectField
@@ -526,31 +548,49 @@ export function PharmacyInventoryManagement() {
               onChange={(e) => setPrice(Number(e.target.value))}
             />
 
-            <InputField
-              label="Supplier"
-              required
-              value={supplier}
-              onChange={(e) => setSupplier(e.target.value)}
-              placeholder="e.g. Acme Pharma Distributors"
-              className="sm:col-span-2"
-              list="suppliers-datalist"
-            />
-            <datalist id="suppliers-datalist">
-              {supplier.trim().length > 0 &&
-                appSuppliers
-                  .filter((s) =>
-                    s.name.toLowerCase().includes(supplier.toLowerCase())
-                  )
-                  .map((s) => <option key={s._id} value={s.name} />)}
-            </datalist>
+            {dbSuppliers.length > 0 ? (
+              <SelectField
+                label="Supplier"
+                required
+                value={supplier}
+                onChange={(e) => setSupplier(e.target.value)}
+                className="sm:col-span-2"
+              >
+                <option value="">-- Select Registered Supplier --</option>
+                {dbSuppliers.map((s) => (
+                  <option key={s._id} value={s.name}>
+                    {s.name} ({s.supplierId || s.phone || "Active"})
+                  </option>
+                ))}
+                {supplier && !dbSuppliers.some((s) => s.name === supplier) && (
+                  <option value={supplier}>{supplier}</option>
+                )}
+              </SelectField>
+            ) : (
+              <InputField
+                label="Supplier"
+                required
+                value={supplier}
+                onChange={(e) => setSupplier(e.target.value)}
+                placeholder="e.g. Apollo Pharmacy Distributors"
+                className="sm:col-span-2"
+              />
+            )}
           </div>
 
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
             <Button type="button" variant="secondary" onClick={() => setIsAddEditOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit">
-              {selectedMed ? "Save Changes" : "Add Medicine"}
+            <Button
+              type="submit"
+              disabled={isSubmitting || createMutation.isPending || updateMutation.isPending}
+            >
+              {isSubmitting || createMutation.isPending || updateMutation.isPending
+                ? "Saving..."
+                : selectedMed
+                  ? "Save Changes"
+                  : "Add Medicine"}
             </Button>
           </div>
         </form>
@@ -569,10 +609,10 @@ export function PharmacyInventoryManagement() {
         isOpen={isImportOpen}
         title="Import Medicine Inventory Excel"
         sampleFilename="Medicine_Inventory_Import_Template.csv"
-        sampleHeaders={["Medicine Name", "SKU", "Category", "Batch No", "Stock Qty", "Reorder Level", "Expiry Date", "Unit Price", "Supplier"]}
+        sampleHeaders={["Medicine Name", "Strength", "SKU", "Category", "Batch No", "Stock Qty", "Reorder Level", "Expiry Date", "Unit Price", "Supplier"]}
         sampleRows={[
-          ["Paracetamol 500mg", "ANA-PAR-101", "Analgesic", "B2026-01", 200, 20, "2027-12-31", 15.5, "PharmaCorp"],
-          ["Amoxicillin 250mg", "ANT-AMO-202", "Antibiotic", "B2026-02", 100, 15, "2027-06-30", 45.0, "MediSupply"],
+          ["Paracetamol", "500mg", "ANA-PAR-101", "Analgesic", "B2026-01", 200, 20, "2027-12-31", 15.5, "PharmaCorp"],
+          ["Amoxicillin", "250mg", "ANT-AMO-202", "Antibiotic", "B2026-02", 100, 15, "2027-06-30", 45.0, "MediSupply"],
         ]}
         onClose={() => setIsImportOpen(false)}
         onImport={handleImportMeds}

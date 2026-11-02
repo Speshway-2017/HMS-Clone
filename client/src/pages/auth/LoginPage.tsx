@@ -1,12 +1,15 @@
-import { FormEvent, useEffect, useState } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import AnimatedInput from "../../components/ui/AnimatedInput";
 import AnimatedSubmitButton from "../../components/ui/AnimatedSubmitButton";
 import SpringScaleIn from "../../components/ui/SpringScaleIn";
+import { motion, AnimatePresence } from "motion/react";
 import { ROLE_HOME_PATH } from "../../types/auth";
 import { usePublicHospital } from "../../features/hospitals";
-import { ShieldCheck, Lock, Mail, Activity, ArrowLeft, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { ShieldCheck, Lock, Mail, Activity, ArrowLeft, CheckCircle2, Eye, EyeOff, Settings, Globe, Laptop } from "lucide-react";
+import { isElectron } from "../../utils/electron";
+import { getBaseUrl, setCustomApiUrl } from "../../lib/api";
 
 export function LoginPage() {
   const { user, login } = useAuth();
@@ -25,6 +28,12 @@ export function LoginPage() {
       }
       favicon.href = logoUrl;
     }
+
+    const blockedMsg = sessionStorage.getItem("desktop_blocked_message");
+    if (blockedMsg) {
+      setError(blockedMsg);
+      sessionStorage.removeItem("desktop_blocked_message");
+    }
   }, [hospitalName, logoUrl]);
 
   const navigate = useNavigate();
@@ -35,6 +44,11 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+
+  const [showServerModal, setShowServerModal] = useState(false);
+  const [serverInput, setServerInput] = useState(() => {
+    return localStorage.getItem("hms_custom_api_url") || getBaseUrl().replace(/\/api\/v1\/?$/, "");
+  });
 
   // Rotate features or stats on the left panel
   const [activePromoIdx, setActivePromoIdx] = useState(0);
@@ -97,8 +111,8 @@ export function LoginPage() {
       // Trigger green tick mark animation
       setIsSuccess(true);
 
-      // Wait 2.2 seconds for full spin and green tick mark animation to show
-      await new Promise((resolve) => setTimeout(resolve, 2200));
+      // Short delay for success tick mark animation
+      await new Promise((resolve) => setTimeout(resolve, 1200));
 
       if (sessionStorage.getItem("pendingAppointmentDraft") && loggedInUser.role === "patient") {
         navigate("/patient?tab=appointments", { replace: true });
@@ -107,8 +121,11 @@ export function LoginPage() {
 
       const targetPath = redirectParam || (location.state as { from?: string })?.from || ROLE_HOME_PATH[loggedInUser.role] || "/";
       navigate(targetPath, { replace: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed.");
+    } catch (err: any) {
+      console.error("[HMS Login] Authentication failed:", err);
+      const msg = err?.message || (err instanceof Error ? err.message : "Login failed.");
+      setError(msg);
+    } finally {
       setIsSubmitting(false);
       setIsSuccess(false);
     }
@@ -157,17 +174,27 @@ export function LoginPage() {
           </div>
 
           {/* Carousel Promo */}
-          <div className="rounded-xl border border-blue-500/20 bg-blue-900/20 p-4 backdrop-blur-md min-h-[110px] transition-all duration-300">
+          <div className="rounded-xl border border-blue-500/20 bg-blue-900/20 p-4 backdrop-blur-md min-h-[110px] overflow-hidden">
             <span className="text-[9px] font-bold text-blue-400 uppercase tracking-widest block mb-1">
               SYSTEM BENEFIT
             </span>
-            <h4 className="text-xs font-bold flex items-center gap-1.5 text-white">
-              <ShieldCheck className="h-4 w-4 text-blue-400" />
-              {promos[activePromoIdx].title}
-            </h4>
-            <p className="mt-1.5 text-xs text-slate-300 leading-relaxed">
-              {promos[activePromoIdx].desc}
-            </p>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activePromoIdx}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <h4 className="text-xs font-bold flex items-center gap-1.5 text-white">
+                  <ShieldCheck className="h-4 w-4 text-blue-400" />
+                  {promos[activePromoIdx].title}
+                </h4>
+                <p className="mt-1.5 text-xs text-slate-300 leading-relaxed">
+                  {promos[activePromoIdx].desc}
+                </p>
+              </motion.div>
+            </AnimatePresence>
           </div>
 
           {/* Quick trust metrics */}
@@ -192,12 +219,21 @@ export function LoginPage() {
           <div className="mx-auto w-full max-w-[420px] space-y-8">
             {/* Header branding for mobile / small screen */}
             <div className="text-center space-y-2 lg:text-left">
-              <Link to="/" className="inline-flex lg:hidden items-center gap-2.5 text-xl font-extrabold text-blue-900 justify-center">
-                {logoUrl && (
-                  <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover" />
-                )}
-                <span>{hospitalName}</span>
-              </Link>
+              {isElectron() ? (
+                <div className="inline-flex lg:hidden items-center gap-2.5 text-xl font-extrabold text-blue-900 justify-center">
+                  {logoUrl && (
+                    <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover" />
+                  )}
+                  <span>{hospitalName}</span>
+                </div>
+              ) : (
+                <Link to="/" className="inline-flex lg:hidden items-center gap-2.5 text-xl font-extrabold text-blue-900 justify-center">
+                  {logoUrl && (
+                    <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover" />
+                  )}
+                  <span>{hospitalName}</span>
+                </Link>
+              )}
               <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight block">
                 <SpringScaleIn delay={100} stagger={80}>
                   Sign In to Dashboard
@@ -211,10 +247,15 @@ export function LoginPage() {
             </div>
 
             {/* Login Card */}
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-8 shadow-xl">
-              <form onSubmit={handleSubmit} className="space-y-6 text-xs font-semibold text-slate-700">
+            <motion.div
+              initial={{ opacity: 0, y: 25 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+              className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-8 shadow-xl transition-all duration-500 ease-out hover:shadow-2xl hover:shadow-blue-500/10 hover:border-blue-200/50 hover:-translate-y-1"
+            >
+              <form onSubmit={handleSubmit} className="space-y-4 text-xs font-semibold text-slate-700">
                 {/* Email / Phone input with AnimatedInput */}
-                <div className="pt-2">
+                <div>
                   <AnimatedInput
                     id="identifier"
                     icon={<Mail className="h-4 w-4 text-blue-500" />}
@@ -269,35 +310,122 @@ export function LoginPage() {
                 )}
 
                 {/* Animated Submit Button */}
-                <AnimatedSubmitButton
-                  type="submit"
-                  disabled={isSubmitting || isSuccess}
-                  isSubmitting={isSubmitting}
-                  isSuccess={isSuccess}
-                  text="Secure Sign In"
-                />
+                <div className="space-y-3 pt-1">
+                  <AnimatedSubmitButton
+                    type="submit"
+                    disabled={isSubmitting || isSuccess}
+                    isSubmitting={isSubmitting}
+                    isSuccess={isSuccess}
+                    text="Secure Sign In"
+                  />
+                  <div className="flex items-center justify-between text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowServerModal(true);
+                        setServerInput(localStorage.getItem("hms_custom_api_url") || getBaseUrl().replace(/\/api\/v1\/?$/, ""));
+                      }}
+                      className="text-slate-500 hover:text-blue-600 flex items-center gap-1.5 transition-colors"
+                      title="Configure Backend Server URL"
+                    >
+                      <Settings className="h-3.5 w-3.5 text-blue-500" />
+                      <span>Server Settings</span>
+                    </button>
+                    <Link to="/forgot-password" className="text-blue-600 hover:text-blue-800 hover:underline">
+                      Forgot Password?
+                    </Link>
+                  </div>
+                </div>
               </form>
 
-              {/* Patient Register link */}
-              <div className="mt-6 border-t border-slate-100 pt-4 text-center">
-                <p className="text-xs text-slate-500 font-medium">
-                  New Patient?{" "}
-                  <Link to="/register" className="font-bold text-blue-600 hover:text-blue-800 hover:underline">
-                    Register for Patient Portal & Appointments →
-                  </Link>
-                </p>
-              </div>
-            </div>
+              {/* Patient Register link (web only) */}
+              {!isElectron() && (
+                <div className="mt-4 border-t border-slate-100 pt-4 text-center">
+                  <p className="text-xs text-slate-500 font-medium">
+                    New Patient?{" "}
+                    <Link to="/register" className="font-bold text-blue-600 hover:text-blue-800 hover:underline">
+                      Register for Patient Portal & Appointments →
+                    </Link>
+                  </p>
+                </div>
+              )}
+            </motion.div>
 
-            {/* Back button */}
-            <div className="text-center">
-              <Link
-                to="/"
-                className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4" /> Back to Marketing Portal
-              </Link>
-            </div>
+            {/* Server Connection Settings Modal */}
+            {showServerModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="w-full max-w-md bg-white rounded-2xl p-6 shadow-2xl border border-slate-200 space-y-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
+                      <Globe className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-base font-bold text-slate-900">Server Connection Settings</h4>
+                      <p className="text-xs text-slate-500">Configure your deployed Backend API URL</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-2">
+                    <label className="text-xs font-semibold text-slate-700 block">
+                      Backend Server API Base URL
+                    </label>
+                    <input
+                      type="url"
+                      value={serverInput}
+                      onChange={(e) => setServerInput(e.target.value)}
+                      placeholder="e.g. https://your-hms-server.com or http://192.168.1.100:5000"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50/50"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setServerInput("http://127.0.0.1:5000")}
+                        className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors flex items-center gap-1"
+                      >
+                        <Laptop className="h-3 w-3" /> Local (127.0.0.1:5000)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowServerModal(false)}
+                      className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomApiUrl(serverInput);
+                        setShowServerModal(false);
+                        window.location.reload();
+                      }}
+                      className="px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all"
+                    >
+                      Save & Connect
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Back button (web only) */}
+            {!isElectron() && (
+              <div className="text-center">
+                <Link
+                  to="/"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors"
+                >
+                  <ArrowLeft className="h-4 w-4" /> Back to Marketing Portal
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -32,12 +32,12 @@ import { api } from "../../lib/api";
 import { useMyHospital } from "../../features/hospitals";
 
 interface Props {
-  activeTab?: "new" | "admissions" | "rooms" | "transfer" | "discharges";
+  activeTab?: "new" | "admissions" | "rooms" | "transfer" | "discharges" | "discharged";
 }
 
 export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"new" | "admissions" | "rooms" | "transfer" | "discharges">(activeTab);
+  const [tab, setTab] = useState<"new" | "admissions" | "rooms" | "transfer" | "discharges" | "discharged">(activeTab);
   const { data: hospitalData } = useMyHospital();
 
   useEffect(() => {
@@ -96,7 +96,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const { data: requests, refetch: refetchRequests } = useAdmissionRequests();
   const { data: rooms, refetch: refetchRooms } = useRoomsAvailability();
   const { data: activeAdmissions, refetch: refetchAdmissions } = useAdmissions("admitted");
-  const { data: dischargedAdmissions } = useAdmissions("discharged");
+  const { data: dischargedAdmissions, refetch: refetchDischargedAdmissions } = useAdmissions("discharged");
   const uniqueWards = Array.from(new Set(rooms?.map((r: any) => r.wardName).filter(Boolean)));
 
   // Additional autocomplete & metadata queries
@@ -133,7 +133,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   // Handle URL query parameters at startup
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
-    const urlTab = queryParams.get("tab") as "new" | "admissions" | "rooms" | "transfer" | "discharges" | null;
+    const urlTab = queryParams.get("tab") as "new" | "admissions" | "rooms" | "transfer" | "discharges" | "discharged" | null;
     const urlAdmissionId = queryParams.get("admissionId") || "";
     const urlDischargeId = queryParams.get("dischargeAdmissionId") || "";
 
@@ -291,9 +291,9 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       setPaymentMethod("Cash");
       setNotes("");
       refetchRequests();
-      const res = await admitMutation.mutateAsync(payload);
+      refetchAdmissions();
+      refetchRooms();
       toast.success("Patient successfully admitted!");
-      setSuccessData(res.admission || res.data || res);
     } catch (err: any) {
       const errMsg = err?.response?.data?.message || err?.message;
       if (errMsg && errMsg.includes("Admission Slip")) {
@@ -363,6 +363,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
       refetchRooms();
       refetchAdmissions();
       refetchDischargeRequests();
+      refetchDischargedAdmissions();
       setTab("admissions");
     } catch (err: any) {
       toast.error(err.message || "Failed to complete discharge");
@@ -372,26 +373,28 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const admissionsColumns = [
     {
       header: "UHID",
-      render: (row: any) => <span className="font-mono text-xs font-semibold text-slate-800">{row.patient?.uhid}</span>
+      render: (row: any) => <span className="font-mono text-xs font-semibold text-slate-800">{row.patient?.uhid || "N/A"}</span>
     },
     {
       header: "Patient",
       render: (row: any) => (
         <div>
-          <div className="font-semibold text-slate-900">{row.patient?.name}</div>
-          <div className="text-[10px] text-slate-450">{row.patient?.gender} / {row.patient?.age} yrs</div>
+          <div className="font-semibold text-slate-900">{row.patient?.name || "N/A"}</div>
+          <div className="text-[10px] text-slate-450">
+            {row.patient?.gender || "N/A"}{row.patient?.age !== undefined && row.patient?.age !== null ? ` / ${row.patient.age} yrs` : ""}
+          </div>
         </div>
       )
     },
     {
       header: "Admission Date",
-      render: (row: any) => <span className="text-xs">{new Date(row.admissionDate).toLocaleDateString()}</span>
+      render: (row: any) => <span className="text-xs">{row.admissionDate ? new Date(row.admissionDate).toLocaleDateString("en-IN") : "N/A"}</span>
     },
     {
       header: "Ward / Room / Bed",
       render: (row: any) => (
         <span className="text-xs font-medium text-slate-700">
-          {row.ward} — R{row.room?.roomNumber} / Bed {row.bed?.bedNumber}
+          {(typeof row.ward === "object" ? row.ward?.name : row.ward) || "N/A"} — R{typeof row.room === "object" && row.room ? row.room.roomNumber : (row.room || "N/A")} / Bed {typeof row.bed === "object" && row.bed ? row.bed.bedNumber : (row.bed || "N/A")}
         </span>
       )
     },
@@ -523,6 +526,71 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
     }
   ];
 
+  const dischargedColumns = [
+    {
+      header: "IP No / UHID",
+      render: (row: any) => (
+        <div>
+          <div className="font-mono text-xs font-bold text-indigo-700">{row.admissionNumber || "N/A"}</div>
+          <div className="font-mono text-[10px] text-slate-500">{row.patient?.uhid || "N/A"}</div>
+        </div>
+      )
+    },
+    {
+      header: "Patient",
+      render: (row: any) => (
+        <div>
+          <div className="font-semibold text-slate-900">{row.patient?.name || "N/A"}</div>
+          <div className="text-[10px] text-slate-450">{row.patient?.gender || "N/A"} / {row.patient?.age ? `${row.patient.age} yrs` : "N/A"}</div>
+        </div>
+      )
+    },
+    {
+      header: "Ward / Room",
+      render: (row: any) => (
+        <span className="text-xs font-medium text-slate-700">
+          {row.ward} — R{row.room?.roomNumber || "N/A"}
+        </span>
+      )
+    },
+    {
+      header: "Admission Date",
+      render: (row: any) => <span className="text-xs text-slate-700">{row.admissionDate ? new Date(row.admissionDate).toLocaleDateString("en-IN") : "N/A"}</span>
+    },
+    {
+      header: "Discharge Date",
+      render: (row: any) => (
+        <span className="text-xs font-medium text-slate-700">
+          {row.dischargedAt ? new Date(row.dischargedAt).toLocaleDateString("en-IN") : (row.updatedAt ? new Date(row.updatedAt).toLocaleDateString("en-IN") : "N/A")}
+        </span>
+      )
+    },
+    {
+      header: "Doctor",
+      render: (row: any) => (
+        <span className="text-xs text-slate-800">
+          Dr. {row.admittingDoctor?.name || row.dischargeRequestedBy?.name || "N/A"}
+        </span>
+      )
+    },
+    {
+      header: "Discharge Notes",
+      render: (row: any) => (
+        <span className="text-xs text-slate-600 line-clamp-2 max-w-xs">
+          {row.dischargeNotes || row.diagnosisAtDischarge || "Cleared & Discharged"}
+        </span>
+      )
+    },
+    {
+      header: "Status",
+      render: (row: any) => (
+        <Badge tone="success">
+          {row.status || "Discharged"}
+        </Badge>
+      )
+    }
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4">
@@ -575,6 +643,19 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
             {(dischargeRequests?.length ?? 0) > 0 && (
               <span className="ml-1 rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
                 {dischargeRequests!.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setTab("discharged")}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+              tab === "discharged" ? "bg-emerald-50 text-emerald-700 font-bold" : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            <UserCheck className="h-3.5 w-3.5" /> Discharged
+            {(dischargedAdmissions?.length ?? 0) > 0 && (
+              <span className="ml-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                {dischargedAdmissions!.length}
               </span>
             )}
           </button>
@@ -1524,6 +1605,22 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
             ))
           )}
         </div>
+      )}
+
+      {/* Discharged Patients Tab */}
+      {tab === "discharged" && (
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-base font-semibold text-slate-800">Discharged Inpatients Registry</h2>
+              <p className="text-xs text-slate-500">History of all inpatient admissions that have been cleared and discharged.</p>
+            </div>
+            <Badge tone="success" className="text-xs font-semibold">
+              Total Discharged: {dischargedAdmissions?.length || 0}
+            </Badge>
+          </div>
+          <DataTable columns={dischargedColumns} rows={dischargedAdmissions || []} rowKey={(row) => row._id} />
+        </Card>
       )}
 
       {/* Discharge Dialog */}

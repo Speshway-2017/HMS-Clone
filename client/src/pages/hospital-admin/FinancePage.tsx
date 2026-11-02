@@ -285,6 +285,7 @@ export function FinancePage() {
 
   return (
     <div className="space-y-6">
+      <div className="print:hidden space-y-6">
       {/* Header & Sub-Tabs Navigation */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -804,6 +805,7 @@ export function FinancePage() {
           )}
         </div>
       )}
+      </div>
 
       {/* Modal: Consolidated Patient Statement Printable View */}
       <Modal

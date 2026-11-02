@@ -219,10 +219,13 @@ export const getIPBillItemsSummary = async (bill: any, admission: any, hospitalI
     });
   }
 
+  const branchFilter = admission.branch ? { branch: admission.branch } : {};
+
   // 4. Completed Doctor Consultations / Visits during stay
   const appointments = await Appointment.find({
     patient: patientId,
     hospital: hospitalId,
+    ...branchFilter,
     status: "completed",
     date: { $gte: stayStart, $lte: stayEnd }
   }).populate("doctor", "name specialization consultationFee").lean();
@@ -315,6 +318,7 @@ export const getIPBillItemsSummary = async (bill: any, admission: any, hospitalI
   const labOrders = await LabOrder.find({
     patient: patientId,
     hospital: hospitalId,
+    ...branchFilter,
     status: "completed",
     date: { $gte: stayStart, $lte: stayEnd }
   }).lean();
@@ -350,6 +354,7 @@ export const getIPBillItemsSummary = async (bill: any, admission: any, hospitalI
   const radiologyOrders = await RadiologyOrder.find({
     patient: patientId,
     hospital: hospitalId,
+    ...branchFilter,
     status: "completed",
     date: { $gte: stayStart, $lte: stayEnd }
   }).lean();
@@ -383,6 +388,7 @@ export const getIPBillItemsSummary = async (bill: any, admission: any, hospitalI
   const prescriptions = await Prescription.find({
     patient: patientId,
     hospital: hospitalId,
+    ...branchFilter,
     status: { $in: ["Dispensed", "Completed"] },
     createdAt: { $gte: stayStart, $lte: stayEnd }
   }).lean();

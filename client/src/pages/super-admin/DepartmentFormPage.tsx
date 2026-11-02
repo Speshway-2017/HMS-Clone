@@ -64,7 +64,7 @@ export function DepartmentFormPage() {
       setForm({
         name: department.name,
         hospital: typeof department.hospital === "object" ? department.hospital._id : department.hospital,
-        branch: department.branch ?? "",
+        branch: typeof department.branch === "object" && department.branch !== null ? department.branch._id : (department.branch ?? ""),
         category: department.category,
         description: department.description,
         headName: department.headName,

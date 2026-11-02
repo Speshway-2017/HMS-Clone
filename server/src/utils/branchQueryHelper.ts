@@ -16,6 +16,11 @@ export function buildBranchQuery(hospitalFilter: any): Record<string, unknown> {
     return { hospital: hospitalFilter };
   }
 
+  // If passed tenantContext object with queryFilter
+  if (hospitalFilter.queryFilter) {
+    return hospitalFilter.queryFilter;
+  }
+
   if (!hospitalFilter.hospital) {
     return { hospital: null };
   }
@@ -70,11 +75,27 @@ export function combineBranchQuery(hospitalFilter: any, additionalQuery: Record<
 
 export function parseHospitalAndBranch(filterOrId: any): { targetHospital: any; targetBranch: any } {
   if (!filterOrId) return { targetHospital: null, targetBranch: null };
-  if (typeof filterOrId === "object" && filterOrId.hospital) {
-    return {
-      targetHospital: filterOrId.hospital,
-      targetBranch: "branch" in filterOrId ? filterOrId.branch : null,
-    };
+
+  if (typeof filterOrId === "object") {
+    if (filterOrId.queryFilter) {
+      return {
+        targetHospital: filterOrId.queryFilter.hospital,
+        targetBranch: "branch" in filterOrId.queryFilter ? filterOrId.queryFilter.branch : (filterOrId.branchId || null),
+      };
+    }
+    if (filterOrId.hospital) {
+      return {
+        targetHospital: filterOrId.hospital,
+        targetBranch: "branch" in filterOrId ? filterOrId.branch : (filterOrId.branchId || null),
+      };
+    }
+    if (filterOrId.hospitalId) {
+      return {
+        targetHospital: filterOrId.hospitalId,
+        targetBranch: filterOrId.branchId || filterOrId.branch || null,
+      };
+    }
   }
+
   return { targetHospital: filterOrId, targetBranch: null };
 }

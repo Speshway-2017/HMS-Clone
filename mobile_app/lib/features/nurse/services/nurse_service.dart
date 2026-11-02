@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../../../core/config/api_config.dart';
+import '../../../core/config/user_session.dart';
 import '../../authentication/services/auth_service.dart';
 
 class NurseService {
@@ -10,12 +11,12 @@ class NurseService {
   NurseService({http.Client? client}) : _client = client ?? http.Client();
 
   Future<Map<String, String>> _getHeaders() async {
+    final map = Map<String, String>.from(UserSession.headers);
     final token = await AuthService.getToken();
-    return {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
+    if (token != null && token.isNotEmpty) {
+      map['Authorization'] = 'Bearer $token';
+    }
+    return map;
   }
 
   /// Lists all active inpatients/admissions in the nurse's hospital

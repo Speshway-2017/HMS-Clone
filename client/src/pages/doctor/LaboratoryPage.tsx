@@ -503,7 +503,10 @@ function ReportDetailModal({ orderId, onClose }: ReportDetailModalProps) {
   const doctor = order?.doctor as any;
 
   const getResolvedFileUrl = (file: any, repId?: string) => {
-    const rawUrl = file?.secure_url || file?.url || file?.path || "";
+    let rawUrl = file?.secure_url || file?.url || file?.path || "";
+    if (rawUrl.includes("res.cloudinary.com")) {
+      rawUrl = rawUrl.replace("/upload/", "/upload/fl_attachment/");
+    }
     if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://") || rawUrl.startsWith("data:")) {
       return rawUrl;
     }

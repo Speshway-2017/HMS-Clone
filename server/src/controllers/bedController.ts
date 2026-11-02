@@ -4,6 +4,7 @@ import { AppError } from "../utils/AppError";
 import { Bed } from "../models/Bed";
 import { Room } from "../models/Room";
 import { Admission } from "../models/Admission";
+import { buildBranchQuery } from "../utils/branchQueryHelper";
 import { z } from "zod";
 import {
   requiredTrimmedString,
@@ -21,7 +22,7 @@ const bedSchema = z.object({
 export const listBeds = catchAsync(async (req: Request, res: Response) => {
   const { search, ward, room, status, page = 1, limit = 10 } = req.query;
 
-  const query: any = { ...req.hospitalFilter };
+  const query: any = buildBranchQuery(req.hospitalFilter);
 
   if (search) {
     query.$or = [

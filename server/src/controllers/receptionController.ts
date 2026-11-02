@@ -203,9 +203,8 @@ export const checkDuplicateAppointment = catchAsync(async (req: Request, res: Re
 
 export const processBillingPayment = catchAsync(async (req: Request, res: Response) => {
   const paymentData = paymentSchema.parse(req.body);
-  const hospitalId = req.hospitalFilter?.hospital || req.user?.hospital;
-
-  const invoice = await Invoice.findOne({ _id: paymentData.invoiceId, hospital: hospitalId });
+  
+  const invoice = await Invoice.findOne({ _id: paymentData.invoiceId, ...buildBranchQuery(req.hospitalFilter) });
   if (!invoice) {
     throw new AppError("Invoice not found.", 404);
   }
@@ -275,7 +274,7 @@ export const rejectAdmissionRequest = catchAsync(async (req: Request, res: Respo
     throw new AppError("Forbidden: You do not have permission to perform this action.", 403);
   }
   const result = await ReceptionService.rejectAdmissionRequest(
-    req.hospitalFilter!.hospital as any,
+    req.hospitalFilter as any,
     req.params.id,
     req.user!._id
   );
@@ -294,7 +293,7 @@ export const transferPatient = catchAsync(async (req: Request, res: Response) =>
   }).parse(req.body);
 
   const admission = await ReceptionService.transferPatient(
-    req.hospitalFilter!.hospital as any,
+    req.hospitalFilter as any,
     transferData,
     req.user!._id
   );
@@ -349,10 +348,11 @@ export const getAdmissions = catchAsync(async (req: Request, res: Response) => {
 
   const admissions = await Admission.find(query)
     .populate("patient", "name uhid phone age gender bloodGroup")
-    .populate("room")
-    .populate("bed")
+    .populate("room", "roomNumber roomName roomType")
+    .populate("bed", "bedNumber bedCode bedType")
     .populate("admittingDoctor", "name specialization")
     .populate("dischargeRequestedBy", "name specialization")
+    .populate("assignedNurse", "name employeeId role")
     .sort({ admissionDate: -1 })
     .lean();
 
@@ -409,18 +409,20 @@ export const getDoctorsAvailability = catchAsync(async (req: Request, res: Respo
 });
 
 export const getRoomsAvailability = catchAsync(async (req: Request, res: Response) => {
-  const availability = await ReceptionRepository.getRoomsAvailability(req.hospitalFilter!.hospital as any);
+  const availability = await ReceptionRepository.getRoomsAvailability(req.hospitalFilter as any);
   res.json({ status: "success", data: { availability } });
 });
 
 export const getNotifications = catchAsync(async (req: Request, res: Response) => {
-  await ReceptionService.generateScheduledAlerts(req.hospitalFilter!.hospital as any);
-  const notifs = await ReceptionRepository.getNotificationsByRole(req.hospitalFilter!.hospital as any, "receptionist");
+  if (req.hospitalFilter?.hospital) {
+    await ReceptionService.generateScheduledAlerts(req.hospitalFilter.hospital as any);
+  }
+  const notifs = await ReceptionRepository.getNotificationsByRole(req.hospitalFilter as any, "receptionist");
   res.json({ status: "success", data: { notifications: notifs } });
 });
 
 export const markNotificationRead = catchAsync(async (req: Request, res: Response) => {
-  const notif = await ReceptionRepository.markNotificationRead(req.hospitalFilter!.hospital as any, req.params.id);
+  const notif = await ReceptionRepository.markNotificationRead(req.hospitalFilter as any, req.params.id);
   res.json({ status: "success", data: { notification: notif } });
 });
 

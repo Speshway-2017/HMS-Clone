@@ -121,11 +121,15 @@ export function DashboardLayout() {
   }, [queryClient]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Topbar onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 min-w-0 overflow-y-auto p-3 sm:p-4 md:p-6">
+    <div className="flex h-screen overflow-hidden bg-slate-50 print:bg-white print:h-auto print:overflow-visible">
+      <div className="print:hidden">
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      </div>
+      <div className="flex flex-1 flex-col overflow-hidden print:overflow-visible">
+        <div className="print:hidden">
+          <Topbar onMenuClick={() => setSidebarOpen(true)} />
+        </div>
+        <main className="flex-1 min-w-0 overflow-y-auto p-3 sm:p-4 md:p-6 print:p-0 print:overflow-visible">
           <Outlet />
         </main>
       </div>

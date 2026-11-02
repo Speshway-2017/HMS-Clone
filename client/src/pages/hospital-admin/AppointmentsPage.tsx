@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, CalendarClock, CalendarCheck2 } from "lucide-react";
 import { useAppointments, mapAppointmentTypeForDisplay } from "../../features/appointments";
+import { useBranchContext } from "../../context/BranchContext";
+import { AllBranchesNoticeBanner } from "../../components/common/AllBranchesNoticeBanner";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { KpiCard } from "../../components/ui/KpiCard";
@@ -21,6 +23,7 @@ const STATUS_TONE: Record<Appointment["status"], "success" | "info" | "warning" 
 };
 
 export function AppointmentsPage() {
+  const { isAllBranches } = useBranchContext();
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
   const { data, isLoading } = useAppointments({ page, status: status || undefined });
@@ -61,6 +64,8 @@ export function AppointmentsPage() {
 
   return (
     <div className="space-y-6">
+      <AllBranchesNoticeBanner />
+
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Appointment Management</h1>

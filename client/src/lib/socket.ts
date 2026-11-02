@@ -1,25 +1,22 @@
 import { io, Socket } from "socket.io-client";
+import { getBaseUrl } from "./api";
 
-// Detect API server URL from window location if VITE_API_URL is relative or unspecified
-const getSocketUrl = (): string => {
-  const envUrl = (import.meta as any).env.VITE_API_URL;
-  if (envUrl && envUrl.startsWith("http")) {
-    return envUrl;
+// Detect API server URL from active API base URL configuration
+export const getSocketUrl = (): string => {
+  const apiBase = getBaseUrl();
+  try {
+    const urlObj = new URL(apiBase);
+    return urlObj.origin;
+  } catch (_) {
+    return apiBase.replace(/\/api\/v1\/?$/, "");
   }
-  if (typeof window !== "undefined") {
-    const protocol = window.location.protocol;
-    const hostname = window.location.hostname;
-    // Default backend port 5000 in dev
-    return `${protocol}//${hostname}:5000`;
-  }
-  return "http://localhost:5000";
 };
 
 const SOCKET_URL = getSocketUrl();
 
 export const socket: Socket = io(SOCKET_URL, {
   autoConnect: true,
-  transports: ["websocket", "polling"],
+  transports: ["polling", "websocket"],
   reconnection: true,
   reconnectionAttempts: Infinity,
   reconnectionDelay: 1000,

@@ -16,9 +16,9 @@ import { notifyAssignedDoctorForPatient } from "../utils/autoNotifyAssignedDocto
 
 import { buildBranchQuery } from "../utils/branchQueryHelper";
 
-async function findOrder(requestId: string, hospitalId?: string | Types.ObjectId) {
-  const query: any = { _id: requestId };
-  if (hospitalId) query.hospital = hospitalId;
+async function findOrder(requestId: string, hospitalFilter?: any) {
+  const filter = buildBranchQuery(hospitalFilter);
+  const query: any = { _id: requestId, ...filter };
   let order: any = await LabOrder.findOne(query).populate("patient").populate("doctor");
   let type: "Laboratory" | "Radiology" = "Laboratory";
   if (!order) {
@@ -408,7 +408,7 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
           existingReport.observations = rep.observations ? String(rep.observations).trim().slice(0, 5000) : existingReport.observations;
           existingReport.remarks = rep.remarks ? String(rep.remarks).trim().slice(0, 2000) : existingReport.remarks;
           if (uploadedFiles.length > 0) existingReport.files = uploadedFiles as any;
-          existingReport.status = "report_uploaded";
+          existingReport.status = "completed";
           existingReport.uploadedBy = req.user!._id as any;
           existingReport.uploadedAt = new Date();
           await existingReport.save({ session });
@@ -429,7 +429,7 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
                 remarks: rep.remarks ? String(rep.remarks).trim().slice(0, 2000) : "",
                 files: uploadedFiles,
                 uploadedBy: req.user!._id,
-                status: "report_uploaded",
+                status: "completed",
                 version: 1,
                 versions: []
               }
@@ -445,17 +445,18 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
         await Promise.all([
           LabOrder.updateMany(
             { appointment: order.appointment, hospital: order.hospital },
-            { status: "report_uploaded" },
+            { status: "completed", sampleStatus: "Completed" },
             { session }
           ),
           RadiologyOrder.updateMany(
             { appointment: order.appointment, hospital: order.hospital },
-            { status: "report_uploaded" },
+            { status: "completed" },
             { session }
           )
         ]);
       } else {
-        order.status = "report_uploaded";
+        order.status = "completed";
+        if (type === "Laboratory") order.sampleStatus = "Completed";
         await order.save({ session });
       }
 
@@ -557,7 +558,7 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
             remarks: remarks || "",
             files: uploadedFiles,
             uploadedBy: req.user!._id,
-            status: "report_uploaded"
+            status: "completed"
           }
         ],
         { session }
@@ -567,17 +568,18 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
         await Promise.all([
           LabOrder.updateMany(
             { appointment: order.appointment, hospital: order.hospital },
-            { status: "report_uploaded" },
+            { status: "completed", sampleStatus: "Completed" },
             { session }
           ),
           RadiologyOrder.updateMany(
             { appointment: order.appointment, hospital: order.hospital },
-            { status: "report_uploaded" },
+            { status: "completed" },
             { session }
           )
         ]);
       } else {
-        order.status = "report_uploaded";
+        order.status = "completed";
+        if (type === "Laboratory") order.sampleStatus = "Completed";
         await order.save({ session });
       }
 

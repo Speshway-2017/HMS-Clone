@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, Navigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRegisterPatientUser } from "../../features/auth";
+import { isElectron } from "../../utils/electron";
 import { usePublicHospital } from "../../features/hospitals";
 import { useAuth } from "../../context/AuthContext";
 import { tokenStorage } from "../../lib/tokenStorage";
@@ -18,17 +19,21 @@ import {
   Eye,
   EyeOff,
   MapPin,
-  ShieldAlert,
-  FileText,
   UserPlus,
   Loader2,
   ArrowLeft,
+  ShieldAlert,
+  FileText,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "../../lib/api";
 import { registrationSchema, RegistrationFormData } from "../../features/authValidation";
 
 export function RegisterPage() {
+  if (isElectron()) {
+    return <Navigate to="/login" replace />;
+  }
+
   const { data: hospital } = usePublicHospital();
   const hospitalName = hospital?.name || "HMS Enterprise";
   const logoUrl = hospital?.logoUrl;

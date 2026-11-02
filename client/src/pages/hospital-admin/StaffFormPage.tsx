@@ -11,6 +11,7 @@ import { FileUpload } from "../../components/ui/FileUpload";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { api } from "../../lib/api";
+<<<<<<< HEAD
 import { isValidEmail, isValidPhone } from "../../lib/validation";
 
 const STAFF_LIMITS = {
@@ -25,6 +26,9 @@ const STAFF_LIMITS = {
 const NAME_REGEX = /^[a-zA-Z\s\.\-']+$/;
 const QUALIFICATIONS_REGEX = /^[a-zA-Z0-9\s\.\-/'&,()]+$/;
 const EMPLOYEE_ID_REGEX = /^[A-Za-z0-9\-_]+$/;
+=======
+import { useBranchContext } from "../../context/BranchContext";
+>>>>>>> origin/development
 
 function getRolePrefix(role: string): string {
   const clean = (role || "").toLowerCase().trim();
@@ -48,6 +52,10 @@ export function StaffFormPage() {
   const { data: roles } = useRoles();
   const createStaff = useCreateStaff();
   const updateStaff = useUpdateStaff(id ?? "");
+  const { isAllBranches, branches } = useBranchContext();
+
+  // When admin is in "All Branches" mode, they must choose a branch for the new staff member
+  const [selectedBranchId, setSelectedBranchId] = useState("");
 
   const [form, setForm] = useState({
     name: "",
@@ -299,6 +307,7 @@ export function StaffFormPage() {
     e.preventDefault();
     setError(null);
 
+<<<<<<< HEAD
     const nameErr = validateField("name", form.name);
     const genderErr = validateField("gender", form.gender);
     const emailErr = validateField("email", form.email);
@@ -350,14 +359,32 @@ export function StaffFormPage() {
       department: form.department || null,
     };
 
+=======
+    // Validate: when admin is in All Branches mode, a branch must be selected
+    if (!isEdit && isAllBranches && !selectedBranchId) {
+      setError("Please select the branch this staff member belongs to.");
+      return;
+    }
+
+>>>>>>> origin/development
     try {
       if (isEdit) {
         await updateStaff.mutateAsync(payload);
         toast.success("Staff member updated successfully!");
         navigate("/admin/staff");
       } else {
+<<<<<<< HEAD
         const result = await createStaff.mutateAsync(payload);
         toast.success("Staff member created successfully!");
+=======
+        // When admin is in All Branches view, explicitly override X-Branch-ID for this POST
+        const headers: Record<string, string> = {};
+        if (isAllBranches && selectedBranchId) {
+          headers["X-Branch-ID"] = selectedBranchId;
+        }
+        const res = await api.post("/staff", payload, { headers });
+        const result = res.data.data as { staff: any; tempPassword: string | null };
+>>>>>>> origin/development
         if (result.tempPassword) {
           setCreated({ name: form.name, email: form.email, tempPassword: result.tempPassword, role: form.role });
         } else {
@@ -548,6 +575,22 @@ export function StaffFormPage() {
         </FormSection>
 
         <FormSection icon={Briefcase} title="Professional Details">
+          {/* Branch selector — only shown to admins in "All Branches" mode */}
+          {!isEdit && isAllBranches && (
+            <SelectField
+              label="Assign to Branch *"
+              required
+              value={selectedBranchId}
+              onChange={(e) => setSelectedBranchId(e.target.value)}
+            >
+              <option value="">Select Branch</option>
+              {branches.map((b) => (
+                <option key={b._id} value={b._id}>
+                  {b.name}
+                </option>
+              ))}
+            </SelectField>
+          )}
           <SelectField
             label="Role / Designation *"
             required

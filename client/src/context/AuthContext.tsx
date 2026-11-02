@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, ReactNode 
 import { api, getApiErrorMessage } from "../lib/api";
 import { tokenStorage } from "../lib/tokenStorage";
 import { AuthUser } from "../types/auth";
+import { isElectron, DESKTOP_ALLOWED_ROLES } from "../utils/electron";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -31,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tokenStorage.clear();
       tokenStorage.broadcastSessionEvent("LOGOUT");
       localStorage.removeItem("nurse_shift_completed");
+      localStorage.removeItem("hms_active_branch_id");
       setUser(null);
     }
   }, []);
@@ -45,6 +47,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .get<{ data: { user: AuthUser } }>("/auth/me")
       .then((res) => {
         const u = res.data.data.user;
+        if (isElectron() && !DESKTOP_ALLOWED_ROLES.includes(u.role)) {
+          tokenStorage.clear();
+          setUser(null);
+          sessionStorage.setItem(
+            "desktop_blocked_message",
+            "This account is available only through the patient web portal."
+          );
+          return;
+        }
         setUser(u);
         if (u) {
           if (u.hospital) socket.emit("join_hospital", u.hospital);
@@ -117,9 +128,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       const loggedUser = res.data.data.user;
+
+      if (isElectron() && !DESKTOP_ALLOWED_ROLES.includes(loggedUser.role)) {
+        tokenStorage.clear();
+        throw new Error(
+          "This account is available only through the patient web portal."
+        );
+      }
+
       tokenStorage.set(res.data.data.token, res.data.data.refreshToken);
       tokenStorage.broadcastSessionEvent("LOGIN", loggedUser.id);
       localStorage.removeItem("nurse_shift_completed");
+      if (loggedUser.role !== "hospital_admin") {
+        localStorage.removeItem("hms_active_branch_id");
+      }
       setUser(loggedUser);
       return loggedUser;
     } catch (error) {
