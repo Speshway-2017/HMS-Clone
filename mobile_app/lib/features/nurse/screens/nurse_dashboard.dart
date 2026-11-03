@@ -1519,10 +1519,10 @@ class _NurseDashboardState extends State<NurseDashboard> {
                     CircleAvatar(
                       radius: 46,
                       backgroundColor: AppColors.navy100,
-                      backgroundImage: _profileImagePath != null 
+                      backgroundImage: (_profileImagePath != null && File(_profileImagePath!).existsSync()) 
                           ? FileImage(File(_profileImagePath!)) 
                           : null,
-                      child: _profileImagePath == null 
+                      child: (_profileImagePath == null || !File(_profileImagePath!).existsSync()) 
                           ? Text(
                               _nurseName.isNotEmpty ? _nurseName.substring(0, 2).toUpperCase() : 'NS',
                               style: const TextStyle(

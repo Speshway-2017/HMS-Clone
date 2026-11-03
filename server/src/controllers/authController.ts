@@ -22,17 +22,17 @@ const loginSchema = z.object({
 });
 
 const registerSchema = z.object({
-  // Section 1: Account & Security (Mandatory)
+  // Section 1: Account & Security
   name: z.string().min(2, "Full Name must be at least 2 characters long"),
-  email: z.string().email("Valid email address is required"),
+  email: z.string().optional().default(""),
   password: z.string().min(6, "Password must be at least 6 characters"),
 
-  // Section 2: Demographics & Contact (Mandatory)
+  // Section 2: Demographics & Contact (Phone mandatory, rest optional with defaults for easy patient signup)
   phone: z.string().min(10, "Phone Number must be at least 10 digits"),
-  age: z.coerce.number({ invalid_type_error: "Valid Age is required" }).min(0, "Age must be between 0 and 120").max(120, "Age must be between 0 and 120"),
-  gender: z.string().min(1, "Gender selection is required"),
-  bloodGroup: z.string().min(1, "Blood Group selection is required"),
-  address: z.string().min(3, "Residential Address must be at least 3 characters long"),
+  age: z.coerce.number().optional().default(25),
+  gender: z.string().optional().default("Male"),
+  bloodGroup: z.string().optional().default("O+"),
+  address: z.string().optional().default("General"),
 
   // Section 3: Emergency Contact (Optional - set in Profile)
   emergencyContact: z.object({
@@ -98,8 +98,10 @@ export const register = catchAsync(async (req: Request, res: Response) => {
     emergencyContact,
   } = registerSchema.parse(req.body);
 
-  const emailClean = (email || "").trim().toLowerCase();
   const phoneClean = (phone || "").replace(/\D/g, "").slice(-10);
+  const emailClean = (email && email.trim().length > 3)
+    ? email.trim().toLowerCase()
+    : `patient_${phoneClean}@patient.speshway.site`;
 
   // Check if a user account already exists by email or phone
   const userConds: any[] = [];
