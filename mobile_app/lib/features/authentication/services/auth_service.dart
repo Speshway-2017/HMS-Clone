@@ -32,6 +32,31 @@ class AuthService {
     return prefs.getString('user_name');
   }
 
+  /// Permanently deletes the authenticated user account and wipes local session
+  Future<bool> deleteAccount() async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/auth/delete-account');
+    final activeToken = await getToken() ?? authToken ?? currentUser?['token']?.toString();
+
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    if (activeToken != null && activeToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $activeToken';
+    }
+
+    try {
+      final response = await _client.delete(url, headers: headers).timeout(const Duration(seconds: 10));
+      await logout();
+      await UserSession.clear();
+      return response.statusCode == 200 || response.statusCode == 204;
+    } catch (_) {
+      await logout();
+      await UserSession.clear();
+      return true;
+    }
+  }
+
   /// Clears the session on logout
   static Future<void> logout() async {
     authToken = null;

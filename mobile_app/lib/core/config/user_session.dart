@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -51,7 +52,21 @@ class UserSession {
       final prefs = await SharedPreferences.getInstance();
       _token = prefs.getString(_keyToken);
       _selectedBranchId = prefs.getString(_keySelectedBranch) ?? 'all';
-      _profileImagePath = prefs.getString(_keyProfileImage);
+      final savedImg = prefs.getString(_keyProfileImage);
+      if (savedImg != null && savedImg.isNotEmpty) {
+        try {
+          if (File(savedImg).existsSync()) {
+            _profileImagePath = savedImg;
+          } else {
+            _profileImagePath = null;
+            await prefs.remove(_keyProfileImage);
+          }
+        } catch (_) {
+          _profileImagePath = null;
+        }
+      } else {
+        _profileImagePath = null;
+      }
 
       final userStr = prefs.getString(_keyUser);
       if (userStr != null && userStr.isNotEmpty) {

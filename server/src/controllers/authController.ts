@@ -31,6 +31,31 @@ const loginSchema = z.object({
   password: z.string().min(1, "Password is required").max(64, "Password cannot exceed 64 characters"),
 });
 
+const registerSchema = z.object({
+  // Section 1: Account & Security
+  name: z.string().min(2, "Full Name must be at least 2 characters long"),
+  email: z.string().optional().default(""),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+
+  // Section 2: Demographics & Contact (Phone mandatory, rest optional with defaults for easy patient signup)
+  phone: z.string().min(10, "Phone Number must be at least 10 digits"),
+  age: z.coerce.number().optional().default(25),
+  gender: z.string().optional().default("Male"),
+  bloodGroup: z.string().optional().default("O+"),
+  address: z.string().optional().default("General"),
+
+  // Section 3: Emergency Contact (Optional - set in Profile)
+  emergencyContact: z.object({
+    name: z.string().optional().default(""),
+    phone: z.string().optional().default(""),
+    relation: z.string().optional().default(""),
+  }).optional().default({ name: "", phone: "", relation: "" }),
+
+  // Section 4: Allergies & Insurance Details (Optional - set in Profile)
+  allergies: z.string().optional().default(""),
+  insuranceProvider: z.string().optional().default(""),
+  insurancePolicyNumber: z.string().optional().default(""),
+});
 const registerSchema = z
   .object({
     // Section 1: Account & Security (Mandatory)
@@ -117,8 +142,10 @@ export const register = catchAsync(async (req: Request, res: Response) => {
     emergencyContact,
   } = registerSchema.parse(req.body);
 
-  const emailClean = (email || "").trim().toLowerCase();
   const phoneClean = (phone || "").replace(/\D/g, "").slice(-10);
+  const emailClean = (email && email.trim().length > 3)
+    ? email.trim().toLowerCase()
+    : `patient_${phoneClean}@patient.speshway.site`;
 
   // Check if a user account already exists by email or phone
   const userConds: any[] = [];
