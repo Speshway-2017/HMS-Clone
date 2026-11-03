@@ -4,6 +4,24 @@ import { AppError } from "../utils/AppError";
 import { Ward } from "../models/Ward";
 import { Room } from "../models/Room";
 import { buildBranchQuery } from "../utils/branchQueryHelper";
+import { z } from "zod";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+  codeValidator,
+} from "../utils/validators";
+
+const wardSchema = z.object({
+  name: requiredTrimmedString("Ward name", 2, 100),
+  code: codeValidator("Ward code", 1, 20, true),
+  wardType: requiredTrimmedString("Ward type", 1, 50),
+  floorNumber: z.coerce
+    .number({ invalid_type_error: "Floor number must be a number" })
+    .min(-5, "Floor number cannot be less than -5")
+    .max(100, "Floor number cannot exceed 100"),
+  description: optionalTrimmedString("Description", 500),
+  status: z.enum(["Active", "Inactive", "Maintenance"]).optional().default("Active"),
+});
 
 export const listWards = catchAsync(async (req: Request, res: Response) => {
   const { search, wardType, status, page = 1, limit = 10 } = req.query;

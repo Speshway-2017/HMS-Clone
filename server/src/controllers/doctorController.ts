@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { Doctor, DOCTOR_STATUSES } from "../models/Doctor";
 import { User } from "../models/User";
@@ -16,21 +16,65 @@ import { syncDoctorStaffRecords } from "./staffController";
 import { Department } from "../models/Department";
 import { Feedback } from "../models/Feedback";
 import { emitToHospital } from "../config/socket";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+  emailValidator,
+  phoneValidator,
+  tenDigitPhoneValidator,
+  urlValidator,
+  numberValidator,
+} from "../utils/validators";
 
 const doctorSchema = z.object({
   department: z.string().optional().nullable(),
-  name: z.string().min(1),
+  name: z
+    .string({ invalid_type_error: "Full Name must be a string" })
+    .trim()
+    .min(2, "Full Name is required and must be at least 2 characters")
+    .max(100, "Full Name cannot exceed 100 characters")
+    .regex(/^[a-zA-Z\s\.\-']+$/, "Full Name should contain only letters, dots, hyphens, and spaces"),
   gender: z.string().min(1, "Gender is required").default("Male"),
-  email: z.string().optional().default(""),
-  phone: z.string().optional().default(""),
-  photoUrl: z.string().optional().default(""),
-  specialization: z.string().optional().default(""),
-  qualification: z.string().optional().default(""),
-  licenseNo: z.string().optional().default(""),
-  bio: z.string().optional().default(""),
+  email: emailValidator("Email Address", false, 100),
+  phone: tenDigitPhoneValidator("Phone Number", false),
+  photoUrl: z.string().max(500, "Photo URL cannot exceed 500 characters").optional().default(""),
+  specialization: z
+    .string()
+    .max(100, "Specialization cannot exceed 100 characters. Please enter valid data")
+    .optional()
+    .refine(
+      (val) => !val || (/^[a-zA-Z\s\.\-/'&,()]+$/.test(val) && /[a-zA-Z]/.test(val) && val.trim().length >= 2),
+      {
+        message: "Specialization contains invalid data. Please enter valid data",
+      }
+    )
+    .default(""),
+  qualification: z
+    .string()
+    .max(100, "Qualification cannot exceed 100 characters. Please enter valid data")
+    .optional()
+    .refine(
+      (val) => !val || (/^[a-zA-Z0-9\s\.\-/'&,()]+$/.test(val) && /[a-zA-Z]/.test(val) && val.trim().length >= 2),
+      {
+        message: "Qualification contains invalid data. Please enter valid data",
+      }
+    )
+    .default(""),
+  licenseNo: z
+    .string()
+    .max(50, "Doctor / License ID cannot exceed 50 characters. Please enter valid data")
+    .optional()
+    .refine(
+      (val) => !val || (/^[A-Za-z0-9\-_]+$/.test(val) && val.trim().length >= 2),
+      {
+        message: "Doctor / License ID contains invalid data. Must contain only letters, numbers, hyphens, and underscores. Please enter valid data",
+      }
+    )
+    .default(""),
+  bio: z.string().max(500, "Bio cannot exceed 500 characters").optional().default(""),
   status: z.enum(DOCTOR_STATUSES).optional(),
-  rating: z.coerce.number().min(0).max(100).optional(),
-  opExpiryLimit: z.coerce.number().min(0).optional(),
+  rating: z.coerce.number().min(0, "Rating must be at least 0").max(100, "Rating cannot exceed 100").optional(),
+  opExpiryLimit: z.coerce.number().min(0, "Expiry limit must be at least 0").optional(),
 });
 
 export const listDoctors = catchAsync(async (req: Request, res: Response) => {
@@ -408,4 +452,3 @@ export const updateDoctorProfileMe = catchAsync(async (req: Request, res: Respon
 
   res.json({ status: "success", data: { doctor: resolvedDoctor } });
 });
-

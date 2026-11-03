@@ -1,6 +1,34 @@
 import dotenv from "dotenv";
+import path from "path";
 
 dotenv.config();
+
+// If required env var MONGO_URI is missing, try candidate paths (especially for packaged Electron app)
+if (!process.env.MONGO_URI) {
+  const candidatePaths = [
+    path.resolve(process.cwd(), ".env"),
+    path.resolve(process.cwd(), "server", ".env"),
+    path.resolve(__dirname, "..", "..", ".env"),
+    path.resolve(__dirname, "..", ".env"),
+    path.resolve(__dirname, ".env"),
+  ];
+  const resPath = process.env.ELECTRON_RESOURCES_PATH || (process as any).resourcesPath;
+  if (typeof resPath === "string") {
+    candidatePaths.push(
+      path.resolve(resPath, "server", ".env"),
+      path.resolve(resPath, ".env"),
+      path.resolve(resPath, "..", ".env"),
+      path.resolve(resPath, "..", "server", ".env")
+    );
+  }
+  for (const envPath of candidatePaths) {
+    dotenv.config({ path: envPath });
+    if (process.env.MONGO_URI) {
+      console.log(`[HMS Server] Loaded environment from: ${envPath}`);
+      break;
+    }
+  }
+}
 
 function required(name: string): string {
   const value = process.env[name];

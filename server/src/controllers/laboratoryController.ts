@@ -405,8 +405,8 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
           existingReport.versions = existingReport.versions || [];
           existingReport.versions.push(versionEntry as any);
           existingReport.version = (existingReport.version || 1) + 1;
-          existingReport.observations = rep.observations || existingReport.observations;
-          existingReport.remarks = rep.remarks || existingReport.remarks;
+          existingReport.observations = rep.observations ? String(rep.observations).trim().slice(0, 5000) : existingReport.observations;
+          existingReport.remarks = rep.remarks ? String(rep.remarks).trim().slice(0, 2000) : existingReport.remarks;
           if (uploadedFiles.length > 0) existingReport.files = uploadedFiles as any;
           existingReport.status = "completed";
           existingReport.uploadedBy = req.user!._id as any;
@@ -425,8 +425,8 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
                 requestType,
                 requestId: order._id,
                 testName: rep.testName,
-                observations: rep.observations || "",
-                remarks: rep.remarks || "",
+                observations: rep.observations ? String(rep.observations).trim().slice(0, 5000) : "",
+                remarks: rep.remarks ? String(rep.remarks).trim().slice(0, 2000) : "",
                 files: uploadedFiles,
                 uploadedBy: req.user!._id,
                 status: "completed",
@@ -965,8 +965,8 @@ export const editReport = catchAsync(async (req: Request, res: Response) => {
   report.versions.push(currentVersionData as any);
   report.version = (report.version || 1) + 1;
 
-  if (observations !== undefined) report.observations = observations;
-  if (remarks !== undefined) report.remarks = remarks;
+  if (observations !== undefined) report.observations = String(observations).trim().slice(0, 5000);
+  if (remarks !== undefined) report.remarks = String(remarks).trim().slice(0, 2000);
 
   if (files && files.length > 0) {
     const uploadedFiles = [];

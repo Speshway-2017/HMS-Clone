@@ -4,8 +4,52 @@ import { Staff } from "../models/Staff";
 import { Doctor } from "../models/Doctor";
 import { AuditLog } from "../models/AuditLog";
 import { AppError } from "../utils/AppError";
+import { z } from "zod";
 import { catchAsync } from "../utils/catchAsync";
 import { emitToHospital } from "../config/socket";
+
+const TIME_REGEX = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](\s?[APap][Mm])?$/;
+
+const shiftSchema = z.object({
+  name: z
+    .string({ invalid_type_error: "Shift name must be a string" })
+    .trim()
+    .min(2, "Shift Name is required and must be at least 2 characters")
+    .max(50, "Shift Name cannot exceed 50 characters. Please enter valid data")
+    .regex(/^[a-zA-Z0-9\s\.\-/_()]+$/, "Shift Name contains invalid data. Please enter valid data"),
+  startTime: z
+    .string({ invalid_type_error: "Start time must be a string" })
+    .trim()
+    .min(1, "Start Time is required. Please enter valid data")
+    .max(20, "Start Time cannot exceed 20 characters. Please enter valid data")
+    .refine((val) => TIME_REGEX.test(val), {
+      message: "Start Time must be a valid time (e.g. 08:00 AM). Please enter valid data",
+    }),
+  endTime: z
+    .string({ invalid_type_error: "End time must be a string" })
+    .trim()
+    .min(1, "End Time is required. Please enter valid data")
+    .max(20, "End Time cannot exceed 20 characters. Please enter valid data")
+    .refine((val) => TIME_REGEX.test(val), {
+      message: "End Time must be a valid time (e.g. 05:00 PM). Please enter valid data",
+    }),
+  gracePeriodMinutes: z.coerce
+    .number({ invalid_type_error: "Grace Period must be a valid number. Please enter valid data" })
+    .min(0, "Grace Period cannot be negative. Please enter valid data")
+    .max(120, "Grace Period cannot exceed 120 minutes. Please enter valid data")
+    .default(15),
+  halfDayHours: z.coerce
+    .number({ invalid_type_error: "Half Day must be a valid number. Please enter valid data" })
+    .min(0, "Half Day hours cannot be negative. Please enter valid data")
+    .max(24, "Half Day hours cannot exceed 24 hours. Please enter valid data")
+    .default(4),
+  fullDayHours: z.coerce
+    .number({ invalid_type_error: "Full Day must be a valid number. Please enter valid data" })
+    .min(0, "Full Day hours cannot be negative. Please enter valid data")
+    .max(24, "Full Day hours cannot exceed 24 hours. Please enter valid data")
+    .default(8),
+  crossesMidnight: z.boolean().optional().default(false),
+});
 
 /**
  * List all shifts for hospital
@@ -82,21 +126,11 @@ export const createShift = catchAsync(async (req: Request, res: Response) => {
     throw new AppError("Hospital context is required.", 400);
   }
 
-  const { name, startTime, endTime, gracePeriodMinutes, halfDayHours, fullDayHours, crossesMidnight } = req.body;
-
-  if (!name || !startTime || !endTime) {
-    throw new AppError("Shift name, start time, and end time are required.", 400);
-  }
+  const body = shiftSchema.parse(req.body);
 
   const newShift = await Shift.create({
     hospital: hospitalId,
-    name,
-    startTime,
-    endTime,
-    gracePeriodMinutes: gracePeriodMinutes !== undefined ? Number(gracePeriodMinutes) : 15,
-    halfDayHours: halfDayHours !== undefined ? Number(halfDayHours) : 4,
-    fullDayHours: fullDayHours !== undefined ? Number(fullDayHours) : 8,
-    crossesMidnight: Boolean(crossesMidnight),
+    ...body,
   });
 
   // Audit log
@@ -108,7 +142,7 @@ export const createShift = catchAsync(async (req: Request, res: Response) => {
     action: "Shift Created",
     entity: "Shift",
     entityId: String(newShift._id),
-    details: { name, startTime, endTime },
+    details: { name: body.name, startTime: body.startTime, endTime: body.endTime },
   });
 
   emitToHospital(hospitalId, "shift:updated", { action: "CREATE", shift: newShift });
@@ -131,9 +165,11 @@ export const updateShift = catchAsync(async (req: Request, res: Response) => {
   }
 
   const { id } = req.params;
+  const body = shiftSchema.partial().parse(req.body);
+
   const updatedShift = await Shift.findOneAndUpdate(
     { _id: id, hospital: hospitalId },
-    req.body,
+    body,
     { new: true, runValidators: true }
   );
 

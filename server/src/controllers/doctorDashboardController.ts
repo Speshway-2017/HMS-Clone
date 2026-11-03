@@ -381,10 +381,37 @@ export const addInpatientNotes = catchAsync(async (req: Request, res: Response) 
 
 // 5. Completed Consultations List
 export const getCompletedConsultations = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
   const filter = getDoctorScopeFilter(req, doctor);
-  const data = await DoctorDashboardRepository.getCompletedConsultations(filter, doctor._id.toString());
-  res.json({ status: "success", data });
+  const appointments = await DoctorDashboardRepository.getCompletedConsultations(filter, doctor._id.toString());
+
+  const apptIds = appointments.map((a: any) => a._id);
+  const sessions = await ConsultationSession.find({ appointment: { $in: apptIds }, hospital: hospitalId });
+  const sessionMap = new Map<string, any>();
+  for (const s of sessions) {
+    if (s.appointment) sessionMap.set(s.appointment.toString(), s);
+  }
+
+  const enrichedData = appointments.map((a: any) => {
+    const apptObj = a.toObject ? a.toObject() : { ...a };
+    const sess = sessionMap.get(apptObj._id.toString());
+    if (sess) {
+      apptObj.vitals = sess.vitals || apptObj.vitals;
+      apptObj.chiefComplaint = sess.chiefComplaint || apptObj.chiefComplaint;
+      apptObj.diagnosis = sess.diagnosis || apptObj.diagnosis;
+      apptObj.symptoms = sess.symptoms || apptObj.symptoms;
+      apptObj.clinicalNotes = sess.clinicalNotes || apptObj.clinicalNotes;
+      apptObj.advice = sess.advice || apptObj.advice;
+      apptObj.prescriptions = (sess.prescriptions && sess.prescriptions.length > 0) ? sess.prescriptions : (apptObj.prescriptions || apptObj.medicines || []);
+      apptObj.labOrders = (sess.labOrders && sess.labOrders.length > 0) ? sess.labOrders : (apptObj.labOrders || apptObj.labTests || []);
+      apptObj.radiologyOrders = (sess.radiologyOrders && sess.radiologyOrders.length > 0) ? sess.radiologyOrders : (apptObj.radiologyOrders || apptObj.radiologyTests || []);
+      apptObj.admissionRecommendation = sess.admissionRecommendation || apptObj.admissionRecommendation;
+    }
+    return apptObj;
+  });
+
+  res.json({ status: "success", data: enrichedData });
 });
 
 // 6. Pending Prescriptions & Actions
@@ -1151,17 +1178,50 @@ export const completeConsultation = catchAsync(async (req: Request, res: Respons
   const appointmentId = req.params.id;
   const doctor = await getLoggedDoctor(req);
 
-  const { medications, labOrders, radiologyOrders, diagnosis, chiefComplaint, clinicalNotes, advice, followUpDate } = req.body;
+  const {
+    medications,
+    medicines,
+    labOrders,
+    labTests,
+    radiologyOrders,
+    radiologyTests,
+    diagnosis,
+    chiefComplaint,
+    clinicalNotes,
+    notes,
+    symptoms,
+    advice,
+    vitals,
+    followUpDate
+  } = req.body;
+
+  const actualMeds = medications || medicines || [];
+  const actualLabOrders = labOrders || labTests || [];
+  const actualRadiologyOrders = radiologyOrders || radiologyTests || [];
+  const actualNotes = clinicalNotes || notes || "";
 
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: doctor._id })
+    let targetApptId = appointmentId;
+    let appointment = await Appointment.findOne({ _id: targetApptId, hospital: hospitalId })
       .populate("patient")
       .populate("doctor")
       .populate("department")
       .session(session);
+
+    if (!appointment) {
+      const qItem = await Queue.findOne({ _id: targetApptId, hospital: hospitalId }).session(session);
+      if (qItem && qItem.appointment) {
+        targetApptId = qItem.appointment.toString();
+        appointment = await Appointment.findOne({ _id: targetApptId, hospital: hospitalId })
+          .populate("patient")
+          .populate("doctor")
+          .populate("department")
+          .session(session);
+      }
+    }
 
     if (!appointment) {
       throw new AppError("Appointment not found.", 404);
@@ -1171,33 +1231,83 @@ export const completeConsultation = catchAsync(async (req: Request, res: Respons
     appointment.status = "completed";
     if (diagnosis) appointment.diagnosis = diagnosis;
     if (chiefComplaint) appointment.chiefComplaint = chiefComplaint;
-    if (clinicalNotes) appointment.clinicalNotes = clinicalNotes;
+    if (actualNotes) appointment.clinicalNotes = actualNotes;
+    if (symptoms) appointment.symptoms = symptoms;
     if (advice) appointment.advice = advice;
+    if (vitals && typeof vitals === "object") {
+      appointment.vitals = { ...(appointment.vitals || {}), ...vitals };
+    }
     if (followUpDate) appointment.followUpDate = followUpDate;
+
+    // Attach lab orders, radiology orders, prescriptions, and IP recommendation to appointment object
+    (appointment as any).labOrders = actualLabOrders;
+    (appointment as any).radiologyOrders = actualRadiologyOrders;
+    (appointment as any).prescriptions = actualMeds;
+    if (req.body.ipRecommendation || req.body.admissionRecommendation) {
+      (appointment as any).admissionRecommendation = req.body.ipRecommendation || req.body.admissionRecommendation;
+    }
     await appointment.save({ session });
 
     // Update queue item status to completed if exists
     await Queue.findOneAndUpdate(
-      { appointment: appointmentId, hospital: hospitalId, doctor: doctor._id },
+      { appointment: targetApptId, hospital: hospitalId },
       { status: "completed" },
       { session }
     );
 
-    // Save prescription automatically using transaction
-    const reqHostUrl = `${req.protocol}://${req.get("host")}`;
-    const prescription = await createOrUpdatePrescriptionCore(
-      session,
-      hospitalId,
-      doctor,
-      appointmentId,
-      { medications, labOrders, radiologyOrders, diagnosis, chiefComplaint, clinicalNotes, advice, followUpDate },
-      reqHostUrl
+    // Update ConsultationSession to COMPLETED state with full record payload
+    await ConsultationSession.findOneAndUpdate(
+      { appointment: targetApptId, hospital: hospitalId },
+      {
+        status: "COMPLETED",
+        vitals: vitals || appointment.vitals || {},
+        diagnosis: diagnosis || appointment.diagnosis || "",
+        chiefComplaint: chiefComplaint || appointment.chiefComplaint || "",
+        clinicalNotes: actualNotes || appointment.clinicalNotes || "",
+        symptoms: symptoms || appointment.symptoms || "",
+        advice: advice || appointment.advice || "",
+        prescriptions: actualMeds,
+        labOrders: actualLabOrders,
+        radiologyOrders: actualRadiologyOrders,
+        admissionRecommendation: req.body.ipRecommendation || req.body.admissionRecommendation || {},
+        completedAt: new Date(),
+        completedBy: doctor._id
+      },
+      { session, upsert: true }
     );
+
+    // Save prescription automatically ONLY IF medicines, lab orders, or radiology orders are present
+    let prescription = null;
+    const formattedMeds = formatAndSanitizeMedications(actualMeds || []);
+    const hasMed = formattedMeds.length > 0;
+    const hasLab = Array.isArray(actualLabOrders) && actualLabOrders.some((l: any) => l && String(l).trim());
+    const hasRadio = Array.isArray(actualRadiologyOrders) && actualRadiologyOrders.some((r: any) => r && String(r).trim());
+
+    if (hasMed || hasLab || hasRadio) {
+      const reqHostUrl = `${req.protocol}://${req.get("host")}`;
+      prescription = await createOrUpdatePrescriptionCore(
+        session,
+        hospitalId,
+        doctor,
+        appointmentId,
+        {
+          medications: actualMeds,
+          labOrders: actualLabOrders,
+          radiologyOrders: actualRadiologyOrders,
+          diagnosis,
+          chiefComplaint,
+          clinicalNotes: actualNotes,
+          advice,
+          followUpDate
+        },
+        reqHostUrl
+      );
+    }
 
     // Push to patient's medicalHistory array
     const departmentName = (appointment.department as any)?.name || "General OPD";
     const diagnosisVal = diagnosis || appointment.diagnosis || "Consultation";
-    const notesVal = `Chief Complaint: ${chiefComplaint || appointment.chiefComplaint || "None"}. Vitals: BP: ${appointment.vitals?.bloodPressure || "—"}, Temp: ${appointment.vitals?.temperature || "—"}. Notes: ${clinicalNotes || appointment.clinicalNotes || "None"}. Plan: ${appointment.treatmentPlan || "None"}.`;
+    const notesVal = `Chief Complaint: ${chiefComplaint || appointment.chiefComplaint || "None"}. Vitals: BP: ${vitals?.bp || appointment.vitals?.bloodPressure || "—"}, Temp: ${vitals?.temp || appointment.vitals?.temperature || "—"}. Notes: ${actualNotes || appointment.clinicalNotes || "None"}. Advice: ${advice || appointment.advice || "None"}.`;
 
     await Patient.findOneAndUpdate(
       { _id: appointment.patient._id, hospital: hospitalId },
@@ -1223,6 +1333,10 @@ export const completeConsultation = catchAsync(async (req: Request, res: Respons
     );
 
     await session.commitTransaction();
+    emitToHospital(hospitalId.toString(), "queue_updated", { doctorId: doctor._id, appointmentId, status: "completed" });
+    emitToHospital(hospitalId.toString(), "appointment_updated", { appointmentId, status: "completed" });
+    emitToHospital(hospitalId.toString(), "dashboard_update", { action: "complete_consultation", appointmentId });
+    emitToHospital(hospitalId.toString(), "consultation_completed", { doctorId: doctor._id, appointmentId });
     res.json({ status: "success", data: appointment, prescription });
   } catch (err) {
     await session.abortTransaction();
@@ -1493,19 +1607,18 @@ export const getMyPatients = catchAsync(async (req: Request, res: Response) => {
   const patientIdSet = new Set<string>(rawIds.map((id: any) => id.toString()));
   const patientIds = Array.from(patientIdSet).map((id) => new Types.ObjectId(id));
 
-  // Step 2: fetch the actual patient documents — scoped to hospital
+  // Step 2: fetch the actual patient documents — strictly scoped to this doctor
   const filter: Record<string, unknown> = {};
 
   if (hospitalId) {
     filter.hospital = hospitalId;
   }
 
-  if (patientIds.length > 0) {
-    filter.$or = [
-      { _id: { $in: patientIds } },
-      { assignedDoctor: { $in: doctorObjIds } },
-    ];
-  }
+  // Always scope patients to those assigned to or treated by this doctor
+  filter.$or = [
+    { _id: { $in: patientIds } },
+    { assignedDoctor: { $in: doctorObjIds } },
+  ];
 
   const searchStr = (search || "").trim();
   if (searchStr) {
@@ -1517,12 +1630,8 @@ export const getMyPatients = catchAsync(async (req: Request, res: Response) => {
         { uhid: new RegExp(escapedSearch, "i") },
       ],
     };
-    if (filter.$or) {
-      filter.$and = [{ $or: filter.$or }, searchFilter];
-      delete filter.$or;
-    } else {
-      filter.$or = searchFilter.$or;
-    }
+    filter.$and = [{ $or: filter.$or }, searchFilter];
+    delete filter.$or;
   }
 
   const patients = await Patient.find(filter)
@@ -1553,6 +1662,7 @@ export const getMyPatients = catchAsync(async (req: Request, res: Response) => {
 export const getMyPatientById = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
+  const doctorObjId = doctor._id;
   const patientIdParam = req.params.patientId;
   const patientId = Types.ObjectId.isValid(patientIdParam) ? new Types.ObjectId(patientIdParam) : null;
 
@@ -1592,41 +1702,149 @@ export const getMyPatientById = catchAsync(async (req: Request, res: Response) =
     });
   }
 
-  // Fetch comprehensive clinical records for this patient across all departments & tabs
-  const [appointments, prescriptions, labOrders, radiologyOrders, admissions, diagnosticReports] = await Promise.all([
-    Appointment.find(patientQuery).sort({ date: -1, createdAt: -1 }).limit(30),
-    Prescription.find(patientQuery).sort({ createdAt: -1 }).limit(30),
-    LabOrder.find(patientQuery).sort({ createdAt: -1 }).limit(30),
-    RadiologyOrder.find(patientQuery).sort({ createdAt: -1 }).limit(30),
-    Admission.find(patientQuery).sort({ admissionDate: -1, createdAt: -1 }).limit(20),
-    DiagnosticReport.find(patientQuery).sort({ createdAt: -1 }).limit(30),
+  // Fetch this doctor's clinical data for this patient
+  const [appointments, prescriptionsRaw, labOrdersRaw, radiologyOrdersRaw, admissions] = await Promise.all([
+    Appointment.find({ hospital: hospitalId || patient.hospital, ...patientQuery })
+      .sort({ date: -1 })
+      .limit(30),
+    Prescription.find({ hospital: hospitalId || patient.hospital, ...patientQuery })
+      .sort({ createdAt: -1 })
+      .limit(30),
+    LabOrder.find({ hospital: hospitalId || patient.hospital, ...patientQuery })
+      .sort({ createdAt: -1 })
+      .limit(30),
+    RadiologyOrder.find({ hospital: hospitalId || patient.hospital, ...patientQuery })
+      .sort({ createdAt: -1 })
+      .limit(30),
+    Admission.find({ hospital: hospitalId || patient.hospital, ...patientQuery })
+      .sort({ admissionDate: -1 })
+      .limit(20),
   ]);
 
-  // Combine lab orders with diagnostic reports if labOrders is empty or missing test items
-  const combinedLabOrders = [...labOrders];
-  diagnosticReports.forEach((report) => {
-    if (report.requestType === "Laboratory") {
-      combinedLabOrders.push({
-        _id: report._id,
-        orderNumber: report.testName,
-        tests: [{ name: report.testName }],
-        status: report.status,
-        createdAt: report.createdAt,
-      } as any);
+  // Deduplicate prescriptions by _id
+  const seenPrescriptionIds = new Set<string>();
+  const prescriptions: any[] = [];
+  for (const p of prescriptionsRaw) {
+    const obj = p.toObject();
+    const idStr = obj._id ? obj._id.toString() : "";
+    if (!idStr || !seenPrescriptionIds.has(idStr)) {
+      if (idStr) seenPrescriptionIds.add(idStr);
+      prescriptions.push({
+        ...obj,
+        medicines: obj.medications || [],
+      });
     }
+  }
+
+  // Fetch all DiagnosticReport records for this patient
+  const patientDiagnosticReports = await DiagnosticReport.find({ hospital: hospitalId, patient: patientId })
+    .populate("uploadedBy", "name")
+    .sort({ uploadedAt: -1, createdAt: -1 });
+
+  const processedLabReportIds = new Set<string>();
+
+  // For each LabOrder, find attached DiagnosticReport and files
+  const labOrders = labOrdersRaw.map((o) => {
+    const orderObj = o.toObject();
+    const report = patientDiagnosticReports.find((r) => {
+      if (processedLabReportIds.has(r._id.toString())) return false;
+      if (r.requestId && r.requestId.toString() === o._id.toString()) return true;
+      if (o.appointment && r.appointment && r.appointment.toString() === o.appointment.toString() && r.requestType === "Laboratory") return true;
+      if (r.requestType === "Laboratory" && r.testName && orderObj.tests && orderObj.tests.some((t: string) => t.toLowerCase() === r.testName.toLowerCase())) return true;
+      return false;
+    });
+
+    if (report) {
+      processedLabReportIds.add(report._id.toString());
+    }
+
+    const files = report?.files && report.files.length > 0
+      ? report.files
+      : (orderObj.attachments || []);
+
+    return {
+      ...orderObj,
+      report,
+      files,
+      observations: report?.observations || orderObj.rejectionReason || "",
+      remarks: report?.remarks || "",
+      status: report?.status ? report.status : orderObj.status,
+    };
   });
 
-  const combinedRadiology = [...radiologyOrders];
-  diagnosticReports.forEach((report) => {
-    if (report.requestType === "Radiology") {
-      combinedRadiology.push({
-        _id: report._id,
-        procedureName: report.testName,
-        status: report.status,
-        createdAt: report.createdAt,
+  // Synthesize ONLY standalone Laboratory DiagnosticReports not linked to any LabOrder
+  const labReports = patientDiagnosticReports.filter(r => r.requestType === "Laboratory" || (!r.requestType && r.testName));
+  for (const rep of labReports) {
+    if (!processedLabReportIds.has(rep._id.toString())) {
+      const repObj = rep.toObject();
+      labOrders.push({
+        _id: rep._id,
+        orderNumber: (rep as any).orderNumber || rep._id.toString().slice(-6),
+        tests: [rep.testName || "Laboratory Test"],
+        testName: rep.testName || "Laboratory Test",
+        status: rep.status || "report_uploaded",
+        report: repObj,
+        files: repObj.files || [],
+        observations: repObj.observations || repObj.remarks || "",
+        remarks: repObj.remarks || "",
+        createdAt: rep.createdAt || rep.uploadedAt,
       } as any);
+      processedLabReportIds.add(rep._id.toString());
     }
+  }
+
+  const processedRadReportIds = new Set<string>();
+
+  // For each RadiologyOrder, find attached DiagnosticReport and scan files
+  const radiologyOrders = radiologyOrdersRaw.map((o) => {
+    const orderObj = o.toObject();
+    const report = patientDiagnosticReports.find((r) => {
+      if (processedRadReportIds.has(r._id.toString())) return false;
+      if (r.requestId && r.requestId.toString() === o._id.toString()) return true;
+      if (o.appointment && r.appointment && r.appointment.toString() === o.appointment.toString() && r.requestType === "Radiology") return true;
+      if (r.requestType === "Radiology" && r.testName && orderObj.type && (r.testName.toLowerCase().includes(orderObj.type.toLowerCase()) || orderObj.type.toLowerCase().includes(r.testName.toLowerCase()))) return true;
+      return false;
+    });
+
+    if (report) {
+      processedRadReportIds.add(report._id.toString());
+    }
+
+    let files: any[] = report?.files && report.files.length > 0 ? (report.files as any[]) : [];
+    if (files.length === 0 && orderObj.resultsUrl) {
+      files = [{ secure_url: orderObj.resultsUrl, original_filename: `${orderObj.type || "Radiology Scan"} Report`, mime_type: "image/png", file_size: 0, public_id: "rad-scan" }];
+    }
+
+    return {
+      ...orderObj,
+      report,
+      files,
+      observations: report?.observations || orderObj.findings || orderObj.notes || "",
+      remarks: report?.remarks || "",
+      status: report?.status ? report.status : orderObj.status,
+    };
   });
+
+  // Synthesize ONLY standalone Radiology DiagnosticReports not linked to any RadiologyOrder
+  const radReports = patientDiagnosticReports.filter(r => r.requestType === "Radiology");
+  for (const rep of radReports) {
+    if (!processedRadReportIds.has(rep._id.toString())) {
+      const repObj = rep.toObject();
+      radiologyOrders.push({
+        _id: rep._id,
+        orderNumber: (rep as any).orderNumber || rep._id.toString().slice(-6),
+        type: rep.testName || "Radiology Scan",
+        procedureName: rep.testName || "Radiology Scan",
+        status: rep.status || "report_uploaded",
+        report: repObj,
+        files: repObj.files || [],
+        observations: repObj.observations || repObj.remarks || "",
+        remarks: repObj.remarks || "",
+        createdAt: rep.createdAt || rep.uploadedAt,
+      } as any);
+      processedRadReportIds.add(rep._id.toString());
+    }
+  }
 
   res.json({
     status: "success",
@@ -1634,8 +1852,8 @@ export const getMyPatientById = catchAsync(async (req: Request, res: Response) =
       patient,
       appointments,
       prescriptions,
-      labOrders: combinedLabOrders,
-      radiologyOrders: combinedRadiology,
+      labOrders,
+      radiologyOrders,
       admissions,
     },
   });
@@ -1768,22 +1986,33 @@ export const startConsultationSession = catchAsync(async (req: Request, res: Res
 
 export const getConsultationDraft = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
-  const { appointmentId } = req.params;
+  let targetApptId = req.params.appointmentId;
   const doctor = await getLoggedDoctor(req);
   const doctorObjIds = [doctor._id, (doctor as any).user, req.user?._id].filter(Boolean);
 
   let session = await ConsultationSession.findOne({
-    appointment: appointmentId,
+    appointment: targetApptId,
     hospital: hospitalId,
   }).sort({ createdAt: -1 });
 
   if (!session) {
-    const appointment = await Appointment.findOne({ _id: appointmentId, hospital: hospitalId, doctor: { $in: doctorObjIds } });
+    const qItem = await Queue.findOne({ _id: targetApptId, hospital: hospitalId });
+    if (qItem && qItem.appointment) {
+      targetApptId = qItem.appointment.toString();
+      session = await ConsultationSession.findOne({
+        appointment: targetApptId,
+        hospital: hospitalId,
+      }).sort({ createdAt: -1 });
+    }
+  }
+
+  if (!session) {
+    const appointment = await Appointment.findOne({ _id: targetApptId, hospital: hospitalId });
     if (appointment) {
       session = await ConsultationSession.create({
         hospital: hospitalId,
         patient: appointment.patient,
-        appointment: appointmentId,
+        appointment: appointment._id,
         doctor: doctor._id,
         status: appointment.status === "completed" ? "COMPLETED" : "IN_PROGRESS",
         vitals: appointment.vitals || {},
@@ -3121,6 +3350,161 @@ export const getConsultationHistory = catchAsync(async (req: Request, res: Respo
       status: session.status,
     },
   });
+});
+
+export const addInpatientLabOrders = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const targetId = req.params.id;
+  const { tests, priority } = req.body;
+  const doctor = await getLoggedDoctor(req);
+
+  const activeAdmission = await findActiveAdmission(hospitalId, targetId);
+  if (!activeAdmission) {
+    throw new AppError("No active inpatient admission found or unauthorized.", 403);
+  }
+
+  const testsList = Array.isArray(tests) ? tests : (tests ? [tests] : []);
+  if (testsList.length === 0) {
+    throw new AppError("At least one lab test must be selected.", 400);
+  }
+
+  const targetBranch = activeAdmission.branch || doctor.branch || req.hospitalFilter?.branch || null;
+
+  let labOrder = await LabOrder.findOne({
+    hospital: hospitalId,
+    patient: activeAdmission.patient,
+    admission: activeAdmission._id,
+    status: "pending"
+  });
+
+  if (labOrder) {
+    labOrder.tests = Array.from(new Set([...(labOrder.tests || []), ...testsList]));
+    if (priority === "STAT" || (priority === "Urgent" && labOrder.priority !== "STAT")) {
+      labOrder.priority = priority;
+    }
+    await labOrder.save();
+  } else {
+    labOrder = await LabOrder.create({
+      hospital: hospitalId,
+      branch: targetBranch,
+      patient: activeAdmission.patient,
+      admission: activeAdmission._id,
+      doctor: doctor._id,
+      tests: testsList,
+      priority: priority || "Routine",
+      sampleStatus: "Pending",
+      status: "pending"
+    });
+  }
+
+  await DbNotification.create({
+    hospital: hospitalId,
+    title: "New IP Pathology Lab Order",
+    message: `New IP lab order created by Dr. ${doctor.name} for patient (IP No: ${activeAdmission.admissionNumber}): ${testsList.join(", ")}`,
+    type: "lab_request",
+    recipientRole: "lab_technician",
+    severity: priority === "STAT" ? "high" : "info",
+    link: `/pathology/orders`
+  });
+
+  emitToHospital(hospitalId.toString(), "new_lab_order", {
+    labOrderId: labOrder._id,
+    patientId: activeAdmission.patient,
+    admissionId: activeAdmission._id
+  });
+
+  activeAdmission.timeline.push({
+    date: new Date(),
+    time: new Date().toTimeString().split(" ")[0].substring(0, 5),
+    userName: doctor.name,
+    userRole: "doctor",
+    eventType: "lab_request",
+    description: `Lab orders prescribed: ${testsList.join(", ")}`
+  });
+  await activeAdmission.save();
+
+  res.json({ status: "success", message: "Lab orders prescribed and synced to Pathology Dashboard!", data: activeAdmission });
+});
+
+export const addInpatientRadiologyOrders = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
+  const targetId = req.params.id;
+  const { scans, type, notes, priority } = req.body;
+  const doctor = await getLoggedDoctor(req);
+
+  const activeAdmission = await findActiveAdmission(hospitalId, targetId);
+  if (!activeAdmission) {
+    throw new AppError("No active inpatient admission found or unauthorized.", 403);
+  }
+
+  const scansList = Array.isArray(scans) ? scans : (type ? [type] : []);
+  if (scansList.length === 0) {
+    throw new AppError("At least one radiology scan must be selected.", 400);
+  }
+
+  const targetBranch = activeAdmission.branch || doctor.branch || req.hospitalFilter?.branch || null;
+
+  let order = await RadiologyOrder.findOne({
+    hospital: hospitalId,
+    patient: activeAdmission.patient,
+    admission: activeAdmission._id,
+    status: "pending"
+  });
+
+  if (order) {
+    const existingScans = order.scans || [];
+    for (const s of scansList) {
+      if (!existingScans.includes(s)) existingScans.push(s);
+    }
+    order.scans = existingScans;
+    order.type = existingScans.join(", ");
+    if (notes) order.notes = order.notes ? `${order.notes}; ${notes}` : notes;
+    if (priority === "STAT" || (priority === "Urgent" && order.priority !== "STAT")) {
+      order.priority = priority;
+    }
+    await order.save();
+  } else {
+    order = await RadiologyOrder.create({
+      hospital: hospitalId,
+      branch: targetBranch,
+      patient: activeAdmission.patient,
+      admission: activeAdmission._id,
+      doctor: doctor._id,
+      scans: scansList,
+      type: scansList.join(", "),
+      notes: notes || "",
+      priority: priority || "Routine",
+      status: "pending"
+    });
+  }
+
+  await DbNotification.create({
+    hospital: hospitalId,
+    title: "New IP Radiology Order",
+    message: `New IP radiology order created by Dr. ${doctor.name} for patient (IP No: ${activeAdmission.admissionNumber}): ${scansList.join(", ")}`,
+    type: "radiology_request",
+    recipientRole: "radiologist",
+    severity: priority === "STAT" ? "high" : "info",
+    link: `/radiology/orders`
+  });
+
+  emitToHospital(hospitalId.toString(), "new_radiology_order", {
+    radiologyOrderId: order._id,
+    patientId: activeAdmission.patient,
+    admissionId: activeAdmission._id
+  });
+
+  activeAdmission.timeline.push({
+    date: new Date(),
+    time: new Date().toTimeString().split(" ")[0].substring(0, 5),
+    userName: doctor.name,
+    userRole: "doctor",
+    eventType: "radiology_request",
+    description: `Radiology scans ordered: ${scansList.join(", ")}`
+  });
+  await activeAdmission.save();
+
+  res.json({ status: "success", message: "Radiology orders prescribed and synced to Radiology Dashboard!", data: activeAdmission });
 });
 
 

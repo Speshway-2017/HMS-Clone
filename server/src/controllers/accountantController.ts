@@ -10,6 +10,20 @@ import { Expense } from "../models/Expense";
 import { InsuranceClaim } from "../models/InsuranceClaim";
 import { User } from "../models/User";
 import { emitToHospital } from "../config/socket";
+import { z } from "zod";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+} from "../utils/validators";
+
+const expenseSchema = z.object({
+  category: requiredTrimmedString("Category", 1, 50),
+  amount: z.coerce.number({ invalid_type_error: "Amount must be a number" }).positive("Amount must be positive").max(100000000, "Amount cannot exceed 100,000,000"),
+  recipient: requiredTrimmedString("Recipient", 1, 100),
+  description: optionalTrimmedString("Description", 500),
+  paymentMethod: optionalTrimmedString("Payment method", 50, "Cash"),
+  date: z.coerce.date().optional(),
+});
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -684,13 +698,13 @@ export const getAccountantDashboard = catchAsync(async (req: Request, res: Respo
     allBucket: boolean
   ) {
     const method = pmt.paymentMethod || "Cash";
-    const amt = pmt.amount || 0;
+    const amt = Number(pmt.amount) || 0;
     const md = pmt.mixedDetails;
 
     if (method === "Mixed" && md) {
-      const cash = md.cashAmount || 0;
-      const upi = md.upiAmount || 0;
-      const card = md.cardAmount || 0;
+      const cash = Number(md.cashAmount) || 0;
+      const upi = Number(md.upiAmount) || 0;
+      const card = Number(md.cardAmount) || 0;
       if (todayBucket) { todayCash += cash; todayUPI += upi; todayCard += card; }
       if (allBucket) { allCash += cash; allUPI += upi; allCard += card; }
     } else {
@@ -703,7 +717,7 @@ export const getAccountantDashboard = catchAsync(async (req: Request, res: Respo
   }
 
   for (const p of opPaymentsAgg) {
-    const amt = p.amount || 0;
+    const amt = Number(p.amount) || 0;
     const paidAt = new Date(p.paidAt);
     const today = isToday(paidAt);
     const btype: string = p.billingType || "OTHER";
@@ -721,7 +735,7 @@ export const getAccountantDashboard = catchAsync(async (req: Request, res: Respo
   }
 
   for (const p of ipPaymentsAgg) {
-    const amt = p.amount || 0;
+    const amt = Number(p.amount) || 0;
     const paidAt = new Date(p.paidAt);
     const today = isToday(paidAt);
 

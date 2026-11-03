@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { Staff, STAFF_DUTY_STATUSES } from "../models/Staff";
 import { User } from "../models/User";
@@ -8,17 +8,48 @@ import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { generateTempPassword, generateUniqueEmployeeId } from "../utils/idGenerator";
 import { getPagination, paginatedResponse } from "../utils/pagination";
+import {
+  requiredTrimmedString,
+  optionalTrimmedString,
+  emailValidator,
+  phoneValidator,
+  tenDigitPhoneValidator,
+  urlValidator,
+  numberValidator,
+} from "../utils/validators";
 
 const staffSchema = z.object({
   department: z.string().optional().nullable(),
-  name: z.string().min(1),
+  name: z
+    .string({ invalid_type_error: "Full Name must be a string" })
+    .trim()
+    .min(2, "Full Name is required and must be at least 2 characters")
+    .max(100, "Full Name cannot exceed 100 characters")
+    .regex(/^[a-zA-Z\s\.\-']+$/, "Full Name should contain only letters, dots, hyphens, and spaces"),
   gender: z.string().min(1, "Gender is required").default("Male"),
-  email: z.string().optional().default(""),
-  phone: z.string().optional().default(""),
-  photoUrl: z.string().optional().default(""),
-  role: z.string().optional().default(""),
-  employeeId: z.string().optional().default(""),
-  qualifications: z.string().optional().default(""),
+  email: emailValidator("Email Address", false, 100),
+  phone: tenDigitPhoneValidator("Phone Number", false),
+  photoUrl: z.string().max(500, "Photo URL cannot exceed 500 characters").optional().default(""),
+  role: z.string().min(1, "Role is required").max(50),
+  employeeId: z
+    .string()
+    .max(50, "Employee ID cannot exceed 50 characters")
+    .optional()
+    .refine((val) => !val || (/^[A-Za-z0-9\-_]+$/.test(val) && val.trim().length >= 2), {
+      message: "Employee ID must contain only letters, numbers, hyphens, and underscores",
+    })
+    .default(""),
+  qualifications: z
+    .string()
+    .max(100, "Qualifications / Certifications cannot exceed 100 characters")
+    .optional()
+    .refine(
+      (val) => !val || (/^[a-zA-Z0-9\s\.\-/'&,()]+$/.test(val) && /[a-zA-Z]/.test(val) && val.trim().length >= 2),
+      {
+        message: "Qualifications / Certifications contains invalid data. Please enter valid data",
+      }
+    )
+    .default(""),
   dateOfJoining: z.coerce.date().optional().nullable(),
   dutyStatus: z.enum(STAFF_DUTY_STATUSES).optional(),
   checkInTime: z.string().optional().default(""),
@@ -275,6 +306,9 @@ export const getStaffMember = catchAsync(async (req: Request, res: Response) => 
 });
 
 export const updateStaff = catchAsync(async (req: Request, res: Response) => {
+  if (req.body.employeeId !== undefined && !req.body.employeeId.trim()) {
+    throw new AppError("Employee ID is required. Please enter valid data", 400);
+  }
   const body = staffSchema.partial().parse(req.body);
   const staff = await Staff.findOneAndUpdate({ _id: req.params.id, ...req.hospitalFilter }, body, {
     new: true,
@@ -337,4 +371,3 @@ export const getStaffProfileMe = catchAsync(async (req: Request, res: Response) 
 
   res.json({ status: "success", data: { staff } });
 });
-

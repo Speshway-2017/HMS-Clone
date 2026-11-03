@@ -6,7 +6,7 @@ import {
   Search, Filter, Download, Phone, Mail, MessageSquare,
   Eye, Printer, CreditCard, Clock, Calendar, ChevronDown,
   X, RefreshCw, ChevronLeft, ChevronRight, FileText,
-  CheckCircle2, ArrowUpRight, BanknoteIcon
+  CheckCircle2, ArrowUpRight, BanknoteIcon, Copy
 } from "lucide-react";
 import { usePendingOverdue, PendingOverdueItem } from "../../features/invoices";
 import { useDepartments } from "../../features/departments";
@@ -14,8 +14,11 @@ import { useDoctors } from "../../features/doctors";
 import { useBranches } from "../../features/branches";
 import { formatINR } from "../../lib/currency";
 import { Badge } from "../../components/ui/Badge";
+import { Modal } from "../../components/ui/Modal";
+import { Button } from "../../components/ui/Button";
 import { socket } from "../../lib/socket";
 import { useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 
 const STATUS_CONFIG = {
   pending: { tone: "warning" as const, label: "Pending", bg: "bg-amber-50 border-amber-200 text-amber-800" },
@@ -34,18 +37,34 @@ const BILLING_TYPE_LABELS: Record<string, string> = {
   OTHER: "Other",
 };
 
-function SummaryKpi({ label, value, sub, icon, accentClass }: {
-  label: string; value: string; sub?: string; icon: React.ReactNode; accentClass: string;
+function SummaryKpi({ label, value, sub, icon, accentClass, onClick }: {
+  label: string; value: string; sub?: string; icon: React.ReactNode; accentClass: string; onClick?: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = value.length > 15;
+
   return (
-    <div className={`relative bg-white rounded-2xl border shadow-sm p-4 flex items-start gap-4 overflow-hidden`}>
-      <div className={`flex-shrink-0 h-11 w-11 rounded-xl flex items-center justify-center ${accentClass}`}>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => {
+        if (onClick) onClick();
+        else if (isLong) setExpanded(!expanded);
+      }}
+      className="relative bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 flex items-start gap-3.5 overflow-hidden cursor-pointer hover:border-slate-350 transition-all"
+      title={`${label}: ${value} (Click to show complete amount)`}
+    >
+      <div className={`flex-shrink-0 h-10 w-10 sm:h-11 sm:w-11 rounded-xl flex items-center justify-center ${accentClass}`}>
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">{label}</p>
-        <p className="text-xl font-black text-slate-900 mt-0.5 truncate">{value}</p>
-        {sub && <p className="text-[11px] text-slate-400 mt-0.5 truncate">{sub}</p>}
+        <p className="text-[11px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wide leading-tight whitespace-normal break-words" title={label}>
+          {label}
+        </p>
+        <p className={`font-black text-slate-900 mt-1 ${expanded ? "text-base sm:text-lg break-all whitespace-normal" : "text-lg sm:text-xl truncate"}`}>
+          {value}
+        </p>
+        {sub && <p className="text-[11px] text-slate-400 mt-0.5 leading-tight truncate">{sub}</p>}
       </div>
     </div>
   );
@@ -318,6 +337,7 @@ export function PendingOverduePage() {
   const [branch, setBranch] = useState("");
   const [selectedItem, setSelectedItem] = useState<PendingOverdueItem | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedMetric, setSelectedMetric] = useState<{ label: string; value: string; description: string } | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
 
   // Debounce search
@@ -367,6 +387,21 @@ export function PendingOverduePage() {
 
   const hasActiveFilters = !!(dateFrom || dateTo || department || doctor || billingType || status || branch || search || uhid);
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      await refetch();
+      toast.success("Pending and overdue page data refreshed successfully", { id: "pending-overdue-refreshed" });
+    } catch {
+      toast.error("Failed to refresh pending and overdue data", { id: "pending-overdue-refresh-err" });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const clearFilters = () => {
     setDateFrom(""); setDateTo(""); setDepartment(""); setDoctor("");
     setBillingType(""); setStatus(""); setBranch(""); setSearch(""); setUhid("");
@@ -404,13 +439,17 @@ export function PendingOverduePage() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => refetch()}
-            className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg transition"
+            onClick={handleRefresh}
+            disabled={isRefreshing || isLoading}
+            aria-label="Refresh Pending and Overdue Data"
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg transition disabled:opacity-60"
           >
-            <RefreshCw className="h-3.5 w-3.5" /> Refresh
+            <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing || isLoading ? "animate-spin" : ""}`} />
+            Refresh
           </button>
           <button
             onClick={exportCSV}
+            aria-label="Export CSV"
             className="flex items-center gap-1.5 text-xs font-bold text-white bg-navy-700 hover:bg-navy-800 px-3 py-2 rounded-lg transition shadow"
           >
             <Download className="h-3.5 w-3.5" /> Export CSV
@@ -442,7 +481,7 @@ export function PendingOverduePage() {
           accentClass="bg-red-50 text-red-600"
         />
         <SummaryKpi
-          label="Today's Collections"
+          label="Today's Collection"
           value={summary ? formatINR(summary.todayCollection) : "—"}
           sub={new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
           icon={<BanknoteIcon className="h-5 w-5 text-emerald-600" />}

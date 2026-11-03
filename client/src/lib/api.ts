@@ -1,11 +1,58 @@
 import axios from "axios";
 import { tokenStorage } from "./tokenStorage";
 
+export const getBaseUrl = (): string => {
+  if (typeof window !== "undefined") {
+    const customUrl = localStorage.getItem("hms_custom_api_url");
+    if (customUrl && typeof customUrl === "string" && customUrl.trim()) {
+      const trimmed = customUrl.trim();
+      return trimmed.endsWith("/api/v1") ? trimmed : `${trimmed.replace(/\/$/, "")}/api/v1`;
+    }
+    const hmsConfigUrl = (window as any).HMS_CONFIG?.apiUrl;
+    if (hmsConfigUrl && typeof hmsConfigUrl === "string" && hmsConfigUrl.trim()) {
+      const trimmed = hmsConfigUrl.trim();
+      return trimmed.endsWith("/api/v1") ? trimmed : `${trimmed.replace(/\/$/, "")}/api/v1`;
+    }
+  }
+
+  const envUrl = (import.meta as any).env?.VITE_API_URL;
+  if (envUrl && typeof envUrl === "string" && envUrl.trim() !== "") {
+    const trimmed = envUrl.trim();
+    return trimmed.endsWith("/api/v1") ? trimmed : `${trimmed.replace(/\/$/, "")}/api/v1`;
+  }
+
+  return "http://127.0.0.1:5000/api/v1";
+};
+
+export const API_BASE_URL = getBaseUrl();
+
 export const api = axios.create({
-  baseURL: "/api/v1",
+  baseURL: API_BASE_URL,
+  timeout: 15000,
 });
 
+export function setCustomApiUrl(rawUrl: string): string {
+  let cleanUrl = rawUrl.trim();
+  if (cleanUrl) {
+    if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+      cleanUrl = `http://${cleanUrl}`;
+    }
+    const fullApiUrl = cleanUrl.endsWith("/api/v1") ? cleanUrl : `${cleanUrl.replace(/\/$/, "")}/api/v1`;
+    localStorage.setItem("hms_custom_api_url", fullApiUrl);
+    api.defaults.baseURL = fullApiUrl;
+    return fullApiUrl;
+  } else {
+    localStorage.removeItem("hms_custom_api_url");
+    const defaultUrl = getBaseUrl();
+    api.defaults.baseURL = defaultUrl;
+    return defaultUrl;
+  }
+}
+
 api.interceptors.request.use((config) => {
+  if (config.url?.includes("/auth/login")) {
+    console.log(`[HMS API] Sending login request to ${config.baseURL || ""}${config.url}`);
+  }
   const token = tokenStorage.get();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -17,8 +64,6 @@ api.interceptors.request.use((config) => {
   } else if (activeBranchId === "main") {
     config.headers["X-Branch-ID"] = "main";
   }
-  // "all" is intentionally NOT forwarded — admin in "All Branches" mode gets the
-  // unfiltered hospital-wide query on GETs; POST/PATCH/DELETE must set a branch explicitly.
   return config;
 });
 
@@ -37,8 +82,16 @@ const processQueue = (error: any, token: string | null = null) => {
 };
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.config.url?.includes("/auth/login")) {
+      console.log(`[HMS API] Login response received: HTTP ${response.status}`);
+    }
+    return response;
+  },
   async (error) => {
+    if (error.config?.url?.includes("/auth/login")) {
+      console.warn(`[HMS API] Login request failed: HTTP ${error.response?.status || "Network/Timeout Error"} - ${error.message}`);
+    }
     const originalRequest = error.config;
 
     // Auto refresh token on 401 Unauthorized (unless request is login or refresh itself)
