@@ -19,6 +19,7 @@ interface WrapperProps {
   error?: string | null;
   charCount?: number;
   maxLength?: number;
+  minCharCount?: number;
   rightElement?: ReactNode;
   children: ReactNode;
 }
@@ -30,12 +31,14 @@ export function FieldWrapper({
   error,
   charCount,
   maxLength,
+  minCharCount,
   rightElement,
   children,
 }: WrapperProps) {
   const cleanLabel = (label || "").replace(/[\s\*\^]+$/, "").trim();
   const isOverLimit = maxLength !== undefined && charCount !== undefined && charCount > maxLength;
   const isNearLimit = maxLength !== undefined && charCount !== undefined && charCount >= maxLength * 0.9;
+  const isUnderMin = minCharCount !== undefined && charCount !== undefined && charCount > 0 && charCount < minCharCount;
 
   return (
     <div>
@@ -52,11 +55,24 @@ export function FieldWrapper({
                   ? "text-red-600 font-bold"
                   : isNearLimit
                   ? "text-amber-600 font-medium"
+                  : isUnderMin
+                  ? "text-amber-600 font-medium"
                   : "text-slate-400"
               }`}
-              title={isOverLimit ? "Exceeds maximum character limit" : undefined}
+              title={
+                isOverLimit
+                  ? "Exceeds maximum character limit"
+                  : minCharCount
+                  ? `Min: ${minCharCount}, Max: ${maxLength}`
+                  : undefined
+              }
             >
-              {charCount ?? 0}/{maxLength}
+              <span>{charCount ?? 0}/{maxLength}</span>
+              {minCharCount !== undefined && (
+                <span className="ml-1 text-[10px] text-slate-400 font-sans font-medium">
+                  (Min: {minCharCount})
+                </span>
+              )}
             </span>
           )}
           {rightElement}
@@ -81,6 +97,9 @@ export interface InputFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   rightElement?: ReactNode;
   inputRightElement?: ReactNode;
   showCharCount?: boolean;
+  charCount?: number;
+  maxCharCount?: number;
+  minCharCount?: number;
 }
 
 export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
@@ -100,6 +119,9 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
       value,
       defaultValue,
       showCharCount,
+      charCount: propCharCount,
+      maxCharCount,
+      minCharCount,
       ...props
     },
     ref
@@ -113,12 +135,21 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
       props.type === "email" || /email/i.test(label || "") || /email/i.test(props.name || "");
 
     const effectiveMaxLength =
-      maxLength !== undefined
+      maxCharCount !== undefined
+        ? maxCharCount
+        : maxLength !== undefined
         ? maxLength
         : isPhoneField
         ? MAX_LENGTHS.PHONE
         : isEmailField
         ? MAX_LENGTHS.EMAIL
+        : undefined;
+
+    const effectiveMinLength =
+      minCharCount !== undefined
+        ? minCharCount
+        : props.minLength !== undefined
+        ? props.minLength
         : undefined;
 
     const [touched, setTouched] = useState(false);
@@ -128,22 +159,24 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
     );
 
     const currentVal = value !== undefined ? String(value) : internalValue;
-    const charCount = currentVal.length;
+    const charCount = currentVal ? currentVal.length : (propCharCount ?? 0);
 
     const cleanLabel = (label || "").replace(/[\s\*\^]+$/, "").trim();
 
     let autoError: string | null = null;
     if (effectiveMaxLength && charCount > effectiveMaxLength) {
       autoError = isPhoneField
-        ? `${cleanLabel} cannot exceed ${effectiveMaxLength} digits. Please enter valid data`
-        : `${cleanLabel} cannot exceed ${effectiveMaxLength} characters. Please enter valid data`;
+        ? `${cleanLabel} cannot exceed ${effectiveMaxLength} digits. Too long text is not accepted. Please enter valid data`
+        : `${cleanLabel} cannot exceed ${effectiveMaxLength} characters. Too long text is not accepted. Please enter valid data`;
     } else if (touched) {
       if (required && !currentVal.trim()) {
-        autoError = `${cleanLabel} is required. Please fill out this field`;
+        autoError = `${cleanLabel} is required. Field is required. Please fill out this field`;
+      } else if (effectiveMinLength && currentVal.trim() && currentVal.trim().length < effectiveMinLength) {
+        autoError = `${cleanLabel} must be at least ${effectiveMinLength} characters. Value must be at least ${effectiveMinLength} characters. Too short text is not accepted. Minimum characters required: ${effectiveMinLength}. Please enter valid data`;
       } else if (isEmailField && currentVal.trim() && !isValidEmail(currentVal)) {
-        autoError = "Please enter a valid email address. Please enter valid data";
+        autoError = "Please enter a valid email address. Invalid data is not accepted. Please enter valid data";
       } else if (isPhoneField && currentVal.trim() && !isValidPhone(currentVal)) {
-        autoError = "Please enter a valid 10-digit phone number. Please enter valid data";
+        autoError = "Please enter a valid 10-digit phone number. Invalid data is not accepted. Please enter valid data";
       }
     }
 
@@ -167,7 +200,7 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
       if (isPhoneField) {
         if (!allowedNavKeys.includes(e.key) && !e.ctrlKey && !e.metaKey && !/^[0-9]$/.test(e.key)) {
           e.preventDefault();
-          const digitOnlyMsg = "Invalid phone number. Phone Number should accept 10 digits only. Please enter valid data";
+          const digitOnlyMsg = "Invalid phone number. Phone Number should accept 10 digits only. Invalid data is not accepted. Please enter valid data";
           setKeyLimitError(digitOnlyMsg);
           toast.error(digitOnlyMsg, { id: `${cleanLabel}-digit-only` });
           if (onKeyDown) onKeyDown(e);
@@ -181,8 +214,8 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
         if (!hasSelection && currentVal.length >= effectiveMaxLength) {
           e.preventDefault();
           const limitMsg = isPhoneField
-            ? `${cleanLabel} cannot exceed ${effectiveMaxLength} digits. Please enter valid data`
-            : `${cleanLabel} cannot exceed ${effectiveMaxLength} characters. Please enter valid data`;
+            ? `${cleanLabel} cannot exceed ${effectiveMaxLength} digits. Too long text is not accepted. Please enter valid data`
+            : `${cleanLabel} cannot exceed ${effectiveMaxLength} characters. Too long text is not accepted. Please enter valid data`;
           setKeyLimitError(limitMsg);
           toast.error(limitMsg, { id: `${cleanLabel}-limit-exceeded` });
           if (onKeyDown) onKeyDown(e);
@@ -227,6 +260,7 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
         hint={hint}
         error={activeError}
         charCount={charCount}
+        minCharCount={effectiveMinLength}
         maxLength={
           showCharCount !== false && effectiveMaxLength && props.type !== "number"
             ? effectiveMaxLength
@@ -237,6 +271,8 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
         <div className="relative flex items-center">
           <input
             ref={ref}
+            minLength={effectiveMinLength}
+            maxLength={props.type !== "number" ? effectiveMaxLength : undefined}
             className={`${fieldClasses} ${borderStyle} ${inputRightElement ? "pr-8" : ""} ${className}`}
             required={required}
             value={value}
@@ -294,6 +330,9 @@ export interface TextareaFieldProps extends TextareaHTMLAttributes<HTMLTextAreaE
   error?: string | null;
   rightElement?: ReactNode;
   showCharCount?: boolean;
+  charCount?: number;
+  maxCharCount?: number;
+  minCharCount?: number;
 }
 
 export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>(
@@ -312,10 +351,20 @@ export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>
       value,
       defaultValue,
       showCharCount,
+      charCount: propCharCount,
+      maxCharCount,
+      minCharCount,
       ...props
     },
     ref
   ) => {
+    const effectiveMaxLength = maxCharCount !== undefined ? maxCharCount : maxLength;
+    const effectiveMinLength =
+      minCharCount !== undefined
+        ? minCharCount
+        : props.minLength !== undefined
+        ? props.minLength
+        : undefined;
     const [touched, setTouched] = useState(false);
     const [keyLimitError, setKeyLimitError] = useState<string | null>(null);
     const [internalValue, setInternalValue] = useState(
@@ -323,14 +372,18 @@ export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>
     );
 
     const currentVal = value !== undefined ? String(value) : internalValue;
-    const charCount = currentVal.length;
+    const charCount = currentVal ? currentVal.length : (propCharCount ?? 0);
     const cleanLabel = (label || "").replace(/[\s\*\^]+$/, "").trim();
 
     let autoError: string | null = null;
-    if (maxLength && charCount > maxLength) {
-      autoError = `${cleanLabel} cannot exceed ${maxLength} characters. Please enter valid data`;
-    } else if (touched && required && !currentVal.trim()) {
-      autoError = `${cleanLabel} is required. Please fill out this field`;
+    if (effectiveMaxLength && charCount > effectiveMaxLength) {
+      autoError = `${cleanLabel} cannot exceed ${effectiveMaxLength} characters. Too long text is not accepted. Please enter valid data`;
+    } else if (touched) {
+      if (required && !currentVal.trim()) {
+        autoError = `${cleanLabel} is required. Field is required. Please fill out this field`;
+      } else if (effectiveMinLength && currentVal.trim() && currentVal.trim().length < effectiveMinLength) {
+        autoError = `${cleanLabel} must be at least ${effectiveMinLength} characters. Value must be at least ${effectiveMinLength} characters. Too short text is not accepted. Minimum characters required: ${effectiveMinLength}. Please enter valid data`;
+      }
     }
 
     const activeError = propError !== undefined ? (propError || keyLimitError) : (keyLimitError || autoError);
@@ -355,7 +408,7 @@ export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>
         const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
         if (!hasSelection && currentVal.length >= maxLength) {
           e.preventDefault();
-          const limitMsg = `${cleanLabel} cannot exceed ${maxLength} characters. Please enter valid data`;
+          const limitMsg = `${cleanLabel} cannot exceed ${maxLength} characters. Too long text is not accepted. Please enter valid data`;
           setKeyLimitError(limitMsg);
           toast.error(limitMsg, { id: `${cleanLabel}-limit-exceeded` });
           if (onKeyDown) onKeyDown(e);
@@ -393,11 +446,14 @@ export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>
         hint={hint}
         error={activeError}
         charCount={charCount}
-        maxLength={showCharCount !== false ? maxLength : undefined}
+        minCharCount={effectiveMinLength}
+        maxLength={showCharCount !== false ? effectiveMaxLength : undefined}
         rightElement={rightElement}
       >
         <textarea
           ref={ref}
+          minLength={effectiveMinLength}
+          maxLength={effectiveMaxLength}
           className={`${fieldClasses} ${borderStyle} ${className}`}
           required={required}
           value={value}

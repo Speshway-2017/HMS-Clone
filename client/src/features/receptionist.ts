@@ -277,7 +277,7 @@ export function useReceptionQueue(date?: string) {
       const res = await api.get<{ data: { tokens: QueueToken[] } }>("/reception/queues/today", {
         params: { date }
       });
-      return res.data.data.tokens;
+      return res.data?.data?.tokens ?? (res.data as any)?.tokens ?? [];
     },
     refetchInterval: 10000 // Poll queue every 10 seconds for TV updates
   });
@@ -405,6 +405,8 @@ export function useAdmitPatient() {
       queryClient.invalidateQueries({ queryKey: ["reception", "admissions"] });
       queryClient.invalidateQueries({ queryKey: ["reception", "rooms"] });
       queryClient.invalidateQueries({ queryKey: ["reception", "stats"] });
+      queryClient.invalidateQueries({ queryKey: ["beds"] });
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
     }
   });
 }
@@ -419,6 +421,8 @@ export function useTransferPatient() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reception", "admissions"] });
       queryClient.invalidateQueries({ queryKey: ["reception", "rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["beds"] });
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
     }
   });
 }
@@ -434,6 +438,8 @@ export function useRequestDischarge() {
       queryClient.invalidateQueries({ queryKey: ["reception", "admissions"] });
       queryClient.invalidateQueries({ queryKey: ["reception", "rooms"] });
       queryClient.invalidateQueries({ queryKey: ["reception", "stats"] });
+      queryClient.invalidateQueries({ queryKey: ["beds"] });
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
     }
   });
 }

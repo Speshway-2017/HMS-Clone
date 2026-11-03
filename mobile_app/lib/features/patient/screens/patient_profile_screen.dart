@@ -1,3 +1,4 @@
+import '../../legal/widgets/permission_disclosure_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -265,6 +266,103 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     }
   }
 
+  Future<void> _handleDeleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: AppColors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Row(
+            children: const [
+              Icon(Icons.warning_amber_rounded, color: AppColors.errorRed, size: 24),
+              SizedBox(width: 10),
+              Text(
+                'Delete Account',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.slate900,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text(
+                'Are you sure you want to permanently delete your patient account?',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.slate800,
+                ),
+              ),
+              SizedBox(height: 10),
+              Text(
+                '• Your email credentials and login sessions will be immediately and irreversibly destroyed.\n'
+                '• You will no longer be able to access this portal or your self-service appointment drafts.\n'
+                '• Pursuant to healthcare compliance laws, past diagnostic and treatment records are archived per hospital retention regulations.',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: AppColors.slate600,
+                  height: 1.45,
+                ),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'This action cannot be undone.',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.errorRed,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel', style: TextStyle(color: AppColors.slate500)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.errorRed,
+                foregroundColor: AppColors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Permanently Delete', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(
+          child: CircularProgressIndicator(color: AppColors.errorRed),
+        ),
+      );
+
+      await AuthService().deleteAccount();
+
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading indicator
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Your account has been deleted successfully.'),
+          backgroundColor: AppColors.slate800,
+        ),
+      );
+      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
+    }
+  }
+
   Future<void> _updatePhotoAndSession(String photoUrl) async {
     final cleanUrl = photoUrl.trim();
     if (cleanUrl.isEmpty) return;
@@ -299,6 +397,18 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
 
   // --- CAMERA / GALLERY PHOTO PICKER & CLOUDINARY UPLOAD ---
   Future<void> _pickAndUploadPhoto(ImageSource source) async {
+    final isCamera = source == ImageSource.camera;
+    final proceed = await PermissionDisclosureDialog.show(
+      context,
+      title: isCamera ? 'Camera Access Required' : 'Photo Gallery Access',
+      permissionType: isCamera ? 'Camera' : 'Photos & Media',
+      purposeDescription: isCamera
+          ? 'HMS Enterprise requires camera access so you can take an identification photo for your hospital profile and medical charts.'
+          : 'HMS Enterprise requires photo access to let you select an identification picture for your hospital profile.',
+      icon: isCamera ? Icons.camera_alt_rounded : Icons.photo_library_rounded,
+    );
+    if (!proceed) return;
+
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: source,
@@ -819,6 +929,115 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                                   ),
                                 ],
                               ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Legal & Compliance Policies Card
+                    _buildCardContainer(
+                      title: 'Legal & Compliance',
+                      icon: Icons.gavel_rounded,
+                      accentColor: AppColors.navy700,
+                      child: Column(
+                        children: [
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.navy50,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.shield_outlined, color: AppColors.navy700, size: 20),
+                            ),
+                            title: const Text(
+                              'Privacy Policy',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.slate800),
+                            ),
+                            subtitle: const Text(
+                              'Data safety, HIPAA & encryption disclosures',
+                              style: TextStyle(fontSize: 11, color: AppColors.slate500),
+                            ),
+                            trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.slate400),
+                            onTap: () => Navigator.pushNamed(context, AppRoutes.privacyPolicy),
+                          ),
+                          const Divider(color: AppColors.slate100),
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.navy50,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.description_outlined, color: AppColors.navy700, size: 20),
+                            ),
+                            title: const Text(
+                              'Terms & Conditions',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.slate800),
+                            ),
+                            subtitle: const Text(
+                              'Emergency disclaimer & user agreement',
+                              style: TextStyle(fontSize: 11, color: AppColors.slate500),
+                            ),
+                            trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.slate400),
+                            onTap: () => Navigator.pushNamed(context, AppRoutes.termsConditions),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Danger Zone / Account Deletion Card
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFFEE2E2), width: 1.5),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.warning_amber_rounded, color: AppColors.errorRed, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Account Management & Deletion',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.slate900,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Permanently deactivate your patient profile and erase your login credentials in accordance with Google Play Data Safety standards.',
+                            style: TextStyle(fontSize: 11, color: AppColors.slate500, height: 1.4),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppColors.errorRed, width: 1.5),
+                                foregroundColor: AppColors.errorRed,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: _handleDeleteAccount,
+                              icon: const Icon(Icons.delete_forever_rounded, size: 18),
+                              label: const Text(
+                                'Delete My Account & Personal Data',
+                                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 20),

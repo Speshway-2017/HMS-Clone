@@ -28,14 +28,49 @@ import {
   nameValidator,
 } from "../utils/validators";
 
+const safeTextRefine = (val: string | undefined) =>
+  !val || !/<script|javascript:|data:|<[^>]*>/i.test(val);
+
 const hospitalSchema = z.object({
-  name: requiredTrimmedString("Hospital Name", 2, 100),
-  code: z.string().max(20, "Hospital Code cannot exceed 20 characters").optional().default(""),
-  address: optionalTrimmedString("Address", 250),
-  contactEmail: emailValidator("Contact Email", false, 100),
-  contactPhone: tenDigitPhoneValidator("Primary Phone", false),
+  name: z
+    .string({ invalid_type_error: "Hospital Name must be valid data. Please enter valid data" })
+    .trim()
+    .min(1, "Hospital Name is required. Field is required. Please fill out this field")
+    .max(100, "Hospital Name cannot exceed 100 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => val.length >= 2 && /^[a-zA-Z0-9][a-zA-Z0-9\s.,\-_/'&()]*$/.test(val), {
+      message: "Hospital Name contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    }),
+  code: z.string().max(20, "Hospital Code cannot exceed 20 characters. Too long text is not accepted. Please enter valid data").optional().default(""),
+  address: z
+    .string({ invalid_type_error: "Hospital Address must be valid data. Please enter valid data" })
+    .trim()
+    .max(250, "Hospital Address cannot exceed 250 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => !val || (!/<script|javascript:|data:/i.test(val) && /^[a-zA-Z0-9\s,.\-#/'()]+$/.test(val)), {
+      message: "Hospital Address contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional()
+    .default(""),
+  contactEmail: z
+    .string({ invalid_type_error: "Contact Email must be valid data. Please enter valid data" })
+    .trim()
+    .max(100, "Contact Email cannot exceed 100 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => !val || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
+      message: "Please enter a valid email address. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional()
+    .default(""),
+  contactPhone: z
+    .string({ invalid_type_error: "Contact Phone must be valid data. Please enter valid data" })
+    .trim()
+    .max(10, "Contact Phone cannot exceed 10 digits. Too long text is not accepted. Please enter valid data")
+    .refine((val) => !val || (/^[0-9]{10}$/.test(val) && !/^(\d)\1{9}$/.test(val)), {
+      message: "Please enter a valid 10-digit phone number. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional()
+    .default(""),
   logoUrl: z
     .string()
+    .max(500, "Logo URL cannot exceed 500 characters. Too long text is not accepted. Please enter valid data")
     .optional()
     .default("")
     .refine(
@@ -58,7 +93,7 @@ const hospitalSchema = z.object({
         );
       },
       {
-        message: "Hospital Logo must be a valid image file (PNG, JPEG, WEBP, or SVG)",
+        message: "Hospital Logo must be a valid image file (PNG, JPEG, WEBP, or SVG). Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
       }
     ),
   licenseUrl: z
@@ -76,19 +111,132 @@ const hospitalSchema = z.object({
   primaryAdminId: z.string().optional(),
   
   // Marketing & Public website fields
-  heroBannerUrl: z.string().optional().default(""),
-  aboutText: z.string().optional().default(""),
-  googleMapsLink: z.string().optional().default(""),
-  workingHours: z.string().optional().default(""),
-  footerText: z.string().optional().default(""),
-  socialLinks: z.record(z.string()).optional(),
-  faqs: z.array(z.object({ q: z.string(), a: z.string() })).optional(),
-  heroTitle: z.string().optional().default(""),
-  heroSub: z.string().optional().default(""),
-  whyChooseUs: z.array(z.object({ title: z.string(), desc: z.string() })).optional(),
-  missionText: z.string().optional().default(""),
-  visionText: z.string().optional().default(""),
-  valuesText: z.string().optional().default(""),
+  heroBannerUrl: z
+    .string()
+    .max(500, "Hero Banner URL cannot exceed 500 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => !val || /^(https?:\/\/|\/)/i.test(val), {
+      message: "Hero Banner URL contains invalid data. Please enter a valid URL. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional()
+    .default(""),
+  aboutText: z
+    .string()
+    .max(1000, "About Us Description cannot exceed 1000 characters. Too long text is not accepted. Please enter valid data")
+    .refine(safeTextRefine, {
+      message: "About Us Description contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional()
+    .default(""),
+  googleMapsLink: z
+    .string()
+    .max(1000, "Google Maps Embed Link cannot exceed 1000 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => !val || /^https?:\/\//i.test(val), {
+      message: "Google Maps Embed Link contains invalid data. Please enter a valid URL. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional()
+    .default(""),
+  workingHours: z
+    .string()
+    .max(100, "Working Hours (OPD / Labs) cannot exceed 100 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => !val || (!/<script|javascript:|data:/i.test(val) && /^[a-zA-Z0-9\s:,\-–—()./&]+$/.test(val)), {
+      message: "Working Hours (OPD / Labs) contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional()
+    .default(""),
+  footerText: z
+    .string()
+    .max(150, "Footer Tagline cannot exceed 150 characters. Too long text is not accepted. Please enter valid data")
+    .refine(safeTextRefine, {
+      message: "Footer Tagline contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional()
+    .default(""),
+  socialLinks: z
+    .record(
+      z
+        .string()
+        .max(300, "Social link cannot exceed 300 characters. Too long text is not accepted. Please enter valid data")
+        .refine((val) => !val || /^https?:\/\//i.test(val), {
+          message: "Social link contains invalid data. Please enter a valid URL. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+        })
+    )
+    .optional(),
+  faqs: z
+    .array(
+      z.object({
+        q: z
+          .string()
+          .max(200, "Question cannot exceed 200 characters. Too long text is not accepted. Please enter valid data")
+          .refine(safeTextRefine, {
+            message: "Question contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+          }),
+        a: z
+          .string()
+          .max(1000, "Answer cannot exceed 1000 characters. Too long text is not accepted. Please enter valid data")
+          .refine(safeTextRefine, {
+            message: "Answer contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+          }),
+      })
+    )
+    .optional(),
+  heroTitle: z
+    .string()
+    .max(150, "Hero Title Banner cannot exceed 150 characters. Too long text is not accepted. Please enter valid data")
+    .refine(safeTextRefine, {
+      message: "Hero Title Banner contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional()
+    .default(""),
+  heroSub: z
+    .string()
+    .max(500, "Hero Subdescription Text cannot exceed 500 characters. Too long text is not accepted. Please enter valid data")
+    .refine(safeTextRefine, {
+      message: "Hero Subdescription Text contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional()
+    .default(""),
+  whyChooseUs: z
+    .array(
+      z.object({
+        title: z
+          .string()
+          .max(100, "Pillar Title cannot exceed 100 characters. Too long text is not accepted. Please enter valid data")
+          .refine(safeTextRefine, {
+            message: "Pillar Title contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+          }),
+        desc: z
+          .string()
+          .max(300, "Pillar Description cannot exceed 300 characters. Too long text is not accepted. Please enter valid data")
+          .refine(safeTextRefine, {
+            message: "Pillar Description contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+          }),
+      })
+    )
+    .optional(),
+  missionText: z
+    .string()
+    .max(500, "Our Mission cannot exceed 500 characters. Too long text is not accepted. Please enter valid data")
+    .refine(safeTextRefine, {
+      message: "Our Mission contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional()
+    .default(""),
+  visionText: z
+    .string()
+    .max(500, "Our Vision cannot exceed 500 characters. Too long text is not accepted. Please enter valid data")
+    .refine(safeTextRefine, {
+      message: "Our Vision contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional()
+    .default(""),
+  valuesText: z
+    .string()
+    .max(500, "Our Values cannot exceed 500 characters. Too long text is not accepted. Please enter valid data")
+    .refine(safeTextRefine, {
+      message: "Our Values contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional()
+    .default(""),
 });
 
 export const listHospitals = catchAsync(async (req: Request, res: Response) => {

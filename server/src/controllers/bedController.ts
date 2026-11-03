@@ -12,11 +12,32 @@ import {
   codeValidator,
 } from "../utils/validators";
 
+const BED_NUMBER_REGEX = /^[A-Za-z0-9\-_./\s]+$/;
+
 const bedSchema = z.object({
-  bedNumber: codeValidator("Bed number", 1, 20, true),
-  roomId: requiredTrimmedString("Room ID", 1, 50),
-  bedType: optionalTrimmedString("Bed type", 50, "Standard"),
-  status: z.enum(["Available", "Occupied", "Maintenance", "Reserved"]).optional().default("Available"),
+  roomId: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .min(1, "Please select a destination Room. Please fill out this field"),
+  bedNumber: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .min(1, "Bed Number / Prefix is required. Please fill out this field")
+    .max(50, "Bed Number cannot exceed 50 characters. Please enter valid data")
+    .refine((val) => BED_NUMBER_REGEX.test(val), {
+      message: "Bed Number contains invalid data. Please enter valid data",
+    }),
+  bedType: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .max(50, "Bed Hardware Type cannot exceed 50 characters. Please enter valid data")
+    .optional()
+    .default("Standard"),
+  status: z
+    .enum(["Available", "Occupied", "Maintenance", "Reserved", "Cleaning", "Blocked"])
+    .optional()
+    .default("Available"),
+  lastSanitized: z.string().optional(),
 });
 
 export const listBeds = catchAsync(async (req: Request, res: Response) => {
@@ -63,19 +84,19 @@ export const listBeds = catchAsync(async (req: Request, res: Response) => {
   // Enrich occupied beds with patient details if missing from direct reference
   const enrichedBeds = await Promise.all(
     beds.map(async (b: any) => {
-      if (!b.patient && (b.isOccupied || b.status === "Occupied")) {
+      if ((!b.admission || !b.patient) && (b.isOccupied || b.status === "Occupied")) {
         const activeAdm = await Admission.findOne({
           hospital: req.hospitalFilter?.hospital,
-          bed: b._id,
+          $or: [{ bed: b._id }, ...(b.patient ? [{ patient: (b.patient as any)._id || b.patient }] : [])],
           status: { $nin: ["discharged", "Discharged", "Cancelled", "Expired", "Transferred Out (Final)"] }
         })
           .populate("patient", "name uhid patientCode phone")
           .lean();
 
-        if (activeAdm && activeAdm.patient) {
+        if (activeAdm) {
           return {
             ...b,
-            patient: activeAdm.patient,
+            patient: activeAdm.patient || b.patient,
             admission: {
               _id: activeAdm._id,
               admissionNumber: activeAdm.admissionNumber,
@@ -114,9 +135,10 @@ export const getBed = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const createBed = catchAsync(async (req: Request, res: Response) => {
+  const parsed = bedSchema.parse(req.body);
   const hospitalId = req.hospitalFilter!.hospital;
   const branchId = req.hospitalFilter?.branch ?? null;
-  const { bedNumber, roomId, bedType, status } = req.body;
+  const { bedNumber, roomId, bedType, status } = parsed;
 
   if (!bedNumber || !roomId) {
     throw new AppError("Bed Number and Room are required.", 400);
@@ -167,10 +189,12 @@ export const createBed = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const updateBed = catchAsync(async (req: Request, res: Response) => {
+  const parsed = bedSchema.partial().parse(req.body);
   const { id } = req.params;
-  const { bedNumber, roomId, bedType, status } = req.body;
+  const { bedNumber, roomId, bedType, status } = parsed;
 
-  const bed = await Bed.findOne({ _id: id, ...req.hospitalFilter });
+  const hospitalId = req.hospitalFilter?.hospital || (req.user as any)?.hospital;
+  const bed = await Bed.findOne({ _id: id, hospital: hospitalId });
   if (!bed) {
     throw new AppError("Bed not found.", 404);
   }
@@ -187,8 +211,8 @@ export const updateBed = catchAsync(async (req: Request, res: Response) => {
       throw new AppError(`Cannot move bed. Destination room capacity of ${room.capacity} beds has been reached.`, 400);
     }
 
-    bed.room = roomId;
-    bed.ward = room.ward;
+    bed.room = roomId as any;
+    bed.ward = room.ward as any;
   }
 
   // If changing bed number, regenerate bedCode
@@ -218,13 +242,31 @@ export const updateBed = catchAsync(async (req: Request, res: Response) => {
 
   if (bedType) bed.bedType = bedType;
   if (status) {
-    if (bed.status === "Occupied" && status !== "Occupied" && bed.patient) {
+    if (bed.status === "Occupied" && status !== "Occupied" && (bed.patient || bed.isOccupied)) {
       throw new AppError("Occupied beds can only be made available via inpatient transfer or discharge.", 400);
     }
     bed.status = status;
+    bed.isOccupied = status === "Occupied";
+    if (status !== "Occupied" && !bed.patient) {
+      bed.isOccupied = false;
+    }
+    if (status === "Cleaning") {
+      bed.lastSanitized = new Date();
+    }
+  }
+
+  if (req.body.lastSanitized) {
+    bed.lastSanitized = new Date(req.body.lastSanitized);
   }
 
   await bed.save();
+
+  await bed.populate([
+    { path: "ward", select: "name code" },
+    { path: "room", select: "roomNumber roomName roomType capacity tariff" },
+    { path: "patient", select: "name uhid patientCode phone" },
+    { path: "admission", select: "admissionNumber admissionDate status" }
+  ]);
 
   res.json({ status: "success", data: { bed } });
 });
@@ -232,7 +274,8 @@ export const updateBed = catchAsync(async (req: Request, res: Response) => {
 export const deleteBed = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
 
-  const bed = await Bed.findOne({ _id: id, ...req.hospitalFilter });
+  const hospitalId = req.hospitalFilter?.hospital || (req.user as any)?.hospital;
+  const bed = await Bed.findOne({ _id: id, hospital: hospitalId });
   if (!bed) {
     throw new AppError("Bed not found.", 404);
   }
@@ -241,7 +284,7 @@ export const deleteBed = catchAsync(async (req: Request, res: Response) => {
     throw new AppError("Cannot delete bed because it is currently occupied by a patient.", 400);
   }
 
-  await Bed.deleteOne({ _id: id, ...req.hospitalFilter });
+  await Bed.deleteOne({ _id: id });
 
   res.json({ status: "success", message: "Bed deleted successfully." });
 });

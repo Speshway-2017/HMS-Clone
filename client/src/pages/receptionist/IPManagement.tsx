@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { List, Plus, Network, BedDouble, UserCheck, ShieldAlert, ArrowRightLeft, DoorOpen, Printer, CheckCircle, FileText, Search, AlertTriangle } from "lucide-react";
+import { List, Plus, Network, BedDouble, UserCheck, ShieldAlert, ArrowRightLeft, DoorOpen, Printer, CheckCircle, FileText, Search, AlertTriangle, AlertCircle } from "lucide-react";
 import {
   useAdmissionRequests,
   useRoomsAvailability,
@@ -35,6 +35,19 @@ interface Props {
   activeTab?: "new" | "admissions" | "rooms" | "transfer" | "discharges" | "discharged";
 }
 
+const IP_LIMITS = {
+  SEARCH: 100,
+  EXPECTED_STAY: 3,
+  DIAGNOSIS: 150,
+  INSURANCE: 100,
+  POLICY_NUMBER: 50,
+  ADVANCE_AMOUNT: 10,
+  REMARKS: 500,
+};
+
+const TEXT_GENERAL_REGEX = /^[a-zA-Z0-9\s,\.\-/'&()#]+$/;
+const DIAGNOSIS_REGEX = /^[a-zA-Z0-9\s,\.\-/'&()#]+$/;
+
 export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const navigate = useNavigate();
   const [tab, setTab] = useState<"new" | "admissions" | "rooms" | "transfer" | "discharges" | "discharged">(activeTab);
@@ -58,6 +71,185 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const [manualExpectedStay, setManualExpectedStay] = useState("");
   const [manualPrimaryDiagnosis, setManualPrimaryDiagnosis] = useState("");
   const [verbalApproval, setVerbalApproval] = useState(false);
+
+  // Validation Error States
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [expectedStayError, setExpectedStayError] = useState<string | null>(null);
+  const [diagnosisError, setDiagnosisError] = useState<string | null>(null);
+  const [insuranceError, setInsuranceError] = useState<string | null>(null);
+  const [policyError, setPolicyError] = useState<string | null>(null);
+  const [advanceError, setAdvanceError] = useState<string | null>(null);
+  const [remarksError, setRemarksError] = useState<string | null>(null);
+
+  const validateDiagnosis = (val: string): string | null => {
+    const trimmed = val.trim();
+    if (!trimmed) {
+      const msg = "Primary Diagnosis is required. Please fill out this field. Field is required";
+      setDiagnosisError(msg);
+      return msg;
+    }
+    if (val.length > IP_LIMITS.DIAGNOSIS) {
+      const msg = `Primary Diagnosis cannot exceed ${IP_LIMITS.DIAGNOSIS} characters. Too long text not accepted. Too long text is not accepted. Please enter valid data`;
+      setDiagnosisError(msg);
+      return msg;
+    }
+    if (!DIAGNOSIS_REGEX.test(val)) {
+      const msg = "Primary Diagnosis contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data";
+      setDiagnosisError(msg);
+      return msg;
+    }
+    setDiagnosisError(null);
+    return null;
+  };
+
+  const validateExpectedStay = (val: string): string | null => {
+    if (!val || !val.trim()) {
+      setExpectedStayError(null);
+      return null;
+    }
+    if (val.length > IP_LIMITS.EXPECTED_STAY) {
+      const msg = `Expected Stay cannot exceed ${IP_LIMITS.EXPECTED_STAY} digits. Too long text not accepted. Too long text is not accepted. Please enter valid data`;
+      setExpectedStayError(msg);
+      return msg;
+    }
+    if (/[^\d]/.test(val) || parseInt(val, 10) <= 0) {
+      const msg = "Expected Stay must be a valid positive number of days. Invalid data not accepted. Invalid data is not accepted. Please enter valid data";
+      setExpectedStayError(msg);
+      return msg;
+    }
+    setExpectedStayError(null);
+    return null;
+  };
+
+  const validateInsurance = (val: string): string | null => {
+    if (!val || !val.trim()) {
+      setInsuranceError(null);
+      return null;
+    }
+    if (val.length > IP_LIMITS.INSURANCE) {
+      const msg = `Insurance Provider cannot exceed ${IP_LIMITS.INSURANCE} characters. Too long text not accepted. Too long text is not accepted. Please enter valid data`;
+      setInsuranceError(msg);
+      return msg;
+    }
+    if (!TEXT_GENERAL_REGEX.test(val)) {
+      const msg = "Insurance Provider contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data";
+      setInsuranceError(msg);
+      return msg;
+    }
+    setInsuranceError(null);
+    return null;
+  };
+
+  const validatePolicy = (val: string): string | null => {
+    if (!val || !val.trim()) {
+      setPolicyError(null);
+      return null;
+    }
+    if (val.length > IP_LIMITS.POLICY_NUMBER) {
+      const msg = `Policy Number cannot exceed ${IP_LIMITS.POLICY_NUMBER} characters. Too long text not accepted. Too long text is not accepted. Please enter valid data`;
+      setPolicyError(msg);
+      return msg;
+    }
+    if (!TEXT_GENERAL_REGEX.test(val)) {
+      const msg = "Policy Number contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data";
+      setPolicyError(msg);
+      return msg;
+    }
+    setPolicyError(null);
+    return null;
+  };
+
+  const validateRemarks = (val: string): string | null => {
+    if (!val || !val.trim()) {
+      setRemarksError(null);
+      return null;
+    }
+    if (val.length > IP_LIMITS.REMARKS) {
+      const msg = `Admission Remarks cannot exceed ${IP_LIMITS.REMARKS} characters. Too long text not accepted. Too long text is not accepted. Please enter valid data`;
+      setRemarksError(msg);
+      return msg;
+    }
+    if (!TEXT_GENERAL_REGEX.test(val)) {
+      const msg = "Admission Remarks contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data";
+      setRemarksError(msg);
+      return msg;
+    }
+    setRemarksError(null);
+    return null;
+  };
+
+  const validateAdvance = (val: string): string | null => {
+    if (!val || !val.trim()) {
+      const msg = "Advance Deposit Amount is required. Please fill out this field. Field is required";
+      setAdvanceError(msg);
+      return msg;
+    }
+    if (val.length > IP_LIMITS.ADVANCE_AMOUNT) {
+      const msg = `Advance Deposit Amount cannot exceed ${IP_LIMITS.ADVANCE_AMOUNT} digits. Too long text not accepted. Too long text is not accepted. Please enter valid data`;
+      setAdvanceError(msg);
+      return msg;
+    }
+    const num = parseFloat(val);
+    if (isNaN(num) || num < 0) {
+      const msg = "Advance Deposit Amount must be a valid non-negative number. Invalid data not accepted. Invalid data is not accepted. Please enter valid data";
+      setAdvanceError(msg);
+      return msg;
+    }
+    setAdvanceError(null);
+    return null;
+  };
+
+  const validateSearch = (val: string): string | null => {
+    if (!val || !val.trim()) {
+      setSearchError(null);
+      return null;
+    }
+    if (val.length > IP_LIMITS.SEARCH) {
+      const msg = `Search query cannot exceed ${IP_LIMITS.SEARCH} characters. Too long text not accepted. Too long text is not accepted. Please enter valid data`;
+      setSearchError(msg);
+      return msg;
+    }
+    if (!TEXT_GENERAL_REGEX.test(val)) {
+      const msg = "Search query contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data";
+      setSearchError(msg);
+      return msg;
+    }
+    setSearchError(null);
+    return null;
+  };
+
+  const handleKeyGuard = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>, maxLen: number) => {
+    const isControlKey = [
+      "Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+      "Home", "End", "Tab", "Enter", "Escape"
+    ].includes(e.key) || e.ctrlKey || e.metaKey || e.altKey;
+
+    if (isControlKey) return;
+
+    const target = e.currentTarget;
+    const hasSelection = (target.selectionEnd ?? 0) - (target.selectionStart ?? 0) > 0;
+    if (target.value.length >= maxLen && !hasSelection) {
+      e.preventDefault();
+    }
+  };
+
+  const handlePasteGuard = (
+    e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+    maxLen: number,
+    setter: (val: string) => void,
+    validator: (val: string) => any
+  ) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text") || "";
+    const target = e.currentTarget;
+    const start = target.selectionStart ?? 0;
+    const end = target.selectionEnd ?? 0;
+    const current = target.value;
+    const combined = current.slice(0, start) + pasted + current.slice(end);
+    const sliced = combined.slice(0, maxLen);
+    setter(sliced);
+    validator(sliced);
+  };
 
   // Form Fields for admission
   const [admissionDate, setAdmissionDate] = useState(new Date().toISOString().split("T")[0]);
@@ -149,6 +341,33 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
     }
   }, [window.location.search]);
 
+  // Synchronize bed and admission selection if opened with bedId in URL
+  useEffect(() => {
+    const queryParams = new URLSearchParams(window.location.search);
+    const urlBedId = queryParams.get("bedId");
+    if (!urlBedId) return;
+
+    if (tab === "transfer" && !transferAdmissionId && activeAdmissions && activeAdmissions.length > 0) {
+      const match = activeAdmissions.find((adm: any) => {
+        const bId = adm.bed?._id || adm.bed;
+        return String(bId) === String(urlBedId);
+      });
+      if (match) {
+        setTransferAdmissionId(match._id);
+      }
+    }
+
+    if (tab === "new" && !selectedBedId && rooms && rooms.length > 0) {
+      const parentRoom = rooms.find((r: any) => r.beds?.some((b: any) => String(b._id) === String(urlBedId)));
+      if (parentRoom) {
+        setWard(parentRoom.wardName || "");
+        setRoomType(parentRoom.acType || "");
+        setSelectedRoomId(parentRoom._id);
+        setSelectedBedId(urlBedId);
+      }
+    }
+  }, [tab, activeAdmissions, rooms, transferAdmissionId, selectedBedId]);
+
   // Discharge requests from doctors
   const { data: dischargeRequests, refetch: refetchDischargeRequests } = useDischargeRequests();
   useEffect(() => {
@@ -199,29 +418,36 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
   const handleAdmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (subTab === "requests" && !selectedReq) {
-      alert("Please select a pending admission request first");
+      toast.error("Please select a pending admission request first");
       return;
     }
     if (subTab === "manual" && !selectedPatientId) {
-      alert("Please search and select a patient first");
+      toast.error("Please search and select a patient first");
       return;
     }
     if (!ward || !selectedRoomId || !selectedBedId || !assignedNurse) {
-      alert("Please fill all required room/bed allocation fields and select a nurse");
+      toast.error("Please fill all required room/bed allocation fields and select a nurse");
       return;
     }
 
     if (subTab === "manual") {
+      const diagErr = validateDiagnosis(manualPrimaryDiagnosis);
+      const stayErr = validateExpectedStay(manualExpectedStay);
+      const insErr = validateInsurance(insuranceProvider);
+      const polErr = validatePolicy(insurancePolicyNumber);
+      const remErr = validateRemarks(notes);
+      const advErr = validateAdvance(advanceAmount);
+
       if (!manualDoctor) {
-        alert("Admitting doctor selection is mandatory");
+        toast.error("Admitting doctor selection is mandatory");
         return;
       }
       if (!verbalApproval) {
-        alert("Doctor verbal order checkbox must be verified");
+        toast.error("Doctor verbal order checkbox must be verified");
         return;
       }
-      if (!manualPrimaryDiagnosis || !manualPrimaryDiagnosis.trim()) {
-        alert("Primary diagnosis / admission reason is required");
+      if (diagErr || stayErr || insErr || polErr || remErr || advErr) {
+        toast.error(diagErr || stayErr || insErr || polErr || remErr || advErr || "Please correct the form errors.");
         return;
       }
     }
@@ -829,10 +1055,27 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                       type="text"
                       placeholder="Search patient by UHID, Patient Name, Phone, Appointment Number, or Token Number..."
                       value={patientSearchQuery}
-                      onChange={(e) => setPatientSearchQuery(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 pl-10 pr-4 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setPatientSearchQuery(val);
+                        validateSearch(val);
+                      }}
+                      onKeyDown={(e) => handleKeyGuard(e, IP_LIMITS.SEARCH)}
+                      onPaste={(e) => handlePasteGuard(e, IP_LIMITS.SEARCH, setPatientSearchQuery, validateSearch)}
+                      maxLength={IP_LIMITS.SEARCH}
+                      className={`w-full rounded-lg border pl-10 pr-4 py-2 text-sm outline-none transition-all ${
+                        searchError
+                          ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-50/20"
+                          : "border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                      }`}
                     />
                   </div>
+                  {searchError && (
+                    <p className="mt-1 text-xs font-semibold text-red-600 flex items-center gap-1" role="alert">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span>{searchError}</span>
+                    </p>
+                  )}
                   {patientSearchQuery && searchPatients && searchPatients.length > 0 && (
                     <div className="rounded-lg border border-slate-150 divide-y divide-slate-100 max-h-40 overflow-y-auto">
                       {searchPatients.map((p) => {
@@ -1105,7 +1348,15 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                         <InputField
                           label="Expected Stay (Days)"
                           value={manualExpectedStay}
-                          onChange={(e) => setManualExpectedStay(e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setManualExpectedStay(val);
+                            validateExpectedStay(val);
+                          }}
+                          onKeyDown={(e) => handleKeyGuard(e, IP_LIMITS.EXPECTED_STAY)}
+                          onPaste={(e) => handlePasteGuard(e, IP_LIMITS.EXPECTED_STAY, setManualExpectedStay, validateExpectedStay)}
+                          maxLength={IP_LIMITS.EXPECTED_STAY}
+                          error={expectedStayError || undefined}
                           placeholder="e.g. 3"
                         />
 
@@ -1113,7 +1364,18 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                           label="Primary Diagnosis *"
                           required
                           value={manualPrimaryDiagnosis}
-                          onChange={(e) => setManualPrimaryDiagnosis(e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setManualPrimaryDiagnosis(val);
+                            validateDiagnosis(val);
+                          }}
+                          onKeyDown={(e) => handleKeyGuard(e, IP_LIMITS.DIAGNOSIS)}
+                          onPaste={(e) => handlePasteGuard(e, IP_LIMITS.DIAGNOSIS, setManualPrimaryDiagnosis, validateDiagnosis)}
+                          maxLength={IP_LIMITS.DIAGNOSIS}
+                          showCharCount
+                          charCount={manualPrimaryDiagnosis.length}
+                          maxCharCount={IP_LIMITS.DIAGNOSIS}
+                          error={diagnosisError || undefined}
                           placeholder="e.g. Acute Appendicitis"
                         />
 
@@ -1248,19 +1510,48 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                         <InputField
                           label="Insurance Provider"
                           value={insuranceProvider}
-                          onChange={(e) => setInsuranceProvider(e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setInsuranceProvider(val);
+                            validateInsurance(val);
+                          }}
+                          onKeyDown={(e) => handleKeyGuard(e, IP_LIMITS.INSURANCE)}
+                          onPaste={(e) => handlePasteGuard(e, IP_LIMITS.INSURANCE, setInsuranceProvider, validateInsurance)}
+                          maxLength={IP_LIMITS.INSURANCE}
+                          showCharCount
+                          charCount={insuranceProvider.length}
+                          maxCharCount={IP_LIMITS.INSURANCE}
+                          error={insuranceError || undefined}
+                          placeholder="e.g. Cigna, BlueShield"
                         />
                         <InputField
-                          label="Policy number"
+                          label="Policy Number"
                           value={insurancePolicyNumber}
-                          onChange={(e) => setInsurancePolicyNumber(e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setInsurancePolicyNumber(val);
+                            validatePolicy(val);
+                          }}
+                          onKeyDown={(e) => handleKeyGuard(e, IP_LIMITS.POLICY_NUMBER)}
+                          onPaste={(e) => handlePasteGuard(e, IP_LIMITS.POLICY_NUMBER, setInsurancePolicyNumber, validatePolicy)}
+                          maxLength={IP_LIMITS.POLICY_NUMBER}
+                          showCharCount
+                          charCount={insurancePolicyNumber.length}
+                          maxCharCount={IP_LIMITS.POLICY_NUMBER}
+                          error={policyError || undefined}
+                          placeholder="e.g. #CS-293"
                         />
                         <InputField
                           label="Advance Deposit Amount (₹) *"
                           type="number"
                           required
                           value={advanceAmount}
-                          onChange={(e) => setAdvanceAmount(e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setAdvanceAmount(val);
+                            validateAdvance(val);
+                          }}
+                          error={advanceError || undefined}
                         />
                         <SelectField
                           label="Payment Method"
@@ -1280,8 +1571,20 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                     <TextareaField
                       label="Admission Remarks / Notes"
                       value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNotes(val);
+                        validateRemarks(val);
+                      }}
+                      onKeyDown={(e) => handleKeyGuard(e, IP_LIMITS.REMARKS)}
+                      onPaste={(e) => handlePasteGuard(e, IP_LIMITS.REMARKS, setNotes, validateRemarks)}
+                      maxLength={IP_LIMITS.REMARKS}
+                      showCharCount
+                      charCount={notes.length}
+                      maxCharCount={IP_LIMITS.REMARKS}
+                      error={remarksError || undefined}
                       rows={2}
+                      placeholder="Ward specialty notes, equipment configuration, special patient instructions..."
                     />
                   </Card>
 

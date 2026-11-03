@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/config/user_session.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../routes/app_routes.dart';
 import '../../../utils/responsive_helper.dart';
@@ -28,8 +30,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       duration: const Duration(milliseconds: 1400),
     );
 
-    // Logo scale and opacity animations
-    _logoScale = Tween<double>(begin: 0.6, end: 1.0).animate(
+    _logoScale = Tween<double>(begin: 0.7, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
         curve: const Interval(0.0, 0.6, curve: Curves.easeOutBack),
@@ -43,7 +44,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       ),
     );
 
-    // Text slide up and fade in animation
     _textOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
@@ -52,7 +52,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     );
 
     _textOffset = Tween<Offset>(
-      begin: const Offset(0, 0.3),
+      begin: const Offset(0, 0.25),
       end: Offset.zero,
     ).animate(
       CurvedAnimation(
@@ -61,15 +61,51 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       ),
     );
 
-    // Start the animation sequence
     _controller.forward();
+    _handleRouting();
+  }
 
-    // Navigate to Login Screen after 2.2 seconds
-    Timer(const Duration(milliseconds: 2200), () {
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, AppRoutes.login);
+  Future<void> _handleRouting() async {
+    // Wait minimum 2.2 seconds for splash animation presentation
+    await Future.delayed(const Duration(milliseconds: 2200));
+
+    if (!mounted) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final hasSeenOnboarding = prefs.getBool('has_seen_onboarding') ?? false;
+
+      if (!hasSeenOnboarding) {
+        Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
+        return;
       }
-    });
+
+      // Check if user has an existing authenticated session
+      final token = UserSession.token;
+      if (token != null && token.isNotEmpty) {
+        final role = UserSession.user?['role']?.toString().toLowerCase();
+
+        if (role == 'admin' || role == 'hospital_admin') {
+          Navigator.pushReplacementNamed(context, AppRoutes.adminDashboard);
+          return;
+        } else if (role == 'doctor') {
+          Navigator.pushReplacementNamed(context, AppRoutes.doctorDashboard);
+          return;
+        } else if (role == 'nurse') {
+          Navigator.pushReplacementNamed(context, AppRoutes.nurseDashboard);
+          return;
+        } else {
+          // Default to patient dashboard
+          Navigator.pushReplacementNamed(context, AppRoutes.patientDashboard);
+          return;
+        }
+      }
+
+      // No active session -> Login
+      Navigator.pushReplacementNamed(context, AppRoutes.login);
+    } catch (_) {
+      Navigator.pushReplacementNamed(context, AppRoutes.login);
+    }
   }
 
   @override
@@ -101,26 +137,26 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // Ambient glow in the center
+            // Ambient cyan/emerald glow behind the logo
             Positioned(
-              top: responsive.height * 0.35,
+              top: responsive.height * 0.33,
               child: Container(
-                width: responsive.scaleWidth(250.0),
-                height: responsive.scaleWidth(250.0),
+                width: responsive.scaleWidth(260.0),
+                height: responsive.scaleWidth(260.0),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.emerald500.withOpacity(0.06),
+                  color: AppColors.emerald500.withOpacity(0.08),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.emerald500.withOpacity(0.08),
-                      blurRadius: 100,
-                      spreadRadius: 20,
+                      color: AppColors.emerald500.withOpacity(0.12),
+                      blurRadius: 110,
+                      spreadRadius: 25,
                     ),
                   ],
                 ),
               ),
             ),
-            
+
             // Branding Logo & Text
             Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -129,7 +165,32 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   opacity: _logoOpacity,
                   child: ScaleTransition(
                     scale: _logoScale,
-                    child: AppLogo(size: logoSize),
+                    child: Container(
+                      width: logoSize,
+                      height: logoSize,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(logoSize * 0.24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.navy950.withOpacity(0.6),
+                            blurRadius: 24,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(logoSize * 0.24),
+                        child: Image.asset(
+                          'assets/icon/app_icon.png',
+                          width: logoSize,
+                          height: logoSize,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return AppLogo(size: logoSize);
+                          },
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 SizedBox(height: spacing),
@@ -165,9 +226,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               ],
             ),
 
-            // Loading/Progress Indicator at the bottom
+            // Loading / Progress Indicator at the bottom
             Positioned(
-              bottom: responsive.scaleHeight(60.0) + responsive.paddingBottom,
+              bottom: responsive.scaleHeight(55.0) + responsive.paddingBottom,
               child: FadeTransition(
                 opacity: _textOpacity,
                 child: SizedBox(

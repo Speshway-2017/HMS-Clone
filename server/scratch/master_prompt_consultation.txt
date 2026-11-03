@@ -1,0 +1,660 @@
+<USER_REQUEST>
+# MASTER PROMPT – HMS CONSULTATION WORKSPACE COMPLETE VALIDATION & BUG FIXING
+
+## ROLE AND OBJECTIVE
+
+Act as a Senior Full-Stack Developer, React TypeScript Expert, Node.js Backend Engineer, Healthcare Application QA Engineer, and Security Specialist.
+
+Your task is to thoroughly audit and fix all 46 validation test cases in the existing Hospital Management System (HMS), focusing on the Doctor Consultation Workspace and its related modules.
+
+**IMPORTANT: Directly inspect, modify, and fix the existing source code. Do not provide only suggestions, explanations, or terminal commands.**
+
+### Technology Stack
+
+- Frontend: React.js, TypeScript, Tailwind CSS
+- Backend: Node.js, Express.js, TypeScript
+- Database: MongoDB / Mongoose
+- Real-time communication: Socket.IO
+
+Confirm the actual project structure and implementation before modifying any files.
+
+## STRICT RULES
+
+1. Do not change existing UI designs, colors, fonts, or layouts unless necessary to display validation errors correctly.
+2. Do not remove or break any existing functionality.
+3. Do not change unrelated modules or dashboards.
+4. Preserve all existing patient records.
+5. Do not use hardcoded or dummy data.
+6. Do not modify existing API contracts unnecessarily.
+7. Maintain authentication, authorization, and hospital/branch isolation.
+8. Validate all affected fields on both frontend and backend.
+9. Never save invalid values to MongoDB.
+10. Do not silently truncate medical notes or prescription instructions.
+11. Reuse existing validation utilities wherever possible.
+12. Preserve valid medical terminology, abbreviations, symbols, and Unicode.
+13. Do not introduce arbitrary clinical limits without reviewing existing requirements.
+14. Do not mark tests as passed without verification.
+15. Fix root causes rather than adding temporary workarounds.
+
+---
+
+# PHASE 1 – CONSULTATION DETAILS VALIDATION
+
+Locate the Consultation Workspace page and inspect all consultation-related input fields.
+
+### Test Cases 1–12
+
+| Field | Invalid Input | Excessive Length |
+|---|---|---|
+| Chief Complaint | Reject invalid input | Enforce maximum length |
+| Diagnosis | Reject invalid input | Enforce maximum length |
+| Symptoms | Reject invalid input | Enforce maximum length |
+| Clinical Notes | Reject invalid input | Enforce maximum length |
+| Treatment Plan | Reject invalid input | Enforce maximum length |
+| Advice / Follow-up Notes | Reject invalid input | Enforce maximum length |
+
+### Required Implementation
+
+For all six fields:
+
+- Identify existing validation rules.
+- Determine whether each field is required or optional.
+- Reject unsupported data types.
+- Reject whitespace-only values when required.
+- Reject invalid control characters.
+- Prevent unsafe HTML or script execution.
+- Accept legitimate clinical descriptions.
+- Support appropriate punctuation, multiline text, and medical terminology.
+- Enforce the configured maximum length.
+- Show validation messages below the relevant field.
+- Prevent invalid values from reaching the database.
+- Preserve valid input after a failed submission.
+- Ensure validation works during both creation and editing.
+
+### Validation Messages
+
+For invalid input:
+
+"Please enter valid data"
+
+For excessive length:
+
+"Maximum allowed character limit exceeded"
+
+For required fields:
+
+"[Field Name] is required"
+
+### Expected Result
+
+All six fields must accept valid clinical information, reject invalid or excessively long data, and prevent invalid records from being saved.
+
+---
+
+# PHASE 2 – RECORD PATIENT VITALS VALIDATION
+
+Locate the **Record Patient Vitals** section inside the Consultation Workspace.
+
+### Test Cases 13–24
+
+| Field | Unit | Validation Requirements |
+|---|---|---|
+| Temperature | °F | Valid numeric format and configured clinical limits |
+| BP | mmHg | Valid systolic/diastolic format |
+| Pulse Rate | BPM | Valid numeric value |
+| Respiratory Rate | /min | Valid numeric value |
+| Oxygen Saturation | % | Valid numeric value between 0 and 100 |
+| Weight | KG | Valid positive numeric value |
+
+### Temperature
+
+- Reject alphabetic characters.
+- Reject unsupported special characters.
+- Reject malformed decimals.
+- Reject values outside configured limits.
+- Reject excessively long numeric strings.
+- Preserve the existing Fahrenheit unit.
+- Do not silently convert units.
+
+Example error messages:
+
+"Please enter a valid temperature in °F"
+
+"Temperature is outside the allowed range"
+
+### Blood Pressure
+
+- Verify the existing input format.
+- For a combined field, validate systolic/diastolic values such as `120/80`.
+- Reject alphabetic characters and malformed separators.
+- Reject negative or impossible numeric values.
+- Validate both systolic and diastolic components.
+- Enforce configured numeric limits.
+- Do not accept excessively long strings.
+
+Example error:
+
+"Please enter a valid blood pressure value (e.g., 120/80)"
+
+### Pulse Rate
+
+- Accept valid numeric BPM values.
+- Reject letters and unsupported symbols.
+- Reject negative values.
+- Reject values outside configured limits.
+- Reject excessively long numeric input.
+
+Example error:
+
+"Please enter a valid pulse rate"
+
+### Respiratory Rate
+
+- Accept valid numeric values according to the existing specification.
+- Reject alphabetic characters.
+- Reject negative values.
+- Reject malformed input.
+- Enforce configured numeric limits.
+
+Example error:
+
+"Please enter a valid respiratory rate"
+
+### Oxygen Saturation
+
+- Accept numeric percentage values.
+- Reject values below 0 or above 100.
+- Reject alphabetic input.
+- Reject unsupported characters.
+- Enforce reasonable numeric precision.
+
+Example error:
+
+"Oxygen saturation must be between 0 and 100%"
+
+### Weight
+
+- Accept positive numeric values.
+- Support decimals according to the existing specification.
+- Reject negative numbers.
+- Reject alphabetic input.
+- Reject malformed values.
+- Enforce configured limits and precision.
+
+Example error:
+
+"Please enter a valid weight in KG"
+
+### Clinical Safety Requirement
+
+Distinguish malformed input from unusual but potentially genuine clinical measurements.
+
+Do not silently discard a genuine observation solely because it falls outside a typical reference range. Follow the application's approved hard limits and warning rules. Where appropriate, require confirmation rather than rejecting a clinically possible measurement.
+
+### Expected Result
+
+All six vital fields must reject malformed or unsupported input, enforce the correct format and limits, and prevent invalid values from being stored.
+
+---
+
+# PHASE 3 – ISSUE MEDICATION VALIDATION
+
+Locate the **Issue Medication** section.
+
+### Test Cases 25–34
+
+| Field | Invalid Input | Excessive Length |
+|---|---|---|
+| Medicine Name | Validate supported medicine names | Enforce maximum length |
+| Custom Strength | Validate strength format | Enforce maximum length |
+| Dosage | Validate dosage format | Enforce maximum length |
+| Frequency | Validate supported frequency | Enforce maximum length |
+| Duration | Validate supported duration | Enforce maximum length |
+
+## Medicine Name
+
+- Reject empty values when mandatory.
+- Reject unsupported input types.
+- Reject invalid control characters.
+- Accept legitimate medicine names containing numbers, hyphens, or other supported characters.
+- Validate against the medicine catalog if the existing workflow requires catalog selection.
+- Enforce the maximum allowed length.
+- Prevent invalid medicine names from entering prescriptions.
+
+Error message:
+
+"Please enter a valid medicine name"
+
+## Custom Strength – Other (Custom)
+
+When the user selects **Other (Custom)**:
+
+- Display the Custom Strength input.
+- Apply required-field validation.
+- Validate the existing supported strength format.
+- Accept valid units such as mg, mcg, g, or mL where supported.
+- Reject malformed or unsupported values.
+- Enforce maximum length.
+- Prevent prescription generation when invalid.
+
+When another predefined strength is selected, preserve its existing behavior.
+
+Error message:
+
+"Please enter a valid medicine strength"
+
+## Dosage
+
+- Validate the existing dosage input format.
+- Reject unsupported values.
+- Preserve legitimate decimal or fractional dosing where supported.
+- Validate units and instructions according to the application's prescription model.
+- Enforce maximum length.
+- Do not invent dosing instructions.
+
+Error message:
+
+"Please enter a valid dosage"
+
+## Frequency
+
+- Accept supported frequencies from the existing options or approved custom-entry rules.
+- Reject unsupported values.
+- Preserve valid schedules and clinical abbreviations.
+- Enforce maximum length.
+- Ensure invalid values cannot be used for prescription generation.
+
+Error message:
+
+"Please enter a valid frequency"
+
+## Duration
+
+- Validate the expected duration format.
+- Reject unsupported alphabetic values where numeric duration is required.
+- Reject zero or negative durations when prohibited by the existing business rules.
+- Enforce configured limits.
+- Preserve the existing duration unit and interpretation.
+
+Error message:
+
+"Please enter a valid duration"
+
+### Medication Submission Safety
+
+Before issuing medication:
+
+1. Validate all required medication fields.
+2. Confirm the medicine selection.
+3. Validate custom strength when applicable.
+4. Validate dosage, frequency, and duration.
+5. Prevent submission if any field is invalid.
+6. Ensure the backend performs the same checks.
+7. Prevent duplicate prescription creation.
+8. Verify the saved prescription matches the submitted valid values.
+
+Do not change clinical prescribing rules or automatically generate dosage values.
+
+---
+
+# PHASE 4 – RADIOLOGY VALIDATION
+
+Locate the **Radiology** tab and its **Order Imaging Studies** section.
+
+### Test Cases 35–36
+
+Field: **Clinical Notes / Indications**
+
+### Invalid Input
+
+- Reject unsupported input types.
+- Reject invalid control characters.
+- Prevent unsafe HTML/script execution.
+- Preserve valid medical descriptions.
+- Support legitimate punctuation and multiline notes.
+- Validate required/optional behavior according to existing rules.
+- Prevent invalid notes from being saved.
+
+Error message:
+
+"Please enter valid clinical notes / indications"
+
+### Excessive Length
+
+- Identify the existing maximum length.
+- Apply consistent frontend and backend validation.
+- Display a clear maximum-length error.
+- Do not silently truncate clinical information.
+- Prevent invalid radiology order submissions.
+
+Error message:
+
+"Clinical Notes / Indications exceeds the maximum allowed length"
+
+### Expected Result
+
+Radiology orders must reject invalid clinical notes without breaking the existing imaging study selection and ordering workflow.
+
+---
+
+# PHASE 5 – RECOMMEND IP ADMISSION VALIDATION
+
+Locate the **Recommend IP Admission** section.
+
+### Test Cases 37–46
+
+| Field | Invalid Input | Excessive Length |
+|---|---|---|
+| Primary Diagnosis | Reject invalid values | Enforce maximum length |
+| Expected Stay Duration | Reject invalid numeric values | Enforce maximum value |
+| Admission Reason | Reject invalid values | Enforce maximum length |
+| Clinical Notes / Diagnosis Remarks | Reject invalid values | Enforce maximum length |
+| Special Instructions | Reject invalid values | Enforce maximum length |
+
+## Primary Diagnosis
+
+- Validate legitimate diagnosis descriptions.
+- Reject unsupported input types.
+- Reject invalid control characters.
+- Preserve medical abbreviations and terminology.
+- Enforce maximum length.
+- Prevent invalid diagnosis records.
+
+Error message:
+
+"Please enter a valid primary diagnosis"
+
+## Expected Stay Duration
+
+- Inspect the existing duration unit and business rules.
+- Accept only valid numeric values when the field is numeric.
+- Reject alphabetic characters.
+- Reject unsupported symbols.
+- Reject negative values.
+- Reject zero when prohibited.
+- Reject decimals if only whole units are supported.
+- Enforce the configured maximum value.
+- Prevent invalid admission recommendations.
+
+Error messages:
+
+"Please enter a valid expected stay duration"
+
+"Expected stay duration exceeds the maximum allowed value"
+
+## Admission Reason
+
+- Validate supported clinical text.
+- Reject unsupported data types.
+- Reject invalid control characters.
+- Preserve valid clinical explanations.
+- Enforce maximum length.
+- Prevent invalid submission.
+
+Error message:
+
+"Please enter a valid admission reason"
+
+## Clinical Notes / Diagnosis Remarks
+
+- Accept legitimate clinical descriptions.
+- Support multiline input where intended.
+- Reject unsafe or malformed values.
+- Enforce maximum length.
+- Preserve valid notes after failed submission.
+
+Error message:
+
+"Please enter valid clinical notes / diagnosis remarks"
+
+## Special Instructions
+
+- Validate supported text.
+- Preserve legitimate clinical instructions.
+- Reject invalid control characters.
+- Enforce maximum length.
+- Prevent invalid submission.
+
+Error message:
+
+"Please enter valid special instructions"
+
+### Expected Result
+
+All five admission fields must validate correctly and prevent invalid or excessively long values from being saved.
+
+---
+
+# PHASE 6 – SHARED VALIDATION ARCHITECTURE
+
+Audit the existing validation architecture.
+
+Use or extend reusable validation utilities rather than duplicating logic across components.
+
+### Frontend Validation
+
+Implement:
+
+- Field-level validation.
+- Validation on submit.
+- Appropriate validation on blur.
+- Error clearing after correction.
+- Maximum-length validation.
+- Numeric format validation.
+- Required-field validation.
+- Conditional validation for custom fields.
+- Accessible error messages.
+- Consistent error styling.
+
+For text fields, use existing length limits and show character counters where useful.
+
+For numeric fields, validate actual numeric values, supported precision, and configured ranges instead of relying only on string length.
+
+### Backend Validation
+
+Inspect:
+
+- Express routes.
+- Controllers.
+- Request validation middleware.
+- Mongoose models.
+- Schema validators.
+- Create and update operations.
+- Prescription generation.
+- Vitals recording.
+- Admission recommendations.
+- Radiology order creation.
+
+Implement consistent server-side validation.
+
+Reject invalid requests with appropriate 4xx status codes and structured field-level errors.
+
+Ensure invalid values are not saved even when the frontend is bypassed.
+
+### Validation Consistency
+
+Frontend and backend must use the same approved rules.
+
+If shared schema validation is already available, reuse it.
+
+Otherwise, keep the validation contracts synchronized and add tests to detect mismatches.
+
+Do not change existing medical data or database structures unnecessarily.
+
+---
+
+# PHASE 7 – INVALID DATA AND MAXIMUM LENGTH TESTING
+
+For every one of the 23 fields, test the following applicable scenarios:
+
+1. Valid input.
+2. Invalid input.
+3. Excessively long input.
+4. Empty input.
+5. Whitespace-only input.
+6. Boundary-length input.
+7. One character beyond maximum length.
+8. Unsupported data type.
+9. Special characters.
+10. Unicode characters.
+11. Script-like input.
+12. Editing an existing record.
+13. Direct API submission bypassing frontend validation.
+14. Verification that rejected data was not persisted.
+
+For numeric fields, additionally test:
+
+- Negative numbers.
+- Zero.
+- Decimals.
+- Alphabetic characters.
+- Very large values.
+- Unsupported scientific notation.
+- Values at the configured minimum and maximum.
+- Values just outside the configured range.
+
+Do not treat medically valid characters or clinically plausible values as invalid without a documented rule.
+
+---
+
+# PHASE 8 – UI/UX AND RESPONSIVENESS
+
+Maintain the existing HMS UI.
+
+### Requirements
+
+- Preserve current colors.
+- Preserve typography.
+- Preserve card designs.
+- Preserve button styling.
+- Preserve page navigation.
+- Display validation errors directly below the correct fields.
+- Prevent error messages from overlapping other components.
+- Ensure modal dialogs remain usable.
+- Ensure input fields are accessible on mobile.
+- Prevent horizontal overflow.
+- Maintain responsive layouts.
+
+### Test Viewports
+
+- 320px
+- 375px
+- 430px
+- 768px
+- 1024px
+- 1366px
+- 1920px
+
+Ensure validation messages remain visible and readable on every supported screen size.
+
+---
+
+# PHASE 9 – DATA INTEGRITY AND REGRESSION TESTING
+
+After applying fixes, verify that:
+
+- Valid consultation notes can be saved.
+- Valid patient vitals can be recorded.
+- Valid medication prescriptions can be issued.
+- Valid radiology orders can be submitted.
+- Valid IP admission recommendations can be created.
+- Existing patient records remain unchanged.
+- Invalid input does not create new records.
+- Invalid updates do not overwrite existing valid values.
+- Validation failures do not trigger success notifications.
+- No duplicate records are created.
+- Existing Socket.IO notifications remain functional.
+- Existing authentication and authorization remain intact.
+- Hospital and branch isolation is preserved.
+- Other doctor dashboard features continue working.
+
+Use the existing test environment and non-production test records.
+
+---
+
+# PHASE 10 – FINAL VERIFICATION REPORT
+
+After completing the code changes, provide a detailed report.
+
+### Report Format
+
+| Test ID | Field | Test Type | Root Cause | Fix Applied | Result |
+|---|---|---|---|---|---|
+| TC-001 | Chief Complaint | Invalid Input | Findings | Fix details | PASS/FAIL |
+| TC-002 | Chief Complaint | Too Long | Findings | Fix details | PASS/FAIL |
+| ... | ... | ... | ... | ... | ... |
+| TC-046 | Special Instructions | Too Long | Findings | Fix details | PASS/FAIL |
+
+Use these verification statuses:
+
+- PASS – Test executed and verified.
+- FAIL – Test executed but failed.
+- BLOCKED – Environment or dependency prevented verification.
+- NOT RUN – Test was not executed.
+
+Also provide:
+
+1. Complete list of modified files.
+2. Root causes identified.
+3. Frontend validation changes.
+4. Backend validation changes.
+5. Final validation limits and accepted formats for all 23 fields.
+6. Actual test execution results.
+7. Database persistence verification results.
+8. Regression test results.
+9. Remaining unresolved issues, if any.
+
+---
+
+# FINAL EXECUTION INSTRUCTIONS
+
+**Your responsibility is to fix all 46 original test cases, not merely review them.**
+
+Execute the following workflow:
+
+**STEP 1:** Inspect the Consultation Workspace and all related components.
+
+**STEP 2:** Trace every field from UI input to API request, backend validation, and MongoDB persistence.
+
+**STEP 3:** Identify the exact root cause of each failed validation test.
+
+**STEP 4:** Implement frontend and backend fixes using the existing project architecture.
+
+**STEP 5:** Ensure invalid input and excessive values are rejected with appropriate messages.
+
+**STEP 6:** Verify that invalid data cannot be saved or used for prescription, radiology, or admission workflows.
+
+**STEP 7:** Run applicable automated tests and check all 46 test cases.
+
+**STEP 8:** Verify mobile, tablet, and desktop responsiveness without redesigning the UI.
+
+**STEP 9:** Check that no existing functionality has been broken.
+
+**STEP 10:** Produce the complete final QA report with accurate verification statuses.
+
+### CRITICAL REQUIREMENTS
+
+- Make direct code-level changes.
+- Do not provide terminal commands instead of implementing fixes.
+- Do not skip any listed field.
+- Do not remove existing functionality.
+- Do not change the application color scheme.
+- Do not use dummy data.
+- Do not silently truncate clinical information.
+- Do not allow invalid records into MongoDB.
+- Do not claim PASS without executing the corresponding verification.
+- Do not stop after fixing only some fields.
+
+**FINAL GOAL: All 46 validation test cases must be addressed, with valid clinical inputs preserved, invalid inputs rejected, appropriate error messages displayed, and no regression in the existing Hospital Management System.**
+
+Begin the full code-level investigation and implementation now.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-11-03T16:50:51+05:30.
+
+The user has uploaded 3 image(s):
+- C:/Users/Lenovo/.gemini/antigravity/brain/2ccc27af-708d-4629-a4e1-01afda2176a3/.user_uploaded/media_1793704812045_2f263781.jpg
+- C:/Users/Lenovo/.gemini/antigravity/brain/2ccc27af-708d-4629-a4e1-01afda2176a3/.user_uploaded/media_1793704826353_3867386c.jpg
+- C:/Users/Lenovo/.gemini/antigravity/brain/2ccc27af-708d-4629-a4e1-01afda2176a3/.user_uploaded/media_1793704850186_349c93ef.jpg
+You can embed these images in an artifact if you need the USER to review them.
+</ADDITIONAL_METADATA>

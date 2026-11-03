@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import {
+  useState, useEffect } from "react";
 import toast from "react-hot-toast";
 // @ts-ignore
 import html2pdf from "html2pdf.js";
 import { 
+  Loader2,
   Receipt, 
   Plus, 
   Search, 

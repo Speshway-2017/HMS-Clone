@@ -18,7 +18,8 @@ const ROLE_LIMITS = {
 const ROLE_LABEL_REGEX = /^[a-zA-Z][a-zA-Z0-9\s\.\-/'&]*$/;
 
 // Role Key: lowercase characters, numbers, and underscores only
-const ROLE_KEY_REGEX = /^[a-z0-9_]+$/;
+// Role Key: lowercase characters and underscores only
+const ROLE_KEY_REGEX = /^[a-z_]+$/;
 
 const AVAILABLE_PERMISSIONS = [
   "Manage Staff",
@@ -83,13 +84,13 @@ export function RoleFormPage() {
 
     if (field === "label") {
       if (!trimmed) {
-        return "Role Label is required. Please fill out this field";
+        return "Role Label (Display Name) is required. Field is required. Please fill out this field";
       }
       if (valStr.length > ROLE_LIMITS.LABEL) {
-        return `Role Label cannot exceed ${ROLE_LIMITS.LABEL} characters. Please enter valid data`;
+        return `Role Label (Display Name) cannot exceed ${ROLE_LIMITS.LABEL} characters. Too long text is not accepted. Please enter valid data`;
       }
       if (trimmed.length < 2 || !ROLE_LABEL_REGEX.test(trimmed)) {
-        return "Role Label contains invalid characters. Please enter valid data";
+        return "Role Label (Display Name) contains invalid data. Invalid data is not accepted. Please enter valid data";
       }
       return undefined;
     }
@@ -97,21 +98,27 @@ export function RoleFormPage() {
     if (field === "role") {
       if (!isEdit) {
         if (!trimmed) {
-          return "Role Key is required. Please fill out this field";
+          return "Role Key (System Identifier) is required. Field is required. Please fill out this field";
         }
         if (valStr.length > ROLE_LIMITS.KEY) {
-          return `Role Key cannot exceed ${ROLE_LIMITS.KEY} characters. Please enter valid data`;
+          return `Role Key (System Identifier) cannot exceed ${ROLE_LIMITS.KEY} characters. Too long text is not accepted. Please enter valid data`;
         }
         if (trimmed.length < 2 || !ROLE_KEY_REGEX.test(trimmed)) {
-          return "Role Key must contain only lowercase characters and underscores";
+          return "Role Key must contain only lowercase characters and underscores. Invalid data is not accepted. Please enter valid data";
         }
       }
       return undefined;
     }
 
     if (field === "description") {
+      if (!trimmed) {
+        return undefined; // Optional: empty description is valid and has no required message
+      }
       if (valStr.length > ROLE_LIMITS.DESCRIPTION) {
-        return `Description cannot exceed ${ROLE_LIMITS.DESCRIPTION} characters. Please enter valid data`;
+        return `Description cannot exceed ${ROLE_LIMITS.DESCRIPTION} characters. Too long text is not accepted. Please enter valid data`;
+      }
+      if (/<script|javascript:|data:|<[^>]*>|[\x00-\x08\x0B\x0C\x0E-\x1F]/i.test(trimmed)) {
+        return "Description contains invalid data. Invalid data is not accepted. Please enter valid data";
       }
       return undefined;
     }
@@ -146,9 +153,28 @@ export function RoleFormPage() {
     const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
     if (!hasSelection && currentLen >= limit) {
       e.preventDefault();
-      const msg = `${label} cannot exceed ${limit} characters. Please enter valid data`;
+      const msg = `${label} cannot exceed ${limit} characters. Too long text is not accepted. Please enter valid data`;
       setError(msg);
       toast.error(msg, { id: `${label}-limit` });
+    }
+  };
+
+  const handlePasteGuard = (
+    e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+    limit: number,
+    label: string,
+    field: "label" | "role" | "description"
+  ) => {
+    const pasted = e.clipboardData.getData("text");
+    const input = e.currentTarget;
+    const selStart = input.selectionStart ?? 0;
+    const selEnd = input.selectionEnd ?? 0;
+    const currentVal = form[field];
+    const nextLen = currentVal.length - (selEnd - selStart) + pasted.length;
+    if (nextLen > limit) {
+      const msg = `${label} cannot exceed ${limit} characters. Too long text is not accepted. Please enter valid data`;
+      setError(msg);
+      toast.error(msg, { id: `${label}-paste-limit` });
     }
   };
 
@@ -257,7 +283,8 @@ export function RoleFormPage() {
               setFieldErrors((prev) => ({ ...prev, label: err }));
               if (!err && error) setError(null);
             }}
-            onKeyDown={(e) => handleKeyGuard(e, form.label.length, ROLE_LIMITS.LABEL, "Role Label")}
+            onKeyDown={(e) => handleKeyGuard(e, form.label.length, ROLE_LIMITS.LABEL, "Role Label (Display Name)")}
+            onPaste={(e) => handlePasteGuard(e, ROLE_LIMITS.LABEL, "Role Label (Display Name)", "label")}
             onBlur={() => handleBlur("label")}
             placeholder="e.g. Ward Nurse"
           />
@@ -277,9 +304,10 @@ export function RoleFormPage() {
               setFieldErrors((prev) => ({ ...prev, role: err }));
               if (!err && error) setError(null);
             }}
-            onKeyDown={(e) => handleKeyGuard(e, form.role.length, ROLE_LIMITS.KEY, "Role Key")}
+            onKeyDown={(e) => handleKeyGuard(e, form.role.length, ROLE_LIMITS.KEY, "Role Key (System Identifier)")}
+            onPaste={(e) => handlePasteGuard(e, ROLE_LIMITS.KEY, "Role Key (System Identifier)", "role")}
             onBlur={() => handleBlur("role")}
-            placeholder="e.g. ward_nurse_123 (lowercase, numbers, and underscores)"
+            placeholder="e.g. ward_nurse (lowercase characters and underscores)"
           />
 
           <div className="sm:col-span-2">
@@ -297,6 +325,7 @@ export function RoleFormPage() {
                 if (!err && error) setError(null);
               }}
               onKeyDown={(e) => handleKeyGuard(e, form.description.length, ROLE_LIMITS.DESCRIPTION, "Description")}
+              onPaste={(e) => handlePasteGuard(e, ROLE_LIMITS.DESCRIPTION, "Description", "description")}
               onBlur={() => handleBlur("description")}
               placeholder="Describe the responsibilities and scope of this role..."
               rows={3}

@@ -13,18 +13,58 @@ import {
   numberValidator,
 } from "../utils/validators";
 
+const ROOM_NUMBER_REGEX = /^[a-zA-Z0-9\-_./]+$/;
+const ROOM_NAME_REGEX = /^[a-zA-Z0-9\s\.\-/'&,()]+$/;
+
 const roomSchema = z.object({
-  roomNumber: codeValidator("Room number", 1, 20, true),
-  roomName: optionalTrimmedString("Room name", 100),
-  wardId: requiredTrimmedString("Ward", 1, 50),
-  floor: optionalTrimmedString("Floor", 20),
-  roomType: requiredTrimmedString("Room type", 1, 50),
-  acType: optionalTrimmedString("AC type", 50),
+  wardId: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .min(1, "Please select a destination Ward. Please fill out this field"),
+  roomNumber: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .min(1, "Room Number is required. Please fill out this field")
+    .max(20, "Room Number cannot exceed 20 characters. Please enter valid data")
+    .refine((val) => ROOM_NUMBER_REGEX.test(val), {
+      message: "Room Number contains invalid data. Please enter valid data",
+    }),
+  roomName: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .max(100, "Room Name cannot exceed 100 characters. Please enter valid data")
+    .refine((val) => !val || ROOM_NAME_REGEX.test(val), {
+      message: "Room Name contains invalid data. Please enter valid data",
+    })
+    .optional()
+    .default(""),
+  floor: z.coerce
+    .number({ invalid_type_error: "Floor Number must be a valid number" })
+    .min(-5, "Floor Number cannot be less than -5. Please enter valid data")
+    .max(100, "Floor Number cannot exceed 100. Please enter valid data"),
+  roomType: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .min(1, "Room Category is required. Please fill out this field")
+    .max(50, "Room Category cannot exceed 50 characters. Please enter valid data"),
+  acType: z.enum(["AC", "Non AC"]).optional().default("Non AC"),
   acSubTypes: z.array(z.string().trim().max(50)).optional().default([]),
-  capacity: z.coerce.number().min(1, "Room bed capacity must be at least 1").max(500, "Room capacity cannot exceed 500"),
-  description: optionalTrimmedString("Description", 500),
-  status: optionalTrimmedString("Status", 50, "Available"),
+  capacity: z.coerce
+    .number({ invalid_type_error: "Room capacity must be a valid number" })
+    .min(1, "Room bed capacity must be at least 1. Please enter valid data")
+    .max(50, "Room bed capacity cannot exceed 50. Please enter valid data"),
+  description: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .max(500, "Description cannot exceed 500 characters. Please enter valid data")
+    .optional()
+    .default(""),
+  status: z
+    .enum(["Available", "Occupied", "Cleaning", "Maintenance", "Blocked", "Active", "Inactive"])
+    .optional()
+    .default("Available"),
   autoGenerateBeds: z.boolean().optional().default(true),
+  bedPrefix: z.string().trim().max(50).optional().default(""),
   tariff: z.any().optional(),
 });
 
@@ -141,6 +181,7 @@ export const getRoom = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const createRoom = catchAsync(async (req: Request, res: Response) => {
+  const parsed = roomSchema.parse(req.body);
   const hospitalId = req.hospitalFilter!.hospital;
   const branchId = req.hospitalFilter?.branch ?? null;
   const {
@@ -156,7 +197,7 @@ export const createRoom = catchAsync(async (req: Request, res: Response) => {
     status,
     autoGenerateBeds = true,
     tariff
-  } = req.body;
+  } = parsed;
 
   // Real-world validation: Cannot create room without selecting a ward
   if (!wardId) {
@@ -282,6 +323,7 @@ export const createRoom = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const updateRoom = catchAsync(async (req: Request, res: Response) => {
+  const parsed = roomSchema.partial().parse(req.body);
   const hospitalId = req.hospitalFilter!.hospital;
   const branchId = req.hospitalFilter?.branch ?? null;
   const { id } = req.params;
@@ -298,7 +340,7 @@ export const updateRoom = catchAsync(async (req: Request, res: Response) => {
     status,
     tariff,
     autoGenerateBeds = true
-  } = req.body;
+  } = parsed;
 
   const room = await Room.findOne({ _id: id, ...req.hospitalFilter });
   if (!room) {
@@ -400,9 +442,9 @@ export const updateRoom = catchAsync(async (req: Request, res: Response) => {
 
   if (roomName !== undefined) room.roomName = roomName.trim();
   if (floor !== undefined) room.floor = Number(floor);
-  room.roomType = targetRoomType;
+  (room as any).roomType = targetRoomType;
   room.acType = targetAcType;
-  room.acSubTypes = targetAcSubTypes;
+  (room as any).acSubTypes = targetAcSubTypes;
   if (description !== undefined) room.description = description;
   if (status) room.status = status;
 
