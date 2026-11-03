@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../core/config/api_config.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../routes/app_routes.dart';
 import '../../../utils/responsive_helper.dart';
@@ -153,106 +152,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _showSettingsDialog() {
-    final controller = TextEditingController(text: ApiConfig.baseUrl);
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: AppColors.white,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: const [
-              Icon(Icons.dns_outlined, color: AppColors.navy700),
-              SizedBox(width: 10),
-              Text(
-                'Server Address',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.slate900),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Configure the MERN API Base URL for this physical device to reach the backend:',
-                style: TextStyle(fontSize: 12, color: AppColors.slate500, height: 1.4),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: controller,
-                autofocus: true,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                decoration: InputDecoration(
-                  hintText: 'https://cms.speshway.site/api/v1',
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: AppColors.slate500)),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                var url = controller.text.trim();
-                if (url.isNotEmpty) {
-                  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                    url = 'https://$url';
-                  }
-
-                  final hostPart = url.replaceFirst('http://', '').replaceFirst('https://', '');
-                  final domainOrHost = hostPart.split('/').first;
-                  final hasPort = RegExp(r':\d+').hasMatch(domainOrHost);
-                  if (!hasPort) {
-                    final isIpOrLocal = RegExp(r'^(localhost|127\.0\.0\.1|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})').hasMatch(domainOrHost);
-                    if (isIpOrLocal) {
-                      if (url.contains('/api/v1')) {
-                        url = url.replaceFirst('/api/v1', ':5000/api/v1');
-                      } else {
-                        url = '$url:5000';
-                      }
-                    }
-                  }
-
-                  if (!url.endsWith('/api/v1') && !url.endsWith('/api/v1/')) {
-                    if (url.endsWith('/')) {
-                      url = '${url}api/v1';
-                    } else {
-                      url = '$url/api/v1';
-                    }
-                  }
-
-                  final navigator = Navigator.of(context);
-                  final messenger = ScaffoldMessenger.of(context);
-                  await ApiConfig.setBaseUrl(url);
-                  navigator.pop();
-                  messenger.showSnackBar(
-                    SnackBar(
-                      content: Text('Server URL updated to: $url'),
-                      backgroundColor: AppColors.navy700,
-                    ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.navy700,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Text('Save URL', style: TextStyle(fontSize: 12, color: AppColors.white)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   void _handleSubmit() {
     if (_isRegisterMode) {
       _handleRegister();
@@ -268,16 +167,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (_formKey.currentState!.validate()) {
       final name = _nameController.text.trim();
-      final email = _emailController.text.trim();
+      final rawEmail = _emailController.text.trim();
+      final phone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
       final password = _passwordController.text;
       final confirmPassword = _confirmPasswordController.text;
-      final phone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
       final ageStr = _ageController.text.trim();
-      final address = _addressController.text.trim();
+      final rawAddress = _addressController.text.trim();
 
-      if (password != confirmPassword) {
+      if (name.length < 2) {
         setState(() {
-          _errorMessage = 'Passwords do not match. Please verify your confirm password.';
+          _errorMessage = 'Full Name must be at least 2 characters long.';
         });
         return;
       }
@@ -289,7 +188,23 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      final ageVal = int.tryParse(ageStr) ?? 0;
+      if (password.length < 6) {
+        setState(() {
+          _errorMessage = 'Password must be at least 6 characters long.';
+        });
+        return;
+      }
+
+      if (password != confirmPassword) {
+        setState(() {
+          _errorMessage = 'Passwords do not match. Please verify your confirm password.';
+        });
+        return;
+      }
+
+      final email = rawEmail.isNotEmpty ? rawEmail : 'patient_$phone@speshway.site';
+      final ageVal = int.tryParse(ageStr) ?? 25;
+      final address = rawAddress.isNotEmpty ? rawAddress : 'General';
 
       setState(() {
         _isLoading = true;
@@ -466,9 +381,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: AppColors.slate50,
       body: SafeArea(
-        child: Stack(
-          children: [
-            GestureDetector(
+        child: GestureDetector(
               onTap: () => FocusScope.of(context).unfocus(),
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
@@ -616,74 +529,51 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    
-                    SizedBox(height: responsive.scaleHeight(20.0)),
-                    
-                    // Connection Info Banner
-                    Container(
-                      padding: const EdgeInsets.all(14.0),
-                      decoration: BoxDecoration(
-                        color: AppColors.navy50,
-                        borderRadius: BorderRadius.circular(12.0),
-                        border: Border.all(color: AppColors.navy100),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                          const SizedBox(height: 8),
+
+                          // Legal and Policy Links
                           Row(
-                            children: const [
-                              Icon(Icons.wifi_tethering, color: AppColors.navy700, size: 16),
-                              SizedBox(width: 8),
-                              Text(
-                                'Physical Device Connection Settings',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.navy800,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              GestureDetector(
+                                onTap: () => Navigator.pushNamed(context, AppRoutes.privacyPolicy),
+                                child: Text(
+                                  'Privacy Policy',
+                                  style: TextStyle(
+                                    fontSize: responsive.scaleText(11.0),
+                                    color: AppColors.slate500,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                child: Text('•', style: TextStyle(color: AppColors.slate400, fontSize: responsive.scaleText(11.0))),
+                              ),
+                              GestureDetector(
+                                onTap: () => Navigator.pushNamed(context, AppRoutes.termsConditions),
+                                child: Text(
+                                  'Terms & Conditions',
+                                  style: TextStyle(
+                                    fontSize: responsive.scaleText(11.0),
+                                    color: AppColors.slate500,
+                                    decoration: TextDecoration.underline,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _isRegisterMode
-                                ? '1. Ensure your PC and this phone are on the same Wi-Fi network.\n'
-                                  '2. Fill in your details to create a patient profile in the backend.\n'
-                                  '3. After registration, you will be automatically logged in to your portal.'
-                                : '1. Ensure your PC and this phone are on the same Wi-Fi network.\n'
-                                  '2. Tap the settings gear icon in the top right to configure your PC\'s local IP address.\n'
-                                  '3. Use credentials registered in your database (e.g. superadmin@hms.com / admin123).',
-                            style: TextStyle(
-                              fontSize: responsive.scaleText(10.5),
-                              color: AppColors.navy900,
-                              height: 1.5,
-                            ),
-                          ),
                         ],
                       ),
                     ),
                     
                     SizedBox(height: responsive.scaleHeight(20.0)),
+                    
+
                   ],
                 ),
               ),
             ),
-
-            // Settings/Gear Icon positioned at top right
-            Positioned(
-              top: 8,
-              right: 8,
-              child: IconButton(
-                icon: const Icon(Icons.settings_outlined, color: AppColors.slate500, size: 24),
-                onPressed: _showSettingsDialog,
-                tooltip: 'Server Settings',
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -866,7 +756,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // Email Address
               Text(
-                'Email Address *',
+                'Email Address (Optional)',
                 style: TextStyle(
                   fontSize: responsive.scaleText(11.5),
                   fontWeight: FontWeight.bold,
@@ -881,13 +771,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 textInputAction: TextInputAction.next,
                 style: TextStyle(fontSize: responsive.scaleText(13.0), color: AppColors.slate900, fontWeight: FontWeight.w500),
                 decoration: const InputDecoration(
-                  hintText: 'rahul@example.com',
+                  hintText: 'Optional / rahul@example.com',
                   prefixIcon: Icon(Icons.mail_outline, size: 18),
                 ),
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) return 'Email Address is required';
-                  final emailRegExp = RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+");
-                  if (!emailRegExp.hasMatch(value.trim())) return 'Please enter a valid email address';
+                  if (value != null && value.trim().isNotEmpty) {
+                    final emailRegExp = RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+");
+                    if (!emailRegExp.hasMatch(value.trim())) return 'Please enter a valid email address';
+                  }
                   return null;
                 },
                 onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_passwordFocusNode),
@@ -1098,7 +989,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Age *',
+                          'Age (Optional)',
                           style: TextStyle(
                             fontSize: responsive.scaleText(11.5),
                             fontWeight: FontWeight.bold,
@@ -1114,12 +1005,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           textInputAction: TextInputAction.next,
                           style: TextStyle(fontSize: responsive.scaleText(13.0), color: AppColors.slate900, fontWeight: FontWeight.w500),
                           decoration: const InputDecoration(
-                            hintText: 'e.g. 28',
+                            hintText: 'e.g. 25',
                           ),
                           validator: (value) {
-                            if (value == null || value.trim().isEmpty) return 'Age is required';
-                            final age = int.tryParse(value.trim());
-                            if (age == null || age < 0 || age > 120) return 'Age must be 0-120';
+                            if (value != null && value.trim().isNotEmpty) {
+                              final age = int.tryParse(value.trim());
+                              if (age == null || age < 0 || age > 120) return 'Valid age (0-120)';
+                            }
                             return null;
                           },
                         ),
@@ -1197,7 +1089,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 14),
 
               Text(
-                'Residential Address *',
+                'Residential Address (Optional)',
                 style: TextStyle(
                   fontSize: responsive.scaleText(11.5),
                   fontWeight: FontWeight.bold,
@@ -1212,14 +1104,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 textInputAction: TextInputAction.done,
                 style: TextStyle(fontSize: responsive.scaleText(13.0), color: AppColors.slate900, fontWeight: FontWeight.w500),
                 decoration: const InputDecoration(
-                  hintText: 'House / Street, City, Pincode',
+                  hintText: 'City, Street or Area',
                   prefixIcon: Icon(Icons.location_on_outlined, size: 18),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) return 'Residential Address is required';
-                  if (value.trim().length < 3) return 'Address must be at least 3 characters long';
-                  return null;
-                },
+                validator: (value) => null,
                 onFieldSubmitted: (_) => _handleSubmit(),
               ),
             ],
