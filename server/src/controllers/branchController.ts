@@ -5,10 +5,7 @@ import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { generateBranchId } from "../utils/idGenerator";
 import { getPagination, paginatedResponse } from "../utils/pagination";
-<<<<<<< HEAD
-=======
 import { getRealtimeStaffCountsForBranches } from "../utils/branchStaffHelper";
->>>>>>> origin/development
 import { syncBranchDepartmentsForBranch } from "../utils/branchDepartmentSync";
 import { emitToHospital } from "../config/socket";
 

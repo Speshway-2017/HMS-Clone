@@ -9,7 +9,10 @@ import { Role } from "../utils/roles";
 
 export const protect = catchAsync(async (req: Request, _res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : undefined;
+  let token = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : undefined;
+  if (!token && typeof req.query?.token === "string" && req.query.token.trim()) {
+    token = req.query.token.trim();
+  }
   if (!token) {
     throw new AppError("You are not logged in.", 401);
   }

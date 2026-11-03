@@ -102,7 +102,7 @@ export function BedsPage() {
     limit: 10
   });
 
-  const { data: bedData, isLoading: isLoadingBeds } = useBeds({
+  const { data: bedData, isLoading: isLoadingBeds, refetch: refetchBeds } = useBeds({
     search: bedSearch || undefined,
     ward: bedWardFilter || undefined,
     room: bedRoomFilter || undefined,
@@ -195,6 +195,7 @@ export function BedsPage() {
     const nextStatus = bed.status === "Blocked" ? "Available" : "Blocked";
     try {
       await updateBedMutation.mutateAsync({ id: bed._id, status: nextStatus });
+      await refetchBeds();
       toast.success(`Bed ${bed.bedCode} is now ${nextStatus}.`);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to update bed status.");
@@ -213,6 +214,7 @@ export function BedsPage() {
         status: nextStatus,
         lastSanitized: new Date().toISOString()
       });
+      await refetchBeds();
       toast.success(`Bed ${bed.bedCode} status set to ${nextStatus}.`);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to update bed status.");
@@ -227,6 +229,7 @@ export function BedsPage() {
       onConfirm: async () => {
         try {
           await deleteBedMutation.mutateAsync(id);
+          await refetchBeds();
           toast.success("✓ Bed Deleted Successfully");
         } catch (err: any) {
           toast.error(err.response?.data?.message || "Failed to delete bed.");
@@ -396,7 +399,7 @@ export function BedsPage() {
             <>
               {b.status === "Available" && (
                 <button
-                  onClick={() => navigate("/reception/ip-management")}
+                  onClick={() => navigate(`/admin/ip?tab=new&bedId=${b._id}`)}
                   className="text-xs bg-navy-700 text-white px-2 py-1 rounded hover:bg-navy-800 transition flex items-center gap-1 font-medium"
                   title="Assign Patient"
                 >
@@ -405,9 +408,15 @@ export function BedsPage() {
               )}
               {b.status === "Occupied" && (
                 <button
-                  onClick={() => navigate("/reception/ip-management")}
+                  onClick={() => {
+                    const admId = b.admission?._id || "";
+                    const target = admId
+                      ? `/admin/ip?tab=transfer&admissionId=${admId}&bedId=${b._id}`
+                      : `/admin/ip?tab=transfer&bedId=${b._id}`;
+                    navigate(target);
+                  }}
                   className="text-xs bg-amber-600 text-white px-2 py-1 rounded hover:bg-amber-700 transition flex items-center gap-1 font-medium"
-                  title="Transfer Patient"
+                  title="Transfer Bed"
                 >
                   <ArrowRightLeft className="h-3 w-3" /> Transfer
                 </button>

@@ -6,25 +6,96 @@ import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 import { emitToHospital } from "../config/socket";
 import { logAudit } from "../utils/auditLogger";
-import {
-  requiredTrimmedString,
-  optionalTrimmedString,
-  numberValidator,
-} from "../utils/validators";
+
+const ITEM_NAME_REGEX = /^[a-zA-Z0-9\s\.\-/'&,()%+]+$/;
+const SKU_REGEX = /^[a-zA-Z0-9\-_./]+$/;
+const UNIT_REGEX = /^[a-zA-Z0-9\s\-_/()]+$/;
+const SUPPLIER_REGEX = /^[a-zA-Z0-9\s\.\-/'&,()]+$/;
+const STORAGE_REGEX = /^[a-zA-Z0-9\s\.\-°/():,]+$/;
 
 const inventoryItemSchema = z.object({
-  name: z.string().min(1),
-  strength: z.string().optional().default(""),
-  sku: z.string().min(1),
-  category: z.enum(INVENTORY_CATEGORIES).optional(),
-  description: z.string().optional().default(""),
-  unit: z.string().optional().default("units"),
-  stockQty: z.coerce.number().min(0).optional().default(0),
-  reorderLevel: z.coerce.number().min(0).optional().default(0),
-  maxLevel: z.coerce.number().min(0).optional().default(0),
-  unitCost: z.coerce.number().min(0).optional().default(0),
-  supplier: z.string().optional().default(""),
-  storageCondition: z.string().optional().default(""),
+  name: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .min(1, "Please enter valid data")
+    .max(100, "Item Name cannot exceed 100 characters. Please enter valid data")
+    .refine((val) => ITEM_NAME_REGEX.test(val), {
+      message: "Please enter valid data",
+    }),
+  strength: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .max(100, "Strength cannot exceed 100 characters. Please enter valid data")
+    .optional()
+    .default(""),
+  sku: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .min(1, "Please enter valid data")
+    .max(50, "SKU cannot exceed 50 characters. Please enter valid data")
+    .refine((val) => SKU_REGEX.test(val), {
+      message: "Please enter valid data",
+    }),
+  category: z.enum(INVENTORY_CATEGORIES, {
+    errorMap: () => ({ message: "Please enter valid data" }),
+  }).optional(),
+  description: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .max(500, "Description cannot exceed 500 characters. Please enter valid data")
+    .optional()
+    .default(""),
+  unit: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .max(50, "Unit cannot exceed 50 characters. Please enter valid data")
+    .refine((val) => !val || UNIT_REGEX.test(val), {
+      message: "Please enter valid data",
+    })
+    .optional()
+    .default("units"),
+  stockQty: z.coerce
+    .number({ invalid_type_error: "Please enter valid data" })
+    .min(0, "Stock Quantity cannot be negative. Please enter valid data")
+    .max(1000000, "Stock Quantity cannot exceed 1,000,000. Please enter valid data")
+    .optional()
+    .default(0),
+  reorderLevel: z.coerce
+    .number({ invalid_type_error: "Please enter valid data" })
+    .min(0, "Reorder Level cannot be negative. Please enter valid data")
+    .max(1000000, "Reorder Level cannot exceed 1,000,000. Please enter valid data")
+    .optional()
+    .default(0),
+  maxLevel: z.coerce
+    .number({ invalid_type_error: "Please enter valid data" })
+    .min(0, "Max Level cannot be negative. Please enter valid data")
+    .max(1000000, "Max Level cannot exceed 1,000,000. Please enter valid data")
+    .optional()
+    .default(0),
+  unitCost: z.coerce
+    .number({ invalid_type_error: "Please enter valid data" })
+    .min(0, "Unit Cost cannot be negative. Please enter valid data")
+    .max(10000000, "Unit Cost cannot exceed 10,000,000. Please enter valid data")
+    .optional()
+    .default(0),
+  supplier: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .max(100, "Supplier cannot exceed 100 characters. Please enter valid data")
+    .refine((val) => !val || (SUPPLIER_REGEX.test(val) && val.length >= 2), {
+      message: "Please enter valid data",
+    })
+    .optional()
+    .default(""),
+  storageCondition: z
+    .string({ invalid_type_error: "Please enter valid data" })
+    .trim()
+    .max(100, "Storage Condition cannot exceed 100 characters. Please enter valid data")
+    .refine((val) => !val || STORAGE_REGEX.test(val), {
+      message: "Please enter valid data",
+    })
+    .optional()
+    .default(""),
 });
 
 function withComputedStatus(item: InstanceType<typeof InventoryItem>) {

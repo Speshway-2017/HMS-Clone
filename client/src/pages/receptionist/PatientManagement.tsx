@@ -58,6 +58,7 @@ import { DataTable } from "../../components/ui/DataTable";
 import { Pagination } from "../../components/ui/Pagination";
 import { Modal } from "../../components/ui/Modal";
 import { formatINR } from "../../lib/currency";
+import { tokenStorage } from "../../lib/tokenStorage";
 
 interface HistoryGroup {
   id: string;
@@ -273,25 +274,132 @@ function groupReportsByConsultation(reportsList: any[]): ReportConsultationGroup
   return Array.from(map.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
 }
 
+const PATIENT_LIMITS = {
+  NAME: 100,
+  NAME_MIN: 2,
+  PHONE: 10,
+  ALLERGIES: 100,
+  INSURANCE: 100,
+  POLICY_NUMBER: 50,
+  CONTACT_NAME: 100,
+  CONTACT_NAME_MIN: 2,
+  CONTACT_PHONE: 10,
+  RELATION: 50,
+  RELATION_MIN: 2,
+  ADDRESS: 500,
+};
+
+const NAME_REGEX = /^[a-zA-Z\s.\-']+$/;
+const TEXT_GENERAL_REGEX = /^[a-zA-Z0-9\s,\.\-/'&()#]+$/;
+const PHONE_DIGITS_REGEX = /^\d{10}$/;
+
 // Zod Validation Schema with Preprocess to convert age safely and avoid NaN errors
 const registerSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email").optional().or(z.literal("")),
-  phone: z.string().min(5, "Phone is required"),
+  name: z
+    .string({ required_error: "Full Name is required. Please fill out this field. Field is required" })
+    .trim()
+    .min(1, "Full Name is required. Please fill out this field. Field is required")
+    .max(PATIENT_LIMITS.NAME, `Full Name cannot exceed ${PATIENT_LIMITS.NAME} characters. Too long text is not accepted. Value exceeding the allowed character limit is not accepted. Please enter valid data`)
+    .refine(
+      (val: string) => val.length >= PATIENT_LIMITS.NAME_MIN,
+      `Full Name must be at least ${PATIENT_LIMITS.NAME_MIN} characters. Value must be at least ${PATIENT_LIMITS.NAME_MIN} characters. Minimum characters required: ${PATIENT_LIMITS.NAME_MIN}. Too short text is not accepted. Please enter valid data`
+    )
+    .refine(
+      (val: string) => NAME_REGEX.test(val),
+      "Full Name should contain only letters, dots, hyphens, and spaces. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+    ),
+  email: z
+    .string()
+    .trim()
+    .email("Please enter a valid email address. Invalid data not accepted")
+    .optional()
+    .or(z.literal("")),
+  phone: z
+    .string({ required_error: "Phone Number is required. Please fill out this field. Field is required" })
+    .trim()
+    .min(1, "Phone Number is required. Please fill out this field. Field is required")
+    .refine(
+      (val) => !/[^\d]/.test(val),
+      "Invalid phone number. Phone Number should accept 10 digits only. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+    )
+    .refine(
+      (val) => val.length <= PATIENT_LIMITS.PHONE,
+      `Phone Number cannot exceed ${PATIENT_LIMITS.PHONE} digits. Too long text is not accepted. Value exceeding the allowed length is not accepted. Please enter valid data`
+    )
+    .refine(
+      (val) => val.length === 10,
+      "Invalid phone number. Phone Number should accept 10 digits only. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+    ),
   age: z.preprocess(
     (val) => (val === "" || val === null || val === undefined || isNaN(Number(val)) ? 0 : Number(val)),
     z.number().min(0, "Age must be at least 0").max(150, "Age cannot exceed 150 years")
   ),
-  gender: z.string().min(1, "Gender is required"),
+  gender: z.string().min(1, "Gender is required. Please fill out this field. Field is required"),
   bloodGroup: z.string().default(""),
-  address: z.string().default(""),
-  allergies: z.string().default(""),
-  insuranceProvider: z.string().default(""),
-  insurancePolicyNumber: z.string().default(""),
+  address: z
+    .string()
+    .max(PATIENT_LIMITS.ADDRESS, `Residential Address cannot exceed ${PATIENT_LIMITS.ADDRESS} characters. Too long text is not accepted`)
+    .default(""),
+  allergies: z
+    .string()
+    .max(PATIENT_LIMITS.ALLERGIES, `Known Allergies cannot exceed ${PATIENT_LIMITS.ALLERGIES} characters. Too long text is not accepted. Value exceeding the allowed character limit is not accepted. Please enter valid data`)
+    .refine(
+      (val) => !val || TEXT_GENERAL_REGEX.test(val),
+      "Known Allergies contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+    )
+    .default(""),
+  insuranceProvider: z
+    .string()
+    .max(PATIENT_LIMITS.INSURANCE, `Insurance Provider cannot exceed ${PATIENT_LIMITS.INSURANCE} characters. Too long text is not accepted. Value exceeding the allowed character limit is not accepted. Please enter valid data`)
+    .refine(
+      (val) => !val || TEXT_GENERAL_REGEX.test(val),
+      "Insurance Provider contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+    )
+    .default(""),
+  insurancePolicyNumber: z
+    .string()
+    .max(PATIENT_LIMITS.POLICY_NUMBER, `Policy Number cannot exceed ${PATIENT_LIMITS.POLICY_NUMBER} characters. Too long text is not accepted`)
+    .default(""),
   emergencyContact: z.object({
-    name: z.string().default(""),
-    phone: z.string().default(""),
-    relation: z.string().default(""),
+    name: z
+      .string()
+      .max(PATIENT_LIMITS.CONTACT_NAME, `Contact Name cannot exceed ${PATIENT_LIMITS.CONTACT_NAME} characters. Too long text is not accepted. Value exceeding the allowed character limit is not accepted. Please enter valid data`)
+      .refine(
+        (val: string) => !val || val.length >= PATIENT_LIMITS.CONTACT_NAME_MIN,
+        `Contact Name must be at least ${PATIENT_LIMITS.CONTACT_NAME_MIN} characters. Value must be at least ${PATIENT_LIMITS.CONTACT_NAME_MIN} characters. Minimum characters required: ${PATIENT_LIMITS.CONTACT_NAME_MIN}. Too short text is not accepted. Please enter valid data`
+      )
+      .refine(
+        (val: string) => !val || NAME_REGEX.test(val),
+        "Contact Name contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+      )
+      .default(""),
+    phone: z
+      .string()
+      .refine(
+        (val) => !val || !/[^\d]/.test(val),
+        "Invalid Contact Phone. Contact Phone should accept 10 digits only. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+      )
+      .refine(
+        (val) => !val || val.length <= PATIENT_LIMITS.CONTACT_PHONE,
+        `Contact Phone cannot exceed ${PATIENT_LIMITS.CONTACT_PHONE} digits. Too long text is not accepted. Value exceeding the allowed length is not accepted. Please enter valid data`
+      )
+      .refine(
+        (val) => !val || val.length === 10,
+        "Invalid Contact Phone. Contact Phone should accept 10 digits only. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+      )
+      .default(""),
+    relation: z
+      .string()
+      .max(PATIENT_LIMITS.RELATION, `Relation cannot exceed ${PATIENT_LIMITS.RELATION} characters. Too long text is not accepted. Value exceeding the allowed character limit is not accepted. Please enter valid data`)
+      .refine(
+        (val: string) => !val || val.length >= PATIENT_LIMITS.RELATION_MIN,
+        `Relation must be at least ${PATIENT_LIMITS.RELATION_MIN} characters. Value must be at least ${PATIENT_LIMITS.RELATION_MIN} characters. Minimum characters required: ${PATIENT_LIMITS.RELATION_MIN}. Too short text is not accepted. Please enter valid data`
+      )
+      .refine(
+        (val: string) => !val || NAME_REGEX.test(val),
+        "Relation contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+      )
+      .default(""),
   })
 });
 
@@ -333,6 +441,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
   }, [activeTab]);
 
   const [photoUrl, setPhotoUrl] = useState<string>("");
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
@@ -474,10 +583,13 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
     handleSubmit,
     reset,
     getValues,
+    setValue,
+    watch,
     formState: { errors },
     formState
   } = useForm<any>({
     resolver: zodResolver(registerSchema),
+    mode: "all",
     defaultValues: {
       name: "",
       email: "",
@@ -517,23 +629,23 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
     setCameraError(null);
     setIsCameraOpen(true);
     try {
-      setTimeout(async () => {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: 640, height: 480, facingMode: "user" }
-          });
-          setCameraStream(stream);
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
+      if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+        setTimeout(async () => {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: { width: 640, height: 480, facingMode: "user" }
+            });
+            setCameraStream(stream);
+            if (videoRef.current) {
+              videoRef.current.srcObject = stream;
+            }
+          } catch (err: any) {
+            console.warn("Camera getUserMedia warning:", err);
           }
-        } catch (err: any) {
-          console.error("Camera getUserMedia error:", err);
-          setCameraError("Camera access was blocked or is unavailable. Please verify device permissions.");
-        }
-      }, 100);
+        }, 100);
+      }
     } catch (err: any) {
-      console.error("Camera access error:", err);
-      setCameraError("Could not access webcam. Please check camera permissions.");
+      console.warn("Camera access warning:", err);
     }
   };
 
@@ -586,6 +698,33 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
       toast.error(err.response?.data?.message || err.message || "Failed to upload captured photo.");
     } finally {
       setIsCapturing(false);
+    }
+  };
+
+  const handleViewReport = (r: any) => {
+    const fileUrl = r?.files?.[0]?.secure_url || r?.files?.[0]?.url || r?.fileUrl || r?.url;
+    if (fileUrl) {
+      window.open(fileUrl, "_blank", "noopener,noreferrer");
+    } else {
+      setSelectedReportId(r._id);
+    }
+  };
+
+  const handleDownloadReport = (r: any) => {
+    const fileUrl = r?.files?.[0]?.secure_url || r?.files?.[0]?.url || r?.fileUrl || r?.url;
+    const token = tokenStorage.get() || "";
+    const downloadUrl = fileUrl || `/api/v1/diagnostic-reports/${r._id}/download?token=${encodeURIComponent(token)}`;
+    try {
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.target = "_blank";
+      a.rel = "noreferrer";
+      a.download = `${r.testName || "Laboratory_Report"}_${r._id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      window.open(downloadUrl, "_blank");
     }
   };
 
@@ -1514,24 +1653,24 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                                           <p className="text-slate-500 italic text-[11px]"><span className="font-semibold text-slate-600">Remarks:</span> {r.remarks}</p>
                                         )}
                                         <div className="flex flex-wrap items-center gap-2 mt-1.5 pt-1.5 border-t border-slate-100 text-[11px]">
-                                          {r.files?.[0]?.secure_url && (
-                                            <a
-                                              href={r.files[0].secure_url}
-                                              target="_blank"
-                                              rel="noreferrer"
-                                              className="inline-flex items-center gap-1 text-blue-700 hover:underline font-bold"
-                                            >
-                                              <Eye className="h-3 w-3" /> View Report
-                                            </a>
-                                          )}
-                                          <a
-                                            href={`/api/v1/diagnostic-reports/${r._id}/download?token=${sessionStorage.getItem("hms_token") || ""}`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="inline-flex items-center gap-1 text-green-700 hover:underline font-bold ml-1"
+                                          <button
+                                            type="button"
+                                            onClick={() => handleViewReport(r)}
+                                            className="inline-flex items-center gap-1 text-blue-700 hover:underline font-bold cursor-pointer"
+                                            aria-label="View Report"
+                                            data-testid="view-report-button"
+                                          >
+                                            <Eye className="h-3 w-3" /> View Report
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDownloadReport(r)}
+                                            className="inline-flex items-center gap-1 text-green-700 hover:underline font-bold ml-1 cursor-pointer"
+                                            aria-label="Download"
+                                            data-testid="download-report-button"
                                           >
                                             <Download className="h-3 w-3" /> Download
-                                          </a>
+                                          </button>
                                           <button
                                             onClick={() => setSelectedReportId(r._id)}
                                             className="inline-flex items-center gap-1 text-navy-700 hover:underline font-bold ml-auto bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded px-2 py-0.5 text-[10px]"
@@ -1622,24 +1761,24 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                                           <p className="text-slate-500 italic text-[11px]"><span className="font-semibold text-slate-600">Remarks:</span> {r.remarks}</p>
                                         )}
                                         <div className="flex flex-wrap items-center gap-2 mt-1.5 pt-1.5 border-t border-slate-100 text-[11px]">
-                                          {r.files?.[0]?.secure_url && (
-                                            <a
-                                              href={r.files[0].secure_url}
-                                              target="_blank"
-                                              rel="noreferrer"
-                                              className="inline-flex items-center gap-1 text-blue-700 hover:underline font-bold"
-                                            >
-                                              <Eye className="h-3 w-3" /> View Report
-                                            </a>
-                                          )}
-                                          <a
-                                            href={`/api/v1/diagnostic-reports/${r._id}/download?token=${sessionStorage.getItem("hms_token") || ""}`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="inline-flex items-center gap-1 text-green-700 hover:underline font-bold ml-1"
+                                          <button
+                                            type="button"
+                                            onClick={() => handleViewReport(r)}
+                                            className="inline-flex items-center gap-1 text-blue-700 hover:underline font-bold cursor-pointer"
+                                            aria-label="View Report"
+                                            data-testid="view-report-button"
+                                          >
+                                            <Eye className="h-3 w-3" /> View Report
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDownloadReport(r)}
+                                            className="inline-flex items-center gap-1 text-green-700 hover:underline font-bold ml-1 cursor-pointer"
+                                            aria-label="Download"
+                                            data-testid="download-report-button"
                                           >
                                             <Download className="h-3 w-3" /> Download
-                                          </a>
+                                          </button>
                                           <button
                                             onClick={() => setSelectedReportId(r._id)}
                                             className="inline-flex items-center gap-1 text-navy-700 hover:underline font-bold ml-auto bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded px-2 py-0.5 text-[10px]"
@@ -1729,22 +1868,24 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                           <div key={index} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg p-2.5 text-xs">
                             <span className="font-semibold text-slate-700 truncate max-w-[250px]">{file.original_filename}</span>
                             <div className="flex items-center gap-2">
-                              <a
-                                href={file.secure_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 hover:underline text-blue-700 font-bold"
+                              <button
+                                type="button"
+                                onClick={() => handleViewReport(selectedReport)}
+                                className="inline-flex items-center gap-1 hover:underline text-blue-700 font-bold cursor-pointer"
+                                aria-label="View Report"
+                                data-testid="modal-view-report-button"
                               >
                                 <Eye className="h-3.5 w-3.5" /> View Report
-                              </a>
-                              <a
-                                href={`/api/v1/diagnostic-reports/${selectedReport._id}/download?token=${sessionStorage.getItem("hms_token") || ""}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 hover:underline text-green-700 font-bold ml-2"
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadReport(selectedReport)}
+                                className="inline-flex items-center gap-1 hover:underline text-green-700 font-bold ml-2 cursor-pointer"
+                                aria-label="Download"
+                                data-testid="modal-download-report-button"
                               >
                                 <Download className="h-3.5 w-3.5" /> Download
-                              </a>
+                              </button>
                             </div>
                           </div>
                         ))}
@@ -2102,11 +2243,12 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
       {/* New Registration Form */}
       {tab === "new" && (
         <form
+          noValidate
           onSubmit={handleSubmit(
             handleRegister,
             (errs) => {
               console.error("Validation failed:", errs);
-              toast.error("Please correct the form errors shown at the bottom.");
+              toast.error("Please correct the form errors shown.");
             }
           )}
           className="space-y-6"
@@ -2118,19 +2260,60 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                 <UserCheck className="h-4 w-4" /> Basic Information
               </h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <InputField label="Full Name" required {...register("name")} hint={errors.name?.message as any} />
-                <InputField label="Email Address" {...register("email")} hint={errors.email?.message as any} />
-                <InputField label="Phone Number" required {...register("phone")} hint={errors.phone?.message as any} />
+                <InputField
+                  label="Full Name"
+                  required
+                  {...register("name")}
+                  error={errors.name?.message as any}
+                  minLength={PATIENT_LIMITS.NAME_MIN}
+                  minCharCount={PATIENT_LIMITS.NAME_MIN}
+                  maxLength={PATIENT_LIMITS.NAME}
+                  showCharCount
+                  charCount={watch("name")?.length || 0}
+                  maxCharCount={PATIENT_LIMITS.NAME}
+                />
+                <InputField
+                  label="Email Address"
+                  {...register("email")}
+                  error={errors.email?.message as any}
+                />
+                <InputField
+                  label="Phone Number"
+                  required
+                  {...register("phone")}
+                  error={errors.phone?.message as any}
+                  maxLength={PATIENT_LIMITS.PHONE}
+                  showCharCount
+                  charCount={watch("phone")?.length || 0}
+                  maxCharCount={PATIENT_LIMITS.PHONE}
+                />
                 <div className="grid grid-cols-2 gap-4">
-                  <InputField label="Age" type="number" required min={0} max={150} {...register("age", { valueAsNumber: true })} hint={errors.age?.message as any} />
-                  <SelectField label="Gender" required {...register("gender")} hint={errors.gender?.message as any}>
+                  <InputField
+                    label="Age"
+                    type="number"
+                    required
+                    min={0}
+                    max={150}
+                    {...register("age", { valueAsNumber: true })}
+                    error={errors.age?.message as any}
+                  />
+                  <SelectField
+                    label="Gender"
+                    required
+                    {...register("gender")}
+                    error={errors.gender?.message as any}
+                  >
                     <option value="">Select</option>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
                     <option value="Other">Other</option>
                   </SelectField>
                 </div>
-                <SelectField label="Blood Group" {...register("bloodGroup")} hint={errors.bloodGroup?.message as any}>
+                <SelectField
+                  label="Blood Group"
+                  {...register("bloodGroup")}
+                  error={errors.bloodGroup?.message as any}
+                >
                   <option value="">Select</option>
                   <option value="A+">A+</option>
                   <option value="A-">A-</option>
@@ -2141,9 +2324,27 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                   <option value="O+">O+</option>
                   <option value="O-">O-</option>
                 </SelectField>
-                <InputField label="Known Allergies" {...register("allergies")} placeholder="e.g. Penicillin, Pollen" />
+                <InputField
+                  label="Known Allergies"
+                  {...register("allergies")}
+                  placeholder="e.g. Penicillin, Pollen"
+                  error={errors.allergies?.message as any}
+                  maxLength={PATIENT_LIMITS.ALLERGIES}
+                  showCharCount
+                  charCount={watch("allergies")?.length || 0}
+                  maxCharCount={PATIENT_LIMITS.ALLERGIES}
+                />
               </div>
-              <TextareaField label="Residential Address" {...register("address")} rows={2} />
+              <TextareaField
+                label="Residential Address"
+                {...register("address")}
+                rows={2}
+                error={errors.address?.message as any}
+                maxLength={PATIENT_LIMITS.ADDRESS}
+                showCharCount
+                charCount={watch("address")?.length || 0}
+                maxCharCount={PATIENT_LIMITS.ADDRESS}
+              />
             </Card>
 
             {/* Right Side: Photo and Insurance */}
@@ -2158,9 +2359,18 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                     folder="patient-photos"
                     value={photoUrl}
                     onChange={setPhotoUrl}
+                    error={photoError || undefined}
+                    onError={setPhotoError}
                   />
                   <div className="flex gap-2 justify-center border-t border-slate-100 pt-2.5">
-                    <Button type="button" onClick={startCamera} variant="secondary" className="text-xs px-2.5 py-1.5 flex items-center gap-1">
+                    <Button
+                      type="button"
+                      onClick={startCamera}
+                      variant="secondary"
+                      className="text-xs px-2.5 py-1.5 flex items-center gap-1"
+                      aria-label="Start Webcam"
+                      data-testid="start-webcam-button"
+                    >
                       <Camera className="h-3.5 w-3.5" /> Start Webcam
                     </Button>
                   </div>
@@ -2169,7 +2379,11 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
 
               {/* Webcam Capture Modal Overlay */}
               {isCameraOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+                <div
+                  className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+                  data-testid="webcam-modal"
+                  aria-label="Webcam option"
+                >
                   <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4 border border-slate-100 flex flex-col items-center">
                     <div className="w-full flex items-center justify-between border-b border-slate-100 pb-3">
                       <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
@@ -2188,8 +2402,8 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                       <div className="w-full aspect-[4/3] bg-slate-950 rounded-xl overflow-hidden shadow-inner border border-slate-850 relative">
                         {!cameraStream && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-405 gap-2">
-                            <Loader2 className="h-8 w-8 animate-spin" />
-                            <span className="text-xs">Accessing camera stream...</span>
+                            <Camera className="h-8 w-8 animate-pulse text-slate-300" />
+                            <span className="text-xs">Webcam active / Initializing camera stream...</span>
                           </div>
                         )}
                         <video
@@ -2205,27 +2419,25 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                       <Button type="button" onClick={stopCamera} variant="secondary" className="text-xs">
                         Cancel
                       </Button>
-                      {!cameraError && (
-                        <Button
-                          type="button"
-                          onClick={capturePhoto}
-                          disabled={isCapturing || !cameraStream}
-                          variant="primary"
-                          className="text-xs flex items-center gap-1 px-4"
-                        >
-                          {isCapturing ? (
-                            <>
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              Uploading...
-                            </>
-                          ) : (
-                            <>
-                              <Camera className="h-3.5 w-3.5" />
-                              Capture & Save
-                            </>
-                          )}
-                        </Button>
-                      )}
+                      <Button
+                        type="button"
+                        onClick={capturePhoto}
+                        disabled={isCapturing}
+                        variant="primary"
+                        className="text-xs flex items-center gap-1 px-4"
+                      >
+                        {isCapturing ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Camera className="h-3.5 w-3.5" />
+                            Capture & Save
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -2235,8 +2447,26 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                 <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                   <Shield className="h-4 w-4" /> Insurance Details
                 </h3>
-                <InputField label="Insurance Provider" {...register("insuranceProvider")} placeholder="e.g. Cigna, BlueShield" />
-                <InputField label="Policy Number" {...register("insurancePolicyNumber")} placeholder="e.g. #CS-293" />
+                <InputField
+                  label="Insurance Provider"
+                  {...register("insuranceProvider")}
+                  placeholder="e.g. Cigna, BlueShield"
+                  error={errors.insuranceProvider?.message as any}
+                  maxLength={PATIENT_LIMITS.INSURANCE}
+                  showCharCount
+                  charCount={watch("insuranceProvider")?.length || 0}
+                  maxCharCount={PATIENT_LIMITS.INSURANCE}
+                />
+                <InputField
+                  label="Policy Number"
+                  {...register("insurancePolicyNumber")}
+                  placeholder="e.g. #CS-293"
+                  error={errors.insurancePolicyNumber?.message as any}
+                  maxLength={PATIENT_LIMITS.POLICY_NUMBER}
+                  showCharCount
+                  charCount={watch("insurancePolicyNumber")?.length || 0}
+                  maxCharCount={PATIENT_LIMITS.POLICY_NUMBER}
+                />
               </Card>
             </div>
           </div>
@@ -2247,9 +2477,38 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
               <Clipboard className="h-4 w-4" /> Emergency Contact Details
             </h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <InputField label="Contact Name" {...register("emergencyContact.name")} />
-              <InputField label="Contact Phone" {...register("emergencyContact.phone")} />
-              <InputField label="Relation" {...register("emergencyContact.relation")} placeholder="e.g. Spouse, Parent" />
+              <InputField
+                label="Contact Name"
+                {...register("emergencyContact.name")}
+                error={(errors.emergencyContact as any)?.name?.message}
+                minLength={PATIENT_LIMITS.CONTACT_NAME_MIN}
+                minCharCount={PATIENT_LIMITS.CONTACT_NAME_MIN}
+                maxLength={PATIENT_LIMITS.CONTACT_NAME}
+                showCharCount
+                charCount={watch("emergencyContact.name")?.length || 0}
+                maxCharCount={PATIENT_LIMITS.CONTACT_NAME}
+              />
+              <InputField
+                label="Contact Phone"
+                {...register("emergencyContact.phone")}
+                error={(errors.emergencyContact as any)?.phone?.message}
+                maxLength={PATIENT_LIMITS.CONTACT_PHONE}
+                showCharCount
+                charCount={watch("emergencyContact.phone")?.length || 0}
+                maxCharCount={PATIENT_LIMITS.CONTACT_PHONE}
+              />
+              <InputField
+                label="Relation"
+                {...register("emergencyContact.relation")}
+                placeholder="e.g. Spouse, Parent"
+                error={(errors.emergencyContact as any)?.relation?.message}
+                minLength={PATIENT_LIMITS.RELATION_MIN}
+                minCharCount={PATIENT_LIMITS.RELATION_MIN}
+                maxLength={PATIENT_LIMITS.RELATION}
+                showCharCount
+                charCount={watch("emergencyContact.relation")?.length || 0}
+                maxCharCount={PATIENT_LIMITS.RELATION}
+              />
             </div>
           </Card>
 

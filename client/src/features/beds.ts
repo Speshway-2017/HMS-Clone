@@ -71,6 +71,7 @@ export function useCreateBed() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["beds"] });
+      queryClient.refetchQueries({ queryKey: ["beds"] });
       queryClient.invalidateQueries({ queryKey: ["rooms"] });
       queryClient.invalidateQueries({ queryKey: ["reception", "rooms"] });
     }
@@ -94,6 +95,7 @@ export function useUpdateBed() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["beds"] });
+      queryClient.refetchQueries({ queryKey: ["beds"] });
       queryClient.invalidateQueries({ queryKey: ["rooms"] });
       queryClient.invalidateQueries({ queryKey: ["reception", "rooms"] });
     }
@@ -108,6 +110,7 @@ export function useDeleteBed() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["beds"] });
+      queryClient.refetchQueries({ queryKey: ["beds"] });
       queryClient.invalidateQueries({ queryKey: ["rooms"] });
       queryClient.invalidateQueries({ queryKey: ["reception", "rooms"] });
     }

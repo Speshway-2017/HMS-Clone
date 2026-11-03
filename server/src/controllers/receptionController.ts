@@ -29,23 +29,132 @@ import {
 
 
 
+const PATIENT_LIMITS = {
+  NAME: 100,
+  NAME_MIN: 2,
+  PHONE: 10,
+  ALLERGIES: 100,
+  INSURANCE: 100,
+  POLICY_NUMBER: 50,
+  CONTACT_NAME: 100,
+  CONTACT_NAME_MIN: 2,
+  CONTACT_PHONE: 10,
+  RELATION: 50,
+  RELATION_MIN: 2,
+  ADDRESS: 500,
+};
+
+const NAME_REGEX = /^[a-zA-Z\s.\-']+$/;
+const TEXT_GENERAL_REGEX = /^[a-zA-Z0-9\s,\.\-/'&()#]+$/;
+
 // Validation Schemas
 const patientRegistrationSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email").optional().or(z.literal("")),
-  phone: z.string().min(5, "Phone is required"),
+  name: z
+    .string({ required_error: "Full Name is required. Please fill out this field. Field is required" })
+    .trim()
+    .min(1, "Full Name is required. Please fill out this field. Field is required")
+    .max(PATIENT_LIMITS.NAME, `Full Name cannot exceed ${PATIENT_LIMITS.NAME} characters. Too long text is not accepted. Value exceeding the allowed character limit is not accepted. Please enter valid data`)
+    .refine(
+      (val: string) => val.length >= PATIENT_LIMITS.NAME_MIN,
+      `Full Name must be at least ${PATIENT_LIMITS.NAME_MIN} characters. Value must be at least ${PATIENT_LIMITS.NAME_MIN} characters. Minimum characters required: ${PATIENT_LIMITS.NAME_MIN}. Too short text is not accepted. Please enter valid data`
+    )
+    .refine(
+      (val) => NAME_REGEX.test(val),
+      "Full Name should contain only letters, dots, hyphens, and spaces. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+    ),
+  email: z
+    .string()
+    .trim()
+    .email("Please enter a valid email address. Invalid data not accepted")
+    .optional()
+    .or(z.literal("")),
+  phone: z
+    .string({ required_error: "Phone Number is required. Please fill out this field. Field is required" })
+    .trim()
+    .min(1, "Phone Number is required. Please fill out this field. Field is required")
+    .refine(
+      (val) => !/[^\d]/.test(val),
+      "Invalid phone number. Phone Number should accept 10 digits only. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+    )
+    .refine(
+      (val) => val.length <= PATIENT_LIMITS.PHONE,
+      `Phone Number cannot exceed ${PATIENT_LIMITS.PHONE} digits. Too long text is not accepted. Value exceeding the allowed length is not accepted. Please enter valid data`
+    )
+    .refine(
+      (val) => val.length === 10,
+      "Invalid phone number. Phone Number should accept 10 digits only. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+    ),
   age: z.coerce.number().min(0, "Age must be at least 0").max(150, "Age cannot exceed 150 years"),
-  gender: z.string().min(1, "Gender is required"),
+  gender: z.string().min(1, "Gender is required. Please fill out this field. Field is required"),
   bloodGroup: z.string().default(""),
-  address: z.string().default(""),
-  allergies: z.string().default(""),
-  insuranceProvider: z.string().default(""),
-  insurancePolicyNumber: z.string().default(""),
-  emergencyContact: z.object({
-    name: z.string().default(""),
-    phone: z.string().default(""),
-    relation: z.string().default(""),
-  }).optional()
+  address: z
+    .string()
+    .max(PATIENT_LIMITS.ADDRESS, `Residential Address cannot exceed ${PATIENT_LIMITS.ADDRESS} characters. Too long text is not accepted`)
+    .default(""),
+  allergies: z
+    .string()
+    .max(PATIENT_LIMITS.ALLERGIES, `Known Allergies cannot exceed ${PATIENT_LIMITS.ALLERGIES} characters. Too long text is not accepted. Value exceeding the allowed character limit is not accepted. Please enter valid data`)
+    .refine(
+      (val) => !val || TEXT_GENERAL_REGEX.test(val),
+      "Known Allergies contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+    )
+    .default(""),
+  insuranceProvider: z
+    .string()
+    .max(PATIENT_LIMITS.INSURANCE, `Insurance Provider cannot exceed ${PATIENT_LIMITS.INSURANCE} characters. Too long text is not accepted. Value exceeding the allowed character limit is not accepted. Please enter valid data`)
+    .refine(
+      (val) => !val || TEXT_GENERAL_REGEX.test(val),
+      "Insurance Provider contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+    )
+    .default(""),
+  insurancePolicyNumber: z
+    .string()
+    .max(PATIENT_LIMITS.POLICY_NUMBER, `Policy Number cannot exceed ${PATIENT_LIMITS.POLICY_NUMBER} characters. Too long text is not accepted`)
+    .default(""),
+  photoUrl: z.string().optional().default(""),
+  emergencyContact: z
+    .object({
+      name: z
+        .string()
+        .max(PATIENT_LIMITS.CONTACT_NAME, `Contact Name cannot exceed ${PATIENT_LIMITS.CONTACT_NAME} characters. Too long text is not accepted. Value exceeding the allowed character limit is not accepted. Please enter valid data`)
+        .refine(
+          (val: string) => !val || val.length >= PATIENT_LIMITS.CONTACT_NAME_MIN,
+          `Contact Name must be at least ${PATIENT_LIMITS.CONTACT_NAME_MIN} characters. Value must be at least ${PATIENT_LIMITS.CONTACT_NAME_MIN} characters. Minimum characters required: ${PATIENT_LIMITS.CONTACT_NAME_MIN}. Too short text is not accepted. Please enter valid data`
+        )
+        .refine(
+          (val) => !val || NAME_REGEX.test(val),
+          "Contact Name contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+        )
+        .default(""),
+      phone: z
+        .string()
+        .refine(
+          (val) => !val || !/[^\d]/.test(val),
+          "Invalid Contact Phone. Contact Phone should accept 10 digits only. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+        )
+        .refine(
+          (val) => !val || val.length <= PATIENT_LIMITS.CONTACT_PHONE,
+          `Contact Phone cannot exceed ${PATIENT_LIMITS.CONTACT_PHONE} digits. Too long text is not accepted. Value exceeding the allowed length is not accepted. Please enter valid data`
+        )
+        .refine(
+          (val) => !val || val.length === 10,
+          "Invalid Contact Phone. Contact Phone should accept 10 digits only. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+        )
+        .default(""),
+      relation: z
+        .string()
+        .max(PATIENT_LIMITS.RELATION, `Relation cannot exceed ${PATIENT_LIMITS.RELATION} characters. Too long text is not accepted. Value exceeding the allowed character limit is not accepted. Please enter valid data`)
+        .refine(
+          (val: string) => !val || val.length >= PATIENT_LIMITS.RELATION_MIN,
+          `Relation must be at least ${PATIENT_LIMITS.RELATION_MIN} characters. Value must be at least ${PATIENT_LIMITS.RELATION_MIN} characters. Minimum characters required: ${PATIENT_LIMITS.RELATION_MIN}. Too short text is not accepted. Please enter valid data`
+        )
+        .refine(
+          (val) => !val || NAME_REGEX.test(val),
+          "Relation contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+        )
+        .default(""),
+    })
+    .optional()
 });
 
 const appointmentBookingSchema = z.object({
@@ -54,8 +163,8 @@ const appointmentBookingSchema = z.object({
   departmentId: z.string().min(1, "Department ID is required"),
   date: z.string().min(1, "Date is required"),
   time: z.string().min(1, "Time is required"),
-  type: z.enum(["Consultation", "Walk-in", "Emergency"]).default("Consultation"),
-  notes: optionalTrimmedString("Notes", 500),
+  type: z.enum(["Consultation", "Walk-in", "Emergency", "Appointment"]).default("Appointment"),
+  notes: optionalTrimmedString("Chief Complaints / Notes", 500),
   // Follow-up booking fields
   followUp: z.boolean().optional().default(false),
   parentAppointmentId: z.string().optional().nullable(),
@@ -85,10 +194,10 @@ const admissionSchema = z.object({
   attenderName: optionalTrimmedString("Attender name", 100),
   attenderPhone: phoneValidator("Attender phone", false),
   assignedNurse: z.string().min(1, "Assigned nurse is required"),
-  insuranceProvider: z.string().optional().default(""),
-  insurancePolicyNumber: z.string().optional().default(""),
+  insuranceProvider: optionalTrimmedString("Insurance Provider", 100),
+  insurancePolicyNumber: optionalTrimmedString("Policy Number", 50),
   advanceAmount: z.coerce.number().min(0).default(0),
-  admissionNotes: z.string().optional().default(""),
+  admissionNotes: optionalTrimmedString("Admission Remarks", 500),
   paymentMethod: z.string().optional().default("Cash"),
 
   // Receptionist Initiated Specifics
@@ -101,8 +210,8 @@ const admissionSchema = z.object({
   // Manual Admission specifics
   departmentId: z.string().optional().nullable(),
   admissionType: z.enum(["Emergency", "Elective", "Direct Admission"]).optional().default("Direct Admission"),
-  expectedStay: z.string().optional().default(""),
-  primaryDiagnosis: z.string().optional().default(""),
+  expectedStay: optionalTrimmedString("Expected Stay", 10),
+  primaryDiagnosis: optionalTrimmedString("Primary Diagnosis", 150),
   requestId: z.string().optional().nullable()
 });
 
@@ -228,9 +337,15 @@ export const processBillingPayment = catchAsync(async (req: Request, res: Respon
 });
 
 export const getQueueState = catchAsync(async (req: Request, res: Response) => {
-  const dateStr = (req.query.date as string) || new Date().toISOString();
-  const tokens = await ReceptionRepository.getQueueByDate(req.hospitalFilter as any, new Date(dateStr));
-  res.json({ status: "success", data: { tokens } });
+  let dateObj = new Date();
+  if (req.query.date && typeof req.query.date === "string") {
+    const parsed = new Date(req.query.date);
+    if (!isNaN(parsed.getTime())) {
+      dateObj = parsed;
+    }
+  }
+  const tokens = await ReceptionRepository.getQueueByDate(req.hospitalFilter as any, dateObj);
+  res.json({ status: "success", data: { tokens: tokens || [] } });
 });
 
 export const simulateDoctorCall = catchAsync(async (req: Request, res: Response) => {

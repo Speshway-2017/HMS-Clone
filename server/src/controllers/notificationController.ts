@@ -12,6 +12,7 @@ import { RadiologyOrder } from "../models/RadiologyOrder";
 import { DbNotification } from "../models/DbNotification";
 import { PayrollRecord } from "../models/PayrollRecord";
 import { NotificationDismissal } from "../models/NotificationDismissal";
+import { AdmissionRequest } from "../models/AdmissionRequest";
 
 export const getNotifications = catchAsync(async (req: Request, res: Response) => {
   const hospitalFilter = req.hospitalFilter as Record<string, unknown>;
@@ -80,6 +81,7 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
     payrollRecalcRecords,
     dbNotifications,
     userDismissals,
+    pendingAdmissionRequests,
   ] = await Promise.all([
     // Appointments: Doctor (own), Patient (own), Receptionist (hospital), Admin (hospital)
     (isDoctor || isPatientUser || isReceptionist || isAdmin)
@@ -174,6 +176,19 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
       user: req.user!._id,
       hospital: hospitalFilter.hospital,
     }).lean(),
+
+    // Pending Admission Requests: Receptionist, Admin, Doctor
+    (isReceptionist || isAdmin || isDoctor)
+      ? AdmissionRequest.find({
+          ...hospitalFilter,
+          status: { $in: ["Pending", "Admission Requested"] },
+        })
+          .populate("patient", "name")
+          .populate("doctor", "name")
+          .sort({ requestedAt: -1 })
+          .limit(10)
+          .lean()
+      : Promise.resolve([]),
   ]);
 
   const dismissedSet = new Set(userDismissals.map(d => d.notificationId));
@@ -276,6 +291,21 @@ export const getNotifications = catchAsync(async (req: Request, res: Response) =
       link: targetLink,
       severity: "info",
       createdAt: patient.createdAt as Date,
+    });
+  }
+
+  // ── Admission Requests ──
+  for (const admReq of (pendingAdmissionRequests as any[]) || []) {
+    const patientName = (admReq.patient as { name?: string })?.name ?? "Unknown patient";
+    const doctorName = (admReq.doctor as { name?: string })?.name ?? "Unknown doctor";
+    notifications.push({
+      id: `adm-${admReq._id}`,
+      type: "admission_request",
+      title: "Admission Request",
+      message: `${admReq.priority || "Routine"} admission request for ${patientName} by Dr. ${doctorName}`,
+      link: isDoctor ? `/doctor/ip-management` : `/receptionist/ip-management`,
+      severity: admReq.priority === "Emergency" ? "critical" : admReq.priority === "Urgent" ? "warning" : "info",
+      createdAt: admReq.requestedAt || admReq.createdAt || new Date(),
     });
   }
 

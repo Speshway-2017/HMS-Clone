@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
-import { Search, Plus, List, ClipboardList, CheckCircle, Filter } from "lucide-react";
+import { Search, Plus, List, ClipboardList, CheckCircle, Filter, AlertCircle } from "lucide-react";
 import {
   usePatientsSearch,
   useDoctorsAvailability,
@@ -24,6 +24,13 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 interface Props {
   activeTab?: "new" | "queue" | "history";
 }
+
+const OP_LIMITS = {
+  SEARCH: 100,
+  REASON: 500,
+};
+
+const TEXT_GENERAL_REGEX = /^[a-zA-Z0-9\s,\.\-/'&()#]+$/;
 
 export function OPManagementPage({ activeTab = "queue" }: Props) {
   const [tab, setTab] = useState<"new" | "queue" | "history">(activeTab);
@@ -51,6 +58,81 @@ export function OPManagementPage({ activeTab = "queue" }: Props) {
   const [historyPage, setHistoryPage] = useState(1);
   const navigate = useNavigate();
 
+  // Field validation error states
+  const [patientSearchError, setPatientSearchError] = useState<string | null>(null);
+  const [reasonError, setReasonError] = useState<string | null>(null);
+
+  const validatePatientSearch = (val: string): string | null => {
+    if (!val || !val.trim()) {
+      setPatientSearchError(null);
+      return null;
+    }
+    if (val.length > OP_LIMITS.SEARCH) {
+      const msg = `Patient Search cannot exceed ${OP_LIMITS.SEARCH} characters. Characters limit: ${OP_LIMITS.SEARCH}. Too long data and characters limit should be mentioned. Too long data is not accepted. Too long text is not accepted. Please enter valid data`;
+      setPatientSearchError(msg);
+      return msg;
+    }
+    if (!TEXT_GENERAL_REGEX.test(val)) {
+      const msg = "Patient Search contains invalid characters. Invalid data is not accepted. Invalid data not accepted. Please enter valid data";
+      setPatientSearchError(msg);
+      return msg;
+    }
+    setPatientSearchError(null);
+    return null;
+  };
+
+  const validateReason = (val: string): string | null => {
+    if (!val || !val.trim()) {
+      setReasonError(null);
+      return null;
+    }
+    if (val.length > OP_LIMITS.REASON) {
+      const msg = `Reason for Visit cannot exceed ${OP_LIMITS.REASON} characters. Characters limit: ${OP_LIMITS.REASON}. Too long data and characters limit should be mentioned. Too long data is not accepted. Too long text is not accepted. Please enter valid data`;
+      setReasonError(msg);
+      return msg;
+    }
+    if (!TEXT_GENERAL_REGEX.test(val)) {
+      const msg = "Reason for Visit contains invalid characters. Invalid data is not accepted. Invalid data not accepted. Please enter valid data";
+      setReasonError(msg);
+      return msg;
+    }
+    setReasonError(null);
+    return null;
+  };
+
+  const handleKeyGuard = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>, maxLen: number) => {
+    const isControlKey = [
+      "Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+      "Home", "End", "Tab", "Enter", "Escape"
+    ].includes(e.key) || e.ctrlKey || e.metaKey || e.altKey;
+
+    if (isControlKey) return;
+
+    const target = e.currentTarget;
+    const hasSelection = (target.selectionEnd ?? 0) - (target.selectionStart ?? 0) > 0;
+    if (target.value.length >= maxLen && !hasSelection) {
+      e.preventDefault();
+    }
+  };
+
+  const handlePasteGuard = (
+    e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+    maxLen: number,
+    setter: (val: string) => void,
+    validator: (val: string) => any
+  ) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text") || "";
+    const target = e.currentTarget;
+    const start = target.selectionStart ?? 0;
+    const end = target.selectionEnd ?? 0;
+    const current = target.value;
+    const combined = current.slice(0, start) + pasted + current.slice(end);
+    const sliced = combined.slice(0, maxLen);
+    setter(sliced);
+    validator(sliced);
+  };
+
   const { data: searchPatients } = usePatientsSearch(patientQuery);
   const { data: doctors } = useDoctorsAvailability();
   const { data: departmentsResponse } = useDepartments();
@@ -66,8 +148,21 @@ export function OPManagementPage({ activeTab = "queue" }: Props) {
 
   const handleCreateOPVisit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPatientId || !selectedDocId || !selectedDeptId) {
+    const searchErr = validatePatientSearch(patientQuery);
+    const reasonErr = validateReason(notes);
+
+    if (!selectedPatientId) {
+      const msg = "Patient Search is required. Please search and select a patient. Field is required";
+      setPatientSearchError(msg);
+      toast.error(msg);
+      return;
+    }
+    if (!selectedDocId || !selectedDeptId) {
       toast.error("Please fill all required fields");
+      return;
+    }
+    if (searchErr || reasonErr) {
+      toast.error(searchErr || reasonErr || "Please correct the form errors.");
       return;
     }
 
@@ -315,19 +410,43 @@ export function OPManagementPage({ activeTab = "queue" }: Props) {
 
             {/* Patient Search */}
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Patient Search *
-              </label>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Patient Search <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-mono text-slate-400" title={`Characters limit: ${OP_LIMITS.SEARCH}`}>
+                    {patientQuery.length}/{OP_LIMITS.SEARCH}
+                  </span>
+                </div>
+              </div>
               <div className="relative">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Type to search patients by UHID or Name..."
                   value={patientQuery}
-                  onChange={(e) => setPatientQuery(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 pl-10 pr-4 py-2 text-sm outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setPatientQuery(val);
+                    validatePatientSearch(val);
+                  }}
+                  onKeyDown={(e) => handleKeyGuard(e, OP_LIMITS.SEARCH)}
+                  onPaste={(e) => handlePasteGuard(e, OP_LIMITS.SEARCH, setPatientQuery, validatePatientSearch)}
+                  maxLength={OP_LIMITS.SEARCH}
+                  className={`w-full rounded-lg border pl-10 pr-4 py-2 text-sm outline-none transition-all ${
+                    patientSearchError
+                      ? "border-red-500 bg-red-50/20 text-red-900 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                      : "border-slate-300 focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+                  }`}
                 />
               </div>
+              {patientSearchError && (
+                <p className="mt-1 text-xs font-semibold text-red-600 flex items-center gap-1" role="alert">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>{patientSearchError}</span>
+                </p>
+              )}
 
               {searchPatients && searchPatients.length > 0 && (
                 <div className="mt-2 rounded-lg border border-slate-150 divide-y divide-slate-100 max-h-36 overflow-y-auto">
@@ -468,7 +587,18 @@ export function OPManagementPage({ activeTab = "queue" }: Props) {
               label="Reason for Visit / Chief Complaints"
               placeholder="e.g. Fever, Headache, Routine Checkup..."
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setNotes(val);
+                validateReason(val);
+              }}
+              onKeyDown={(e) => handleKeyGuard(e, OP_LIMITS.REASON)}
+              onPaste={(e) => handlePasteGuard(e, OP_LIMITS.REASON, setNotes, validateReason)}
+              maxLength={OP_LIMITS.REASON}
+              showCharCount
+              charCount={notes.length}
+              maxCharCount={OP_LIMITS.REASON}
+              error={reasonError || undefined}
               rows={3}
             />
           </Card>

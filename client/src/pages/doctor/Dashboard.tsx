@@ -114,7 +114,7 @@ const Sparkline = React.memo(({ data, color = "#1e3a8a" }: { data: number[]; col
   const chartData = useMemo(() => data.map((val, idx) => ({ id: idx, value: val })), [data]);
   return (
     <div className="h-6 w-16 sm:w-20 shrink-0">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <LineChart data={chartData} margin={{ top: 2, bottom: 2, left: 2, right: 2 }}>
           <Line type="linear" dataKey="value" stroke={color} strokeWidth={1.5} dot={false} isAnimationActive={false} />
         </LineChart>
@@ -135,7 +135,12 @@ export function DoctorDashboard() {
   const [chartType, setChartType] = useState<"area" | "line">("area");
 
   // Fetch real aggregated analytics from the backend
-  const { data: analytics, isLoading: isAnalyticsLoading } = useDoctorDashboardAnalytics({
+  const {
+    data: analytics,
+    isLoading: isAnalyticsLoading,
+    isError: isAnalyticsError,
+    refetch: refetchAnalytics
+  } = useDoctorDashboardAnalytics({
     range: dateRange,
     startDate: customStartDate,
     endDate: customEndDate
@@ -354,6 +359,25 @@ export function DoctorDashboard() {
         </Card>
       )}
 
+      {/* API Failure Alert Banner */}
+      {isAnalyticsError && (
+        <Card className="flex flex-col sm:flex-row items-center justify-between p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl gap-3">
+          <div className="flex items-center gap-2.5">
+            <AlertOctagon className="h-5 w-5 text-rose-600 shrink-0" />
+            <div>
+              <p className="text-xs font-bold text-rose-900 font-sans">Unable to load real-time analytics data</p>
+              <p className="text-[11px] text-rose-600 font-sans">A network or server error occurred while fetching metrics. Displayed counts may be unavailable.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => refetchAnalytics()}
+            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition-colors shrink-0 flex items-center gap-1.5 font-sans"
+          >
+            <RefreshCw className="h-3 w-3" /> Retry Analytics
+          </button>
+        </Card>
+      )}
+
       {/* SECTION 1: TOP SUMMARY CARDS (Responsive: 1 col on mobile, 2 on tablet, 4 cols on desktop) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {[
@@ -409,13 +433,14 @@ export function DoctorDashboard() {
           {
             label: "Follow-up Patients",
             data: metrics?.followupPatients,
-            icon: <ChevronRight className="h-4 w-4" />,
+            icon: <UserCheck className="h-4 w-4" />,
             color: "stroke-teal-600 bg-teal-50 text-teal-700",
             to: "/doctor/followups"
           }
         ].map((card) => {
-          const currentVal = card.data?.current ?? 0;
-          const diff = card.data?.todayDiff ?? 0;
+          const isNum = typeof card.data?.current === "number" && !isNaN(card.data.current);
+          const currentVal = isAnalyticsError ? "—" : (isNum ? card.data.current : 0);
+          const diff = typeof card.data?.todayDiff === "number" && !isNaN(card.data.todayDiff) ? card.data.todayDiff : 0;
           const sparklineArr = card.data?.sparkline ?? [0, 0, 0, 0, 0, 0, 0];
           const isUp = diff >= 0;
 
@@ -631,7 +656,7 @@ export function DoctorDashboard() {
           {/* Donut Chart */}
           <div className="lg:col-span-1 rounded-xl border border-slate-100 bg-slate-50/50 p-3 flex flex-col items-center justify-center relative">
             <div className="h-44 w-full flex items-center justify-center relative">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <PieChart>
                   <Pie
                     data={doctorRevisitMetrics.pieData}
@@ -712,7 +737,7 @@ export function DoctorDashboard() {
       {/* SECTIONS 2 & 3: PATIENT GROWTH & ANALYTICS (Responsive: 1 col on mobile, 3 cols on desktop) */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Patient Demographics / Patient Type Split */}
-        <Card className="flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
+        <Card className="min-w-0 flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
           <div>
             <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-1.5 font-sans">
               <Users className="h-4 w-4 text-navy-600" /> Patient Segment Analytics
@@ -720,48 +745,58 @@ export function DoctorDashboard() {
             <p className="text-xs text-slate-400 mb-4 font-sans">Patient categories distribution</p>
           </div>
 
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={analytics?.patientAnalytics?.types ?? []}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={3}
-                  dataKey="value"
-                  isAnimationActive={true}
-                  animationDuration={1000}
-                  animationEasing="ease-out"
-                >
-                  {(analytics?.patientAnalytics?.types ?? []).map((entry: any, index: number) => (
-                    <Cell key={`cell-${index}`} fill={CHART_COLORS.navy[index % CHART_COLORS.navy.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          {((analytics?.patientAnalytics?.types ?? []).reduce((acc: number, curr: any) => acc + (curr.value || 0), 0) > 0) ? (
+            <>
+              <div className="h-48 w-full">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                  <PieChart>
+                    <Pie
+                      data={analytics?.patientAnalytics?.types ?? []}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={55}
+                      outerRadius={75}
+                      paddingAngle={3}
+                      dataKey="value"
+                      isAnimationActive={true}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                    >
+                      {(analytics?.patientAnalytics?.types ?? []).map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS.navy[index % CHART_COLORS.navy.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
 
-          {/* Details & Percentage Summary */}
-          <div className="grid grid-cols-2 gap-2 mt-4">
-            {(analytics?.patientAnalytics?.types ?? []).map((t: any, i: number) => {
-              const totalVal = (analytics?.patientAnalytics?.types ?? []).reduce((acc: number, curr: any) => acc + curr.value, 0) || 1;
-              const pct = Math.round((t.value / totalVal) * 100);
-              return (
-                <div key={t.name} className="rounded-lg border border-slate-100 p-2 text-center bg-slate-50/50">
-                  <p className="text-[10px] font-extrabold text-slate-400 truncate font-sans">{t.name}</p>
-                  <p className="text-sm font-black text-slate-700 font-sans">{pct}%</p>
-                  <p className="text-[9px] text-slate-400 font-sans">{t.value} cases</p>
-                </div>
-              );
-            })}
-          </div>
+              {/* Details & Percentage Summary */}
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                {(analytics?.patientAnalytics?.types ?? []).map((t: any) => {
+                  const totalVal = (analytics?.patientAnalytics?.types ?? []).reduce((acc: number, curr: any) => acc + (curr.value || 0), 0) || 1;
+                  const pct = Math.round(((t.value || 0) / totalVal) * 100);
+                  return (
+                    <div key={t.name} className="rounded-lg border border-slate-100 p-2 text-center bg-slate-50/50">
+                      <p className="text-[10px] font-extrabold text-slate-400 truncate font-sans">{t.name}</p>
+                      <p className="text-sm font-black text-slate-700 font-sans">{pct}%</p>
+                      <p className="text-[9px] text-slate-400 font-sans">{t.value || 0} cases</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <div className="flex h-48 flex-col items-center justify-center text-center p-4 rounded-lg border border-dashed border-slate-100 bg-slate-50/40 my-auto">
+              <Users className="mb-2 h-8 w-8 text-slate-300" />
+              <p className="text-xs font-bold text-slate-500 font-sans">No Segment Records</p>
+              <p className="text-[10px] text-slate-400 font-sans">No patient category data found for this period.</p>
+            </div>
+          )}
         </Card>
 
         {/* Patient Growth Trend Line/Area Chart */}
-        <Card className="lg:col-span-2 flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
+        <Card className="min-w-0 lg:col-span-2 flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
             <div>
               <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 font-sans">
@@ -803,7 +838,7 @@ export function DoctorDashboard() {
           </div>
 
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               {chartType === "area" ? (
                 <AreaChart data={analytics?.growthTrend?.[growthTab] ?? []} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                   <defs>
@@ -857,7 +892,7 @@ export function DoctorDashboard() {
       {/* SECTIONS 4, 5, 6: CLINICAL LOGISTICS & DIAGNOSTICS (Responsive: 1 col on mobile, 2 on tablet, 3 on desktop) */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {/* Consultation Logistics */}
-        <Card className="flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
+        <Card className="min-w-0 flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
           <div>
             <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-1.5 font-sans">
               <Zap className="h-4 w-4 text-amber-500" /> Consultation Analytics
@@ -866,7 +901,7 @@ export function DoctorDashboard() {
           </div>
 
           <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart
                 data={[
                   { name: "Completed", count: analytics?.consultationAnalytics?.completed ?? 0, fill: "#10b981" },
@@ -907,7 +942,7 @@ export function DoctorDashboard() {
         </Card>
 
         {/* Laboratory Statistics */}
-        <Card className="flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
+        <Card className="min-w-0 flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
           <div>
             <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-1.5 font-sans">
               <Stethoscope className="h-4 w-4 text-purple-600" /> Lab Investigations
@@ -916,7 +951,7 @@ export function DoctorDashboard() {
           </div>
 
           <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart
                 data={[
                   { name: "Pending", count: analytics?.laboratoryAnalytics?.pending ?? 0, fill: "#3660bf" },
@@ -953,7 +988,7 @@ export function DoctorDashboard() {
         </Card>
 
         {/* Radiology Scans (Tablet: Spans 2 columns on Row 2; Desktop: standard 1 column layout) */}
-        <Card className="flex flex-col justify-between hover:border-slate-200 transition-all duration-300 sm:col-span-2 lg:col-span-1">
+        <Card className="min-w-0 flex flex-col justify-between hover:border-slate-200 transition-all duration-300 sm:col-span-2 lg:col-span-1">
           <div>
             <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-1.5 font-sans">
               <AlertOctagon className="h-4 w-4 text-rose-500" /> Radiology Turnaround
@@ -962,7 +997,7 @@ export function DoctorDashboard() {
           </div>
 
           <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart
                 layout="vertical"
                 data={[
@@ -1001,16 +1036,16 @@ export function DoctorDashboard() {
       {/* SECTIONS 7, 8, 9, 10: CLINICAL CORE MATRIX (Responsive: 1 col on mobile, 2 on tablet, 4 on desktop) */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {/* Disease Analytics */}
-        <Card className="flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
+        <Card className="min-w-0 flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
           <div>
             <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-1.5 font-sans">
-              <Stethoscope className="h-4 w-4 text-rose-600" /> Diagnoses breakdown
+              <Stethoscope className="h-4 w-4 text-rose-600" /> Diagnoses Breakdown
             </h3>
             <p className="text-xs text-slate-400 mb-4 font-sans">Top pathologies in last 30 days</p>
           </div>
 
           <div className="h-44">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart
                 data={analytics?.diseaseAnalytics?.topDiseases ?? []}
                 margin={{ top: 5, right: 5, left: -25, bottom: 5 }}
@@ -1036,16 +1071,16 @@ export function DoctorDashboard() {
         </Card>
 
         {/* Prescription categories */}
-        <Card className="flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
+        <Card className="min-w-0 flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
           <div>
             <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-1.5 font-sans">
-              <FileText className="h-4 w-4 text-blue-600" /> Prescriptions issued
+              <FileText className="h-4 w-4 text-blue-600" /> Prescriptions Issued
             </h3>
             <p className="text-xs text-slate-400 mb-4 font-sans">Therapeutic categories split</p>
           </div>
 
           <div className="h-44">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <PieChart>
                 <Pie
                   data={analytics?.prescriptionAnalytics?.categories ?? []}
@@ -1081,7 +1116,7 @@ export function DoctorDashboard() {
         </Card>
 
         {/* Follow-up Calendar */}
-        <Card className="flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
+        <Card className="min-w-0 flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
           <div>
             <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-1.5 font-sans">
               <Calendar className="h-4 w-4 text-teal-600" /> Follow-up Calendar
@@ -1109,7 +1144,7 @@ export function DoctorDashboard() {
         </Card>
 
         {/* Demographics Donuts */}
-        <Card className="flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
+        <Card className="min-w-0 flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
           <div>
             <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-1.5 font-sans">
               <Users className="h-4 w-4 text-emerald-600" /> Gender & Age Group
@@ -1120,7 +1155,7 @@ export function DoctorDashboard() {
           <div className="h-40 flex items-center justify-around">
             {/* Gender donut */}
             <div className="h-28 w-28 relative">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <PieChart>
                   <Pie
                     data={analytics?.demographics?.gender ?? []}
@@ -1146,7 +1181,7 @@ export function DoctorDashboard() {
 
             {/* Age donut */}
             <div className="h-28 w-28 relative">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <PieChart>
                   <Pie
                     data={analytics?.demographics?.ageGroups ?? []}
@@ -1195,7 +1230,7 @@ export function DoctorDashboard() {
       {/* SECTION 11 & 12 & 13: PERFORMANCE COCKPIT, BOOKING CHANNELS & LIVE ACTIVITY (Responsive: 1 col on mobile, 3 on desktop) */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* SECTION 13: LIVE AUDIT FEED */}
-        <Card className="flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
+        <Card className="min-w-0 flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
           <div>
             <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-1.5 font-sans">
               <Info className="h-4 w-4 text-blue-600" /> Live Audit Feed
@@ -1240,7 +1275,7 @@ export function DoctorDashboard() {
         </Card>
 
         {/* Doctor Performance Evaluation */}
-        <Card className="flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
+        <Card className="min-w-0 flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
           <div>
             <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-1.5 font-sans">
               <Award className="h-4 w-4 text-navy-700" /> Performance Index
@@ -1249,7 +1284,7 @@ export function DoctorDashboard() {
           </div>
 
           <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <RadarChart cx="50%" cy="50%" outerRadius="70%" data={[
                 { subject: "Satisfaction", A: analytics?.performance?.patientSatisfaction ?? 95, fullMark: 100 },
                 { subject: "Lab Filled", A: analytics?.performance?.labRequestCompletion ?? 90, fullMark: 100 },
@@ -1282,7 +1317,7 @@ export function DoctorDashboard() {
         </Card>
 
         {/* Appointment booking channel split */}
-        <Card className="flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
+        <Card className="min-w-0 flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
           <div>
             <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-1.5 font-sans">
               <CalendarClock className="h-4 w-4 text-blue-600" /> Source Analysis
@@ -1291,7 +1326,7 @@ export function DoctorDashboard() {
           </div>
 
           <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart
                 data={analytics?.appointmentAnalytics?.types ?? []}
                 margin={{ top: 10, right: 10, left: -25, bottom: 5 }}

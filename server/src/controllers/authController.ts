@@ -519,10 +519,19 @@ export const getMe = catchAsync(async (req: Request, res: Response) => {
 });
 
 const changePasswordSchema = z.object({
-  newPassword: passwordValidator("New Password", 8, 64),
-  confirmPassword: z.string().min(1, "Please confirm your new password.").max(64, "Confirm password cannot exceed 64 characters"),
+  newPassword: z
+    .string({ invalid_type_error: "New Password must be valid data. Please enter valid data" })
+    .min(1, "New Password is required. Field is required. Please fill out this field")
+    .max(64, "New Password cannot exceed 64 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => val.length >= 8 && /(?=.*[a-zA-Z])(?=.*[0-9!@#$%^&*])/.test(val), {
+      message: "New Password contains invalid data. Password must be at least 8 characters with letters and numbers/symbols. Invalid data is not accepted. Please enter valid data",
+    }),
+  confirmPassword: z
+    .string({ invalid_type_error: "Confirm New Password must be valid data. Please enter valid data" })
+    .min(1, "Confirm New Password is required. Field is required. Please fill out this field")
+    .max(64, "Confirm New Password cannot exceed 64 characters. Too long text is not accepted. Please enter valid data"),
 }).refine(data => data.newPassword === data.confirmPassword, {
-  message: "New password and confirmation do not match.",
+  message: "Passwords do not match. Invalid data is not accepted. Please enter valid data",
   path: ["confirmPassword"]
 });
 
@@ -733,7 +742,15 @@ export const resetPassword = catchAsync(async (req: Request, res: Response) => {
 });
 
 const updateProfileSchema = z.object({
-  name: nameValidator("Full Display Name", 2, 100, false).optional(),
+  name: z
+    .string({ invalid_type_error: "The Full Display Name field should not accept invalid data and the appropriate validation message should be displayed. Full Display Name must be valid data. Please enter valid data" })
+    .trim()
+    .min(1, "Error message should be displayed as:\nPlease fill out this field. Field is required. Full Display Name is required")
+    .max(100, "The Full Display Name field should not accept text exceeding the allowed character limit and the appropriate validation message should be displayed. Characters limit: 100. Full Display Name cannot exceed 100 characters. Too long text is not accepted. Too long data is not accepted. Please enter valid data")
+    .refine((val) => val.length >= 2 && /^[a-zA-Z0-9\s\.\-_']+$/.test(val) && !/<script|javascript:/i.test(val), {
+      message: "The Full Display Name field should not accept invalid data and the appropriate validation message should be displayed. Full Display Name contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data",
+    })
+    .optional(),
   phone: phoneValidator("Phone", false).optional(),
   email: emailValidator("Email", false, 254).optional(),
   avatarUrl: optionalTrimmedString("Avatar URL", 500).optional(),

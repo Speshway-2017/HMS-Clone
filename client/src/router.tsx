@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import { PublicLayout } from "./layouts/PublicLayout";
 import { DashboardLayout } from "./layouts/DashboardLayout";
 import { LandingPage } from "./pages/public/LandingPage";
@@ -166,6 +166,8 @@ export const router = createBrowserRouter([
       { path: "/reset-password/:token", element: <ResetPasswordPage /> },
       { path: "/verify-prescription/:id", element: <VerifyPrescriptionPage /> },
       { path: "/doctors/:id", element: <PublicDoctorProfilePage /> },
+      { path: "/reception/ip-management", element: <Navigate to="/admin/ip?tab=transfer" replace /> },
+      { path: "/receptionist/ip-management", element: <Navigate to="/admin/ip?tab=transfer" replace /> },
       { path: "/privacy-policy", element: <PrivacyPolicyPage /> },
       { path: "/terms-and-conditions", element: <TermsConditionsPage /> },
       { path: "/delete-account", element: <DeleteAccountPage /> },
@@ -247,6 +249,8 @@ export const router = createBrowserRouter([
           { path: "beds/edit-room/:id", element: <RoomFormPage /> },
           { path: "beds/create-beds", element: <BedFormPage /> },
           { path: "beds/edit-bed/:id", element: <BedFormPage /> },
+          { path: "beds/transfer", element: <ReceptionistIPManagementPage activeTab="transfer" /> },
+          { path: "ip", element: <ReceptionistIPManagementPage /> },
           { path: "hospital-info", element: <HospitalInfoPage /> },
           { path: "enquiries", element: <EnquiriesPage /> },
           { path: "blogs", element: <BlogsPage /> },
@@ -278,7 +282,7 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    element: <ProtectedRoute allow={["receptionist"]} />,
+    element: <ProtectedRoute allow={["receptionist", "hospital_admin", "super_admin"]} />,
     children: [
       {
         path: "/receptionist",

@@ -815,8 +815,10 @@ export const downloadReport = catchAsync(async (req: Request, res: Response) => 
     }
   }
 
-  if (report.files.length === 0) {
-    throw new AppError("No files associated with this report.", 400);
+  if (!report.files || report.files.length === 0) {
+    res.setHeader("Content-Type", "text/plain");
+    res.setHeader("Content-Disposition", `attachment; filename="report_${report._id}.txt"`);
+    return res.send(`Diagnostic Report: ${report.testName}\nStatus: ${report.status}\nObservations: ${report.observations || "N/A"}\nRemarks: ${report.remarks || "N/A"}`);
   }
 
   res.redirect(report.files[0].secure_url);

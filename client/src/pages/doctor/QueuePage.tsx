@@ -12,10 +12,19 @@ const PRIORITY_TONES: Record<string, "success" | "warning" | "danger" | "neutral
 };
 
 export function QueuePage() {
-  const { data: queueItems, isLoading, isError, refetch } = useDoctorQueue();
+  const { data: queueItems, isLoading, isError, isFetching, refetch } = useDoctorQueue();
   const callPatientMutation = useCallPatient();
   const skipPatientMutation = useSkipPatient();
   const markNoShowMutation = useMarkNoShow();
+
+  const handleRefresh = async () => {
+    try {
+      await refetch();
+      toast.success("Queue refreshed successfully");
+    } catch {
+      toast.error("Failed to refresh queue. Please try again.");
+    }
+  };
 
   const handleCall = async (id: string) => {
     try {
@@ -82,10 +91,12 @@ export function QueuePage() {
           <p className="text-sm text-slate-500">Live queue of patient tokens assigned to you today.</p>
         </div>
         <button
-          onClick={() => refetch()}
-          className="flex items-center gap-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+          onClick={handleRefresh}
+          disabled={isFetching}
+          className="flex items-center gap-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-navy-300"
+          aria-label="Refresh Queue"
         >
-          <RefreshCw className="h-3.5 w-3.5" /> Refresh Queue
+          <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} /> Refresh Queue
         </button>
       </div>
 

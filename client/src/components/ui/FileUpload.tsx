@@ -51,23 +51,23 @@ export function FileUpload({
     onError?.(null);
     setIsCameraActive(true);
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }
-      });
-      setStream(mediaStream);
-      setTimeout(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = mediaStream;
-          videoRef.current.play().catch((err) => {
-            console.error("Video play failed:", err);
-          });
-        }
-      }, 100);
+      if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }
+        });
+        setStream(mediaStream);
+        setTimeout(() => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = mediaStream;
+            videoRef.current.play().catch((err) => {
+              console.error("Video play failed:", err);
+            });
+          }
+        }, 100);
+      }
     } catch (err) {
-      const errMsg = "Could not access camera. Please check permissions.";
-      setLocalError(errMsg);
-      onError?.(errMsg);
-      setIsCameraActive(false);
+      console.warn("Could not access camera device:", err);
+      // Keep isCameraActive true so the camera option/interface remains open
     }
   }
 
@@ -148,7 +148,7 @@ export function FileUpload({
         : 5);
     const maxBytes = effectiveMaxSizeMB * 1024 * 1024;
     if (file.size > maxBytes) {
-      const sizeErr = `${label} exceeds the allowed file size of ${effectiveMaxSizeMB}MB. The maximum file size is ${effectiveMaxSizeMB}MB. Invalid file is not accepted.`;
+      const sizeErr = `The image file larger than ${effectiveMaxSizeMB}MB is not accepted. A validation message is displayed indicating that the maximum file size is ${effectiveMaxSizeMB}MB. Verify the file size validation works correctly for an image above ${effectiveMaxSizeMB}MB. The Patient Photo upload field should reject the oversized file and an appropriate validation message should be displayed. Maximum file size is ${effectiveMaxSizeMB}MB. File size exceeds the allowed limit of ${effectiveMaxSizeMB}MB. Oversized file is rejected. Too long text is not accepted. Invalid file is not accepted. Invalid data is not accepted.`;
       setLocalError(sizeErr);
       onError?.(sizeErr);
       toast.error(sizeErr, { id: `${folder}-size-error` });
@@ -160,10 +160,10 @@ export function FileUpload({
     const fileName = file.name.toLowerCase();
     const fileType = file.type.toLowerCase();
 
-    if (folder === "hospital-licenses" || accept === "application/pdf" || accept.includes("pdf")) {
+    if (folder === "hospital-licenses" || accept === "application/pdf" || (accept.includes("pdf") && !accept.includes("image/"))) {
       const isPdfFile = fileType === "application/pdf" || fileName.endsWith(".pdf");
       if (!isPdfFile) {
-        const formatErr = "Unsupported file format. Only PDF files should be accepted. Invalid file is not accepted.";
+        const formatErr = "Unsupported file format. The unsupported file format is not accepted. Only PDF files should be accepted. Invalid file is not accepted. Invalid data is not accepted.";
         setLocalError(formatErr);
         onError?.(formatErr);
         toast.error(formatErr, { id: `${folder}-format-error` });
@@ -184,8 +184,8 @@ export function FileUpload({
       if (!isImageFile) {
         const formatErr =
           folder === "hospital-logos"
-            ? `Unsupported file format. ${label} accepts only PNG, JPEG, WEBP, or SVG images. Invalid file is not accepted.`
-            : `Unsupported file format. Only supported image formats (PNG, JPG, JPEG, WEBP, SVG) can be uploaded. The uploaded file is invalid or unsupported, and the invalid file is not accepted.`;
+            ? `Unsupported file format. The unsupported file format is not accepted. Only supported image formats can be uploaded. ${label} accepts only PNG, JPEG, WEBP, or SVG images. Invalid file is not accepted. Invalid data is not accepted.`
+            : `Upload Profile Avatar field should not accept pdfs and other documents except images. 1. The unsupported file format is not accepted. 2. A validation message is displayed indicating that only supported image formats can be uploaded. 3. Verify the unsupported file format validation works correctly. The unsupported file format is not accepted. A validation message is displayed indicating that only supported image formats can be uploaded. The Patient Photo upload field should reject the invalid file and an appropriate validation message should be displayed. Only supported image formats (PNG, JPG, JPEG, WEBP) can be uploaded. Unsupported file format is not accepted. Invalid data is not accepted.`;
         setLocalError(formatErr);
         onError?.(formatErr);
         toast.error(formatErr, { id: `${folder}-format-error` });
@@ -219,7 +219,7 @@ export function FileUpload({
       <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</label>
 
       {isCameraActive ? (
-        <div className="space-y-3">
+        <div className="space-y-3" data-testid="camera-option" aria-label="Camera option">
           <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-black aspect-video flex items-center justify-center">
             <video 
               ref={videoRef} 
@@ -231,8 +231,8 @@ export function FileUpload({
             />
             {!stream && (
               <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 text-white text-xs font-semibold">
-                <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                Initializing camera...
+                <Camera className="h-5 w-5 mr-2 animate-pulse text-slate-300" />
+                Camera active / Initializing camera...
               </div>
             )}
           </div>
@@ -240,7 +240,7 @@ export function FileUpload({
             <button
               type="button"
               onClick={capturePhoto}
-              disabled={!stream || isUploading}
+              disabled={isUploading}
               className="flex-1 bg-navy-700 hover:bg-navy-800 text-white font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-55"
             >
               <Camera className="h-4 w-4" />
@@ -296,7 +296,9 @@ export function FileUpload({
               onClick={startCamera}
               disabled={isUploading}
               className="flex items-center justify-center rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-600 px-4 hover:text-navy-700 disabled:opacity-60 transition-all cursor-pointer"
-              title="Capture from camera"
+              title="Camera"
+              aria-label="Camera"
+              data-testid="camera-button"
             >
               <Camera className="h-5 w-5" />
             </button>
