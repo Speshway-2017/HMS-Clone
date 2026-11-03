@@ -148,6 +148,8 @@ export function IPManagementPage() {
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [progressNote, setProgressNote] = useState("");
   const [progressDiagnosis, setProgressDiagnosis] = useState("");
+  const [progressDiagError, setProgressDiagError] = useState<string | null>(null);
+  const [progressNoteError, setProgressNoteError] = useState<string | null>(null);
 
   // Hooks for inpatient actions
   const { data: admissionDetails, isLoading: detailsLoading } = useInpatientDetails(selectedPatientId);
@@ -416,19 +418,50 @@ export function IPManagementPage() {
 
   // Add progress note
   const handleSaveProgressNote = async () => {
-    if (!selectedPatientId || !progressNote.trim()) {
-      toast.error("Progress note content cannot be empty.");
-      return;
+    let hasError = false;
+
+    // Validate Diagnosis/Round Subject
+    const dTrimmed = progressDiagnosis.trim();
+    if (!dTrimmed) {
+      setProgressDiagError("Diagnosis/Round Subject is required");
+      hasError = true;
+    } else if (dTrimmed.length > 200) {
+      setProgressDiagError("Diagnosis/Round Subject exceeds the maximum allowed length");
+      hasError = true;
+    } else if (!/[a-zA-Z0-9]/.test(dTrimmed) || /<[^>]*>|javascript:/i.test(dTrimmed)) {
+      setProgressDiagError("Please enter valid data");
+      hasError = true;
+    } else {
+      setProgressDiagError(null);
     }
+
+    // Validate Daily Progress Notes
+    const nTrimmed = progressNote.trim();
+    if (!nTrimmed) {
+      setProgressNoteError("Daily Progress Notes is required");
+      hasError = true;
+    } else if (nTrimmed.length > 2000) {
+      setProgressNoteError("Daily Progress Notes exceeds the maximum allowed length");
+      hasError = true;
+    } else if (!/[a-zA-Z0-9]/.test(nTrimmed) || /<script\b|javascript:/i.test(nTrimmed)) {
+      setProgressNoteError("Please enter valid data");
+      hasError = true;
+    } else {
+      setProgressNoteError(null);
+    }
+
+    if (hasError || !selectedPatientId) return;
+
     try {
       await addNotesMutation.mutateAsync({
         patientId: selectedPatientId,
-        notes: progressNote,
-        diagnosis: progressDiagnosis || "Inpatient Round Notes"
+        notes: nTrimmed,
+        diagnosis: dTrimmed
       });
       toast.success("Progress note saved successfully!");
-    } catch (err) {
-      toast.error("Failed to save progress note.");
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Failed to save progress note.";
+      toast.error(msg);
     }
   };
 
@@ -794,18 +827,59 @@ export function IPManagementPage() {
                     <span className="text-xs text-slate-400">Day {getDaysAdmitted(selectedPatient)} Note</span>
                   </div>
                   <div className="space-y-3">
-                    <InputField
-                      label="Diagnosis/Round Subject"
-                      value={progressDiagnosis}
-                      onChange={(e) => setProgressDiagnosis(e.target.value)}
-                      placeholder="e.g. Daily General Round / Monitoring"
-                    />
-                    <textarea
-                      value={progressNote}
-                      onChange={(e) => setProgressNote(e.target.value)}
-                      rows={4}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-navy-200"
-                    />
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-semibold text-slate-700">
+                          Diagnosis/Round Subject <span className="text-rose-500">*</span>
+                        </label>
+                        <span className="text-[10px] text-slate-400 font-mono">{progressDiagnosis.length}/200</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={progressDiagnosis}
+                        onChange={(e) => {
+                          setProgressDiagnosis(e.target.value);
+                          if (progressDiagError) setProgressDiagError(null);
+                        }}
+                        placeholder="e.g. Daily General Round / Monitoring"
+                        maxLength={250}
+                        className={`w-full rounded-lg border px-3 py-2 text-xs transition-colors focus:outline-none ${
+                          progressDiagError
+                            ? "border-rose-400 bg-rose-50/20 focus:border-rose-500"
+                            : "border-slate-200 bg-white focus:border-navy-500"
+                        }`}
+                      />
+                      {progressDiagError && (
+                        <p className="mt-1 text-xs font-medium text-rose-500">{progressDiagError}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-semibold text-slate-700">
+                          Daily Progress Notes <span className="text-rose-500">*</span>
+                        </label>
+                        <span className="text-[10px] text-slate-400 font-mono">{progressNote.length}/2000</span>
+                      </div>
+                      <textarea
+                        value={progressNote}
+                        onChange={(e) => {
+                          setProgressNote(e.target.value);
+                          if (progressNoteError) setProgressNoteError(null);
+                        }}
+                        rows={4}
+                        placeholder="Enter patient vitals, stability, or medication updates..."
+                        maxLength={2500}
+                        className={`w-full rounded-lg border px-3 py-2 text-xs transition-colors focus:outline-none resize-none ${
+                          progressNoteError
+                            ? "border-rose-400 bg-rose-50/20 focus:border-rose-500"
+                            : "border-slate-200 bg-white focus:border-navy-500"
+                        }`}
+                      />
+                      {progressNoteError && (
+                        <p className="mt-1 text-xs font-medium text-rose-500">{progressNoteError}</p>
+                      )}
+                    </div>
                   </div>
                   <div className="mt-3 flex gap-2">
                     <Button

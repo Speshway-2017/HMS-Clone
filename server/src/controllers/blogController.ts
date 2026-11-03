@@ -3,20 +3,104 @@ import { z } from "zod";
 import { BlogPost } from "../models/BlogPost";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
-import {
-  requiredTrimmedString,
-  optionalTrimmedString,
-  urlValidator,
-} from "../utils/validators";
 import { logAudit } from "../utils/auditLogger";
+import { broadcastGlobal } from "../config/socket";
 
-const blogSchema = z.object({
-  title: z.string().min(2, "Title is required"),
-  content: z.string().min(5, "Content is required"),
-  author: z.string().optional().default("Hospital Admin"),
-  coverImageUrl: z.string().optional().default(""),
+const createBlogSchema = z.object({
+  title: z
+    .string({ invalid_type_error: "Post Title must be valid data. Please enter valid data" })
+    .trim()
+    .min(1, "Post Title is required. Field is required. Please fill out this field")
+    .max(150, "Post Title cannot exceed 150 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => val.length >= 2 && /^[a-zA-Z0-9\s\.\-/'&,():;!?#%+]+$/.test(val) && !/<script|javascript:|data:/i.test(val), {
+      message: "Post Title contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    }),
+  content: z
+    .string({ invalid_type_error: "Article Content must be valid data. Please enter valid data" })
+    .trim()
+    .min(1, "Article Content is required. Field is required. Please fill out this field")
+    .max(500, "Article Content cannot exceed 500 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => val.length >= 5 && !/<script|javascript:|data:|onload=|onerror=/i.test(val) && !/[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(val), {
+      message: "Article Content contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    }),
+  author: z
+    .string({ invalid_type_error: "Author Designation / Name must be valid data. Please enter valid data" })
+    .trim()
+    .max(100, "Author Designation / Name cannot exceed 100 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => !val || (/^[a-zA-Z0-9\s\.\-/'&,():;/]+$/.test(val) && !/<script|javascript:|data:/i.test(val)), {
+      message: "Author Designation / Name contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional()
+    .default("Hospital Admin"),
+  coverImageUrl: z
+    .string({ invalid_type_error: "Cover Image URL must be valid data. Please enter valid data" })
+    .trim()
+    .max(500, "Cover Image URL cannot exceed 500 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => !val || (/^https?:\/\/.+/i.test(val) && !/<script|javascript:/i.test(val)), {
+      message: "Cover Image URL contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional()
+    .default(""),
   published: z.boolean().optional().default(true),
-  tags: z.array(z.string()).optional().default([]),
+  tags: z
+    .array(
+      z
+        .string()
+        .max(50, "Tag cannot exceed 50 characters. Too long text is not accepted. Please enter valid data")
+        .refine((val) => !val || (/^[a-zA-Z0-9\s\-_#]+$/.test(val) && !/<script|javascript:/i.test(val)), {
+          message: "Tag contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+        })
+    )
+    .optional()
+    .default([]),
+});
+
+const updateBlogSchema = z.object({
+  title: z
+    .string({ invalid_type_error: "Post Title must be valid data. Please enter valid data" })
+    .trim()
+    .min(1, "Post Title is required. Field is required. Please fill out this field")
+    .max(150, "Post Title cannot exceed 150 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => val.length >= 2 && /^[a-zA-Z0-9\s\.\-/'&,():;!?#%+]+$/.test(val) && !/<script|javascript:|data:/i.test(val), {
+      message: "Post Title contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional(),
+  content: z
+    .string({ invalid_type_error: "Article Content must be valid data. Please enter valid data" })
+    .trim()
+    .min(1, "Article Content is required. Field is required. Please fill out this field")
+    .max(500, "Article Content cannot exceed 500 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => val.length >= 5 && !/<script|javascript:|data:|onload=|onerror=/i.test(val) && !/[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(val), {
+      message: "Article Content contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional(),
+  author: z
+    .string({ invalid_type_error: "Author Designation / Name must be valid data. Please enter valid data" })
+    .trim()
+    .max(100, "Author Designation / Name cannot exceed 100 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => !val || (/^[a-zA-Z0-9\s\.\-/'&,():;/]+$/.test(val) && !/<script|javascript:|data:/i.test(val)), {
+      message: "Author Designation / Name contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional(),
+  coverImageUrl: z
+    .string({ invalid_type_error: "Cover Image URL must be valid data. Please enter valid data" })
+    .trim()
+    .max(500, "Cover Image URL cannot exceed 500 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => !val || (/^https?:\/\/.+/i.test(val) && !/<script|javascript:/i.test(val)), {
+      message: "Cover Image URL contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+    })
+    .optional(),
+  published: z.boolean().optional(),
+  tags: z
+    .array(
+      z
+        .string()
+        .max(50, "Tag cannot exceed 50 characters. Too long text is not accepted. Please enter valid data")
+        .refine((val) => !val || (/^[a-zA-Z0-9\s\-_#]+$/.test(val) && !/<script|javascript:/i.test(val)), {
+          message: "Tag contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+        })
+    )
+    .optional(),
 });
 
 function createSlug(title: string): string {
@@ -51,10 +135,8 @@ export const getBlog = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-import { broadcastGlobal } from "../config/socket";
-
 export const createBlog = catchAsync(async (req: Request, res: Response) => {
-  const body = blogSchema.parse(req.body);
+  const body = createBlogSchema.parse(req.body);
   const hospitalId = req.hospitalFilter?.hospital || req.user?.hospital;
 
   if (!hospitalId) {
@@ -86,7 +168,7 @@ export const createBlog = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const updateBlog = catchAsync(async (req: Request, res: Response) => {
-  const body = blogSchema.partial().parse(req.body);
+  const body = updateBlogSchema.parse(req.body);
   
   const updateData: any = { ...body };
   if (body.title) {

@@ -9,20 +9,27 @@ import { AppError } from "../utils/AppError";
 
 const createRoleSchema = z.object({
   role: z
-    .string({ invalid_type_error: "Role Key must be a string" })
+    .string({ invalid_type_error: "Role Key must be valid data. Please enter valid data" })
     .trim()
-    .min(2, "Role Key must be at least 2 characters")
-    .max(50, "Role Key cannot exceed 50 characters")
-    .regex(/^[a-z0-9_]+$/, "Role Key must contain only lowercase characters and underscores"),
+    .min(1, "Role Key (System Identifier) is required. Field is required. Please fill out this field")
+    .max(50, "Role Key (System Identifier) cannot exceed 50 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => val.length >= 2 && /^[a-z_]+$/.test(val), {
+      message: "Role Key must contain only lowercase characters and underscores. Invalid data is not accepted. Please enter valid data",
+    }),
   label: z
-    .string({ invalid_type_error: "Role Label must be a string" })
+    .string({ invalid_type_error: "Role Label must be valid data. Please enter valid data" })
     .trim()
-    .min(2, "Role Label must be at least 2 characters")
-    .max(50, "Role Label cannot exceed 50 characters")
-    .regex(/^[a-zA-Z][a-zA-Z0-9\s\.\-/'&]*$/, "Role Label contains invalid characters"),
+    .min(1, "Role Label (Display Name) is required. Field is required. Please fill out this field")
+    .max(50, "Role Label (Display Name) cannot exceed 50 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => val.length >= 2 && /^[a-zA-Z][a-zA-Z0-9\s\.\-/'&]*$/.test(val), {
+      message: "Role Label (Display Name) contains invalid data. Invalid data is not accepted. Please enter valid data",
+    }),
   description: z
-    .string()
-    .max(500, "Description cannot exceed 500 characters")
+    .string({ invalid_type_error: "Description must be valid data. Please enter valid data" })
+    .max(500, "Description cannot exceed 500 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => !val || !/<script|javascript:|data:|<[^>]*>/i.test(val), {
+      message: "Description contains invalid data. Invalid data is not accepted. Please enter valid data",
+    })
     .optional()
     .default(""),
   permissions: z.array(z.string()).default([]),
@@ -138,15 +145,19 @@ export const listRoles = catchAsync(async (req: Request, res: Response) => {
 
 const updateRoleSchema = z.object({
   label: z
-    .string()
+    .string({ invalid_type_error: "Role Label must be valid data. Please enter valid data" })
     .trim()
-    .min(2, "Role Label must be at least 2 characters")
-    .max(50, "Role Label cannot exceed 50 characters")
-    .regex(/^[a-zA-Z][a-zA-Z0-9\s\.\-/'&]*$/, "Role Label contains invalid characters")
+    .max(50, "Role Label (Display Name) cannot exceed 50 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => !val || (val.length >= 2 && /^[a-zA-Z][a-zA-Z0-9\s\.\-/'&]*$/.test(val)), {
+      message: "Role Label (Display Name) contains invalid data. Invalid data is not accepted. Please enter valid data",
+    })
     .optional(),
   description: z
-    .string()
-    .max(500, "Description cannot exceed 500 characters")
+    .string({ invalid_type_error: "Description must be valid data. Please enter valid data" })
+    .max(500, "Description cannot exceed 500 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => !val || !/<script|javascript:|data:|<[^>]*>/i.test(val), {
+      message: "Description contains invalid data. Invalid data is not accepted. Please enter valid data",
+    })
     .optional(),
   permissions: z.array(z.string()).optional(),
 });

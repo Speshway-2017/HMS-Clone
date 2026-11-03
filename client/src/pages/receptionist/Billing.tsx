@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { 
+  Loader2,
   CreditCard, 
   AlertCircle, 
   FileText, 
@@ -119,6 +120,66 @@ const groupIPItems = (items: any[]) => {
   });
 
   return groups.filter(g => g.items.length > 0);
+};
+
+const BILLING_LIMITS = {
+  SEARCH: 100,
+  AMOUNT: 10,
+  DESC: 150,
+  TX_ID: 50,
+  SMALL_NUM: 5,
+};
+
+const TEXT_GENERAL_REGEX = /^[a-zA-Z0-9\s,\.\-/'&()#+:]+$/;
+const AMOUNT_REGEX = /^\d+(\.\d{1,2})?$/;
+const INT_REGEX = /^\d+$/;
+
+const ERR_REQUIRED = "Error message should be displayed as:\nPlease fill out this field. Field is required";
+const ERR_INVALID = "Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+const errTooLong = (limit: number) =>
+  `Characters limit: ${limit}. Too long data is not accepted. Too long text is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data`;
+
+const handleKeyGuard = (
+  e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+  currentVal: string,
+  maxLen: number
+) => {
+  const allowed = [
+    "Backspace",
+    "Delete",
+    "ArrowLeft",
+    "ArrowRight",
+    "ArrowUp",
+    "ArrowDown",
+    "Tab",
+    "Home",
+    "End",
+    "Escape",
+    "Enter",
+  ];
+  if (allowed.includes(e.key) || e.ctrlKey || e.metaKey || e.altKey) {
+    return;
+  }
+  const target = e.currentTarget;
+  const hasSelection = (target.selectionEnd ?? 0) - (target.selectionStart ?? 0) > 0;
+  if (!hasSelection && currentVal.length >= maxLen) {
+    e.preventDefault();
+  }
+};
+
+const handlePasteGuard = (
+  e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+  currentVal: string,
+  maxLen: number,
+  setter: (val: string) => void
+) => {
+  e.preventDefault();
+  const pasted = e.clipboardData.getData("text") || "";
+  const target = e.currentTarget;
+  const start = target.selectionStart ?? currentVal.length;
+  const end = target.selectionEnd ?? currentVal.length;
+  const nextVal = (currentVal.slice(0, start) + pasted + currentVal.slice(end)).slice(0, maxLen);
+  setter(nextVal);
 };
 
 export function BillingPage({ activeTab = "consultation" }: Props) {
@@ -258,6 +319,96 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
   const [showIPReceiptModal, setShowIPReceiptModal] = useState(false);
   const [selectedReceiptPaymentId, setSelectedReceiptPaymentId] = useState<string | null>(null);
 
+  // Validation errors
+  const [billingSearchError, setBillingSearchError] = useState<string | null>(null);
+  const [payAmountError, setPayAmountError] = useState<string | null>(null);
+  const [upiAmountError, setUpiAmountError] = useState<string | null>(null);
+  const [cashAmountError, setCashAmountError] = useState<string | null>(null);
+  const [cardAmountError, setCardAmountError] = useState<string | null>(null);
+  const [admissionSearchError, setAdmissionSearchError] = useState<string | null>(null);
+  const [itemDescError, setItemDescError] = useState<string | null>(null);
+  const [itemPriceError, setItemPriceError] = useState<string | null>(null);
+  const [itemQtyError, setItemQtyError] = useState<string | null>(null);
+  const [itemDaysError, setItemDaysError] = useState<string | null>(null);
+  const [ipPayAmountError, setIPPayAmountError] = useState<string | null>(null);
+  const [ipPayTxIdError, setIPPayTxIdError] = useState<string | null>(null);
+
+  const validateBillingSearch = (val: string): string | null => {
+    if (!val || val.trim() === "") return null;
+    if (val.length > BILLING_LIMITS.SEARCH) return errTooLong(BILLING_LIMITS.SEARCH);
+    if (!TEXT_GENERAL_REGEX.test(val)) return ERR_INVALID;
+    return null;
+  };
+
+  const validatePayAmount = (val: string): string | null => {
+    if (!val || val.trim() === "") return ERR_REQUIRED;
+    if (val.length > BILLING_LIMITS.AMOUNT) return errTooLong(BILLING_LIMITS.AMOUNT);
+    const num = parseFloat(val);
+    if (!AMOUNT_REGEX.test(val) || isNaN(num) || num <= 0) return ERR_INVALID;
+    return null;
+  };
+
+  const validateSplitAmount = (val: string): string | null => {
+    if (!val || val.trim() === "") return ERR_REQUIRED;
+    if (val.length > BILLING_LIMITS.AMOUNT) return errTooLong(BILLING_LIMITS.AMOUNT);
+    const num = parseFloat(val);
+    if (!AMOUNT_REGEX.test(val) || isNaN(num) || num < 0) return ERR_INVALID;
+    return null;
+  };
+
+  const validateAdmissionSearch = (val: string): string | null => {
+    if (!val || val.trim() === "") return null;
+    if (val.length > BILLING_LIMITS.SEARCH) return errTooLong(BILLING_LIMITS.SEARCH);
+    if (!TEXT_GENERAL_REGEX.test(val)) return ERR_INVALID;
+    return null;
+  };
+
+  const validateItemDesc = (val: string): string | null => {
+    if (!val || val.trim() === "") return ERR_REQUIRED;
+    if (val.length > BILLING_LIMITS.DESC) return errTooLong(BILLING_LIMITS.DESC);
+    if (!TEXT_GENERAL_REGEX.test(val)) return ERR_INVALID;
+    return null;
+  };
+
+  const validateItemPrice = (val: number | string): string | null => {
+    const s = String(val ?? "");
+    if (!s || s.trim() === "") return ERR_REQUIRED;
+    if (s.length > BILLING_LIMITS.AMOUNT) return errTooLong(BILLING_LIMITS.AMOUNT);
+    if (!AMOUNT_REGEX.test(s) || Number(s) <= 0) return ERR_INVALID;
+    return null;
+  };
+
+  const validateItemQty = (val: number | string): string | null => {
+    const s = String(val ?? "");
+    if (!s || s.trim() === "") return ERR_REQUIRED;
+    if (s.length > BILLING_LIMITS.SMALL_NUM) return errTooLong(BILLING_LIMITS.SMALL_NUM);
+    if (!INT_REGEX.test(s) || Number(s) <= 0) return ERR_INVALID;
+    return null;
+  };
+
+  const validateItemDays = (val: number | string): string | null => {
+    const s = String(val ?? "");
+    if (!s || s.trim() === "") return ERR_REQUIRED;
+    if (s.length > BILLING_LIMITS.SMALL_NUM) return errTooLong(BILLING_LIMITS.SMALL_NUM);
+    if (!INT_REGEX.test(s) || Number(s) <= 0) return ERR_INVALID;
+    return null;
+  };
+
+  const validateIPPayAmount = (val: number | string): string | null => {
+    const s = String(val ?? "");
+    if (!s || s.trim() === "" || s === "0") return ERR_REQUIRED;
+    if (s.length > BILLING_LIMITS.AMOUNT) return errTooLong(BILLING_LIMITS.AMOUNT);
+    if (!AMOUNT_REGEX.test(s) || Number(s) <= 0) return ERR_INVALID;
+    return null;
+  };
+
+  const validateIPPayTxId = (val: string): string | null => {
+    if (!val || val.trim() === "") return null;
+    if (val.length > BILLING_LIMITS.TX_ID) return errTooLong(BILLING_LIMITS.TX_ID);
+    if (!TEXT_GENERAL_REGEX.test(val)) return ERR_INVALID;
+    return null;
+  };
+
   // IP React Queries & Mutations
   const { data: admittedPatients, refetch: refetchAdmissions } = useAdmittedPatients(admissionSearch);
   const { data: ipBillData, refetch: refetchBillDetails, isLoading: billLoading } = useIPBillDetails(selectedAdmissionId || undefined);
@@ -342,6 +493,26 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
     e.preventDefault();
     if (!invoice) return;
 
+    if (paymentMethod === "Mixed") {
+      const upiErr = validateSplitAmount(upiAmount);
+      const cashErr = validateSplitAmount(cashAmount);
+      const cardErr = validateSplitAmount(cardAmount);
+      setUpiAmountError(upiErr);
+      setCashAmountError(cashErr);
+      setCardAmountError(cardErr);
+      if (upiErr || cashErr || cardErr) {
+        toast.error("Please resolve validation errors before submitting.");
+        return;
+      }
+    } else {
+      const pErr = validatePayAmount(payAmount);
+      setPayAmountError(pErr);
+      if (pErr) {
+        toast.error("Please enter a valid payment amount.");
+        return;
+      }
+    }
+
     const rawBalance = invoice.totals?.patientBalance !== undefined 
       ? invoice.totals.patientBalance 
       : invoice.totals?.total || 0;
@@ -381,6 +552,10 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
       const result = await payMutation.mutateAsync(payload);
       setReceiptData(result);
       setInvoice(null);
+      setPayAmountError(null);
+      setUpiAmountError(null);
+      setCashAmountError(null);
+      setCardAmountError(null);
       
       queryClient.invalidateQueries({ queryKey: ["reception"] });
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
@@ -422,8 +597,17 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
   };
 
   const handleAddBillItem = async (category: string) => {
-    if (!itemDesc || itemPrice <= 0) {
-      toast.error("Please provide Description and Unit Price.");
+    const descErr = validateItemDesc(itemDesc);
+    const priceErr = validateItemPrice(itemPrice);
+    const qtyErr = validateItemQty(itemQty);
+    const daysErr = validateItemDays(itemDays);
+    setItemDescError(descErr);
+    setItemPriceError(priceErr);
+    setItemQtyError(qtyErr);
+    setItemDaysError(daysErr);
+
+    if (descErr || priceErr || qtyErr || daysErr) {
+      toast.error("Please provide valid item details.");
       return;
     }
     try {
@@ -442,6 +626,10 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
       setItemPrice(0);
       setItemDiscount(0);
       setItemTax(0);
+      setItemDescError(null);
+      setItemPriceError(null);
+      setItemQtyError(null);
+      setItemDaysError(null);
       setAddItemCategory(null);
       toast.success("Bill item added successfully.");
     } catch (err: any) {
@@ -493,12 +681,18 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
     }
   };
 
-  const handleGenerateInvoice = async () => {
+  const [showGenerateInvoiceConfirm, setShowGenerateInvoiceConfirm] = useState(false);
+
+  const handleGenerateInvoiceClick = () => {
     if (gross === 0) {
       toast.error("Cannot generate invoice for a bill with zero items.");
       return;
     }
-    if (!window.confirm("Are you sure you want to lock the bill and generate the invoice? This is permanent.")) return;
+    setShowGenerateInvoiceConfirm(true);
+  };
+
+  const confirmGenerateInvoice = async () => {
+    setShowGenerateInvoiceConfirm(false);
     try {
       await generateInvoiceMutation.mutateAsync({
         discountType,
@@ -519,6 +713,14 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
 
   const handlePostIPPayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    const amtErr = validateIPPayAmount(ipPayAmount);
+    const txErr = validateIPPayTxId(ipPayTxId);
+    setIPPayAmountError(amtErr);
+    setIPPayTxIdError(txErr);
+    if (amtErr || txErr) {
+      toast.error("Please resolve validation errors before submitting.");
+      return;
+    }
     if (ipPayAmount <= 0) return;
 
     let mixed = undefined;
@@ -545,6 +747,8 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
       setShowIPReceiptModal(true);
       setIPPayAmount(0);
       setIPPayTxId("");
+      setIPPayAmountError(null);
+      setIPPayTxIdError(null);
       setIpUpiAmt(0);
       setIpCashAmt(0);
       setIpCardAmt(0);
@@ -799,6 +1003,9 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                 <Card className="space-y-4">
                   <div className="flex items-center justify-between border-b pb-2">
                     <h3 className="text-sm font-bold text-slate-800">Search Patient Dues & Payments</h3>
+                    <span className="text-[10px] font-mono font-medium text-slate-400">
+                      {billingSearchQuery.length}/{BILLING_LIMITS.SEARCH}
+                    </span>
                   </div>
                   <div className="relative">
                     <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -806,10 +1013,31 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                       type="text"
                       placeholder="Search patient by UHID, Name, or Phone..."
                       value={billingSearchQuery}
-                      onChange={(e) => setBillingSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-navy-500"
+                      maxLength={BILLING_LIMITS.SEARCH}
+                      onKeyDown={(e) => handleKeyGuard(e, billingSearchQuery, BILLING_LIMITS.SEARCH)}
+                      onPaste={(e) =>
+                        handlePasteGuard(e, billingSearchQuery, BILLING_LIMITS.SEARCH, (val) => {
+                          setBillingSearchQuery(val);
+                          setBillingSearchError(validateBillingSearch(val));
+                        })
+                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setBillingSearchQuery(val);
+                        setBillingSearchError(validateBillingSearch(val));
+                      }}
+                      className={`w-full pl-9 pr-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-1 ${
+                        billingSearchError
+                          ? "border-rose-400 focus:border-rose-500 focus:ring-rose-400"
+                          : "border-slate-200 focus:ring-navy-500"
+                      }`}
                     />
                   </div>
+                  {billingSearchError && (
+                    <p className="text-xs text-rose-600 font-medium" role="alert">
+                      {billingSearchError}
+                    </p>
+                  )}
                 </Card>
 
                 {billingSearchQuery.trim() !== "" ? (
@@ -909,7 +1137,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
             {invoice && (
               <Card className="print:hidden space-y-4">
                 <h3 className="text-sm font-bold text-slate-850 border-b pb-2">Process Receipt Payment</h3>
-                <form onSubmit={handleProcessPayment} className="space-y-3">
+                <form onSubmit={handleProcessPayment} noValidate className="space-y-3">
                   <SelectField
                     label="Payment Method"
                     value={paymentMethod}
@@ -923,20 +1151,93 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
 
                   {paymentMethod === "Mixed" && (
                     <div className="space-y-2 border-t pt-2 text-xs">
-                      <InputField label="UPI Amount (₹)" type="number" value={upiAmount} onChange={(e) => setUpiAmount(e.target.value)} />
-                      <InputField label="Cash Amount (₹)" type="number" value={cashAmount} onChange={(e) => setCashAmount(e.target.value)} />
-                      <InputField label="Card Amount (₹)" type="number" value={cardAmount} onChange={(e) => setCardAmount(e.target.value)} />
+                      <InputField
+                        label="UPI Amount (₹)"
+                        type="text"
+                        value={upiAmount}
+                        charCount={upiAmount.length}
+                        maxCharCount={BILLING_LIMITS.AMOUNT}
+                        maxLength={BILLING_LIMITS.AMOUNT}
+                        error={upiAmountError || undefined}
+                        onKeyDown={(e) => handleKeyGuard(e, upiAmount, BILLING_LIMITS.AMOUNT)}
+                        onPaste={(e) =>
+                          handlePasteGuard(e, upiAmount, BILLING_LIMITS.AMOUNT, (val) => {
+                            setUpiAmount(val);
+                            setUpiAmountError(validateSplitAmount(val));
+                          })
+                        }
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setUpiAmount(v);
+                          setUpiAmountError(validateSplitAmount(v));
+                        }}
+                      />
+                      <InputField
+                        label="Cash Amount (₹)"
+                        type="text"
+                        value={cashAmount}
+                        charCount={cashAmount.length}
+                        maxCharCount={BILLING_LIMITS.AMOUNT}
+                        maxLength={BILLING_LIMITS.AMOUNT}
+                        error={cashAmountError || undefined}
+                        onKeyDown={(e) => handleKeyGuard(e, cashAmount, BILLING_LIMITS.AMOUNT)}
+                        onPaste={(e) =>
+                          handlePasteGuard(e, cashAmount, BILLING_LIMITS.AMOUNT, (val) => {
+                            setCashAmount(val);
+                            setCashAmountError(validateSplitAmount(val));
+                          })
+                        }
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setCashAmount(v);
+                          setCashAmountError(validateSplitAmount(v));
+                        }}
+                      />
+                      <InputField
+                        label="Card Amount (₹)"
+                        type="text"
+                        value={cardAmount}
+                        charCount={cardAmount.length}
+                        maxCharCount={BILLING_LIMITS.AMOUNT}
+                        maxLength={BILLING_LIMITS.AMOUNT}
+                        error={cardAmountError || undefined}
+                        onKeyDown={(e) => handleKeyGuard(e, cardAmount, BILLING_LIMITS.AMOUNT)}
+                        onPaste={(e) =>
+                          handlePasteGuard(e, cardAmount, BILLING_LIMITS.AMOUNT, (val) => {
+                            setCardAmount(val);
+                            setCardAmountError(validateSplitAmount(val));
+                          })
+                        }
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setCardAmount(v);
+                          setCardAmountError(validateSplitAmount(v));
+                        }}
+                      />
                     </div>
                   )}
 
                   {paymentMethod !== "Mixed" && (
                     <InputField
                       label="Payment Amount (₹)"
-                      type="number"
+                      type="text"
                       value={payAmount}
-                      onChange={(e) => setPayAmount(e.target.value)}
-                      max={invoice.totals?.patientBalance !== undefined ? invoice.totals.patientBalance : invoice.totals?.total}
-                      min="1"
+                      charCount={payAmount.length}
+                      maxCharCount={BILLING_LIMITS.AMOUNT}
+                      maxLength={BILLING_LIMITS.AMOUNT}
+                      error={payAmountError || undefined}
+                      onKeyDown={(e) => handleKeyGuard(e, payAmount, BILLING_LIMITS.AMOUNT)}
+                      onPaste={(e) =>
+                        handlePasteGuard(e, payAmount, BILLING_LIMITS.AMOUNT, (val) => {
+                          setPayAmount(val);
+                          setPayAmountError(validatePayAmount(val));
+                        })
+                      }
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setPayAmount(v);
+                        setPayAmountError(validatePayAmount(v));
+                      }}
                       required
                     />
                   )}
@@ -1061,7 +1362,12 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
           {!selectedAdmissionId ? (
             // Search and Select Patient Selector
             <Card className="space-y-4">
-              <h2 className="text-base font-bold text-slate-800">Select Admitted Inpatient</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-bold text-slate-800">Select Admitted Inpatient</h2>
+                <span className="text-[10px] font-mono font-medium text-slate-400">
+                  {admissionSearch.length}/{BILLING_LIMITS.SEARCH}
+                </span>
+              </div>
               <div className="relative max-w-md">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
                   <Search className="h-4 w-4" />
@@ -1070,10 +1376,31 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                   type="text"
                   placeholder="Search admitted patient by UHID, Name, Admission No, Bed..."
                   value={admissionSearch}
-                  onChange={(e) => setAdmissionSearch(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-4 text-sm text-slate-700 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+                  maxLength={BILLING_LIMITS.SEARCH}
+                  onKeyDown={(e) => handleKeyGuard(e, admissionSearch, BILLING_LIMITS.SEARCH)}
+                  onPaste={(e) =>
+                    handlePasteGuard(e, admissionSearch, BILLING_LIMITS.SEARCH, (val) => {
+                      setAdmissionSearch(val);
+                      setAdmissionSearchError(validateAdmissionSearch(val));
+                    })
+                  }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setAdmissionSearch(val);
+                    setAdmissionSearchError(validateAdmissionSearch(val));
+                  }}
+                  className={`w-full rounded-lg border py-2 pl-9 pr-4 text-sm text-slate-700 outline-none focus:ring-1 ${
+                    admissionSearchError
+                      ? "border-rose-400 focus:border-rose-500 focus:ring-rose-400"
+                      : "border-slate-300 focus:border-navy-500 focus:ring-navy-500"
+                  }`}
                 />
               </div>
+              {admissionSearchError && (
+                <p className="text-xs text-rose-600 font-medium" role="alert">
+                  {admissionSearchError}
+                </p>
+              )}
 
               <div className="overflow-x-auto border border-slate-100 rounded-lg">
                 <table className="w-full text-left text-sm min-w-[700px]">
@@ -1317,53 +1644,126 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                                       )}
 
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                        <input
-                                          type="text"
-                                          placeholder="Service / Item Description"
-                                          value={itemDesc}
-                                          onChange={(e) => setItemDesc(e.target.value)}
-                                          className="rounded border border-slate-200 p-1.5 text-xs outline-none bg-white focus:border-navy-500"
-                                        />
-                                        <div className="grid grid-cols-5 gap-2">
+                                        <div className="space-y-1">
+                                          <div className="flex justify-between items-center text-[10px] text-slate-400">
+                                            <span>Description *</span>
+                                            <span>{itemDesc.length}/{BILLING_LIMITS.DESC}</span>
+                                          </div>
                                           <input
-                                            type="number"
-                                            placeholder="Qty"
-                                            value={itemQty || ""}
-                                            onChange={(e) => setItemQty(Number(e.target.value))}
-                                            className="rounded border border-slate-200 p-1.5 text-xs outline-none text-center bg-white"
-                                            title="Quantity"
-                                            min="1"
-                                          />
-                                          <input
-                                            type="number"
-                                            placeholder="Days"
-                                            value={itemDays || ""}
-                                            onChange={(e) => setItemDays(Number(e.target.value))}
-                                            className="rounded border border-slate-200 p-1.5 text-xs outline-none text-center bg-white"
-                                            title="Days"
-                                            min="1"
-                                          />
-                                          <input
-                                            type="number"
-                                            placeholder="Price"
-                                            value={itemPrice || ""}
-                                            onChange={(e) => setItemPrice(Number(e.target.value))}
-                                            className="rounded border border-slate-200 p-1.5 text-xs outline-none text-right bg-white col-span-2"
-                                            title="Price"
-                                          />
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              handleAddBillItem(manualCategory);
-                                              setAddManualGroup(null);
+                                            type="text"
+                                            placeholder="Service / Item Description"
+                                            value={itemDesc}
+                                            maxLength={BILLING_LIMITS.DESC}
+                                            onKeyDown={(e) => handleKeyGuard(e, itemDesc, BILLING_LIMITS.DESC)}
+                                            onPaste={(e) =>
+                                              handlePasteGuard(e, itemDesc, BILLING_LIMITS.DESC, (val) => {
+                                                setItemDesc(val);
+                                                setItemDescError(validateItemDesc(val));
+                                              })
+                                            }
+                                            onChange={(e) => {
+                                              const val = e.target.value;
+                                              setItemDesc(val);
+                                              setItemDescError(validateItemDesc(val));
                                             }}
-                                            className="bg-navy-700 hover:bg-navy-800 text-white rounded text-xs font-bold"
-                                            title="Submit item"
-                                          >
-                                            ✓
-                                          </button>
+                                            className={`w-full rounded border p-1.5 text-xs outline-none bg-white ${
+                                              itemDescError ? "border-rose-400" : "border-slate-200 focus:border-navy-500"
+                                            }`}
+                                          />
+                                          {itemDescError && (
+                                            <p className="text-[10px] text-rose-600" role="alert">{itemDescError}</p>
+                                          )}
+                                        </div>
+                                        <div className="grid grid-cols-5 gap-2">
+                                          <div className="space-y-1">
+                                            <div className="text-[10px] text-slate-400 text-center">{String(itemQty).length}/{BILLING_LIMITS.SMALL_NUM}</div>
+                                            <input
+                                              type="text"
+                                              placeholder="Qty"
+                                              value={itemQty || ""}
+                                              maxLength={BILLING_LIMITS.SMALL_NUM}
+                                              onKeyDown={(e) => handleKeyGuard(e, String(itemQty), BILLING_LIMITS.SMALL_NUM)}
+                                              onPaste={(e) =>
+                                                handlePasteGuard(e, String(itemQty), BILLING_LIMITS.SMALL_NUM, (val) => {
+                                                  setItemQty(Number(val) || 0);
+                                                  setItemQtyError(validateItemQty(val));
+                                                })
+                                              }
+                                              onChange={(e) => {
+                                                const val = e.target.value;
+                                                setItemQty(Number(val) || 0);
+                                                setItemQtyError(validateItemQty(val));
+                                              }}
+                                              className="w-full rounded border border-slate-200 p-1.5 text-xs outline-none text-center bg-white"
+                                              title="Quantity"
+                                            />
+                                          </div>
+                                          <div className="space-y-1">
+                                            <div className="text-[10px] text-slate-400 text-center">{String(itemDays).length}/{BILLING_LIMITS.SMALL_NUM}</div>
+                                            <input
+                                              type="text"
+                                              placeholder="Days"
+                                              value={itemDays || ""}
+                                              maxLength={BILLING_LIMITS.SMALL_NUM}
+                                              onKeyDown={(e) => handleKeyGuard(e, String(itemDays), BILLING_LIMITS.SMALL_NUM)}
+                                              onPaste={(e) =>
+                                                handlePasteGuard(e, String(itemDays), BILLING_LIMITS.SMALL_NUM, (val) => {
+                                                  setItemDays(Number(val) || 0);
+                                                  setItemDaysError(validateItemDays(val));
+                                                })
+                                              }
+                                              onChange={(e) => {
+                                                const val = e.target.value;
+                                                setItemDays(Number(val) || 0);
+                                                setItemDaysError(validateItemDays(val));
+                                              }}
+                                              className="w-full rounded border border-slate-200 p-1.5 text-xs outline-none text-center bg-white"
+                                              title="Days"
+                                            />
+                                          </div>
+                                          <div className="space-y-1 col-span-2">
+                                            <div className="text-[10px] text-slate-400 text-right">{String(itemPrice).length}/{BILLING_LIMITS.AMOUNT}</div>
+                                            <input
+                                              type="text"
+                                              placeholder="Price"
+                                              value={itemPrice || ""}
+                                              maxLength={BILLING_LIMITS.AMOUNT}
+                                              onKeyDown={(e) => handleKeyGuard(e, String(itemPrice), BILLING_LIMITS.AMOUNT)}
+                                              onPaste={(e) =>
+                                                handlePasteGuard(e, String(itemPrice), BILLING_LIMITS.AMOUNT, (val) => {
+                                                  setItemPrice(Number(val) || 0);
+                                                  setItemPriceError(validateItemPrice(val));
+                                                })
+                                              }
+                                              onChange={(e) => {
+                                                const val = e.target.value;
+                                                setItemPrice(Number(val) || 0);
+                                                setItemPriceError(validateItemPrice(val));
+                                              }}
+                                              className="w-full rounded border border-slate-200 p-1.5 text-xs outline-none text-right bg-white"
+                                              title="Price"
+                                            />
+                                          </div>
+                                          <div className="flex items-end pb-0.5">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                handleAddBillItem(manualCategory);
+                                                setAddManualGroup(null);
+                                              }}
+                                              className="w-full h-8 bg-navy-700 hover:bg-navy-800 text-white rounded text-xs font-bold"
+                                              title="Submit item"
+                                            >
+                                              ✓
+                                            </button>
+                                          </div>
                                         </div>
                                       </div>
+                                      {(itemPriceError || itemQtyError || itemDaysError) && (
+                                        <p className="text-[10px] text-rose-600 mt-1" role="alert">
+                                          {itemPriceError || itemQtyError || itemDaysError}
+                                        </p>
+                                      )}
                                     </div>
                                   </div>
                                 )}
@@ -1526,63 +1926,85 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                   {/* Right Column: Actions, Billing Summary and Payments */}
                   <div className="space-y-6">
                     {/* Billing Summary Step 7 */}
-                    <Card className="space-y-4 border-t-4 border-t-navy-700 bg-navy-50/50 shadow-md">
-                      <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                    <Card className="space-y-4 border-t-4 border-t-navy-700 bg-white shadow-md">
+                      <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                         <CreditCard className="h-4.5 w-4.5 text-navy-600" /> Billing Summary
                       </h3>
-                      <div className="space-y-2 text-xs border-b border-slate-100 pb-3">
-                        <div className="flex justify-between text-slate-550">
-                          <span>Gross Inpatient Bill (₹):</span>
-                          <span className="font-semibold text-slate-800">{formatINR(gross)}</span>
+                      <div className="space-y-2.5 text-xs border-b border-slate-100 pb-3">
+                        <div className="flex justify-between items-center gap-3 text-slate-600">
+                          <span className="shrink-0 font-medium">Gross Inpatient Bill:</span>
+                          <span className="font-semibold text-slate-800 font-mono text-right truncate" title={formatINR(gross)}>
+                            {formatINR(gross)}
+                          </span>
                         </div>
-                        <div className="flex items-center justify-between text-slate-550 gap-2">
-                          <div className="flex items-center gap-1">
-                            <span>GST Tax Rate (%):</span>
+                        <div className="flex items-center justify-between gap-3 text-slate-600">
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="font-medium">GST Tax Rate:</span>
                             {ipBillData.bill.status === "Draft" ? (
-                              <input
-                                type="number"
-                                value={taxRateVal}
-                                onChange={(e) => setTaxRateVal(Number(e.target.value))}
-                                className="w-12 rounded border text-center p-0.5 text-[10px]"
-                                min="0"
-                                max="100"
-                              />
+                              <div className="inline-flex items-center rounded-md border border-slate-300 bg-white px-1.5 py-0.5 shadow-2xs">
+                                <input
+                                  type="number"
+                                  value={taxRateVal}
+                                  onChange={(e) => setTaxRateVal(Math.max(0, Math.min(100, Number(e.target.value))))}
+                                  className="w-9 text-center text-xs font-mono font-bold text-slate-800 outline-none"
+                                  min="0"
+                                  max="100"
+                                />
+                                <span className="text-[10px] text-slate-400 font-semibold">%</span>
+                              </div>
                             ) : (
-                              <span className="font-bold text-slate-800">{ipBillData.bill.taxRate}%</span>
+                              <span className="font-bold text-slate-800 font-mono">{ipBillData.bill.taxRate}%</span>
                             )}
                           </div>
-                          <span className="font-semibold text-slate-800">+{formatINR(grossTax)}</span>
+                          <span className="font-semibold text-slate-800 font-mono text-right shrink-0">
+                            +{formatINR(grossTax)}
+                          </span>
                         </div>
-                        <div className="flex justify-between text-red-650">
-                          <span>Total Discount Benefit:</span>
-                          <span className="font-bold">-{formatINR(discountTotal)}</span>
+                        <div className="flex justify-between items-center gap-3 text-red-650">
+                          <span className="shrink-0 font-medium">Total Discount Benefit:</span>
+                          <span className="font-bold font-mono text-right truncate" title={`-${formatINR(discountTotal)}`}>
+                            -{formatINR(discountTotal)}
+                          </span>
                         </div>
                         {paymentMode !== "Cash" && (
-                          <div className="flex justify-between text-emerald-700 font-medium">
-                            <span>Insurance / TPA Split:</span>
-                            <span>-{formatINR(insuranceTotal)}</span>
+                          <div className="flex justify-between items-center gap-3 text-emerald-700 font-medium">
+                            <span className="shrink-0 font-medium">Insurance / TPA Split:</span>
+                            <span className="font-mono text-right truncate" title={`-${formatINR(insuranceTotal)}`}>
+                              -{formatINR(insuranceTotal)}
+                            </span>
                           </div>
                         )}
-                        <div className="flex justify-between text-slate-800 border-t border-slate-200/50 pt-2 font-bold text-sm">
-                          <span>Grand Total Bill:</span>
-                          <span className="text-slate-900">{formatINR(grandTotal)}</span>
+                        <div className="flex justify-between items-center gap-3 text-slate-800 border-t border-slate-200/70 pt-2.5 font-bold text-sm">
+                          <span className="shrink-0">Grand Total Bill:</span>
+                          <span className="text-slate-900 font-mono text-right truncate" title={formatINR(grandTotal)}>
+                            {formatINR(grandTotal)}
+                          </span>
                         </div>
-                        <div className="flex justify-between text-blue-700 font-medium pt-1">
-                          <span>Advance Paid (INR):</span>
-                          <span>{formatINR(advance)}</span>
+                        <div className="flex justify-between items-center gap-3 text-blue-700 font-medium pt-1">
+                          <span className="shrink-0 whitespace-nowrap">Advance Paid:</span>
+                          <span className="font-mono text-right truncate max-w-[190px]" title={formatINR(advance)}>
+                            {formatINR(advance)}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wide">Outstanding Due</span>
-                          <span className={`text-lg font-black font-mono ${outstanding > 1 ? "text-red-600" : "text-emerald-700"}`}>
+                      <div className="flex justify-between items-center gap-3 pt-1">
+                        <div className="min-w-0">
+                          <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider">
+                            Outstanding Due
+                          </span>
+                          <span
+                            className={`text-xl font-black font-mono truncate block ${
+                              outstanding > 1 ? "text-red-600" : "text-emerald-700"
+                            }`}
+                            title={formatINR(outstanding)}
+                          >
                             {formatINR(outstanding)}
                           </span>
                         </div>
                         {ipBillData.bill.status === "Generated" && (
                           <Button
                             onClick={() => setShowIPPaymentModal(true)}
-                            className="bg-navy-600 hover:bg-navy-700 text-white text-[10px] py-1.5 font-bold"
+                            className="bg-navy-600 hover:bg-navy-700 text-white text-xs px-3.5 py-2 font-bold shrink-0 shadow-sm"
                           >
                             Receive Payment
                           </Button>
@@ -1668,7 +2090,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                     {/* Step 8: Locked generated invoices actions */}
                     {ipBillData.bill.status === "Draft" ? (
                       <Button
-                        onClick={handleGenerateInvoice}
+                        onClick={handleGenerateInvoiceClick}
                         className="w-full py-2.5 font-black text-xs uppercase bg-navy-700 hover:bg-navy-800 text-white rounded-lg transition-all"
                         disabled={generateInvoiceMutation.isPending}
                       >
@@ -1693,13 +2115,27 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
         isOpen={showIPPaymentModal}
         onClose={() => setShowIPPaymentModal(false)}
       >
-        <form onSubmit={handlePostIPPayment} className="space-y-4">
+        <form onSubmit={handlePostIPPayment} noValidate className="space-y-4">
           <InputField
             label="Transaction Amount (₹)"
-            type="number"
-            value={ipPayAmount || ""}
-            onChange={(e) => setIPPayAmount(Number(e.target.value))}
-            min="1"
+            type="text"
+            value={ipPayAmount ? String(ipPayAmount) : ""}
+            charCount={ipPayAmount ? String(ipPayAmount).length : 0}
+            maxCharCount={BILLING_LIMITS.AMOUNT}
+            maxLength={BILLING_LIMITS.AMOUNT}
+            error={ipPayAmountError || undefined}
+            onKeyDown={(e) => handleKeyGuard(e, ipPayAmount ? String(ipPayAmount) : "", BILLING_LIMITS.AMOUNT)}
+            onPaste={(e) =>
+              handlePasteGuard(e, ipPayAmount ? String(ipPayAmount) : "", BILLING_LIMITS.AMOUNT, (val) => {
+                setIPPayAmount(Number(val) || 0);
+                setIPPayAmountError(validateIPPayAmount(val));
+              })
+            }
+            onChange={(e) => {
+              const v = e.target.value;
+              setIPPayAmount(Number(v) || 0);
+              setIPPayAmountError(validateIPPayAmount(v));
+            }}
             required
           />
 
@@ -1729,7 +2165,22 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
           <InputField
             label="Reference ID / Transaction Number"
             value={ipPayTxId}
-            onChange={(e) => setIPPayTxId(e.target.value)}
+            charCount={ipPayTxId.length}
+            maxCharCount={BILLING_LIMITS.TX_ID}
+            maxLength={BILLING_LIMITS.TX_ID}
+            error={ipPayTxIdError || undefined}
+            onKeyDown={(e) => handleKeyGuard(e, ipPayTxId, BILLING_LIMITS.TX_ID)}
+            onPaste={(e) =>
+              handlePasteGuard(e, ipPayTxId, BILLING_LIMITS.TX_ID, (val) => {
+                setIPPayTxId(val);
+                setIPPayTxIdError(validateIPPayTxId(val));
+              })
+            }
+            onChange={(e) => {
+              const v = e.target.value;
+              setIPPayTxId(v);
+              setIPPayTxIdError(validateIPPayTxId(v));
+            }}
             placeholder="e.g. Bank trace, cheque number..."
           />
 
@@ -1827,6 +2278,87 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
         onClose={() => setDeleteTargetItemId(null)}
         onConfirm={confirmDeleteBillItem}
       />
+
+      {/* On-screen Confirmation Modal for Generate Final Bill */}
+      {showGenerateInvoiceConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
+            onClick={() => {
+              if (!generateInvoiceMutation.isPending) setShowGenerateInvoiceConfirm(false);
+            }}
+          />
+          <div
+            className="relative z-10 w-full max-w-md rounded-2xl bg-white p-5 sm:p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-150 flex flex-col space-y-4"
+            role="dialog"
+            aria-modal="true"
+          >
+            {/* Header with Lock/Warning Icon */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 border border-amber-100">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Lock Bill & Generate Invoice
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    Permanent Billing Action
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGenerateInvoiceConfirm(false)}
+                disabled={generateInvoiceMutation.isPending}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors disabled:opacity-50"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Message Body */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs text-slate-700 leading-relaxed font-medium space-y-2">
+              <p className="font-semibold text-slate-800">
+                Are you sure you want to lock the bill and generate the invoice? This is permanent.
+              </p>
+              <p className="text-slate-500 text-[11px]">
+                Once generated, the bill items and category charges will be finalized into a GST invoice and locked against further editing.
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => setShowGenerateInvoiceConfirm(false)}
+                disabled={generateInvoiceMutation.isPending}
+                className="text-xs font-semibold px-4 py-2"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={confirmGenerateInvoice}
+                disabled={generateInvoiceMutation.isPending}
+                className="bg-navy-700 hover:bg-navy-800 text-white text-xs font-bold px-4 py-2 shadow-sm flex items-center gap-1.5"
+              >
+                {generateInvoiceMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Generating...</span>
+                  </>
+                ) : (
+                  <span>Yes, Lock & Generate</span>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

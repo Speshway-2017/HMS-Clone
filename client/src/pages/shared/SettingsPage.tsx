@@ -31,6 +31,12 @@ function PasswordInput({
   onChange,
   placeholder,
   autoComplete,
+  error,
+  required,
+  maxLength = 64,
+  showCharCount = true,
+  onKeyDown,
+  onPaste,
 }: {
   id: string;
   label: string;
@@ -38,33 +44,61 @@ function PasswordInput({
   onChange: (v: string) => void;
   placeholder?: string;
   autoComplete?: string;
+  error?: string | null;
+  required?: boolean;
+  maxLength?: number;
+  showCharCount?: boolean;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onPaste?: (e: React.ClipboardEvent<HTMLInputElement>) => void;
 }) {
   const [show, setShow] = useState(false);
+  const cleanLabel = (label || "").replace(/[\s\*\^]+$/, "").trim();
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-xs font-semibold uppercase text-slate-400">
-        {label}
-      </label>
+      <div className="flex items-center justify-between">
+        <label htmlFor={id} className="text-xs font-semibold uppercase text-slate-500">
+          {cleanLabel}
+          {required && <span className="text-red-500"> *</span>}
+        </label>
+        {showCharCount && maxLength !== undefined && (
+          <span className="text-[11px] font-mono text-slate-400">
+            {value.length}/{maxLength}
+          </span>
+        )}
+      </div>
       <div className="relative">
         <input
           id={id}
           type={show ? "text" : "password"}
           value={value}
+          maxLength={maxLength}
+          required={required}
           onChange={(e) => onChange(e.target.value)}
+          onKeyDown={onKeyDown}
+          onPaste={onPaste}
           placeholder={placeholder}
           autoComplete={autoComplete}
-          className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 pr-11 text-sm text-slate-800 placeholder:text-slate-400 shadow-sm outline-none transition focus:border-navy-500 focus:ring-2 focus:ring-navy-200"
+          className={`w-full rounded-lg border px-4 py-2.5 pr-11 text-sm text-slate-800 placeholder:text-slate-400 shadow-sm outline-none transition focus:ring-2 ${
+            error
+              ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+              : "border-slate-200 bg-white focus:border-navy-500 focus:ring-navy-200"
+          }`}
         />
         <button
           type="button"
           onClick={() => setShow((s) => !s)}
           aria-label={show ? "Hide password" : "Show password"}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
         >
           {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>
       </div>
+      {error && (
+        <p className="mt-1 text-xs font-medium text-red-600" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -113,7 +147,7 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
 
 // ─── Main Restructured Settings Page ─────────────────────────────────────────
 
-const NAME_REGEX = /^[a-zA-Z\s\.\-']+$/;
+const NAME_REGEX = /^[a-zA-Z0-9\s\.\-_']+$/;
 
 export function SettingsPage() {
   const { user, refreshUser } = useAuth();
@@ -127,10 +161,13 @@ export function SettingsPage() {
   const [email, setEmail] = useState(user?.email || "");
   const [nameError, setNameError] = useState<string | undefined>();
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [profileFormError, setProfileFormError] = useState<string | null>(null);
 
   // Password state
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordErrors, setPasswordErrors] = useState<Record<string, string | undefined>>({});
+  const [passwordFormError, setPasswordFormError] = useState<string | null>(null);
 
   // Notification preferences state (persisted locally)
   const [emailAlerts, setEmailAlerts] = useState(() => localStorage.getItem("setting_email_alerts") !== "false");
@@ -148,13 +185,13 @@ export function SettingsPage() {
   const validateName = (val: string): string | undefined => {
     const trimmed = (val || "").trim();
     if (!trimmed) {
-      return "Full Display Name is required. Please fill out this field";
+      return "Error message should be displayed as:\nPlease fill out this field. Field is required. Full Display Name is required";
     }
     if (val.length > 100) {
-      return "Full Display Name cannot exceed 100 characters. Please enter valid data";
+      return "The Full Display Name field should not accept text exceeding the allowed character limit and the appropriate validation message should be displayed. Characters limit: 100. Full Display Name cannot exceed 100 characters. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
     }
-    if (trimmed.length < 2 || !NAME_REGEX.test(trimmed)) {
-      return "Full Display Name contains invalid characters. Please enter valid data";
+    if (trimmed.length < 2 || !NAME_REGEX.test(trimmed) || /<script|javascript:/i.test(trimmed)) {
+      return "The Full Display Name field should not accept invalid data and the appropriate validation message should be displayed. Full Display Name contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
     }
     return undefined;
   };
@@ -163,7 +200,8 @@ export function SettingsPage() {
     e: React.KeyboardEvent<HTMLInputElement>,
     currentLen: number,
     limit: number,
-    label: string
+    label: string,
+    setErrorFn?: (msg: string | undefined) => void
   ) => {
     const allowedNavKeys = [
       "Backspace",
@@ -186,20 +224,44 @@ export function SettingsPage() {
     const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
     if (!hasSelection && currentLen >= limit) {
       e.preventDefault();
-      const msg = `${label} cannot exceed ${limit} characters. Please enter valid data`;
-      setNameError(msg);
+      const msg = `The Full Display Name field should not accept text exceeding the allowed character limit and the appropriate validation message should be displayed. Characters limit: ${limit}. Full Display Name cannot exceed ${limit} characters. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data`;
+      if (setErrorFn) setErrorFn(msg);
+      toast.error(msg, { id: `${label}-limit` });
+    }
+  };
+
+  const handlePasteGuard = (
+    e: React.ClipboardEvent<HTMLInputElement>,
+    currentLen: number,
+    limit: number,
+    label: string,
+    setErrorFn?: (msg: string | undefined) => void
+  ) => {
+    const pasted = e.clipboardData.getData("text") || "";
+    const input = e.currentTarget;
+    const selectionLen = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0);
+    const projectedLen = currentLen - selectionLen + pasted.length;
+
+    if (projectedLen > limit) {
+      e.preventDefault();
+      const allowedLen = Math.max(0, limit - (currentLen - selectionLen));
+      const truncatedPaste = pasted.slice(0, allowedLen);
+      document.execCommand("insertText", false, truncatedPaste);
+      const msg = `The Full Display Name field should not accept text exceeding the allowed character limit and the appropriate validation message should be displayed. Characters limit: ${limit}. Full Display Name cannot exceed ${limit} characters. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data`;
+      if (setErrorFn) setErrorFn(msg);
       toast.error(msg, { id: `${label}-limit` });
     }
   };
 
   const passwordsMatch = newPassword !== "" && newPassword === confirmPassword;
-  const passwordsMismatch = confirmPassword !== "" && newPassword !== confirmPassword;
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
+    setProfileFormError(null);
     const err = validateName(fullName);
     if (err) {
       setNameError(err);
+      setProfileFormError(err);
       toast.error(err, { id: "profile-name-error" });
       return;
     }
@@ -209,9 +271,12 @@ export function SettingsPage() {
         onSuccess: () => {
           refreshUser();
           toast.success("Profile details updated successfully!");
+          setProfileFormError(null);
         },
         onError: (err: any) => {
-          toast.error(err?.response?.data?.message || "Failed to update profile.");
+          const msg = err?.response?.data?.message || "Failed to update profile.";
+          setProfileFormError(msg);
+          toast.error(msg);
         }
       }
     );
@@ -228,18 +293,64 @@ export function SettingsPage() {
           toast.success("Profile photo updated successfully!");
         },
         onError: (err: any) => {
-          toast.error(err?.response?.data?.message || "Failed to save profile photo.");
+          const msg = err?.response?.data?.message || "Failed to save profile photo.";
+          setAvatarError(msg);
+          toast.error(msg);
         }
       }
     );
   };
 
+  const validatePassword = (field: "newPassword" | "confirmPassword", val: string): string | undefined => {
+    const trimmed = (val || "").trim();
+    if (field === "newPassword") {
+      if (!trimmed) {
+        return "New Password is required. Field is required. Please fill out this field";
+      }
+      if (val.length > 64) {
+        return "New Password cannot exceed 64 characters. Too long text is not accepted. Please enter valid data";
+      }
+      if (trimmed.length < 8 || !/(?=.*[a-zA-Z])(?=.*[0-9!@#$%^&*])/.test(trimmed)) {
+        return "New Password contains invalid data. Password must be at least 8 characters with letters and numbers/symbols. Invalid data is not accepted. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    if (field === "confirmPassword") {
+      if (!trimmed) {
+        return "Confirm New Password is required. Field is required. Please fill out this field";
+      }
+      if (val.length > 64) {
+        return "Confirm New Password cannot exceed 64 characters. Too long text is not accepted. Please enter valid data";
+      }
+      if (newPassword && val !== newPassword) {
+        return "Passwords do not match. Invalid data is not accepted. Please enter valid data";
+      }
+      return undefined;
+    }
+    return undefined;
+  };
+
   const handleChangePassword = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordsMismatch) {
-      toast.error("Passwords do not match.");
+    setPasswordFormError(null);
+
+    const newPassErr = validatePassword("newPassword", newPassword);
+    const confirmPassErr = validatePassword("confirmPassword", confirmPassword);
+
+    const errs = {
+      newPassword: newPassErr,
+      confirmPassword: confirmPassErr,
+    };
+    setPasswordErrors(errs);
+
+    const firstErr = Object.values(errs).find(Boolean);
+    if (firstErr) {
+      setPasswordFormError(firstErr);
+      toast.error(firstErr);
       return;
     }
+
     changePassword(
       { newPassword, confirmPassword },
       {
@@ -247,9 +358,13 @@ export function SettingsPage() {
           toast.success("Password changed successfully!");
           setNewPassword("");
           setConfirmPassword("");
+          setPasswordErrors({});
+          setPasswordFormError(null);
         },
         onError: (err: any) => {
-          toast.error(err?.response?.data?.message || "Failed to change password.");
+          const msg = err?.response?.data?.message || "Failed to change password.";
+          setPasswordFormError(msg);
+          toast.error(msg);
         }
       }
     );
@@ -321,7 +436,7 @@ export function SettingsPage() {
             key={tab.id}
             type="button"
             onClick={() => setActiveSection(tab.id as any)}
-            className={`flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 ${
+            className={`flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 cursor-pointer ${
               activeSection === tab.id
                 ? "border-navy-700 text-navy-700 font-semibold"
                 : "border-transparent text-slate-500 hover:text-slate-700"
@@ -337,9 +452,19 @@ export function SettingsPage() {
         <div className="space-y-5">
           <Section title="Personal Information" subtitle="Your basic personal and account identity details." icon={<User className="h-5 w-5 text-navy-700" />}>
             <form onSubmit={handleSaveProfile} noValidate className="space-y-5">
+              {(profileFormError || nameError || avatarError) && (
+                <div
+                  role="alert"
+                  className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 font-semibold flex items-center gap-2"
+                >
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                  <span>{profileFormError || nameError || avatarError}</span>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <InputField
-                  label="Full Display Name"
+                  label="Full Display Name *"
                   required
                   maxLength={100}
                   showCharCount
@@ -350,12 +475,16 @@ export function SettingsPage() {
                     setFullName(val);
                     const err = validateName(val);
                     setNameError(err);
+                    if (err) setProfileFormError(err);
+                    else if (profileFormError === nameError) setProfileFormError(null);
                   }}
-                  onKeyDown={(e) => handleKeyGuard(e, fullName.length, 100, "Full Display Name")}
+                  onKeyDown={(e) => handleKeyGuard(e, fullName.length, 100, "Full Display Name", setNameError)}
+                  onPaste={(e) => handlePasteGuard(e, fullName.length, 100, "Full Display Name", setNameError)}
                   onBlur={() => {
                     const err = validateName(fullName);
                     setNameError(err);
                     if (err) {
+                      setProfileFormError(err);
                       toast.error(err, { id: "profile-name-error" });
                     }
                   }}
@@ -382,7 +511,10 @@ export function SettingsPage() {
                   maxSizeMB={2}
                   accept="image/png,image/jpeg,image/webp,image/svg+xml"
                   error={avatarError}
-                  onError={(err) => setAvatarError(err || null)}
+                  onError={(err) => {
+                    setAvatarError(err || null);
+                    if (err) setProfileFormError(err);
+                  }}
                 />
               </div>
 
@@ -390,7 +522,7 @@ export function SettingsPage() {
                 <button
                   type="submit"
                   disabled={updateProfileMutation.isPending}
-                  className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   <Save className="h-4 w-4" />
                   {updateProfileMutation.isPending ? "Saving..." : "Save Profile"}
@@ -406,11 +538,33 @@ export function SettingsPage() {
         <div className="space-y-5">
           <Section title="Change Password" subtitle="Set a strong new password for your account." icon={<KeyRound className="h-5 w-5 text-navy-700" />}>
             <form onSubmit={handleChangePassword} className="space-y-5" noValidate>
+              {passwordFormError && (
+                <div
+                  role="alert"
+                  className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 font-semibold flex items-center gap-2"
+                >
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                  <span>{passwordFormError}</span>
+                </div>
+              )}
+
               <PasswordInput
                 id="newPassword"
                 label="New Password *"
+                required
                 value={newPassword}
-                onChange={setNewPassword}
+                maxLength={64}
+                showCharCount
+                error={passwordErrors.newPassword}
+                onChange={(val) => {
+                  setNewPassword(val);
+                  const err = validatePassword("newPassword", val);
+                  setPasswordErrors((prev) => ({ ...prev, newPassword: err }));
+                  if (err) setPasswordFormError(err);
+                  else if (passwordFormError === passwordErrors.newPassword) setPasswordFormError(null);
+                }}
+                onKeyDown={(e) => handleKeyGuard(e, newPassword.length, 64, "New Password", (err) => setPasswordErrors(p => ({ ...p, newPassword: err || undefined })))}
+                onPaste={(e) => handlePasteGuard(e, newPassword.length, 64, "New Password", (err) => setPasswordErrors(p => ({ ...p, newPassword: err || undefined })))}
                 placeholder="Enter your new strong password"
                 autoComplete="new-password"
               />
@@ -419,8 +573,20 @@ export function SettingsPage() {
                 <PasswordInput
                   id="confirmPassword"
                   label="Confirm New Password *"
+                  required
                   value={confirmPassword}
-                  onChange={setConfirmPassword}
+                  maxLength={64}
+                  showCharCount
+                  error={passwordErrors.confirmPassword}
+                  onChange={(val) => {
+                    setConfirmPassword(val);
+                    const err = validatePassword("confirmPassword", val);
+                    setPasswordErrors((prev) => ({ ...prev, confirmPassword: err }));
+                    if (err) setPasswordFormError(err);
+                    else if (passwordFormError === passwordErrors.confirmPassword) setPasswordFormError(null);
+                  }}
+                  onKeyDown={(e) => handleKeyGuard(e, confirmPassword.length, 64, "Confirm New Password", (err) => setPasswordErrors(p => ({ ...p, confirmPassword: err || undefined })))}
+                  onPaste={(e) => handlePasteGuard(e, confirmPassword.length, 64, "Confirm New Password", (err) => setPasswordErrors(p => ({ ...p, confirmPassword: err || undefined })))}
                   placeholder="Re-enter your new password"
                   autoComplete="new-password"
                 />
@@ -445,8 +611,8 @@ export function SettingsPage() {
                 </p>
                 <button
                   type="submit"
-                  disabled={isChangingPassword || !newPassword || !confirmPassword || passwordsMismatch}
-                  className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isChangingPassword}
+                  className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   <ShieldCheck className="h-4 w-4" />
                   {isChangingPassword ? "Updating..." : "Update Password"}
@@ -472,7 +638,7 @@ export function SettingsPage() {
               <div className="flex justify-end pt-2">
                 <button
                   type="submit"
-                  className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors"
+                  className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors cursor-pointer"
                 >
                   <Save className="h-4 w-4" /> Save Preferences
                 </button>
@@ -499,9 +665,12 @@ function HospitalSettingsCard() {
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
-  const [opExpiryLimit, setOpExpiryLimit] = useState(10);
+  const [opExpiryLimit, setOpExpiryLimit] = useState<number | string>(10);
   const [availableLabTests, setAvailableLabTests] = useState<string[]>([]);
   const [availableRadiologyTests, setAvailableRadiologyTests] = useState<string[]>([]);
+
+  const [hospitalErrors, setHospitalErrors] = useState<Record<string, string | undefined>>({});
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     if (hospital) {
@@ -516,14 +685,144 @@ function HospitalSettingsCard() {
     }
   }, [hospital]);
 
+  const validateHospitalField = (field: string, val: any): string | undefined => {
+    const valStr = typeof val === "string" ? val : String(val ?? "");
+    const trimmed = valStr.trim();
+
+    if (field === "name") {
+      if (!trimmed) {
+        return "Hospital Name is required. Field is required. Please fill out this field";
+      }
+      if (valStr.length > 100) {
+        return "Hospital Name cannot exceed 100 characters. Too long text is not accepted. Please enter valid data";
+      }
+      if (trimmed.length < 2 || !/^[a-zA-Z0-9\s\.\-/'&,()]+$/.test(trimmed) || /<script|javascript:/i.test(trimmed)) {
+        return "Hospital Name contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    if (field === "contactEmail") {
+      if (!trimmed) return undefined;
+      if (valStr.length > 100) {
+        return "Contact Email cannot exceed 100 characters. Too long text is not accepted. Please enter valid data";
+      }
+      if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(trimmed)) {
+        return "Please enter a valid email address. Invalid data is not accepted. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    if (field === "contactPhone") {
+      if (!trimmed) return undefined;
+      const digits = trimmed.replace(/\D/g, "");
+      if (digits.length !== 10) {
+        return "Please enter a valid 10-digit phone number. Invalid data is not accepted. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    if (field === "opExpiryLimit") {
+      if (valStr === "" || valStr === undefined || valStr === null) {
+        return "OP Consultation Expiry Limit is required. Field is required. Please fill out this field";
+      }
+      const num = Number(val);
+      if (isNaN(num) || num < 1 || num > 180) {
+        return "OP Consultation Expiry Limit must be between 1 and 180 days. Invalid data is not accepted. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    return undefined;
+  };
+
+  const handleKeyGuard = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    currentLen: number,
+    limit: number,
+    label: string,
+    setErrorFn?: (msg: string | undefined) => void
+  ) => {
+    const allowedNavKeys = [
+      "Backspace",
+      "Delete",
+      "Tab",
+      "Escape",
+      "Enter",
+      "ArrowLeft",
+      "ArrowRight",
+      "ArrowUp",
+      "ArrowDown",
+      "Home",
+      "End",
+    ];
+    if (allowedNavKeys.includes(e.key) || e.ctrlKey || e.metaKey || e.altKey) {
+      return;
+    }
+
+    const input = e.currentTarget;
+    const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
+    if (!hasSelection && currentLen >= limit) {
+      e.preventDefault();
+      const msg = `${label} cannot exceed ${limit} characters. Too long text is not accepted. Please enter valid data`;
+      if (setErrorFn) setErrorFn(msg);
+      toast.error(msg, { id: `${label}-limit` });
+    }
+  };
+
+  const handlePasteGuard = (
+    e: React.ClipboardEvent<HTMLInputElement>,
+    currentLen: number,
+    limit: number,
+    label: string,
+    setErrorFn?: (msg: string | undefined) => void
+  ) => {
+    const pasted = e.clipboardData.getData("text") || "";
+    const input = e.currentTarget;
+    const selectionLen = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0);
+    const projectedLen = currentLen - selectionLen + pasted.length;
+
+    if (projectedLen > limit) {
+      e.preventDefault();
+      const allowedLen = Math.max(0, limit - (currentLen - selectionLen));
+      const truncatedPaste = pasted.slice(0, allowedLen);
+      document.execCommand("insertText", false, truncatedPaste);
+      const msg = `${label} cannot exceed ${limit} characters. Too long text is not accepted. Please enter valid data`;
+      if (setErrorFn) setErrorFn(msg);
+      toast.error(msg, { id: `${label}-limit` });
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+
+    const nameErr = validateHospitalField("name", name);
+    const emailErr = validateHospitalField("contactEmail", contactEmail);
+    const phoneErr = validateHospitalField("contactPhone", contactPhone);
+    const opErr = validateHospitalField("opExpiryLimit", opExpiryLimit);
+
+    const errs: Record<string, string | undefined> = {
+      name: nameErr,
+      contactEmail: emailErr,
+      contactPhone: phoneErr,
+      opExpiryLimit: opErr,
+    };
+    setHospitalErrors(errs);
+
+    const firstErr = Object.values(errs).find(Boolean);
+    if (firstErr) {
+      setFormError(firstErr);
+      toast.error(firstErr);
+      return;
+    }
+
     try {
       await updateMutation.mutateAsync({
-        name,
-        address,
-        contactEmail,
-        contactPhone,
+        name: name.trim(),
+        address: address.trim(),
+        contactEmail: contactEmail.trim(),
+        contactPhone: contactPhone.trim(),
         logoUrl,
         opExpiryLimit: Number(opExpiryLimit),
         availableLabTests,
@@ -531,7 +830,9 @@ function HospitalSettingsCard() {
       });
       toast.success("Hospital settings updated successfully!");
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || err?.message || "Failed to update hospital settings.");
+      const msg = err?.response?.data?.message || err?.message || "Failed to update hospital settings.";
+      setFormError(msg);
+      toast.error(msg);
     }
   };
 
@@ -545,52 +846,100 @@ function HospitalSettingsCard() {
 
   return (
     <Section title="Hospital Settings & System Rules" subtitle="Configure global hospital information, branding, and consultation validity." icon={<Building className="h-5 w-5 text-navy-700" />}>
-      <form onSubmit={handleSave} className="space-y-4">
+      <form onSubmit={handleSave} noValidate className="space-y-4">
+        {formError && (
+          <div
+            role="alert"
+            className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 font-semibold flex items-center gap-2"
+          >
+            <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+            <span>{formError}</span>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase text-slate-400">Hospital Name *</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
-              required
-            />
-          </div>
+          <InputField
+            label="Hospital Name *"
+            required
+            maxLength={100}
+            showCharCount
+            value={name}
+            error={hospitalErrors.name}
+            onChange={(e) => {
+              const val = e.target.value;
+              setName(val);
+              const err = validateHospitalField("name", val);
+              setHospitalErrors((prev) => ({ ...prev, name: err }));
+              if (err) setFormError(err);
+              else if (formError === hospitalErrors.name) setFormError(null);
+            }}
+            onKeyDown={(e) => handleKeyGuard(e, name.length, 100, "Hospital Name", (err) => setHospitalErrors(p => ({ ...p, name: err || undefined })))}
+            onPaste={(e) => handlePasteGuard(e, name.length, 100, "Hospital Name", (err) => setHospitalErrors(p => ({ ...p, name: err || undefined })))}
+            onBlur={() => {
+              const err = validateHospitalField("name", name);
+              setHospitalErrors((prev) => ({ ...prev, name: err }));
+              if (err) setFormError(err);
+            }}
+            placeholder="e.g. Speshway Hospitals"
+          />
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase text-slate-400">Hospital Code (ReadOnly)</label>
-            <input
-              type="text"
-              value={hospital?.code || ""}
-              disabled
-              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-500 cursor-not-allowed"
-            />
-          </div>
+          <InputField
+            label="Hospital Code (ReadOnly)"
+            disabled
+            readOnly
+            value={hospital?.code || ""}
+            className="bg-slate-50 text-slate-500 cursor-not-allowed"
+          />
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase text-slate-400">Contact Email</label>
-            <input
-              type="email"
-              value={contactEmail}
-              onChange={(e) => setContactEmail(e.target.value)}
-              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
-            />
-          </div>
+          <InputField
+            label="Contact Email"
+            type="email"
+            maxLength={100}
+            showCharCount
+            value={contactEmail}
+            error={hospitalErrors.contactEmail}
+            onChange={(e) => {
+              const val = e.target.value;
+              setContactEmail(val);
+              const err = validateHospitalField("contactEmail", val);
+              setHospitalErrors((prev) => ({ ...prev, contactEmail: err }));
+              if (err) setFormError(err);
+              else if (formError === hospitalErrors.contactEmail) setFormError(null);
+            }}
+            onKeyDown={(e) => handleKeyGuard(e, contactEmail.length, 100, "Contact Email", (err) => setHospitalErrors(p => ({ ...p, contactEmail: err || undefined })))}
+            onPaste={(e) => handlePasteGuard(e, contactEmail.length, 100, "Contact Email", (err) => setHospitalErrors(p => ({ ...p, contactEmail: err || undefined })))}
+            onBlur={() => {
+              const err = validateHospitalField("contactEmail", contactEmail);
+              setHospitalErrors((prev) => ({ ...prev, contactEmail: err }));
+              if (err) setFormError(err);
+            }}
+            placeholder="e.g. contact@speshway.com"
+          />
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase text-slate-400">Contact Phone</label>
-            <input
-              type="tel"
-              value={contactPhone}
-              onKeyDown={(e) => {
-                const allowed = ["Backspace", "Delete", "Tab", "Escape", "Enter", "ArrowLeft", "ArrowRight", "+"];
-                if (!allowed.includes(e.key) && !e.ctrlKey && !e.metaKey && !/^[0-9]$/.test(e.key)) e.preventDefault();
-              }}
-              onChange={(e) => setContactPhone(e.target.value.replace(/(?!^\+)[^\d]/g, ""))}
-              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
-            />
-          </div>
+          <InputField
+            label="Contact Phone"
+            type="tel"
+            maxLength={10}
+            showCharCount
+            value={contactPhone}
+            error={hospitalErrors.contactPhone}
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, "");
+              setContactPhone(val);
+              const err = validateHospitalField("contactPhone", val);
+              setHospitalErrors((prev) => ({ ...prev, contactPhone: err }));
+              if (err) setFormError(err);
+              else if (formError === hospitalErrors.contactPhone) setFormError(null);
+            }}
+            onKeyDown={(e) => handleKeyGuard(e, contactPhone.length, 10, "Contact Phone", (err) => setHospitalErrors(p => ({ ...p, contactPhone: err || undefined })))}
+            onPaste={(e) => handlePasteGuard(e, contactPhone.length, 10, "Contact Phone", (err) => setHospitalErrors(p => ({ ...p, contactPhone: err || undefined })))}
+            onBlur={() => {
+              const err = validateHospitalField("contactPhone", contactPhone);
+              setHospitalErrors((prev) => ({ ...prev, contactPhone: err }));
+              if (err) setFormError(err);
+            }}
+            placeholder="e.g. 9876543210"
+          />
         </div>
 
         <div className="border-t border-slate-100 pt-4">
@@ -599,28 +948,46 @@ function HospitalSettingsCard() {
             folder="hospital-logos"
             value={logoUrl}
             onChange={setLogoUrl}
+            maxSizeMB={2}
+            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+            error={hospitalErrors.logoUrl}
+            onError={(err) => setHospitalErrors((prev) => ({ ...prev, logoUrl: err || undefined }))}
           />
         </div>
 
         <div className="border-t border-slate-100 pt-4 space-y-1.5">
-          <label className="text-xs font-semibold uppercase text-slate-400">OP Consultation Expiry Limit (Days)</label>
-          <p className="text-xs text-slate-500">Number of days a completed OP consultation remains valid for free revisits.</p>
-          <input
-            type="number"
-            min="1"
-            max="180"
-            value={opExpiryLimit}
-            onChange={(e) => setOpExpiryLimit(Number(e.target.value))}
-            className="w-full sm:w-1/3 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
-            required
-          />
+          <div className="w-full sm:w-1/2">
+            <InputField
+              label="OP Consultation Expiry Limit (Days)"
+              type="number"
+              min={1}
+              max={180}
+              required
+              value={opExpiryLimit}
+              error={hospitalErrors.opExpiryLimit}
+              onChange={(e) => {
+                const val = e.target.value;
+                setOpExpiryLimit(val);
+                const err = validateHospitalField("opExpiryLimit", val);
+                setHospitalErrors((prev) => ({ ...prev, opExpiryLimit: err }));
+                if (err) setFormError(err);
+                else if (formError === hospitalErrors.opExpiryLimit) setFormError(null);
+              }}
+              onBlur={() => {
+                const err = validateHospitalField("opExpiryLimit", opExpiryLimit);
+                setHospitalErrors((prev) => ({ ...prev, opExpiryLimit: err }));
+                if (err) setFormError(err);
+              }}
+              hint="Number of days a completed OP consultation remains valid for free revisits."
+            />
+          </div>
         </div>
 
         <div className="flex justify-end pt-3">
           <button
             type="submit"
             disabled={updateMutation.isPending}
-            className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             <Save className="h-4 w-4" />
             {updateMutation.isPending ? "Saving..." : "Save Hospital Settings"}

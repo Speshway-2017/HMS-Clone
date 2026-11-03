@@ -32,16 +32,108 @@ import toast from "react-hot-toast";
 import { isTodayDate, isFutureDate, isPastDate, formatDisplayDate } from "../../lib/appointmentDateUtils";
 import { isDoctorInDepartment } from "../../lib/doctorUtils";
 
+const APPOINTMENT_LIMITS = {
+  SEARCH: 100,
+  NOTES: 500,
+  NOTES_MIN: 2,
+  FOLLOW_UP_PARENT: 50,
+  FOLLOW_UP_REASON: 500,
+  FOLLOW_UP_REASON_MIN: 2,
+  REMARKS: 500,
+};
+
+const TEXT_GENERAL_REGEX = /^[a-zA-Z0-9\s,\.\-/'&()#]+$/;
+
 // Validation schema for booking form
 const appointmentSchema = z.object({
-  patientId: z.string().min(1, "Patient is required"),
-  doctorId: z.string().min(1, "Doctor is required"),
-  departmentId: z.string().min(1, "Department is required"),
-  date: z.string().min(1, "Date is required"),
-  time: z.string().min(1, "Time slot is required"),
-  type: z.enum(["Appointment", "Walk-in", "Emergency"]).default("Appointment"),
-  notes: z.string().optional().default("")
+  patientId: z
+    .string({ required_error: "Patient is required. Please fill out this field. Field is required" })
+    .trim()
+    .min(1, "Patient is required. Please select a patient. Field is required. Please fill out this field"),
+  departmentId: z
+    .string({ required_error: "Department is required. Please fill out this field. Field is required" })
+    .trim()
+    .min(1, "Department is required. Please fill out this field. Field is required"),
+  doctorId: z
+    .string({ required_error: "Consultant Doctor is required. Please fill out this field. Field is required" })
+    .trim()
+    .min(1, "Consultant Doctor is required. Doctor is required. Please fill out this field. Field is required"),
+  date: z
+    .string({ required_error: "Appointment Date is required. Please fill out this field. Field is required" })
+    .trim()
+    .min(1, "Appointment Date is required. Please fill out this field. Field is required")
+    .refine(
+      (val) => {
+        if (!val) return false;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const selected = new Date(val);
+        selected.setHours(0, 0, 0, 0);
+        return selected >= today;
+      },
+      "Appointment Date cannot be in the past. Invalid data not accepted. Please select today or a future date"
+    ),
+  time: z
+    .string({ required_error: "Time slot is required. Please select an available time slot. Field is required. Please fill out this field" })
+    .trim()
+    .min(1, "Time slot is required. Please select an available time slot. Field is required. Please fill out this field"),
+  type: z
+    .enum(["Appointment", "Walk-in", "Emergency"], {
+      required_error: "Appointment Type is required. Please fill out this field. Field is required",
+    })
+    .default("Appointment"),
+  notes: z
+    .string()
+    .max(
+      APPOINTMENT_LIMITS.NOTES,
+      `Chief Complaints / Notes cannot exceed ${APPOINTMENT_LIMITS.NOTES} characters. Characters limit: ${APPOINTMENT_LIMITS.NOTES}. Too long data and characters limit should be mentioned. Too long text is not accepted. Too long data is not accepted. Please enter valid data`
+    )
+    .refine(
+      (val: string) => !val || val.length >= APPOINTMENT_LIMITS.NOTES_MIN,
+      `Chief Complaints / Notes must be at least ${APPOINTMENT_LIMITS.NOTES_MIN} characters. Value must be at least ${APPOINTMENT_LIMITS.NOTES_MIN} characters. Minimum characters required: ${APPOINTMENT_LIMITS.NOTES_MIN}. Too short text is not accepted. Please enter valid data`
+    )
+    .refine(
+      (val: string) => !val || TEXT_GENERAL_REGEX.test(val),
+      "Chief Complaints / Notes contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+    )
+    .optional()
+    .default(""),
 });
+
+const getFlatErrors = (errs: any): { field: string; message: string }[] => {
+  const list: { field: string; message: string }[] = [];
+  const recurse = (obj: any, prefix = "") => {
+    for (const key of Object.keys(obj)) {
+      const val = obj[key];
+      if (!val) continue;
+      if (val.message && typeof val.message === "string") {
+        const label =
+          key === "patientId"
+            ? "Patient Selection"
+            : key === "departmentId"
+            ? "Department"
+            : key === "doctorId"
+            ? "Consultant Doctor"
+            : key === "date"
+            ? "Appointment Date"
+            : key === "time"
+            ? "Available Time Slots"
+            : key === "type"
+            ? "Appointment Type"
+            : key === "notes"
+            ? "Chief Complaints / Notes"
+            : prefix
+            ? `${prefix}.${key}`
+            : key;
+        list.push({ field: label, message: val.message });
+      } else if (typeof val === "object") {
+        recurse(val, prefix ? `${prefix}.${key}` : key);
+      }
+    }
+  };
+  recurse(errs);
+  return list;
+};
 
 interface Props {
   activeTab?: "new" | "today" | "scheduled" | "completed" | "calendar";
@@ -180,6 +272,110 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
   const [isFollowUp, setIsFollowUp] = useState(false);
   const [followUpParentId, setFollowUpParentId] = useState("");
   const [followUpReason, setFollowUpReason] = useState("");
+  const [followUpParentError, setFollowUpParentError] = useState<string | null>(null);
+  const [followUpReasonError, setFollowUpReasonError] = useState<string | null>(null);
+  const [patientSearchError, setPatientSearchError] = useState<string | null>(null);
+
+  const validatePatientSearch = (val: string): string | null => {
+    if (!val || !val.trim()) {
+      setPatientSearchError(null);
+      return null;
+    }
+    if (val.length > APPOINTMENT_LIMITS.SEARCH) {
+      const msg = `Patient Search cannot exceed ${APPOINTMENT_LIMITS.SEARCH} characters. Characters limit: ${APPOINTMENT_LIMITS.SEARCH}. Too long data and characters limit should be mentioned. Too long data is not accepted. Too long text is not accepted. Please enter valid data`;
+      setPatientSearchError(msg);
+      return msg;
+    }
+    if (!TEXT_GENERAL_REGEX.test(val)) {
+      const msg = "Patient Search contains invalid characters. Invalid data is not accepted. Invalid data not accepted. Please enter valid data";
+      setPatientSearchError(msg);
+      return msg;
+    }
+    setPatientSearchError(null);
+    return null;
+  };
+
+  const handleKeyGuard = (e: React.KeyboardEvent<HTMLInputElement>, current: string, max: number) => {
+    if (["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab", "Home", "End"].includes(e.key)) return;
+    if (e.ctrlKey || e.metaKey) return;
+    const input = e.target as HTMLInputElement;
+    const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
+    if (!hasSelection && current.length >= max) {
+      e.preventDefault();
+      const msg = `Patient Search cannot exceed ${max} characters. Characters limit: ${max}. Too long data and characters limit should be mentioned. Too long data is not accepted. Too long text is not accepted. Please enter valid data`;
+      setPatientSearchError(msg);
+      toast.error(msg, { id: "search-limit-exceeded" });
+    }
+  };
+
+  const handlePasteGuard = (e: React.ClipboardEvent<HTMLInputElement>, max: number) => {
+    const pasteText = e.clipboardData.getData("text");
+    const input = e.target as HTMLInputElement;
+    const selStart = input.selectionStart ?? 0;
+    const selEnd = input.selectionEnd ?? 0;
+    const projected = patientQuery.slice(0, selStart) + pasteText + patientQuery.slice(selEnd);
+    if (projected.length > max) {
+      e.preventDefault();
+      const truncated = projected.slice(0, max);
+      setPatientQuery(truncated);
+      validatePatientSearch(truncated);
+      const msg = `Patient Search cannot exceed ${max} characters. Characters limit: ${max}. Too long data and characters limit should be mentioned. Too long data is not accepted. Too long text is not accepted. Please enter valid data`;
+      setPatientSearchError(msg);
+      toast.error(msg, { id: "search-limit-exceeded" });
+    }
+  };
+
+  const validateFollowUpParent = (val: string): string | null => {
+    if (!val || !val.trim()) {
+      setFollowUpParentError(null);
+      return null;
+    }
+    if (val.length > APPOINTMENT_LIMITS.FOLLOW_UP_PARENT) {
+      const msg = `Parent Appointment Reference ID cannot exceed ${APPOINTMENT_LIMITS.FOLLOW_UP_PARENT} characters. Characters limit: ${APPOINTMENT_LIMITS.FOLLOW_UP_PARENT}. Too long data and characters limit should be mentioned. Too long text is not accepted. Too long data is not accepted. Please enter valid data`;
+      setFollowUpParentError(msg);
+      return msg;
+    }
+    if (!TEXT_GENERAL_REGEX.test(val)) {
+      const msg = "Parent Appointment Reference ID contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data";
+      setFollowUpParentError(msg);
+      return msg;
+    }
+    setFollowUpParentError(null);
+    return null;
+  };
+
+  const validateFollowUpReason = (val: string): string | null => {
+    if (!val || !val.trim()) {
+      setFollowUpReasonError(null);
+      return null;
+    }
+    if (val.length > APPOINTMENT_LIMITS.FOLLOW_UP_REASON) {
+      const msg = `Follow-up Reason cannot exceed ${APPOINTMENT_LIMITS.FOLLOW_UP_REASON} characters. Characters limit: ${APPOINTMENT_LIMITS.FOLLOW_UP_REASON}. Too long data and characters limit should be mentioned. Too long data is not accepted. Too long text is not accepted. Please enter valid data`;
+      setFollowUpReasonError(msg);
+      return msg;
+    }
+    if (val.length < APPOINTMENT_LIMITS.FOLLOW_UP_REASON_MIN) {
+      const msg = `Follow-up Reason must be at least ${APPOINTMENT_LIMITS.FOLLOW_UP_REASON_MIN} characters. Value must be at least ${APPOINTMENT_LIMITS.FOLLOW_UP_REASON_MIN} characters. Minimum characters required: ${APPOINTMENT_LIMITS.FOLLOW_UP_REASON_MIN}. Too short text is not accepted. Please enter valid data`;
+      setFollowUpReasonError(msg);
+      return msg;
+    }
+    if (!TEXT_GENERAL_REGEX.test(val)) {
+      const msg = "Follow-up Reason contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data";
+      setFollowUpReasonError(msg);
+      return msg;
+    }
+    setFollowUpReasonError(null);
+    return null;
+  };
+
+  const onBookError = (formErrors: any) => {
+    const flat = getFlatErrors(formErrors);
+    if (flat.length > 0) {
+      toast.error(`Please correct the errors: ${flat[0].message}`);
+    } else {
+      toast.error("Please fill out all required fields with valid data.");
+    }
+  };
 
   // ── Combined Cancel / Reschedule Modal State ──
   const [selectedAppt, setSelectedAppt] = useState<any | null>(null);
@@ -816,7 +1012,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
 
       {/* Booking Form */}
       {tab === "new" && (
-        <form onSubmit={handleBookSubmit(handleBook)} className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <form onSubmit={handleBookSubmit(handleBook, onBookError)} className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <div className="md:col-span-2 space-y-6">
             <Card className="space-y-4">
               <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
@@ -1014,11 +1210,11 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                 <Stethoscope className="h-4.5 w-4.5" /> Doctor & Department selection
               </h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <SelectField label="Department" required {...register("departmentId")} hint={errors.departmentId?.message as any}>
+                <SelectField label="Department" required {...register("departmentId")} error={errors.departmentId?.message as any}>
                   <option value="">Select Department</option>
                   {departments.map((dept: any) => <option key={dept._id} value={dept._id}>{dept.name}</option>)}
                 </SelectField>
-                <SelectField label="Consultant Doctor" required {...register("doctorId")} hint={errors.doctorId?.message as any}>
+                <SelectField label="Consultant Doctor" required {...register("doctorId")} error={errors.doctorId?.message as any}>
                   <option value="">Select Doctor</option>
                   {doctors?.filter((d: any) => {
                     if (!selectedDeptId) return true;
@@ -1113,9 +1309,9 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                 <Clock className="h-4.5 w-4.5" /> Schedule slot details
               </h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <InputField label="Appointment Date" type="date" required min={new Date().toISOString().split("T")[0]} {...register("date")} hint={errors.date?.message as any} />
+                <InputField label="Appointment Date" type="date" required min={new Date().toISOString().split("T")[0]} {...register("date")} error={errors.date?.message as any} />
                 
-                <SelectField label="Appointment Type" required {...register("type")} hint={errors.type?.message as any}>
+                <SelectField label="Appointment Type" required {...register("type")} error={errors.type?.message as any}>
                   <option value="Appointment">Appointment</option>
                   <option value="Walk-in">Walk-in</option>
                   <option value="Emergency">Emergency</option>
@@ -1179,7 +1375,19 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                   </div>
                 )}
               </div>
-              <TextareaField label="Chief Complaints / Notes" {...register("notes")} rows={2} />
+              <TextareaField
+                label="Chief Complaints / Notes"
+                {...register("notes")}
+                placeholder="e.g. Fever, Headache, Routine Checkup..."
+                error={errors.notes?.message as any}
+                maxLength={APPOINTMENT_LIMITS.NOTES}
+                showCharCount
+                charCount={watch("notes")?.length || 0}
+                maxCharCount={APPOINTMENT_LIMITS.NOTES}
+                minCharCount={APPOINTMENT_LIMITS.NOTES_MIN}
+                minLength={APPOINTMENT_LIMITS.NOTES_MIN}
+                rows={3}
+              />
             </Card>
           </div>
 

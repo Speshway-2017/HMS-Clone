@@ -12,15 +12,16 @@ import {
 const router = Router();
 
 // Secure all routes
-router.use(protect, restrictTo("hospital_admin", "receptionist", "nurse", "doctor"), scopeToHospital);
+router.use(protect, restrictTo("super_admin", "hospital_admin", "receptionist", "nurse", "doctor"), scopeToHospital);
 
 router.route("/")
   .get(listBeds)
-  .post(restrictTo("hospital_admin"), createBed);
+  .post(restrictTo("super_admin", "hospital_admin"), createBed);
 
 router.route("/:id")
   .get(getBed)
-  .patch(restrictTo("hospital_admin"), updateBed)
-  .delete(restrictTo("hospital_admin"), deleteBed);
+  .patch(restrictTo("super_admin", "hospital_admin", "receptionist", "nurse"), updateBed)
+  .put(restrictTo("super_admin", "hospital_admin", "receptionist", "nurse"), updateBed)
+  .delete(restrictTo("super_admin", "hospital_admin"), deleteBed);
 
 export default router;

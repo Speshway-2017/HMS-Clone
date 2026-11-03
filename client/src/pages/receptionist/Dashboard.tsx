@@ -15,7 +15,8 @@ import {
   UserCheck,
   CheckCircle,
   ExternalLink,
-  BarChart3
+  BarChart3,
+  Bell
 } from "lucide-react";
 import { useReceptionStats, useQueueDetails, useAdmissions } from "../../features/receptionist";
 import { useCheckInAppointment, useAppointments } from "../../features/appointments";
@@ -419,14 +420,16 @@ export function ReceptionistDashboard() {
 
               <Card>
                 <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
-                  <h3 className="text-base font-semibold text-slate-800 flex items-center gap-1.5">
-                    <TrendingUp className="h-4.5 w-4.5 text-navy-700" /> Notifications & Requests
+                  <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2" data-testid="notifications-requests-heading">
+                    <Bell className="h-4.5 w-4.5 text-navy-700" /> Notifications & Requests
                   </h3>
-                  {notifications.length > 0 && (
-                    <span className="rounded-full bg-navy-100 px-2 py-0.5 text-[10px] font-bold text-navy-700">
-                      {notifications.length}
-                    </span>
-                  )}
+                  <span
+                    className="rounded-full bg-navy-100 px-2.5 py-0.5 text-xs font-bold text-navy-700"
+                    data-testid="notifications-count"
+                    aria-label={`Notification count: ${notifications.length}`}
+                  >
+                    {notifications.length}
+                  </span>
                 </div>
                 <div className="space-y-3 max-h-[16rem] overflow-y-auto pr-1">
                   {notifications.length === 0 ? (
@@ -434,7 +437,7 @@ export function ReceptionistDashboard() {
                       <p className="text-xs">No pending requests or alerts.</p>
                     </div>
                   ) : (
-                    notifications.slice(0, 5).map((n: any) => (
+                    notifications.slice(0, 10).map((n: any) => (
                       <Link
                         key={n.id}
                         to={n.link}

@@ -20,6 +20,27 @@ import mongoose, { Types } from "mongoose";
 import { emitToHospital } from "../config/socket";
 import { logAudit } from "../utils/auditLogger";
 import { createOrUpdatePrescriptionCore, formatAndSanitizeMedications } from "./prescriptionController";
+import {
+  CONSULTATION_LIMITS,
+  validateClinicalText,
+  validateTemperature,
+  validateBloodPressure,
+  validatePulseRate,
+  validateRespiratoryRate,
+  validateOxygenSaturation,
+  validateWeight,
+  validateMedicineName,
+  validateMedicineStrength,
+  validateDosage,
+  validateFrequency,
+  validateDuration,
+  validateRadiologyNotes,
+  validatePrimaryDiagnosis,
+  validateExpectedStay,
+  validateAdmissionReason,
+  validateAdmissionClinicalNotes,
+  validateSpecialInstructions,
+} from "../utils/consultationValidation";
 
 
 async function getLoggedDoctor(req: Request) {
@@ -306,6 +327,31 @@ export const addInpatientNotes = catchAsync(async (req: Request, res: Response) 
   const { notes, diagnosis, plan } = req.body;
   const doctor = await getLoggedDoctor(req);
 
+  // Validation: Diagnosis/Round Subject
+  const diagTrimmed = typeof diagnosis === 'string' ? diagnosis.trim() : '';
+  if (!diagTrimmed) {
+    throw new AppError('Diagnosis/Round Subject is required', 400);
+  }
+  if (diagTrimmed.length > 200) {
+    throw new AppError('Diagnosis/Round Subject exceeds the maximum allowed length', 400);
+  }
+  if (!/[a-zA-Z0-9]/.test(diagTrimmed) || /<[^>]*>|javascript:/i.test(diagTrimmed)) {
+    throw new AppError('Please enter valid data', 400);
+  }
+
+  // Validation: Daily Progress Notes
+  const notesTrimmed = typeof notes === 'string' ? notes.trim() : '';
+  if (!notesTrimmed) {
+    throw new AppError('Daily Progress Notes is required', 400);
+  }
+  if (notesTrimmed.length > 2000) {
+    throw new AppError('Daily Progress Notes exceeds the maximum allowed length', 400);
+  }
+  const hasScriptOrJs = /<script\b|javascript:/i.test(notesTrimmed);
+  if (!/[a-zA-Z0-9]/.test(notesTrimmed) || hasScriptOrJs) {
+    throw new AppError('Please enter valid data', 400);
+  }
+
   // Hardened validation: Verify active admission exists for this inpatient
   const activeAdmission = await findActiveAdmission(hospitalId, targetId);
 
@@ -329,9 +375,9 @@ export const addInpatientNotes = catchAsync(async (req: Request, res: Response) 
     date: new Date(),
     time: currentTime,
     admissionDay,
-    assessment: diagnosis || "Inpatient Round",
+    assessment: diagTrimmed,
     plan: plan || "",
-    notes: notes || "Stable."
+    notes: notesTrimmed
   };
 
   // 1. Push progress notes to Admission record
@@ -344,7 +390,7 @@ export const addInpatientNotes = catchAsync(async (req: Request, res: Response) 
     userName: doctor.name,
     userRole: "doctor",
     eventType: "progress_note",
-    description: `Progress note added by Dr. ${doctor.name}: ${diagnosis || "Inpatient Round"}. Notes: ${notes}`
+    description: `Progress note added by Dr. ${doctor.name}: ${diagTrimmed}. Notes: ${notesTrimmed}`
   });
 
   await activeAdmission.save();
@@ -454,6 +500,29 @@ export const createPrescription = catchAsync(async (req: Request, res: Response)
 
   // Format medications from old medicines format or new medications format
   const rawMeds = medicines || req.body.medications || [];
+  if (rawMeds.length === 0) {
+    throw new AppError("Please enter a valid medicine name", 400);
+  }
+  for (const m of rawMeds) {
+    const nameErr = validateMedicineName(m.name || m.medicineName);
+    if (nameErr) throw new AppError(nameErr, 400);
+    if (m.strength) {
+      const strErr = validateMedicineStrength(m.strength);
+      if (strErr) throw new AppError(strErr, 400);
+    }
+    if (m.dosage) {
+      const dosErr = validateDosage(m.dosage);
+      if (dosErr) throw new AppError(dosErr, 400);
+    }
+    if (m.frequency) {
+      const freqErr = validateFrequency(m.frequency);
+      if (freqErr) throw new AppError(freqErr, 400);
+    }
+    if (m.duration) {
+      const durErr = validateDuration(m.duration);
+      if (durErr) throw new AppError(durErr, 400);
+    }
+  }
   const medications = rawMeds.map((m: any) => ({
     name: m.name,
     strength: m.strength || "",
@@ -890,6 +959,37 @@ export const saveVitals = catchAsync(async (req: Request, res: Response) => {
   const { vitals, chiefComplaint } = req.body;
   const doctor = await getLoggedDoctor(req);
 
+  if (chiefComplaint) {
+    const err = validateClinicalText(chiefComplaint, "Chief Complaint", CONSULTATION_LIMITS.CHIEF_COMPLAINT);
+    if (err) throw new AppError(err, 400);
+  }
+  if (vitals) {
+    if (vitals.temperature) {
+      const err = validateTemperature(vitals.temperature);
+      if (err) throw new AppError(err, 400);
+    }
+    if (vitals.bloodPressure) {
+      const err = validateBloodPressure(vitals.bloodPressure);
+      if (err) throw new AppError(err, 400);
+    }
+    if (vitals.pulseRate) {
+      const err = validatePulseRate(vitals.pulseRate);
+      if (err) throw new AppError(err, 400);
+    }
+    if (vitals.respiratoryRate) {
+      const err = validateRespiratoryRate(vitals.respiratoryRate);
+      if (err) throw new AppError(err, 400);
+    }
+    if (vitals.oxygenSaturation) {
+      const err = validateOxygenSaturation(vitals.oxygenSaturation);
+      if (err) throw new AppError(err, 400);
+    }
+    if (vitals.weight) {
+      const err = validateWeight(vitals.weight);
+      if (err) throw new AppError(err, 400);
+    }
+  }
+
   const appointment = await Appointment.findOneAndUpdate(
     { _id: appointmentId, hospital: hospitalId, doctor: doctor._id },
     { vitals, chiefComplaint },
@@ -906,8 +1006,31 @@ export const saveVitals = catchAsync(async (req: Request, res: Response) => {
 export const saveClinicalNotes = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const appointmentId = req.params.id;
-  const { diagnosis, symptoms, clinicalNotes, treatmentPlan, advice } = req.body;
+  const { diagnosis, symptoms, clinicalNotes, treatmentPlan, advice, chiefComplaint } = req.body;
   const doctor = await getLoggedDoctor(req);
+
+  const diagErr = validateClinicalText(diagnosis, "Diagnosis", CONSULTATION_LIMITS.DIAGNOSIS, true);
+  if (diagErr) throw new AppError(diagErr, 400);
+  if (chiefComplaint) {
+    const err = validateClinicalText(chiefComplaint, "Chief Complaint", CONSULTATION_LIMITS.CHIEF_COMPLAINT);
+    if (err) throw new AppError(err, 400);
+  }
+  if (symptoms) {
+    const err = validateClinicalText(symptoms, "Symptoms", CONSULTATION_LIMITS.SYMPTOMS);
+    if (err) throw new AppError(err, 400);
+  }
+  if (clinicalNotes) {
+    const err = validateClinicalText(clinicalNotes, "Clinical Notes", CONSULTATION_LIMITS.CLINICAL_NOTES);
+    if (err) throw new AppError(err, 400);
+  }
+  if (treatmentPlan) {
+    const err = validateClinicalText(treatmentPlan, "Treatment Plan", CONSULTATION_LIMITS.TREATMENT_PLAN);
+    if (err) throw new AppError(err, 400);
+  }
+  if (advice) {
+    const err = validateClinicalText(advice, "Advice / Follow-up Notes", CONSULTATION_LIMITS.ADVICE);
+    if (err) throw new AppError(err, 400);
+  }
 
   const appointment = await Appointment.findOneAndUpdate(
     { _id: appointmentId, hospital: hospitalId, doctor: doctor._id },
@@ -936,8 +1059,23 @@ export const recommendAdmission = catchAsync(async (req: Request, res: Response)
     specialInstructions = ""
   } = req.body;
 
-  if (!primaryDiagnosis || !primaryDiagnosis.trim()) {
-    throw new AppError("Diagnosis is mandatory for admission recommendation.", 400);
+  const diagErr = validatePrimaryDiagnosis(primaryDiagnosis);
+  if (diagErr) throw new AppError(diagErr, 400);
+  if (expectedStay) {
+    const stayErr = validateExpectedStay(expectedStay);
+    if (stayErr) throw new AppError(stayErr, 400);
+  }
+  if (admissionReason) {
+    const reasonErr = validateAdmissionReason(admissionReason);
+    if (reasonErr) throw new AppError(reasonErr, 400);
+  }
+  if (clinicalNotes) {
+    const notesErr = validateAdmissionClinicalNotes(clinicalNotes);
+    if (notesErr) throw new AppError(notesErr, 400);
+  }
+  if (specialInstructions) {
+    const instErr = validateSpecialInstructions(specialInstructions);
+    if (instErr) throw new AppError(instErr, 400);
   }
 
   const doctor = await getLoggedDoctor(req);
@@ -1074,6 +1212,10 @@ export const recommendAdmission = catchAsync(async (req: Request, res: Response)
 });
 
 export const createRadiologyOrder = catchAsync(async (req: Request, res: Response) => {
+  if (req.body.notes) {
+    const notesErr = validateRadiologyNotes(req.body.notes);
+    if (notesErr) throw new AppError(notesErr, 400);
+  }
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
   const { patientId, type, notes, priority } = req.body;
@@ -2036,8 +2178,112 @@ export const updateConsultationDraft = catchAsync(async (req: Request, res: Resp
   const doctor = await getLoggedDoctor(req);
 
   const updateData = { ...req.body };
+  if (updateData.chiefComplaint) {
+    const err = validateClinicalText(updateData.chiefComplaint, "Chief Complaint", CONSULTATION_LIMITS.CHIEF_COMPLAINT);
+    if (err) throw new AppError(err, 400);
+  }
+  if (updateData.diagnosis) {
+    const err = validateClinicalText(updateData.diagnosis, "Diagnosis", CONSULTATION_LIMITS.DIAGNOSIS);
+    if (err) throw new AppError(err, 400);
+  }
+  if (updateData.symptoms) {
+    const err = validateClinicalText(updateData.symptoms, "Symptoms", CONSULTATION_LIMITS.SYMPTOMS);
+    if (err) throw new AppError(err, 400);
+  }
+  if (updateData.clinicalNotes) {
+    const err = validateClinicalText(updateData.clinicalNotes, "Clinical Notes", CONSULTATION_LIMITS.CLINICAL_NOTES);
+    if (err) throw new AppError(err, 400);
+  }
+  if (updateData.treatmentPlan) {
+    const err = validateClinicalText(updateData.treatmentPlan, "Treatment Plan", CONSULTATION_LIMITS.TREATMENT_PLAN);
+    if (err) throw new AppError(err, 400);
+  }
+  if (updateData.advice) {
+    const err = validateClinicalText(updateData.advice, "Advice / Follow-up Notes", CONSULTATION_LIMITS.ADVICE);
+    if (err) throw new AppError(err, 400);
+  }
+  if (updateData.vitals) {
+    const v = updateData.vitals;
+    if (v.temperature) {
+      const err = validateTemperature(v.temperature);
+      if (err) throw new AppError(err, 400);
+    }
+    if (v.bloodPressure) {
+      const err = validateBloodPressure(v.bloodPressure);
+      if (err) throw new AppError(err, 400);
+    }
+    if (v.pulseRate) {
+      const err = validatePulseRate(v.pulseRate);
+      if (err) throw new AppError(err, 400);
+    }
+    if (v.respiratoryRate) {
+      const err = validateRespiratoryRate(v.respiratoryRate);
+      if (err) throw new AppError(err, 400);
+    }
+    if (v.oxygenSaturation) {
+      const err = validateOxygenSaturation(v.oxygenSaturation);
+      if (err) throw new AppError(err, 400);
+    }
+    if (v.weight) {
+      const err = validateWeight(v.weight);
+      if (err) throw new AppError(err, 400);
+    }
+  }
   if (Array.isArray(updateData.prescriptions)) {
+    for (const m of updateData.prescriptions) {
+      if (m.name) {
+        const err = validateMedicineName(m.name);
+        if (err) throw new AppError(err, 400);
+      }
+      if (m.strength) {
+        const err = validateMedicineStrength(m.strength);
+        if (err) throw new AppError(err, 400);
+      }
+      if (m.dosage) {
+        const err = validateDosage(m.dosage);
+        if (err) throw new AppError(err, 400);
+      }
+      if (m.frequency) {
+        const err = validateFrequency(m.frequency);
+        if (err) throw new AppError(err, 400);
+      }
+      if (m.duration) {
+        const err = validateDuration(m.duration);
+        if (err) throw new AppError(err, 400);
+      }
+    }
     updateData.prescriptions = formatAndSanitizeMedications(updateData.prescriptions);
+  }
+  if (Array.isArray(updateData.radiologyOrders)) {
+    for (const r of updateData.radiologyOrders) {
+      if (r.notes) {
+        const err = validateRadiologyNotes(r.notes);
+        if (err) throw new AppError(err, 400);
+      }
+    }
+  }
+  if (updateData.admissionRecommendation) {
+    const adm = updateData.admissionRecommendation;
+    if (adm.primaryDiagnosis) {
+      const err = validatePrimaryDiagnosis(adm.primaryDiagnosis);
+      if (err) throw new AppError(err, 400);
+    }
+    if (adm.expectedStay) {
+      const err = validateExpectedStay(adm.expectedStay);
+      if (err) throw new AppError(err, 400);
+    }
+    if (adm.admissionReason) {
+      const err = validateAdmissionReason(adm.admissionReason);
+      if (err) throw new AppError(err, 400);
+    }
+    if (adm.clinicalNotes) {
+      const err = validateAdmissionClinicalNotes(adm.clinicalNotes);
+      if (err) throw new AppError(err, 400);
+    }
+    if (adm.specialInstructions) {
+      const err = validateSpecialInstructions(adm.specialInstructions);
+      if (err) throw new AppError(err, 400);
+    }
   }
 
   const session = await ConsultationSession.findOne({
@@ -2143,8 +2389,9 @@ export const completeConsultationSession = catchAsync(async (req: Request, res: 
     return res.json({ status: "success", data: draft, message: "Consultation is already completed." });
   }
 
-  if (!draft.diagnosis || !draft.diagnosis.trim()) {
-    throw new AppError("Diagnosis is mandatory to complete the consultation.", 400);
+  const diagErr = validateClinicalText(draft.diagnosis, "Diagnosis", CONSULTATION_LIMITS.DIAGNOSIS, true);
+  if (diagErr) {
+    throw new AppError(diagErr, 400);
   }
 
   const appointment = await Appointment.findOne({ _id: draft.appointment, hospital: hospitalId })
@@ -2772,6 +3019,8 @@ export const getAnalytics = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const doctor = await getLoggedDoctor(req);
   const doctorId = doctor._id.toString();
+  const filter = getDoctorScopeFilter(req, doctor);
+  const docIds = await DoctorDashboardRepository.normalizeDocIds(doctor._id);
 
   // Date ranges
   const now = new Date();
@@ -2783,57 +3032,74 @@ export const getAnalytics = catchAsync(async (req: Request, res: Response) => {
   const startOf7DaysAgo = new Date(now); startOf7DaysAgo.setDate(startOf7DaysAgo.getDate() - 7); startOf7DaysAgo.setHours(0, 0, 0, 0);
   const startOf30DaysAgo = new Date(now); startOf30DaysAgo.setDate(startOf30DaysAgo.getDate() - 30); startOf30DaysAgo.setHours(0, 0, 0, 0);
 
-  // Fetch all appointments in the last 30 days
+  // Fetch repository real counts for the 7 top operational cards
+  const [
+    repoTodayAppts,
+    repoWaitingQueue,
+    repoInpatients,
+    repoCompleted,
+    repoPrescriptions,
+    repoLabOrders,
+    repoFollowups,
+    repoSurgeries,
+  ] = await Promise.all([
+    DoctorDashboardRepository.getTodayAppointments(filter, doctorId),
+    DoctorDashboardRepository.getWaitingPatients(filter, doctorId),
+    DoctorDashboardRepository.getCurrentInpatients(filter, doctorId),
+    DoctorDashboardRepository.getCompletedConsultations(filter, doctorId),
+    DoctorDashboardRepository.getPendingPrescriptions(filter, doctorId),
+    DoctorDashboardRepository.getPendingLabOrders(filter, doctorId),
+    DoctorDashboardRepository.getFollowupPatients(filter, doctorId),
+    DoctorDashboardRepository.getTodaySurgeries(filter, doctorId),
+  ]);
+
+  // Fetch all appointments for doctor within the last 30 days or active schedule
   const appointments = await Appointment.find({
     hospital: hospitalId,
-    doctor: { $in: DoctorDashboardRepository.normalizeDocIds(doctor._id) },
-    date: { $gte: startOf30DaysAgo }
+    doctor: { $in: docIds },
+    $or: [
+      { date: { $gte: startOf30DaysAgo } },
+      { createdAt: { $gte: startOf30DaysAgo } },
+      { status: { $in: ["scheduled", "checked_in", "waiting", "called", "in_consultation"] } }
+    ]
   }).populate("patient");
-
-  console.log("\n========== DOCTOR APPOINTMENT DEBUG (getAnalytics) ==========");
-  console.log("Logged-in user ID:   ", req.user?._id?.toString());
-  console.log("Logged-in doctor ID: ", doctor._id?.toString());
-  console.log("Logged-in email:     ", doctor.email);
-  console.log("Logged-in hospital:  ", hospitalId?.toString());
-  console.log("Start of Today (IST):", startOfToday.toISOString());
-  console.log("End of Today (IST):  ", endOfToday.toISOString());
-  console.log("Fetched 30-day appts count:", appointments.length);
-  appointments.forEach(a => {
-    console.log(`  -> Appt _id=${a._id}, ref=${a.referenceId}, date=${a.date?.toISOString()}, status=${a.status}, doc=${a.doctor}`);
-  });
 
   // Fetch all prescriptions in the last 30 days
   const prescriptions = await Prescription.find({
     hospital: hospitalId,
-    doctor: doctor._id,
+    doctor: { $in: docIds },
     createdAt: { $gte: startOf30DaysAgo }
   }).populate("patient");
 
   // Fetch all lab orders in the last 30 days
   const labOrders = await LabOrder.find({
     hospital: hospitalId,
-    doctor: doctor._id,
+    doctor: { $in: docIds },
     createdAt: { $gte: startOf30DaysAgo }
   }).populate("patient");
 
   // Fetch all radiology orders in the last 30 days
   const radiologyOrders = await RadiologyOrder.find({
     hospital: hospitalId,
-    doctor: doctor._id,
+    doctor: { $in: docIds },
     createdAt: { $gte: startOf30DaysAgo }
   }).populate("patient");
 
   // Fetch active admissions (inpatients)
   const activeAdmissions = await Admission.find({
     hospital: hospitalId,
-    admittingDoctor: doctor._id,
-    status: "admitted"
+    $or: [
+      { admittingDoctor: { $in: docIds } },
+      { attendingDoctor: { $in: docIds } },
+      { doctor: { $in: docIds } }
+    ],
+    status: { $in: ["admitted", "Admitted", "active", "Active"] }
   }).populate("patient");
 
   // Fetch completed consultation sessions in the last 30 days to compute avgDuration
   const completedSessions = await ConsultationSession.find({
     hospital: hospitalId,
-    doctor: doctor._id,
+    doctor: { $in: docIds },
     status: "COMPLETED",
     createdAt: { $gte: startOf30DaysAgo }
   });
@@ -2841,7 +3107,7 @@ export const getAnalytics = catchAsync(async (req: Request, res: Response) => {
   // Fetch called/completed queues in the last 30 days to compute avgWaitingTime
   const completedQueues = await Queue.find({
     hospital: hospitalId,
-    doctor: doctor._id,
+    doctor: { $in: docIds },
     status: { $in: ["called", "completed"] },
     createdAt: { $gte: startOf30DaysAgo }
   });
@@ -3180,52 +3446,52 @@ export const getAnalytics = catchAsync(async (req: Request, res: Response) => {
     data: {
       metrics: {
         todayAppointments: {
-          current: todayAppts.length,
-          todayDiff: todayAppts.length - yesterdayAppts.length,
-          weeklyDiff: todayAppts.length - lastWeekSameDayAppts.length,
+          current: repoTodayAppts.length,
+          todayDiff: repoTodayAppts.length - yesterdayAppts.length,
+          weeklyDiff: repoTodayAppts.length - lastWeekSameDayAppts.length,
           sparkline: appointmentsSparkline,
         },
         waitingPatients: {
-          current: waitingPatientsCount,
-          todayDiff: waitingPatientsCount - 1,
-          weeklyDiff: waitingPatientsCount - 2,
-          sparkline: [1, 2, 0, 1, waitingPatientsCount],
+          current: repoWaitingQueue.filter(q => q.status === "waiting" || q.status === "called").length,
+          todayDiff: 0,
+          weeklyDiff: 0,
+          sparkline: [1, 2, 0, 1, repoWaitingQueue.length],
         },
         currentInpatients: {
-          current: activeAdmissions.length,
-          todayDiff: activeAdmissions.length - 2,
-          weeklyDiff: activeAdmissions.length - 1,
-          sparkline: [2, 1, 2, 3, activeAdmissions.length],
+          current: repoInpatients.length,
+          todayDiff: 0,
+          weeklyDiff: 0,
+          sparkline: [2, 1, 2, 3, repoInpatients.length],
         },
         todaySurgeries: {
-          current: todaySurgeries.length,
-          todayDiff: todaySurgeries.length - yesterdaySurgeries.length,
-          weeklyDiff: todaySurgeries.length - lastWeekSurgeries.length,
+          current: repoSurgeries.length,
+          todayDiff: repoSurgeries.length - yesterdaySurgeries.length,
+          weeklyDiff: repoSurgeries.length - lastWeekSurgeries.length,
           sparkline: surgeriesSparkline,
         },
         completedConsultations: {
-          current: todayCompleted.length,
-          todayDiff: todayCompleted.length - yesterdayCompleted.length,
-          weeklyDiff: todayCompleted.length - lastWeekCompleted.length,
+          current: repoCompleted.length,
+          todayDiff: repoCompleted.length - yesterdayCompleted.length,
+          weeklyDiff: repoCompleted.length - lastWeekCompleted.length,
           sparkline: completedSparkline,
         },
         pendingPrescriptions: {
-          current: pendingRx.length,
-          todayDiff: pendingRx.length - 2,
-          weeklyDiff: pendingRx.length - 1,
+          current: repoPrescriptions.length,
+          todayDiff: 0,
+          weeklyDiff: 0,
           sparkline: prescriptionsSparkline,
         },
         pendingLabOrders: {
-          current: pendingLabs.length,
-          todayDiff: pendingLabs.length - 1,
-          weeklyDiff: pendingLabs.length - 2,
+          current: repoLabOrders.length,
+          todayDiff: 0,
+          weeklyDiff: 0,
           sparkline: labOrdersSparkline,
         },
         followupPatients: {
-          current: followups.length,
-          todayDiff: followups.length - 3,
-          weeklyDiff: followups.length - 2,
-          sparkline: [2, 3, 1, 4, followups.length],
+          current: repoFollowups.length,
+          todayDiff: 0,
+          weeklyDiff: 0,
+          sparkline: [2, 3, 1, 4, repoFollowups.length],
         }
       },
       revisitAnalytics: {

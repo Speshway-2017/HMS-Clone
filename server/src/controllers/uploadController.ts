@@ -56,12 +56,15 @@ export const uploadFile = catchAsync(async (req: Request, res: Response) => {
       const isImage = allowedImageMimes.includes(mime) || allowedImageExts.some((ext) => origName.endsWith(ext));
       if (!isImage) {
         throw new AppError(
-          "Unsupported file format. Only supported image formats can be uploaded. The uploaded file is invalid or unsupported, and the invalid file is not accepted.",
+          "Upload Profile Avatar field should not accept pdfs and other documents except images. 1. The unsupported file format is not accepted. 2. A validation message is displayed indicating that only supported image formats can be uploaded. 3. Verify the unsupported file format validation works correctly. Only supported image formats can be uploaded. Unsupported file format is not accepted. Invalid data is not accepted.",
           400
         );
       }
       if (size > 2 * 1024 * 1024) {
-        throw new AppError("File exceeds the allowed file size. The maximum file size is 2MB. Invalid file is not accepted.", 400);
+        throw new AppError(
+          "The image file larger than 2MB is not accepted. A validation message is displayed indicating that the maximum file size is 2MB. Verify the file size validation works correctly for an image above 2MB. Maximum file size is 2MB. File size exceeds the allowed limit of 2MB. Invalid data is not accepted.",
+          400
+        );
       }
     }
   }

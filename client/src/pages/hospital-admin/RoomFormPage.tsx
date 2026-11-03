@@ -35,6 +35,23 @@ const REAL_WORLD_ROOM_CATEGORIES = [
   "Suite"
 ];
 
+const ROOM_LIMITS = {
+  ROOM_NUMBER: 20,
+  ROOM_NAME: 100,
+  FLOOR_MIN: -5,
+  FLOOR_MAX: 100,
+  CAPACITY_MIN: 1,
+  CAPACITY_MAX: 50,
+  BED_PREFIX: 50,
+  DESCRIPTION: 500,
+  CHARGE_MAX: 10000000,
+  GST_MAX: 100,
+} as const;
+
+const ROOM_NUMBER_REGEX = /^[a-zA-Z0-9\-_./]+$/;
+const ROOM_NAME_REGEX = /^[a-zA-Z0-9\s\.\-/'&,()]+$/;
+const BED_PREFIX_REGEX = /^[A-Za-z0-9\-_./\s]+$/;
+
 function getBedLetter(index: number): string {
   let label = "";
   let i = index;
@@ -65,19 +82,42 @@ export function RoomFormPage() {
   const updateRoomMutation = useUpdateRoom();
 
   // Form State
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    wardId: string;
+    roomNumber: string;
+    roomName: string;
+    floor: number | string;
+    roomCategory: string;
+    acType: "AC" | "Non AC";
+    capacity: number | string;
+    autoGenerateBeds: boolean;
+    bedPrefix: string;
+    customBeds: string[];
+    description: string;
+    status: "Available" | "Occupied" | "Cleaning" | "Maintenance" | "Blocked" | "Inactive";
+    consultationCharge: number | string;
+    dailyRoomCharge: number | string;
+    nursingCharge: number | string;
+    maintenanceCharge: number | string;
+    extraBedCharge: number | string;
+    emergencyCharge: number | string;
+    admissionDeposit: number | string;
+    gstPercent: number | string;
+    effectiveFrom: string;
+    tariffStatus: "Active" | "Inactive";
+  }>({
     wardId: urlWardId || "",
     roomNumber: "",
     roomName: "",
     floor: 1,
     roomCategory: "General",
-    acType: "Non AC" as "AC" | "Non AC",
+    acType: "Non AC",
     capacity: 2,
     autoGenerateBeds: true,
     bedPrefix: "",
-    customBeds: [] as string[],
+    customBeds: [],
     description: "",
-    status: "Available" as "Available" | "Occupied" | "Cleaning" | "Maintenance" | "Blocked" | "Inactive",
+    status: "Available",
     // Tariff Fields
     consultationCharge: 500,
     dailyRoomCharge: 1500,
@@ -88,9 +128,11 @@ export function RoomFormPage() {
     admissionDeposit: 5000,
     gstPercent: 5,
     effectiveFrom: new Date().toISOString().split("T")[0],
-    tariffStatus: "Active" as "Active" | "Inactive"
+    tariffStatus: "Active"
   });
 
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string | undefined>>({});
+  const [, setTouched] = useState<Record<string, boolean>>({});
   const [formError, setFormError] = useState<string | null>(null);
 
   // Auto-select ward if urlWardId provided or if wards load
@@ -139,6 +181,7 @@ export function RoomFormPage() {
                 : new Date().toISOString().split("T")[0],
               tariffStatus: room.tariff?.status || "Active"
             });
+            setFieldErrors({});
           } else {
             setFetchError("Unable to load existing room details. Please try again.");
           }
@@ -152,63 +195,326 @@ export function RoomFormPage() {
     }
   }, [id, isEditing]);
 
-  // Auto set bed prefix when roomNumber changes
+  const selectedWardObj = useMemo(() => wards.find((w) => w._id === form.wardId), [wards, form.wardId]);
+
+  // Auto-fill bedPrefix if empty when roomNumber changes
   useEffect(() => {
-    if (form.roomNumber.trim() && !form.bedPrefix) {
-      setForm((prev) => ({ ...prev, bedPrefix: `Bed-${form.roomNumber.trim()}` }));
+    if (form.roomNumber && !isEditing) {
+      setForm((prev) => ({
+        ...prev,
+        bedPrefix: prev.bedPrefix || `Bed-${prev.roomNumber.trim()}`
+      }));
     }
-  }, [form.roomNumber]);
+  }, [form.roomNumber, isEditing]);
 
-  // Auto calculate Total Daily Charge
-  const totalDailyCharge = useMemo(() => {
-    const base = Number(form.dailyRoomCharge) || 0;
-    const nursing = Number(form.nursingCharge) || 0;
-    const maintenance = Number(form.maintenanceCharge) || 0;
-    const gstAmount = (base * (Number(form.gstPercent) || 0)) / 100;
-    return Math.round(base + nursing + maintenance + gstAmount);
-  }, [form.dailyRoomCharge, form.nursingCharge, form.maintenanceCharge, form.gstPercent]);
-
-  // Preview generated beds
+  // Dynamic Bed Code Generation Preview
   const previewBedsList = useMemo(() => {
-    if (!form.roomNumber.trim() || form.capacity <= 0) return [];
+    const numCap = Number(form.capacity) || 0;
+    if (numCap <= 0) return [];
+    const count = Math.min(numCap, 50);
     const list = [];
-    const prefix = form.bedPrefix.trim() || `Bed-${form.roomNumber.trim()}`;
-    const cap = Math.min(form.capacity, 50);
-    for (let i = 0; i < cap; i++) {
+    const prefix = form.bedPrefix.trim() || `Bed-${form.roomNumber.trim() || "101"}`;
+
+    for (let i = 0; i < count; i++) {
       const letter = getBedLetter(i);
       list.push(`${prefix}-${letter}`);
     }
     return list;
-  }, [form.roomNumber, form.capacity, form.bedPrefix]);
+  }, [form.capacity, form.bedPrefix, form.roomNumber]);
 
-  const selectedWardObj = useMemo(() => {
-    return wards.find((w) => w._id === form.wardId);
-  }, [wards, form.wardId]);
+  // Calculated daily room tariff
+  const totalDailyCharge = useMemo(() => {
+    const daily = Number(form.dailyRoomCharge) || 0;
+    const nursing = Number(form.nursingCharge) || 0;
+    const maintenance = Number(form.maintenanceCharge) || 0;
+    const gstRate = Number(form.gstPercent) || 0;
+
+    const subtotal = daily + nursing + maintenance;
+    const gstAmount = Math.round((subtotal * gstRate) / 100);
+    return subtotal + gstAmount;
+  }, [form.dailyRoomCharge, form.nursingCharge, form.maintenanceCharge, form.gstPercent]);
+
+  const validateField = (field: string, value: any): string | undefined => {
+    const valStr = typeof value === "string" ? value : String(value ?? "");
+    const trimmed = valStr.trim();
+
+    if (field === "wardId") {
+      if (!trimmed) {
+        return "Please select a destination Ward. Field is required. Please fill out this field";
+      }
+      return undefined;
+    }
+
+    if (field === "roomNumber") {
+      if (!trimmed) {
+        return "Room Number is required. Field is required. Please fill out this field";
+      }
+      if (valStr.length > ROOM_LIMITS.ROOM_NUMBER) {
+        return `Room Number cannot exceed ${ROOM_LIMITS.ROOM_NUMBER} characters. Too long text is not accepted. Please enter valid data`;
+      }
+      if (!ROOM_NUMBER_REGEX.test(trimmed)) {
+        return "Room Number contains invalid data. Invalid data is not accepted. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    if (field === "roomName") {
+      if (valStr.length > ROOM_LIMITS.ROOM_NAME) {
+        return `Room Name cannot exceed ${ROOM_LIMITS.ROOM_NAME} characters. Too long text is not accepted. Please enter valid data`;
+      }
+      if (trimmed && !ROOM_NAME_REGEX.test(trimmed)) {
+        return "Room Name contains invalid data. Invalid data is not accepted. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    if (field === "floor") {
+      if (valStr === "" || valStr === null || valStr === undefined) {
+        return "Floor Number is required. Field is required. Please fill out this field";
+      }
+      const num = Number(value);
+      if (isNaN(num)) {
+        return "Floor Number must be a valid number. Invalid data is not accepted. Please enter valid data";
+      }
+      if (num < ROOM_LIMITS.FLOOR_MIN) {
+        return `Floor Number cannot be less than ${ROOM_LIMITS.FLOOR_MIN}. Invalid data is not accepted. Please enter valid data`;
+      }
+      if (num > ROOM_LIMITS.FLOOR_MAX) {
+        return `Floor Number cannot exceed ${ROOM_LIMITS.FLOOR_MAX}. Too long text is not accepted. Please enter valid data`;
+      }
+      return undefined;
+    }
+
+    if (field === "capacity") {
+      if (valStr === "" || valStr === null || valStr === undefined) {
+        return "Room bed capacity is required. Field is required. Please fill out this field";
+      }
+      const num = Number(value);
+      if (isNaN(num)) {
+        return "Room bed capacity must be a valid number. Invalid data is not accepted. Please enter valid data";
+      }
+      if (num < ROOM_LIMITS.CAPACITY_MIN) {
+        return `Room bed capacity must be at least ${ROOM_LIMITS.CAPACITY_MIN}. Invalid data is not accepted. Please enter valid data`;
+      }
+      if (num > ROOM_LIMITS.CAPACITY_MAX) {
+        return `Room bed capacity cannot exceed ${ROOM_LIMITS.CAPACITY_MAX}. Too long text is not accepted. Please enter valid data`;
+      }
+      return undefined;
+    }
+
+    if (field === "bedPrefix") {
+      if (valStr.length > ROOM_LIMITS.BED_PREFIX) {
+        return `Bed Prefix cannot exceed ${ROOM_LIMITS.BED_PREFIX} characters. Too long text is not accepted. Please enter valid data`;
+      }
+      if (trimmed && !BED_PREFIX_REGEX.test(trimmed)) {
+        return "Bed Prefix contains invalid data. Invalid data is not accepted. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    if (field === "description") {
+      if (valStr.length > ROOM_LIMITS.DESCRIPTION) {
+        return `Description cannot exceed ${ROOM_LIMITS.DESCRIPTION} characters. Too long text is not accepted. Please enter valid data`;
+      }
+      if (trimmed && /<script|javascript:|data:/i.test(trimmed)) {
+        return "Description contains invalid data. Invalid data is not accepted. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    if (
+      [
+        "consultationCharge",
+        "dailyRoomCharge",
+        "nursingCharge",
+        "maintenanceCharge",
+        "extraBedCharge",
+        "emergencyCharge",
+        "admissionDeposit"
+      ].includes(field)
+    ) {
+      if (valStr === "" || valStr === null || valStr === undefined) {
+        return field === "dailyRoomCharge" ? "Daily Room Charge is required. Field is required. Please fill out this field" : undefined;
+      }
+      const num = Number(value);
+      if (isNaN(num)) {
+        return "Charge must be a valid number. Invalid data is not accepted. Please enter valid data";
+      }
+      if (num < 0) {
+        return "Charge cannot be negative. Invalid data is not accepted. Please enter valid data";
+      }
+      if (num > ROOM_LIMITS.CHARGE_MAX) {
+        return `Charge cannot exceed ${ROOM_LIMITS.CHARGE_MAX.toLocaleString()}. Too long text is not accepted. Please enter valid data`;
+      }
+      return undefined;
+    }
+
+    if (field === "gstPercent") {
+      const num = Number(value);
+      if (isNaN(num) || num < 0) {
+        return "GST must be valid. Invalid data is not accepted. Please enter valid data";
+      }
+      if (num > ROOM_LIMITS.GST_MAX) {
+        return "GST cannot exceed 100%. Too long text is not accepted. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    return undefined;
+  };
+
+  const handleKeyGuard = (
+    e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+    field: string,
+    currentLen: number,
+    limit: number,
+    label: string,
+    allowedCharRegex?: RegExp
+  ) => {
+    const allowedNavKeys = [
+      "Backspace",
+      "Delete",
+      "Tab",
+      "Escape",
+      "Enter",
+      "ArrowLeft",
+      "ArrowRight",
+      "ArrowUp",
+      "ArrowDown",
+      "Home",
+      "End",
+    ];
+
+    if (allowedNavKeys.includes(e.key) || e.ctrlKey || e.metaKey || e.altKey) {
+      return;
+    }
+
+    if (allowedCharRegex && e.key.length === 1 && !allowedCharRegex.test(e.key)) {
+      e.preventDefault();
+      const msg = `${label} contains invalid data. Invalid data is not accepted. Please enter valid data`;
+      setFormError("Please enter valid data");
+      setFieldErrors((prev) => ({ ...prev, [field]: msg }));
+      toast.error(msg, { id: `${field}-invalid-char` });
+      return;
+    }
+
+    const input = e.currentTarget;
+    const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
+    if (!hasSelection && currentLen >= limit) {
+      e.preventDefault();
+      const msg = `${label} cannot exceed ${limit} characters. Too long text is not accepted. Please enter valid data`;
+      setFormError("Please enter valid data");
+      setFieldErrors((prev) => ({ ...prev, [field]: msg }));
+      toast.error(msg, { id: `${field}-limit` });
+    }
+  };
+
+  const handleNumberKeyGuard = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    field: string,
+    label: string,
+    allowNegative = false
+  ) => {
+    const allowedNavKeys = [
+      "Backspace",
+      "Delete",
+      "Tab",
+      "Escape",
+      "Enter",
+      "ArrowLeft",
+      "ArrowRight",
+      "ArrowUp",
+      "ArrowDown",
+      "Home",
+      "End",
+    ];
+
+    if (allowedNavKeys.includes(e.key) || e.ctrlKey || e.metaKey || e.altKey) {
+      return;
+    }
+
+    if (!allowNegative && e.key === "-") {
+      e.preventDefault();
+      const msg = `${label} cannot be negative. Invalid data is not accepted. Please enter valid data`;
+      setFormError("Please enter valid data");
+      setFieldErrors((prev) => ({ ...prev, [field]: msg }));
+      toast.error(msg, { id: `${field}-no-neg` });
+      return;
+    }
+
+    if (e.key === "e" || e.key === "E" || e.key === "+") {
+      e.preventDefault();
+      const msg = "Please enter valid data";
+      setFormError(msg);
+      setFieldErrors((prev) => ({ ...prev, [field]: msg }));
+      toast.error(msg, { id: `${field}-inv-key` });
+      return;
+    }
+  };
+
+  const handleBlur = (field: string) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    const err = validateField(field, (form as any)[field]);
+    setFieldErrors((prev) => ({ ...prev, [field]: err }));
+    if (err) {
+      setFormError("Please enter valid data");
+    }
+  };
 
   const validateAndProceed = (nextStep: 1 | 2 | 3 | 4) => {
     setFormError(null);
 
     if (currentStep === 1) {
-      if (!form.wardId) {
-        setFormError("Please select a Ward.");
-        return;
-      }
-      if (!form.roomNumber.trim()) {
-        setFormError("Room Number is required.");
+      const wardErr = validateField("wardId", form.wardId);
+      const roomNumErr = validateField("roomNumber", form.roomNumber);
+      const roomNameErr = validateField("roomName", form.roomName);
+      const floorErr = validateField("floor", form.floor);
+      const descErr = validateField("description", form.description);
+
+      const errors = {
+        wardId: wardErr,
+        roomNumber: roomNumErr,
+        roomName: roomNameErr,
+        floor: floorErr,
+        description: descErr,
+      };
+
+      setFieldErrors((prev) => ({ ...prev, ...errors }));
+      const hasErrors = Object.values(errors).some(Boolean);
+      if (hasErrors) {
+        const firstError = Object.values(errors).find(Boolean);
+        setFormError(firstError || "Please enter valid data");
+        toast.error(firstError || "Please enter valid data", { id: "room-step1-invalid" });
         return;
       }
     }
 
     if (currentStep === 2) {
-      if (form.capacity <= 0) {
-        setFormError("Room bed capacity must be at least 1.");
+      const capErr = validateField("capacity", form.capacity);
+      const prefixErr = validateField("bedPrefix", form.bedPrefix);
+
+      const errors = { capacity: capErr, bedPrefix: prefixErr };
+      setFieldErrors((prev) => ({ ...prev, ...errors }));
+      const hasErrors = Object.values(errors).some(Boolean);
+      if (hasErrors) {
+        const firstError = Object.values(errors).find(Boolean);
+        setFormError(firstError || "Please enter valid data");
+        toast.error(firstError || "Please enter valid data", { id: "room-step2-invalid" });
         return;
       }
     }
 
     if (currentStep === 3) {
-      if (form.dailyRoomCharge < 0) {
-        setFormError("Daily Room Charge cannot be negative.");
+      const dailyErr = validateField("dailyRoomCharge", form.dailyRoomCharge);
+      const gstErr = validateField("gstPercent", form.gstPercent);
+
+      const errors = { dailyRoomCharge: dailyErr, gstPercent: gstErr };
+      setFieldErrors((prev) => ({ ...prev, ...errors }));
+      const hasErrors = Object.values(errors).some(Boolean);
+      if (hasErrors) {
+        const firstError = Object.values(errors).find(Boolean);
+        setFormError(firstError || "Please enter valid data");
+        toast.error(firstError || "Please enter valid data", { id: "room-step3-invalid" });
         return;
       }
     }
@@ -219,9 +525,39 @@ export function RoomFormPage() {
   const handleSaveRoom = async (proceedToBeds = false) => {
     setFormError(null);
 
-    if (!form.wardId || !form.roomNumber.trim()) {
-      setFormError("Ward selection and Room Number are required.");
-      setCurrentStep(1);
+    const wardErr = validateField("wardId", form.wardId);
+    const roomNumErr = validateField("roomNumber", form.roomNumber);
+    const roomNameErr = validateField("roomName", form.roomName);
+    const floorErr = validateField("floor", form.floor);
+    const capErr = validateField("capacity", form.capacity);
+    const prefixErr = validateField("bedPrefix", form.bedPrefix);
+    const descErr = validateField("description", form.description);
+    const dailyErr = validateField("dailyRoomCharge", form.dailyRoomCharge);
+
+    const allErrors = {
+      wardId: wardErr,
+      roomNumber: roomNumErr,
+      roomName: roomNameErr,
+      floor: floorErr,
+      capacity: capErr,
+      bedPrefix: prefixErr,
+      description: descErr,
+      dailyRoomCharge: dailyErr,
+    };
+
+    setFieldErrors(allErrors);
+    const hasErrors = Object.values(allErrors).some(Boolean);
+    if (hasErrors) {
+      const firstError = Object.values(allErrors).find(Boolean);
+      setFormError(firstError || "Please enter valid data");
+      toast.error(firstError || "Please enter valid data", { id: "room-save-invalid" });
+      if (wardErr || roomNumErr || roomNameErr || floorErr || descErr) {
+        setCurrentStep(1);
+      } else if (capErr || prefixErr) {
+        setCurrentStep(2);
+      } else if (dailyErr) {
+        setCurrentStep(3);
+      }
       return;
     }
 
@@ -234,17 +570,17 @@ export function RoomFormPage() {
       acType: form.acType,
       capacity: Number(form.capacity),
       autoGenerateBeds: form.autoGenerateBeds,
-      description: form.description,
+      description: form.description.trim(),
       status: form.status,
       tariff: {
-        consultationCharge: Number(form.consultationCharge),
-        roomChargePerDay: Number(form.dailyRoomCharge),
-        nursingCharge: Number(form.nursingCharge),
-        maintenanceCharge: Number(form.maintenanceCharge),
-        extraBedCharge: Number(form.extraBedCharge),
-        emergencyCharge: Number(form.emergencyCharge),
-        admissionDeposit: Number(form.admissionDeposit),
-        gstPercent: Number(form.gstPercent),
+        consultationCharge: Number(form.consultationCharge) || 0,
+        roomChargePerDay: Number(form.dailyRoomCharge) || 0,
+        nursingCharge: Number(form.nursingCharge) || 0,
+        maintenanceCharge: Number(form.maintenanceCharge) || 0,
+        extraBedCharge: Number(form.extraBedCharge) || 0,
+        emergencyCharge: Number(form.emergencyCharge) || 0,
+        admissionDeposit: Number(form.admissionDeposit) || 0,
+        gstPercent: Number(form.gstPercent) || 0,
         effectiveFrom: form.effectiveFrom,
         status: form.tariffStatus
       }
@@ -267,7 +603,12 @@ export function RoomFormPage() {
         navigate("/admin/beds");
       }
     } catch (err: any) {
-      setFormError(err.response?.data?.message || "Operation failed.");
+      const serverMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        "Please enter valid data";
+      setFormError(serverMsg);
+      toast.error(serverMsg, { id: "room-save-error" });
     }
   };
 
@@ -302,7 +643,7 @@ export function RoomFormPage() {
   }
 
   return (
-    <div className="space-y-6 w-full max-w-7xl mx-auto pb-20 px-2 sm:px-4">
+    <div className="space-y-6 w-full max-w-5xl mx-auto pb-28 px-2 sm:px-4">
       {/* Breadcrumb Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
@@ -312,7 +653,7 @@ export function RoomFormPage() {
           {selectedWardObj && (
             <>
               <ChevronRight className="h-3.5 w-3.5" />
-              <span className="text-slate-700 font-medium">{selectedWardObj.name} ({selectedWardObj.wardType})</span>
+              <span className="text-slate-700 font-medium">{selectedWardObj.name}</span>
             </>
           )}
           <ChevronRight className="h-3.5 w-3.5" />
@@ -338,12 +679,12 @@ export function RoomFormPage() {
         </div>
       </div>
 
-      {/* Multi-Step Wizard Progress Bar */}
-      <Card className="p-4 sm:p-6 bg-white shadow-sm border border-slate-200">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {/* Progress Step Stepper */}
+      <Card className="p-3 bg-white border border-slate-200 shadow-2xs">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {stepsList.map((step) => {
-            const isCompleted = currentStep > step.number;
             const isActive = currentStep === step.number;
+            const isCompleted = currentStep > step.number;
 
             return (
               <div
@@ -385,9 +726,9 @@ export function RoomFormPage() {
 
       {/* Error Alert */}
       {formError && (
-        <div className="p-4 bg-red-50 text-red-700 border border-red-200 rounded-xl text-sm font-medium flex items-center gap-2">
+        <div className="p-4 bg-red-50 text-red-700 border border-red-200 rounded-xl text-sm font-medium flex items-center gap-2 animate-in fade-in duration-150">
           <ShieldAlert className="h-5 w-5 text-red-600 shrink-0" />
-          {formError}
+          <span>{formError}</span>
         </div>
       )}
 
@@ -403,13 +744,22 @@ export function RoomFormPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Select Destination Ward *
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">
+                Select Destination Ward <span className="text-red-500">*</span>
               </label>
               <select
                 value={form.wardId}
-                onChange={(e) => setForm({ ...form, wardId: e.target.value })}
-                className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-navy-500 bg-white font-medium"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setForm((prev) => ({ ...prev, wardId: val }));
+                  const err = validateField("wardId", val);
+                  setFieldErrors((prev) => ({ ...prev, wardId: err }));
+                  if (!err && formError === "Please enter valid data") setFormError(null);
+                }}
+                onBlur={() => handleBlur("wardId")}
+                className={`w-full px-3.5 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-navy-500 bg-white font-medium ${
+                  fieldErrors.wardId ? "border-red-500 text-red-900" : "border-slate-300 text-slate-900"
+                }`}
                 required
               >
                 <option value="">-- Choose Hospital Ward --</option>
@@ -419,13 +769,29 @@ export function RoomFormPage() {
                   </option>
                 ))}
               </select>
+              {fieldErrors.wardId && (
+                <p className="mt-1 text-xs font-medium text-red-600" role="alert">
+                  {fieldErrors.wardId}
+                </p>
+              )}
             </div>
 
             <InputField
               label="Room Number *"
               placeholder="e.g. 101, 202-A, ICU-01"
               value={form.roomNumber}
-              onChange={(e) => setForm({ ...form, roomNumber: e.target.value })}
+              maxLength={ROOM_LIMITS.ROOM_NUMBER}
+              showCharCount
+              error={fieldErrors.roomNumber}
+              onChange={(e) => {
+                const val = e.target.value;
+                setForm((prev) => ({ ...prev, roomNumber: val }));
+                const err = validateField("roomNumber", val);
+                setFieldErrors((prev) => ({ ...prev, roomNumber: err }));
+                if (!err && formError === "Please enter valid data") setFormError(null);
+              }}
+              onKeyDown={(e) => handleKeyGuard(e, "roomNumber", form.roomNumber.length, ROOM_LIMITS.ROOM_NUMBER, "Room Number", ROOM_NUMBER_REGEX)}
+              onBlur={() => handleBlur("roomNumber")}
               required
             />
           </div>
@@ -435,21 +801,44 @@ export function RoomFormPage() {
               label="Optional Room Name"
               placeholder="e.g. Presidential Suite"
               value={form.roomName}
-              onChange={(e) => setForm({ ...form, roomName: e.target.value })}
+              maxLength={ROOM_LIMITS.ROOM_NAME}
+              showCharCount
+              error={fieldErrors.roomName}
+              onChange={(e) => {
+                const val = e.target.value;
+                setForm((prev) => ({ ...prev, roomName: val }));
+                const err = validateField("roomName", val);
+                setFieldErrors((prev) => ({ ...prev, roomName: err }));
+                if (!err && formError === "Please enter valid data") setFormError(null);
+              }}
+              onKeyDown={(e) => handleKeyGuard(e, "roomName", form.roomName.length, ROOM_LIMITS.ROOM_NAME, "Room Name", ROOM_NAME_REGEX)}
+              onBlur={() => handleBlur("roomName")}
             />
 
             <InputField
               label="Floor Number *"
               type="number"
-              min={0}
+              min={ROOM_LIMITS.FLOOR_MIN}
+              max={ROOM_LIMITS.FLOOR_MAX}
               value={form.floor}
-              onChange={(e) => setForm({ ...form, floor: Number(e.target.value) })}
+              error={fieldErrors.floor}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const val = raw === "" ? "" : Number(raw);
+                setForm((prev) => ({ ...prev, floor: val }));
+                const err = validateField("floor", raw);
+                setFieldErrors((prev) => ({ ...prev, floor: err }));
+                if (!err && formError === "Please enter valid data") setFormError(null);
+              }}
+              onKeyDown={(e) => handleNumberKeyGuard(e, "floor", "Floor Number", true)}
+              onBlur={() => handleBlur("floor")}
+              required
             />
 
             <SelectField
               label="Room Category (Accommodation) *"
               value={form.roomCategory}
-              onChange={(e) => setForm({ ...form, roomCategory: e.target.value })}
+              onChange={(e) => setForm((prev) => ({ ...prev, roomCategory: e.target.value }))}
             >
               {REAL_WORLD_ROOM_CATEGORIES.map((c) => (
                 <option key={c} value={c}>{c}</option>
@@ -470,7 +859,7 @@ export function RoomFormPage() {
                   name="acType"
                   value="AC"
                   checked={form.acType === "AC"}
-                  onChange={() => setForm({ ...form, acType: "AC" })}
+                  onChange={() => setForm((prev) => ({ ...prev, acType: "AC" }))}
                   className="h-4 w-4 text-navy-700 focus:ring-navy-500"
                 />
                 ○ AC Room
@@ -482,7 +871,7 @@ export function RoomFormPage() {
                   name="acType"
                   value="Non AC"
                   checked={form.acType === "Non AC"}
-                  onChange={() => setForm({ ...form, acType: "Non AC" })}
+                  onChange={() => setForm((prev) => ({ ...prev, acType: "Non AC" }))}
                   className="h-4 w-4 text-navy-700 focus:ring-navy-500"
                 />
                 ○ Non AC Room
@@ -494,7 +883,7 @@ export function RoomFormPage() {
             <SelectField
               label="Room Operational Status *"
               value={form.status}
-              onChange={(e) => setForm({ ...form, status: e.target.value as any })}
+              onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value as any }))}
             >
               <option value="Available">Available</option>
               <option value="Occupied">Occupied</option>
@@ -509,7 +898,18 @@ export function RoomFormPage() {
               rows={2}
               placeholder="Room location or operational notes..."
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              maxLength={ROOM_LIMITS.DESCRIPTION}
+              showCharCount
+              error={fieldErrors.description}
+              onChange={(e) => {
+                const val = e.target.value;
+                setForm((prev) => ({ ...prev, description: val }));
+                const err = validateField("description", val);
+                setFieldErrors((prev) => ({ ...prev, description: err }));
+                if (!err && formError === "Please enter valid data") setFormError(null);
+              }}
+              onKeyDown={(e) => handleKeyGuard(e, "description", form.description.length, ROOM_LIMITS.DESCRIPTION, "Description")}
+              onBlur={() => handleBlur("description")}
             />
           </div>
         </Card>
@@ -525,29 +925,42 @@ export function RoomFormPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Total Beds (Capacity) *
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={100}
-                step={1}
-                value={form.capacity}
-                onChange={(e) => {
-                  const val = Math.max(1, Math.min(100, Math.floor(Number(e.target.value) || 1)));
-                  setForm({ ...form, capacity: val });
-                }}
-                className="w-full px-3.5 py-2.5 border border-slate-300 rounded-lg text-sm font-bold focus:ring-2 focus:ring-navy-500"
-              />
-            </div>
+            <InputField
+              label="Total Beds (Capacity) *"
+              type="number"
+              min={ROOM_LIMITS.CAPACITY_MIN}
+              max={ROOM_LIMITS.CAPACITY_MAX}
+              value={form.capacity}
+              error={fieldErrors.capacity}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const val = raw === "" ? "" : Number(raw);
+                setForm((prev) => ({ ...prev, capacity: val }));
+                const err = validateField("capacity", raw);
+                setFieldErrors((prev) => ({ ...prev, capacity: err }));
+                if (!err && formError === "Please enter valid data") setFormError(null);
+              }}
+              onKeyDown={(e) => handleNumberKeyGuard(e, "capacity", "Bed Capacity")}
+              onBlur={() => handleBlur("capacity")}
+              required
+            />
 
             <InputField
               label="Bed Code Prefix"
               placeholder="e.g. Bed-101"
               value={form.bedPrefix}
-              onChange={(e) => setForm({ ...form, bedPrefix: e.target.value })}
+              maxLength={ROOM_LIMITS.BED_PREFIX}
+              showCharCount
+              error={fieldErrors.bedPrefix}
+              onChange={(e) => {
+                const val = e.target.value;
+                setForm((prev) => ({ ...prev, bedPrefix: val }));
+                const err = validateField("bedPrefix", val);
+                setFieldErrors((prev) => ({ ...prev, bedPrefix: err }));
+                if (!err && formError === "Please enter valid data") setFormError(null);
+              }}
+              onKeyDown={(e) => handleKeyGuard(e, "bedPrefix", form.bedPrefix.length, ROOM_LIMITS.BED_PREFIX, "Bed Prefix", BED_PREFIX_REGEX)}
+              onBlur={() => handleBlur("bedPrefix")}
             />
 
             <div className="flex items-center pt-6">
@@ -555,7 +968,7 @@ export function RoomFormPage() {
                 <input
                   type="checkbox"
                   checked={form.autoGenerateBeds}
-                  onChange={(e) => setForm({ ...form, autoGenerateBeds: e.target.checked })}
+                  onChange={(e) => setForm((prev) => ({ ...prev, autoGenerateBeds: e.target.checked }))}
                   className="h-4 w-4 rounded text-navy-700 focus:ring-navy-500"
                 />
                 Auto Generate {previewBedsList.length} Beds
@@ -603,49 +1016,115 @@ export function RoomFormPage() {
               label="Consultation / Doctor Visit Charge (₹)"
               type="number"
               min={0}
+              max={ROOM_LIMITS.CHARGE_MAX}
               value={form.consultationCharge}
-              onChange={(e) => setForm({ ...form, consultationCharge: Number(e.target.value) })}
+              error={fieldErrors.consultationCharge}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const val = raw === "" ? "" : Number(raw);
+                setForm((prev) => ({ ...prev, consultationCharge: val }));
+                const err = validateField("consultationCharge", raw);
+                setFieldErrors((prev) => ({ ...prev, consultationCharge: err }));
+                if (!err && formError === "Please enter valid data") setFormError(null);
+              }}
+              onKeyDown={(e) => handleNumberKeyGuard(e, "consultationCharge", "Consultation Charge")}
+              onBlur={() => handleBlur("consultationCharge")}
             />
 
             <InputField
               label="Daily Room Charge (₹) *"
               type="number"
               min={0}
+              max={ROOM_LIMITS.CHARGE_MAX}
               value={form.dailyRoomCharge}
-              onChange={(e) => setForm({ ...form, dailyRoomCharge: Number(e.target.value) })}
+              error={fieldErrors.dailyRoomCharge}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const val = raw === "" ? "" : Number(raw);
+                setForm((prev) => ({ ...prev, dailyRoomCharge: val }));
+                const err = validateField("dailyRoomCharge", raw);
+                setFieldErrors((prev) => ({ ...prev, dailyRoomCharge: err }));
+                if (!err && formError === "Please enter valid data") setFormError(null);
+              }}
+              onKeyDown={(e) => handleNumberKeyGuard(e, "dailyRoomCharge", "Daily Room Charge")}
+              onBlur={() => handleBlur("dailyRoomCharge")}
+              required
             />
 
             <InputField
               label="Nursing Charge (₹)"
               type="number"
               min={0}
+              max={ROOM_LIMITS.CHARGE_MAX}
               value={form.nursingCharge}
-              onChange={(e) => setForm({ ...form, nursingCharge: Number(e.target.value) })}
+              error={fieldErrors.nursingCharge}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const val = raw === "" ? "" : Number(raw);
+                setForm((prev) => ({ ...prev, nursingCharge: val }));
+                const err = validateField("nursingCharge", raw);
+                setFieldErrors((prev) => ({ ...prev, nursingCharge: err }));
+                if (!err && formError === "Please enter valid data") setFormError(null);
+              }}
+              onKeyDown={(e) => handleNumberKeyGuard(e, "nursingCharge", "Nursing Charge")}
+              onBlur={() => handleBlur("nursingCharge")}
             />
 
             <InputField
               label="Maintenance Charge (₹)"
               type="number"
               min={0}
+              max={ROOM_LIMITS.CHARGE_MAX}
               value={form.maintenanceCharge}
-              onChange={(e) => setForm({ ...form, maintenanceCharge: Number(e.target.value) })}
+              error={fieldErrors.maintenanceCharge}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const val = raw === "" ? "" : Number(raw);
+                setForm((prev) => ({ ...prev, maintenanceCharge: val }));
+                const err = validateField("maintenanceCharge", raw);
+                setFieldErrors((prev) => ({ ...prev, maintenanceCharge: err }));
+                if (!err && formError === "Please enter valid data") setFormError(null);
+              }}
+              onKeyDown={(e) => handleNumberKeyGuard(e, "maintenanceCharge", "Maintenance Charge")}
+              onBlur={() => handleBlur("maintenanceCharge")}
             />
 
             <InputField
               label="GST Tax Rate (%)"
               type="number"
               min={0}
-              max={28}
+              max={ROOM_LIMITS.GST_MAX}
               value={form.gstPercent}
-              onChange={(e) => setForm({ ...form, gstPercent: Number(e.target.value) })}
+              error={fieldErrors.gstPercent}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const val = raw === "" ? "" : Number(raw);
+                setForm((prev) => ({ ...prev, gstPercent: val }));
+                const err = validateField("gstPercent", raw);
+                setFieldErrors((prev) => ({ ...prev, gstPercent: err }));
+                if (!err && formError === "Please enter valid data") setFormError(null);
+              }}
+              onKeyDown={(e) => handleNumberKeyGuard(e, "gstPercent", "GST Tax Rate")}
+              onBlur={() => handleBlur("gstPercent")}
             />
 
             <InputField
               label="Admission / Security Deposit (₹)"
               type="number"
               min={0}
+              max={ROOM_LIMITS.CHARGE_MAX}
               value={form.admissionDeposit}
-              onChange={(e) => setForm({ ...form, admissionDeposit: Number(e.target.value) })}
+              error={fieldErrors.admissionDeposit}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const val = raw === "" ? "" : Number(raw);
+                setForm((prev) => ({ ...prev, admissionDeposit: val }));
+                const err = validateField("admissionDeposit", raw);
+                setFieldErrors((prev) => ({ ...prev, admissionDeposit: err }));
+                if (!err && formError === "Please enter valid data") setFormError(null);
+              }}
+              onKeyDown={(e) => handleNumberKeyGuard(e, "admissionDeposit", "Admission Deposit")}
+              onBlur={() => handleBlur("admissionDeposit")}
             />
           </div>
 
