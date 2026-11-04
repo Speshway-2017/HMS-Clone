@@ -31,31 +31,6 @@ const loginSchema = z.object({
   password: z.string().min(1, "Password is required").max(64, "Password cannot exceed 64 characters"),
 });
 
-const registerSchema = z.object({
-  // Section 1: Account & Security
-  name: z.string().min(2, "Full Name must be at least 2 characters long"),
-  email: z.string().optional().default(""),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-
-  // Section 2: Demographics & Contact (Phone mandatory, rest optional with defaults for easy patient signup)
-  phone: z.string().min(10, "Phone Number must be at least 10 digits"),
-  age: z.coerce.number().optional().default(25),
-  gender: z.string().optional().default("Male"),
-  bloodGroup: z.string().optional().default("O+"),
-  address: z.string().optional().default("General"),
-
-  // Section 3: Emergency Contact (Optional - set in Profile)
-  emergencyContact: z.object({
-    name: z.string().optional().default(""),
-    phone: z.string().optional().default(""),
-    relation: z.string().optional().default(""),
-  }).optional().default({ name: "", phone: "", relation: "" }),
-
-  // Section 4: Allergies & Insurance Details (Optional - set in Profile)
-  allergies: z.string().optional().default(""),
-  insuranceProvider: z.string().optional().default(""),
-  insurancePolicyNumber: z.string().optional().default(""),
-});
 const registerSchema = z
   .object({
     // Section 1: Account & Security (Mandatory)
@@ -522,14 +497,14 @@ const changePasswordSchema = z.object({
   newPassword: z
     .string({ invalid_type_error: "New Password must be valid data. Please enter valid data" })
     .min(1, "New Password is required. Field is required. Please fill out this field")
-    .max(64, "New Password cannot exceed 64 characters. Too long text is not accepted. Please enter valid data")
+    .max(64, "New Password exceeds the maximum allowed length.")
     .refine((val) => val.length >= 8 && /(?=.*[a-zA-Z])(?=.*[0-9!@#$%^&*])/.test(val), {
       message: "New Password contains invalid data. Password must be at least 8 characters with letters and numbers/symbols. Invalid data is not accepted. Please enter valid data",
     }),
   confirmPassword: z
     .string({ invalid_type_error: "Confirm New Password must be valid data. Please enter valid data" })
     .min(1, "Confirm New Password is required. Field is required. Please fill out this field")
-    .max(64, "Confirm New Password cannot exceed 64 characters. Too long text is not accepted. Please enter valid data"),
+    .max(64, "Confirm New Password exceeds the maximum allowed length."),
 }).refine(data => data.newPassword === data.confirmPassword, {
   message: "Passwords do not match. Invalid data is not accepted. Please enter valid data",
   path: ["confirmPassword"]
