@@ -7,11 +7,15 @@ import { useSocketSync } from "../../hooks/useSocketSync";
 
 function StarRating({ rating }: { rating: number }) {
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="flex items-center gap-0.5" aria-label={`${rating} stars`}>
       {[1, 2, 3, 4, 5].map((s) => (
         <Star
           key={s}
-          className={`h-3.5 w-3.5 ${s <= Math.round(rating) ? "text-amber-400 fill-amber-400" : "text-slate-200"}`}
+          className={`h-4 w-4 ${
+            s <= Math.round(rating) && rating > 0
+              ? "text-amber-400 fill-amber-400"
+              : "text-slate-300 fill-none"
+          }`}
         />
       ))}
     </div>
@@ -105,12 +109,14 @@ export function PerformancePage() {
         {/* Rating Summary */}
         <Card>
           <h3 className="mb-4 text-base font-semibold text-slate-800 flex items-center gap-2">
-            <Award className="h-4 w-4 text-amber-500" /> Rating Breakdown
+            <Star className="h-4 w-4 text-amber-500 fill-amber-500" /> Rating Breakdown
           </h3>
           <div className="text-center mb-4">
-            <p className="text-5xl font-bold text-slate-800">{totalReviews > 0 ? avgRating : "0.0"}</p>
-            <div className="flex justify-center my-1">
-              <StarRating rating={avgRating} />
+            <p className="text-5xl font-bold text-slate-800">
+              {totalReviews > 0 ? (typeof avgRating === "number" ? avgRating.toFixed(1) : avgRating) : "0.0"}
+            </p>
+            <div className="flex justify-center my-1.5">
+              <StarRating rating={totalReviews > 0 ? avgRating : 0} />
             </div>
             <p className="text-xs text-slate-500">
               {totalReviews > 0

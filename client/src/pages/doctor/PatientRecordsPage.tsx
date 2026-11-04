@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
+import { tokenStorage } from "../../lib/tokenStorage";
+import { api } from "../../lib/api";
 import {
   Search, User, AlertTriangle, FileText, Activity, Stethoscope,
   ChevronRight, Heart, FlaskConical, ScanLine, Pill, Download, Eye,
@@ -100,6 +103,103 @@ export function PatientRecordsPage() {
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [previewAttachment, setPreviewAttachment] = useState<{
+    url: string;
+    filename: string;
+    mime?: string;
+    report?: any;
+  } | null>(null);
+
+  const handleDownloadReport = async (
+    report: any,
+    fileIndex: number = 0,
+    customFilename?: string
+  ) => {
+    if (!report || !report._id) {
+      toast.error("Report reference is missing or unavailable.");
+      return;
+    }
+
+    const actionKey = `${report._id}-${fileIndex}`;
+    try {
+      setDownloadingId(actionKey);
+      const token = tokenStorage.get() || sessionStorage.getItem("hms_token") || "";
+      if (!token) {
+        toast.error("Authentication expired. Please log in again.");
+        return;
+      }
+
+      const file = report.files?.[fileIndex] || report.files?.[0];
+      const fallbackName =
+        customFilename ||
+        file?.original_filename ||
+        file?.name ||
+        `${(report.testName || "Report").replace(/[^\w.-]/g, "_")}_${report._id}.pdf`;
+
+      // Perform authenticated download via application API client
+      const response = await api.get(`/diagnostic-reports/${report._id}/download`, {
+        params: { fileIndex },
+        responseType: "blob",
+      });
+
+      const blob = response.data;
+      if (!blob || (blob instanceof Blob && blob.size === 0)) {
+        throw new Error("Downloaded report file is empty.");
+      }
+
+      // Check Content-Disposition header for filename if available
+      let filename = fallbackName;
+      const disposition = response.headers?.["content-disposition"] || response.headers?.["Content-Disposition"];
+      if (disposition && typeof disposition === "string" && disposition.includes("filename=")) {
+        const match = disposition.match(/filename=["']?([^"';]+)["']?/);
+        if (match && match[1]) {
+          filename = match[1].trim();
+        }
+      }
+
+      const objectUrl = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(objectUrl);
+      toast.success(`Downloaded: ${filename}`);
+    } catch (err: any) {
+      console.warn("Direct blob download failed, falling back to direct URL:", err);
+      try {
+        const token = tokenStorage.get() || sessionStorage.getItem("hms_token") || "";
+        const file = report.files?.[fileIndex] || report.files?.[0];
+        const directUrl = file?.secure_url || file?.url;
+        const targetUrl =
+          directUrl && (directUrl.startsWith("http://") || directUrl.startsWith("https://"))
+            ? directUrl
+            : `/api/v1/diagnostic-reports/${report._id}/download?fileIndex=${fileIndex}&token=${encodeURIComponent(token)}`;
+
+        const link = document.createElement("a");
+        link.href = targetUrl;
+        link.target = "_blank";
+        link.rel = "noreferrer";
+        link.download =
+          customFilename ||
+          file?.original_filename ||
+          file?.name ||
+          `${(report.testName || "Report").replace(/[^\w.-]/g, "_")}_${report._id}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (fallbackErr) {
+        const errMsg =
+          err?.response?.data?.message || err?.message || "Failed to download report. Please try again.";
+        toast.error(errMsg);
+      }
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const patients: Patient[] = myPatientsData?.patients ?? [];
   const counts = myPatientsData?.counts;
@@ -776,6 +876,53 @@ export function PatientRecordsPage() {
                 </div>
               </div>
             )}
+          </div>
+        </Modal>
+      )}
+      {previewAttachment && (
+        <Modal
+          title={`Attachment Preview: ${previewAttachment.filename}`}
+          isOpen={!!previewAttachment}
+          onClose={() => setPreviewAttachment(null)}
+        >
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b pb-2 text-xs text-slate-500">
+              <span className="font-semibold text-slate-700 truncate max-w-[280px] sm:max-w-[360px]">
+                {previewAttachment.filename}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleDownloadReport(previewAttachment.report || selectedReport, 0, previewAttachment.filename)}
+                className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline cursor-pointer"
+              >
+                <Download className="h-3.5 w-3.5" /> Download
+              </button>
+            </div>
+            <div className="max-h-[65vh] overflow-auto flex items-center justify-center bg-slate-50 rounded-lg p-2 border border-slate-200">
+              {previewAttachment.url && (previewAttachment.url.endsWith(".pdf") || previewAttachment.mime === "application/pdf") ? (
+                <iframe
+                  src={previewAttachment.url}
+                  title={previewAttachment.filename}
+                  className="w-full h-[500px] border-0 rounded"
+                />
+              ) : (
+                <img
+                  src={previewAttachment.url}
+                  alt={previewAttachment.filename}
+                  className="max-h-[480px] w-auto max-w-full rounded object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                    const parent = (e.target as HTMLElement).parentElement;
+                    if (parent) {
+                      const p = document.createElement("p");
+                      p.className = "text-xs text-slate-400 py-8 text-center";
+                      p.textContent = "Unable to preview image directly. Please click Download to view.";
+                      parent.appendChild(p);
+                    }
+                  }}
+                />
+              )}
+            </div>
           </div>
         </Modal>
       )}

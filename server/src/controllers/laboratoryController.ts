@@ -7,6 +7,8 @@ import { RadiologyOrder } from "../models/RadiologyOrder";
 import { DiagnosticReport } from "../models/DiagnosticReport";
 import { DbNotification } from "../models/DbNotification";
 import { Patient } from "../models/Patient";
+import { Appointment } from "../models/Appointment";
+import { Admission } from "../models/Admission";
 import { Invoice } from "../models/Invoice";
 import { emitToDoctor, emitToHospital } from "../config/socket";
 import { logAudit } from "../utils/auditLogger";
@@ -792,12 +794,129 @@ export const getReportById = catchAsync(async (req: Request, res: Response) => {
 
   if (req.user!.role === "doctor") {
     const doctor = await Doctor.findOne({ email: req.user!.email });
-    if (!doctor || report.doctor.toString() !== doctor._id.toString()) {
-      throw new AppError("You are not authorized to view this report.", 403);
+    if (!doctor) throw new AppError("Doctor profile not found", 404);
+    const repDocId = (report.doctor as any)?._id
+      ? (report.doctor as any)._id.toString()
+      : report.doctor?.toString();
+    if (repDocId !== doctor._id.toString()) {
+      const isAssigned =
+        (await Appointment.exists({ patient: report.patient, doctor: doctor._id, hospital: hospitalId })) ||
+        (await Admission.exists({ patient: report.patient, doctor: doctor._id, hospital: hospitalId }));
+      if (!isAssigned) {
+        throw new AppError("You are not authorized to view this report.", 403);
+      }
     }
   }
 
   res.json({ status: "success", data: report });
+});
+
+export const viewReport = catchAsync(async (req: Request, res: Response) => {
+  const { reportId } = req.params;
+  const hospitalId = req.hospitalFilter?.hospital;
+  const query: any = { _id: reportId };
+  if (hospitalId) query.hospital = hospitalId;
+  const report = await DiagnosticReport.findOne(query)
+    .populate("patient", "name uhid age gender")
+    .populate("doctor", "name title specialization")
+    .populate("uploadedBy", "name");
+  if (!report) throw new AppError("Report not found", 404);
+
+  if (req.user!.role === "doctor") {
+    const doctor = await Doctor.findOne({ email: req.user!.email });
+    if (!doctor) throw new AppError("Doctor profile not found", 404);
+    const repDocId = (report.doctor as any)?._id
+      ? (report.doctor as any)._id.toString()
+      : report.doctor?.toString();
+    if (repDocId !== doctor._id.toString()) {
+      const isAssigned =
+        (await Appointment.exists({ patient: report.patient, doctor: doctor._id, hospital: hospitalId })) ||
+        (await Admission.exists({ patient: report.patient, doctor: doctor._id, hospital: hospitalId }));
+      if (!isAssigned) {
+        throw new AppError("You are not authorized to view this report.", 403);
+      }
+    }
+  }
+
+  const fileIndex = req.query.fileIndex !== undefined ? parseInt(String(req.query.fileIndex), 10) : 0;
+  const targetFile = (report.files && report.files[fileIndex]) ? report.files[fileIndex] : (report.files?.[0]);
+
+  if (targetFile?.secure_url) {
+    return res.redirect(targetFile.secure_url);
+  }
+
+  const patient = report.patient as any;
+  const doctor = report.doctor as any;
+  const uploader = report.uploadedBy as any;
+
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  return res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${report.testName} - Diagnostic Report</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1e293b; padding: 2rem; margin: 0; }
+        .card { max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); padding: 2rem; border: 1px solid #e2e8f0; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 1rem; margin-bottom: 1.5rem; }
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 700; background: #dcfce7; color: #15803d; text-transform: uppercase; }
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; background: #f8fafc; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 13px; }
+        .label { color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 11px; margin-bottom: 2px; }
+        .val { font-weight: 600; color: #0f172a; }
+        .section { margin-bottom: 1.5rem; }
+        .section-title { font-size: 13px; font-weight: 700; color: #334155; text-transform: uppercase; margin-bottom: 0.5rem; }
+        .content-box { background: #f1f5f9; padding: 1rem; border-radius: 8px; font-size: 14px; white-space: pre-wrap; line-height: 1.5; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <div class="header">
+          <div>
+            <h1 style="margin: 0; font-size: 20px; color: #0f172a;">${report.testName}</h1>
+            <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b;">${report.requestType} Investigation Report · Ref #${report._id}</p>
+          </div>
+          <span class="badge">${report.status}</span>
+        </div>
+        <div class="grid">
+          <div>
+            <div class="label">Patient Name</div>
+            <div class="val">${patient?.name || "N/A"}</div>
+          </div>
+          <div>
+            <div class="label">UHID</div>
+            <div class="val">${patient?.uhid || "N/A"}</div>
+          </div>
+          <div>
+            <div class="label">Age / Gender</div>
+            <div class="val">${patient?.age ? patient.age + " Yrs" : "—"} / ${patient?.gender || "—"}</div>
+          </div>
+          <div>
+            <div class="label">Ordering Doctor</div>
+            <div class="val">Dr. ${doctor?.name || "Attending Physician"}</div>
+          </div>
+          <div>
+            <div class="label">Date Published</div>
+            <div class="val">${new Date(report.uploadedAt).toLocaleString()}</div>
+          </div>
+          <div>
+            <div class="label">Processed By</div>
+            <div class="val">${uploader?.name || "Staff"}</div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">Findings / Observations</div>
+          <div class="content-box">${report.observations || "No specific observations recorded."}</div>
+        </div>
+        <div class="section">
+          <div class="section-title">Technical Remarks</div>
+          <div class="content-box" style="background: #fffbeb; color: #92400e;">${report.remarks || "No technical remarks."}</div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
 });
 
 export const downloadReport = catchAsync(async (req: Request, res: Response) => {
@@ -810,18 +929,52 @@ export const downloadReport = catchAsync(async (req: Request, res: Response) => 
 
   if (req.user!.role === "doctor") {
     const doctor = await Doctor.findOne({ email: req.user!.email });
-    if (!doctor || report.doctor.toString() !== doctor._id.toString()) {
-      throw new AppError("You are not authorized to download this report.", 403);
+    if (!doctor) throw new AppError("Doctor profile not found", 404);
+    const repDocId = (report.doctor as any)?._id
+      ? (report.doctor as any)._id.toString()
+      : report.doctor?.toString();
+    if (repDocId !== doctor._id.toString()) {
+      const isAssigned =
+        (await Appointment.exists({ patient: report.patient, doctor: doctor._id, hospital: hospitalId })) ||
+        (await Admission.exists({ patient: report.patient, doctor: doctor._id, hospital: hospitalId }));
+      if (!isAssigned) {
+        throw new AppError("You are not authorized to download this report.", 403);
+      }
     }
   }
 
-  if (!report.files || report.files.length === 0) {
-    res.setHeader("Content-Type", "text/plain");
-    res.setHeader("Content-Disposition", `attachment; filename="report_${report._id}.txt"`);
-    return res.send(`Diagnostic Report: ${report.testName}\nStatus: ${report.status}\nObservations: ${report.observations || "N/A"}\nRemarks: ${report.remarks || "N/A"}`);
+  const fileIndex = req.query.fileIndex !== undefined ? parseInt(String(req.query.fileIndex), 10) : 0;
+  const targetFile = (report.files && report.files[fileIndex]) ? report.files[fileIndex] : (report.files?.[0]);
+
+  if (!targetFile || !targetFile.secure_url) {
+    const safeName = (report.testName || "Diagnostic_Report").replace(/[^a-zA-Z0-9_-]/g, "_");
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}_${report._id}.txt"`);
+    return res.send(
+      `Hospital Management System - Diagnostic Report\n` +
+      `---------------------------------------------\n` +
+      `Test Name: ${report.testName}\n` +
+      `Type: ${report.requestType}\n` +
+      `Status: ${report.status}\n` +
+      `Date: ${new Date(report.uploadedAt).toLocaleString()}\n` +
+      `Observations:\n${report.observations || "No specific observations logged."}\n\n` +
+      `Technical Remarks:\n${report.remarks || "No technical remarks."}\n`
+    );
   }
 
-  res.redirect(report.files[0].secure_url);
+  let downloadUrl = targetFile.secure_url;
+  const originalName = targetFile.original_filename || `${report.testName}_${report._id}.pdf`;
+  const cleanFilename = originalName.replace(/[^\w.-]/g, "_");
+
+  if (downloadUrl.includes("res.cloudinary.com") && downloadUrl.includes("/upload/")) {
+    downloadUrl = downloadUrl.replace(
+      /\/upload\/(?:fl_attachment[^/]*\/)?/,
+      `/upload/fl_attachment:${encodeURIComponent(cleanFilename)}/`
+    );
+  }
+
+  res.setHeader("Content-Disposition", `attachment; filename="${cleanFilename}"`);
+  return res.redirect(downloadUrl);
 });
 
 export const getPatientReports = catchAsync(async (req: Request, res: Response) => {

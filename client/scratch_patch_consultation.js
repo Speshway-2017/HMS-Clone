@@ -35,8 +35,8 @@ if (!code.includes('consultationValidation')) {
 }
 
 // 2. MedicineStrengthSelect props and error display
-const oldSelect = 
-`function MedicineStrengthSelect({
+const oldSelect =
+  `function MedicineStrengthSelect({
   medicineName,
   value,
   onChange,
@@ -46,8 +46,8 @@ const oldSelect =
   onChange: (val: string) => void;
 }) {`;
 
-const newSelect = 
-`function MedicineStrengthSelect({
+const newSelect =
+  `function MedicineStrengthSelect({
   medicineName,
   value,
   onChange,
@@ -64,8 +64,8 @@ if (code.includes(toFileFormat(oldSelect))) {
 }
 
 // Update MedicineStrengthSelect returns to show error and limit
-const oldSelectCustomReturn = 
-`        <div className="flex gap-1">
+const oldSelectCustomReturn =
+  `        <div className="flex gap-1">
           <input
             type="text"
             value={value}
@@ -86,8 +86,8 @@ const oldSelectCustomReturn =
         </div>
       </div>`;
 
-const newSelectCustomReturn = 
-`        <div className="flex gap-1">
+const newSelectCustomReturn =
+  `        <div className="flex gap-1">
           <input
             type="text"
             value={value}
@@ -118,8 +118,8 @@ if (code.includes(toFileFormat(oldSelectCustomReturn))) {
 const stateTarget = `  // Admission form state
   const { data: wardsData } = useWards({ limit: 100 });`;
 
-const stateAddition = 
-`  // Validation error states - Phase 1: Clinical Assessment Notes
+const stateAddition =
+  `  // Validation error states - Phase 1: Clinical Assessment Notes
   const [chiefComplaintError, setChiefComplaintError] = useState<string | null>(null);
   const [diagnosisError, setDiagnosisError] = useState<string | null>(null);
   const [symptomsError, setSymptomsError] = useState<string | null>(null);
@@ -158,8 +158,8 @@ if (code.includes(toFileFormat(stateTarget))) {
 }
 
 // 4. Update handleSaveVitals
-const oldSaveVitals = 
-`  const handleSaveVitals = async (e: React.FormEvent) => {
+const oldSaveVitals =
+  `  const handleSaveVitals = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workspaceData?.draftSession) {
       toast.error("No active draft session. Please start consultation.");
@@ -167,8 +167,8 @@ const oldSaveVitals =
     }
     try {`;
 
-const newSaveVitals = 
-`  const handleSaveVitals = async (e: React.FormEvent) => {
+const newSaveVitals =
+  `  const handleSaveVitals = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workspaceData?.draftSession) {
       toast.error("No active draft session. Please start consultation.");
@@ -202,8 +202,8 @@ if (code.includes(toFileFormat(oldSaveVitals))) {
 }
 
 // 5. Update handleSaveClinicalNotes
-const oldSaveNotes = 
-`  const handleSaveClinicalNotes = async (e: React.FormEvent) => {
+const oldSaveNotes =
+  `  const handleSaveClinicalNotes = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workspaceData?.draftSession) {
       toast.error("No active draft session. Please start consultation.");
@@ -211,8 +211,8 @@ const oldSaveNotes =
     }
     try {`;
 
-const newSaveNotes = 
-`  const handleSaveClinicalNotes = async (e: React.FormEvent) => {
+const newSaveNotes =
+  `  const handleSaveClinicalNotes = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workspaceData?.draftSession) {
       toast.error("No active draft session. Please start consultation.");
@@ -246,16 +246,16 @@ if (code.includes(toFileFormat(oldSaveNotes))) {
 }
 
 // 6. Update handleGeneratePrescription
-const oldPresSubmit = 
-`    if (validMeds.length === 0) {
+const oldPresSubmit =
+  `    if (validMeds.length === 0) {
       toast.error("Please enter at least one valid medicine name");
       return;
     }
 
     try {`;
 
-const newPresSubmit = 
-`    if (validMeds.length === 0) {
+const newPresSubmit =
+  `    if (validMeds.length === 0) {
       toast.error("Please enter at least one valid medicine name");
       return;
     }
@@ -297,8 +297,8 @@ if (code.includes(toFileFormat(oldPresSubmit))) {
 }
 
 // 7. Update handleOrderRadiology
-const oldRadSubmit = 
-`  const handleOrderRadiology = async (e: React.FormEvent) => {
+const oldRadSubmit =
+  `  const handleOrderRadiology = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workspaceData?.draftSession) {
       toast.error("No active draft session. Please start consultation.");
@@ -310,8 +310,8 @@ const oldRadSubmit =
     }
     try {`;
 
-const newRadSubmit = 
-`  const handleOrderRadiology = async (e: React.FormEvent) => {
+const newRadSubmit =
+  `  const handleOrderRadiology = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workspaceData?.draftSession) {
       toast.error("No active draft session. Please start consultation.");
@@ -336,8 +336,8 @@ if (code.includes(toFileFormat(oldRadSubmit))) {
 }
 
 // 8. Update handleRecommendAdmission
-const oldAdmSubmit = 
-`  const handleRecommendAdmission = async (e: React.FormEvent) => {
+const oldAdmSubmit =
+  `  const handleRecommendAdmission = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workspaceData?.draftSession) {
       toast.error("No active draft session. Please start consultation.");
@@ -345,8 +345,8 @@ const oldAdmSubmit =
     }
     try {`;
 
-const newAdmSubmit = 
-`  const handleRecommendAdmission = async (e: React.FormEvent) => {
+const newAdmSubmit =
+  `  const handleRecommendAdmission = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workspaceData?.draftSession) {
       toast.error("No active draft session. Please start consultation.");

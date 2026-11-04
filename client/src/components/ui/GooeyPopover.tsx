@@ -232,8 +232,21 @@ export default function GooeyPopover({
         speed * 0.575
       );
 
+      tl.eventCallback("onComplete", () => {
+        if (unfilteredTarget) {
+          gsap.set(unfilteredTarget, { height: "auto", maxHeight: "90vh", overflowY: "auto" });
+        }
+      });
+
       timelineRef.current = tl;
     } else {
+      if (unfilteredTarget) {
+        gsap.set(unfilteredTarget, { height: unfilteredTarget.offsetHeight, overflow: "hidden" });
+      }
+      if (filteredTarget) {
+        gsap.set(filteredTarget, { height: filteredTarget.offsetHeight });
+      }
+
       // Content text fade out first
       const tl = gsap.timeline({
         onComplete: () => {

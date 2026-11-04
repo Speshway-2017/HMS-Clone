@@ -180,7 +180,7 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
       }
     }
 
-    const activeError = propError !== undefined ? (propError || keyLimitError) : (keyLimitError || autoError);
+    const activeError = propError || keyLimitError || autoError;
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
       const allowedNavKeys = [
@@ -386,7 +386,7 @@ export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>
       }
     }
 
-    const activeError = propError !== undefined ? (propError || keyLimitError) : (keyLimitError || autoError);
+    const activeError = propError || keyLimitError || autoError;
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       const allowedNavKeys = [
