@@ -887,13 +887,15 @@ export class ReceptionService {
 
       const enteredPaise = toPaise(amount);
 
+      if (enteredPaise <= 0 || isNaN(enteredPaise)) {
+        throw new AppError("Payment amount must be greater than zero. Please enter valid data", 400);
+      }
+
       // Validate using integer paise — eliminates ALL floating-point edge cases.
-      // e.g. ₹201.60 entered == 20160 paise; ₹201.59999999998 stored == 20160 paise → equal → valid.
       if (enteredPaise > currentOutstandingPaise) {
-        const enteredDisplay = (enteredPaise / 100).toFixed(2);
         const remainingDisplay = (currentOutstandingPaise / 100).toFixed(2);
         throw new AppError(
-          `Entered Amount:\n₹${enteredDisplay}\n\nRemaining Balance:\n₹${remainingDisplay}\n\nPlease enter an amount less than or equal to the remaining balance.`,
+          `Amount cannot exceed the remaining balance of ₹${remainingDisplay}. Please enter valid data`,
           400
         );
       }

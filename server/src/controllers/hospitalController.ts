@@ -40,7 +40,14 @@ const hospitalSchema = z.object({
     .refine((val) => val.length >= 2 && /^[a-zA-Z0-9][a-zA-Z0-9\s.,\-_/'&()]*$/.test(val), {
       message: "Hospital Name contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
     }),
-  code: z.string().max(20, "Hospital Code cannot exceed 20 characters. Too long text is not accepted. Please enter valid data").optional().default(""),
+  code: z
+    .string()
+    .max(20, "Hospital Code cannot exceed 20 characters. Too long text is not accepted. Please enter valid data")
+    .refine((val) => !val || (val.length >= 2 && /^[A-Za-z0-9\-_]+$/.test(val)), {
+      message: "Hospital Code must contain only letters, numbers, hyphens, and underscores. Please enter valid data",
+    })
+    .optional()
+    .default(""),
   address: z
     .string({ invalid_type_error: "Hospital Address must be valid data. Please enter valid data" })
     .trim()
@@ -103,7 +110,13 @@ const hospitalSchema = z.object({
     .refine((val) => !val || val.toLowerCase().endsWith(".pdf") || val.toLowerCase().includes(".pdf?"), {
       message: "Only PDF files should be accepted. Remaining files are not accepted.",
     }),
-  bedCapacity: z.coerce.number().min(0).optional().default(0),
+  bedCapacity: z.coerce
+    .number({ invalid_type_error: "Total Bed Capacity must be a valid number. Please enter valid data" })
+    .int("Total Bed Capacity must be a whole number. Please enter valid data")
+    .min(0, "Total Bed Capacity cannot be negative. Please enter valid data")
+    .max(100000, "Total Bed Capacity cannot exceed 100,000. Please enter valid data")
+    .optional()
+    .default(0),
   opExpiryLimit: z.coerce.number().min(0).optional().default(10),
   availableLabTests: z.array(z.string()).optional(),
   availableRadiologyTests: z.array(z.string()).optional(),

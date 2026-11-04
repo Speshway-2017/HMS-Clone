@@ -12,6 +12,14 @@ import { catchAsync } from "../utils/catchAsync";
 import { emitToHospital } from "../config/socket";
 import { Patient } from "../models/Patient";
 import { notifyAssignedDoctorForPatient, checkCriticalVitalsAndNotify } from "../utils/autoNotifyAssignedDoctor";
+import {
+  validateTemperature,
+  validateBloodPressure,
+  validatePulseRate,
+  validateRespiratoryRate,
+  validateOxygenSaturation,
+  validateWeight,
+} from "../utils/consultationValidation";
 
 // 1. Get Nurse Inpatients
 export const getNurseInpatients = catchAsync(async (req: Request, res: Response) => {
@@ -66,6 +74,57 @@ export const saveNurseInpatientVitals = catchAsync(async (req: Request, res: Res
     bloodSugar,
     observationNotes
   } = req.body;
+
+  // Validate vitals (if provided must be valid and within limits)
+  if (temperature && typeof temperature === "string" && temperature.trim()) {
+    const tTrimmed = temperature.trim();
+    if (tTrimmed.length > 10) throw new AppError("The Temp (°F) field should validate long text input correctly and should not accept unsupported data. Characters limit: 10. Too long text is not accepted. Too long data is not accepted. Please enter valid data", 400);
+    const err = validateTemperature(tTrimmed);
+    if (err) throw new AppError("The Temp (°F) field should validate invalid input correctly and should not accept unsupported data. Please enter valid data", 400);
+  }
+
+  if (bloodPressure && typeof bloodPressure === "string" && bloodPressure.trim()) {
+    const bpTrimmed = bloodPressure.trim();
+    if (bpTrimmed.length > 10) throw new AppError("The BP (mmHg) field should validate long text input correctly and should not accept unsupported data. Characters limit: 10. Too long text is not accepted. Too long data is not accepted. Please enter valid data", 400);
+    const err = validateBloodPressure(bpTrimmed);
+    if (err) throw new AppError("The BP (mmHg) field should validate invalid input correctly and should not accept unsupported data. Please enter valid data", 400);
+  }
+
+  if (pulseRate && typeof pulseRate === "string" && pulseRate.trim()) {
+    const prTrimmed = pulseRate.trim();
+    if (prTrimmed.length > 5) throw new AppError("The Pulse (bpm) field should validate long text input correctly and should not accept unsupported data. Characters limit: 5. Too long text is not accepted. Too long data is not accepted. Please enter valid data", 400);
+    const err = validatePulseRate(prTrimmed);
+    if (err) throw new AppError("The Pulse (bpm) field should validate invalid input correctly and should not accept unsupported data. Please enter valid data", 400);
+  }
+
+  if (respiratoryRate && typeof respiratoryRate === "string" && respiratoryRate.trim()) {
+    const rrTrimmed = respiratoryRate.trim();
+    if (rrTrimmed.length > 5) throw new AppError("Maximum allowed character limit exceeded", 400);
+    const err = validateRespiratoryRate(rrTrimmed);
+    if (err) throw new AppError(err, 400);
+  }
+
+  if (oxygenSaturation && typeof oxygenSaturation === "string" && oxygenSaturation.trim()) {
+    const o2Trimmed = oxygenSaturation.trim();
+    if (o2Trimmed.length > 5) throw new AppError("The SpO2 (%) field should validate long text input correctly and should not accept unsupported data. Characters limit: 5. Too long text is not accepted. Too long data is not accepted. Please enter valid data", 400);
+    const err = validateOxygenSaturation(o2Trimmed);
+    if (err) throw new AppError("The SpO2 (%) field should validate invalid input correctly and should not accept unsupported data. Please enter valid data", 400);
+  }
+
+  if (weight && typeof weight === "string" && weight.trim()) {
+    const wTrimmed = weight.trim();
+    if (wTrimmed.length > 6) throw new AppError("Maximum allowed character limit exceeded", 400);
+    const err = validateWeight(wTrimmed);
+    if (err) throw new AppError(err, 400);
+  }
+
+  if (observationNotes && typeof observationNotes === "string" && observationNotes.trim()) {
+    const obTrimmed = observationNotes.trim();
+    if (obTrimmed.length > 500) throw new AppError("The Observation Notes field should validate long text input correctly and should not accept unsupported data. Observation Notes cannot exceed 500 characters. Too long text is not accepted. Too long data is not accepted. Please enter valid data", 400);
+    if (/<script\b|javascript:/i.test(obTrimmed) || (!/[a-zA-Z0-9]/.test(obTrimmed) && obTrimmed.length > 0)) {
+      throw new AppError("The Observation Notes field should validate invalid input correctly and should not accept unsupported data. Observation Notes contains invalid data. Invalid data not accepted. Invalid data is not accepted. Please enter valid data", 400);
+    }
+  }
 
   const staff = await Staff.findOne({ email: req.user!.email });
   const recordedByName = staff?.name || req.user!.name || "Nurse";
@@ -234,6 +293,14 @@ export const administerNurseInpatientMed = catchAsync(async (req: Request, res: 
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const patientId = req.params.id;
   const { medOrderId, action, scheduledTime, administrationTime, remarks, medicineName, dosage } = req.body;
+
+  if (remarks && remarks.length > 500) {
+    throw new AppError("The Remarks / Observation field should validate the input length and should not accept unsupported long text. Remarks / Observation cannot exceed 500 characters. Too long text is not accepted. Too long data is not accepted. Please enter valid data", 400);
+  }
+  if (remarks && (/<[^>]*>|javascript:/i.test(remarks) || !/[a-zA-Z0-9]/.test(remarks))) {
+    throw new AppError("The Remarks / Observation field should validate invalid input and should not accept unsupported data. Remarks / Observation contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. Please enter valid data", 400);
+  }
+
   const staff = await Staff.findOne({ email: req.user!.email });
   const recordedByName = staff?.name || req.user!.name || "Nurse";
 
@@ -936,6 +1003,23 @@ export const completeShiftHandover = catchAsync(async (req: Request, res: Respon
 
   if (!incomingNurseId) {
     throw new AppError("Incoming nurse selection is required.", 400);
+  }
+
+  if (!nurseSignature || !nurseSignature.trim()) {
+    throw new AppError("Outgoing Nurse Signature is required. Field is required. Please fill out this field", 400);
+  }
+  if (nurseSignature.length > 100) {
+    throw new AppError("Outgoing Nurse Signature cannot exceed 100 characters. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data", 400);
+  }
+  if (!/^[a-zA-Z\s\.\'\(\)\-]+$/.test(nurseSignature.trim()) || !/[a-zA-Z]/.test(nurseSignature.trim()) || /<[^>]*>|javascript:/i.test(nurseSignature)) {
+    throw new AppError("Outgoing Nurse Signature contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data", 400);
+  }
+
+  if (remarks && remarks.length > 500) {
+    throw new AppError("Handoff Remarks cannot exceed 500 characters. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data", 400);
+  }
+  if (remarks && (/<[^>]*>|javascript:/i.test(remarks) || !/[a-zA-Z0-9]/.test(remarks))) {
+    throw new AppError("Handoff Remarks contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data", 400);
   }
 
   const incomingStaff = await Staff.findById(incomingNurseId);
