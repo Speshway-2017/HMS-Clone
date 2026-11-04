@@ -885,9 +885,13 @@ export function LandingPage() {
                           </div>
                           <button
                             onClick={() => changeTab("doctors")}
-                            className="rounded-lg bg-navy-700 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-navy-800 transition-colors"
+                            className="group/btn relative inline-flex items-center gap-1.5 overflow-hidden rounded-lg bg-gradient-to-r from-navy-700 via-navy-800 to-navy-900 px-3.5 py-1.5 text-[11px] font-bold text-white shadow-md transition-all duration-300 ease-out hover:-translate-y-0.5 hover:scale-105 hover:from-navy-800 hover:to-navy-950 hover:shadow-lg hover:shadow-navy-900/35 hover:ring-2 hover:ring-navy-400/30 active:scale-95"
                           >
-                            View Doctors
+                            <span className="relative z-10 flex items-center gap-1.5">
+                              View Doctors
+                              <ArrowRight className="w-3 h-3 transition-transform duration-300 ease-out group-hover/btn:translate-x-0.5" />
+                            </span>
+                            <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/15 to-transparent transition-transform duration-700 ease-out group-hover/btn:translate-x-full" />
                           </button>
                         </div>
                       </div>
