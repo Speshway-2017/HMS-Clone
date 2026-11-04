@@ -384,41 +384,77 @@ export function LandingPage() {
   const [contactSubmitted, setContactSubmitted] = useState(false);
 
   const validateContactField = (field: string, value: string): string => {
-    const val = (value || "").trim();
+    const rawVal = value || "";
+    const val = rawVal.trim();
+
     if (field === "name") {
-      if (!val || val.length < 2 || val.length > 50 || !/^[a-zA-Z\s'-]+$/.test(val)) {
-        return "Please enter valid data";
+      if (!val) {
+        return "Please fill out this field";
+      }
+      if (rawVal.length > 50) {
+        return "Full Name must not exceed 50 characters.";
+      }
+      if (val.length < 2) {
+        return "Full Name must be at least 2 characters.";
+      }
+      if (!/^[a-zA-Z\s'-]+$/.test(val)) {
+        return "Please enter a valid full name.";
       }
       return "";
     }
+
     if (field === "email") {
-      if (!val || val.length > 254 || !isValidEmail(val)) {
-        return "Please enter valid data";
+      if (!val) {
+        return "Please fill out this field";
+      }
+      if (rawVal.length > 254) {
+        return "Email address must not exceed 254 characters.";
+      }
+      if (!isValidEmail(val)) {
+        return "Please enter a valid email address.";
       }
       return "";
     }
+
     if (field === "subject") {
-      if (!val || val.length < 3 || val.length > 100) {
-        return "Please enter valid data";
+      if (!val) {
+        return "Please fill out this field";
+      }
+      if (rawVal.length > 100) {
+        return "Subject must not exceed 100 characters.";
+      }
+      if (val.length < 3) {
+        return "Subject must be at least 3 characters.";
       }
       return "";
     }
+
     if (field === "message") {
-      if (!val || val.length < 10 || val.length > 1000) {
+      if (!val) {
+        return "Please fill out this field";
+      }
+      if (rawVal.length > 1000) {
+        return "Your Message must not exceed 1000 characters.";
+      }
+      if (val.length < 10) {
+        return "Your Message must be at least 10 characters.";
+      }
+      if (/<script|javascript:|data:|<[^>]*>/i.test(val)) {
         return "Please enter valid data";
       }
       return "";
     }
+
     return "";
   };
 
   const handleContactChange = (field: string, value: string) => {
     setContactForm((prev) => ({ ...prev, [field]: value }));
     const errorMsg = validateContactField(field, value);
-    if (contactTouched[field] || (value.length > 0 && errorMsg)) {
+    if (contactTouched[field] || value.length > 0) {
       setContactTouched((prev) => ({ ...prev, [field]: true }));
       setContactErrors((prev) => ({ ...prev, [field]: errorMsg }));
-    } else if (!errorMsg) {
+    } else {
       setContactErrors((prev) => ({ ...prev, [field]: "" }));
     }
   };
@@ -550,7 +586,7 @@ export function LandingPage() {
     setContactErrors(errorsObj);
 
     if (nameErr || emailErr || subjectErr || messageErr) {
-      toast.error("Please enter valid data");
+      toast.error(nameErr || emailErr || subjectErr || messageErr || "Please fill out this field");
       return;
     }
 
@@ -602,7 +638,7 @@ export function LandingPage() {
     }));
 
     if (nameErr || emailErr || messageErr) {
-      toast.error("Please enter valid data");
+      toast.error(nameErr || emailErr || messageErr || "Please fill out this field");
       return;
     }
 
