@@ -11,6 +11,14 @@ import { KpiCard } from "../../components/ui/KpiCard";
 import { Modal } from "../../components/ui/Modal";
 import { InputField, TextareaField, SelectField } from "../../components/ui/Field";
 import { usePatients } from "../../features/patients";
+import {
+  validateTemperature,
+  validateBloodPressure,
+  validatePulseRate,
+  validateRespiratoryRate,
+  validateOxygenSaturation,
+  validateWeight,
+} from "../../utils/consultationValidation";
 import { useInventory, useMedicineNames, useMedicineVariants } from "../../features/inventory";
 import { useMyHospital } from "../../features/hospitals";
 import {
@@ -51,10 +59,12 @@ function IPMedicineStrengthSelect({
   medicineName,
   value,
   onChange,
+  error,
 }: {
   medicineName: string;
   value: string;
   onChange: (val: string) => void;
+  error?: string | null;
 }) {
   const { data: variants } = useMedicineVariants(medicineName);
   const [isCustom, setIsCustom] = useState(false);
@@ -68,16 +78,22 @@ function IPMedicineStrengthSelect({
   if (isCustom || (!hasVariants && value)) {
     return (
       <div>
-        <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
-          Strength
-        </label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            Strength
+          </label>
+          <span className="text-[10px] text-slate-400 font-mono font-sans">{value.length}/50</span>
+        </div>
         <div className="flex gap-1">
           <input
             type="text"
             value={value}
+            maxLength={50}
             onChange={(e) => onChange(e.target.value)}
             placeholder="e.g. 500mg"
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100"
+            className={`w-full rounded-xl border px-3 py-2 text-xs outline-none focus:ring-2 ${
+              error ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-rose-100" : "border-slate-200 bg-white focus:border-navy-600 focus:ring-navy-100"
+            }`}
           />
           {hasVariants && (
             <button
@@ -90,6 +106,7 @@ function IPMedicineStrengthSelect({
             </button>
           )}
         </div>
+        {error && <p className="mt-1 text-xs font-medium text-rose-500">{error}</p>}
       </div>
     );
   }
@@ -97,25 +114,34 @@ function IPMedicineStrengthSelect({
   if (!hasVariants) {
     return (
       <div>
-        <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
-          Strength
-        </label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            Strength
+          </label>
+          <span className="text-[10px] text-slate-400 font-mono font-sans">{value.length}/50</span>
+        </div>
         <input
           type="text"
           value={value}
+          maxLength={50}
           onChange={(e) => onChange(e.target.value)}
           placeholder="e.g. 500mg"
-          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100"
+          className={`w-full rounded-xl border px-3 py-2 text-xs outline-none focus:ring-2 ${
+            error ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-rose-100" : "border-slate-200 bg-white focus:border-navy-600 focus:ring-navy-100"
+          }`}
         />
+        {error && <p className="mt-1 text-xs font-medium text-rose-500">{error}</p>}
       </div>
     );
   }
 
   return (
     <div>
-      <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
-        Strength
-      </label>
+      <div className="flex items-center justify-between mb-1">
+        <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+          Strength
+        </label>
+      </div>
       <select
         value={value}
         onChange={(e) => {
@@ -126,7 +152,9 @@ function IPMedicineStrengthSelect({
             onChange(e.target.value);
           }
         }}
-        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100 cursor-pointer"
+        className={`w-full rounded-xl border px-3 py-2 text-xs outline-none focus:ring-2 cursor-pointer ${
+          error ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-rose-100" : "border-slate-200 bg-white focus:border-navy-600 focus:ring-navy-100"
+        }`}
       >
         <option value="">— Select Strength —</option>
         {variants.map((v) => (
@@ -136,6 +164,7 @@ function IPMedicineStrengthSelect({
         ))}
         <option value="__other__">✏️ Other (Custom)</option>
       </select>
+      {error && <p className="mt-1 text-xs font-medium text-rose-500">{error}</p>}
     </div>
   );
 }
@@ -202,6 +231,24 @@ export function IPManagementPage() {
   const [resp, setResp] = useState("");
   const [spo2, setSpo2] = useState("");
   const [weight, setWeight] = useState("");
+
+  const [tempError, setTempError] = useState<string | null>(null);
+  const [bpError, setBpError] = useState<string | null>(null);
+  const [pulseError, setPulseError] = useState<string | null>(null);
+  const [respError, setRespError] = useState<string | null>(null);
+  const [spo2Error, setSpo2Error] = useState<string | null>(null);
+  const [weightError, setWeightError] = useState<string | null>(null);
+
+  // Medication errors
+  const [drugNameError, setDrugNameError] = useState<string | null>(null);
+  const [strengthError, setStrengthError] = useState<string | null>(null);
+  const [dosageError, setDosageError] = useState<string | null>(null);
+  const [frequencyError, setFrequencyError] = useState<string | null>(null);
+  const [durationError, setDurationError] = useState<string | null>(null);
+
+  // Radiology & Discharge errors
+  const [radioNotesError, setRadioNotesError] = useState<string | null>(null);
+  const [dischargeErrors, setDischargeErrors] = useState<Record<string, Record<string, string | null>>>({});
 
   // Medication form states (matching OP consultation rx fields)
   const { data: inventoryData } = useInventory({ category: "medicines" });
@@ -289,12 +336,27 @@ export function IPManagementPage() {
       toast.error("Please select at least one radiology study");
       return;
     }
+
+    if (radioNotes && radioNotes.trim()) {
+      if (radioNotes.trim().length > 500) {
+        setRadioNotesError("Clinical Notes / Indications exceeds the maximum allowed length");
+        toast.error("Clinical Notes / Indications exceeds the maximum allowed length");
+        return;
+      }
+      if (!/[a-zA-Z0-9]/.test(radioNotes.trim()) || /<[^>]*>|javascript:/i.test(radioNotes.trim())) {
+        setRadioNotesError("Please enter valid clinical notes / indications");
+        toast.error("Please enter valid clinical notes / indications");
+        return;
+      }
+    }
+    setRadioNotesError(null);
+
     try {
       await radiologyMutation.mutateAsync({
         appointmentId: "none",
         patientId: selectedPatientId,
         type: selectedRadiologyStudies.join(", "),
-        notes: radioNotes,
+        notes: radioNotes.trim(),
         priority: radioPriority
       });
       setSelectedRadiologyStudies([]);
@@ -380,8 +442,45 @@ export function IPManagementPage() {
 
   const handleFinalizeDischarge = async (p: any) => {
     const form = dischargeForm[p._id];
-    if (!form?.diagnosis) {
-      toast.error("Please fill in the diagnosis at discharge");
+    const diag = form?.diagnosis?.trim() || "";
+    if (!diag) {
+      toast.error("Please fill out this field");
+      setDischargeErrors(prev => ({
+        ...prev,
+        [p._id]: { ...(prev[p._id] || {}), diagnosis: "Please fill out this field" }
+      }));
+      return;
+    }
+    if (diag.length > 200) {
+      toast.error("Maximum allowed character limit exceeded");
+      setDischargeErrors(prev => ({
+        ...prev,
+        [p._id]: { ...(prev[p._id] || {}), diagnosis: "Maximum allowed character limit exceeded" }
+      }));
+      return;
+    }
+    if (!/[a-zA-Z0-9]/.test(diag) || /<[^>]*>|javascript:/i.test(diag)) {
+      toast.error("Please enter valid data");
+      setDischargeErrors(prev => ({
+        ...prev,
+        [p._id]: { ...(prev[p._id] || {}), diagnosis: "Please enter valid data" }
+      }));
+      return;
+    }
+
+    const meds = form?.medications?.trim() || "";
+    if (meds.length > 1000) {
+      toast.error("Maximum allowed character limit exceeded");
+      return;
+    }
+    const fu = form?.followUp?.trim() || "";
+    if (fu.length > 500) {
+      toast.error("Maximum allowed character limit exceeded");
+      return;
+    }
+    const si = form?.specialInstructions?.trim() || "";
+    if (si.length > 500) {
+      toast.error("Maximum allowed character limit exceeded");
       return;
     }
     setSubmittingId(p._id);
@@ -474,27 +573,223 @@ export function IPManagementPage() {
     setResp(latest.respiratoryRate || "");
     setSpo2(latest.oxygenSaturation || "");
     setWeight(latest.weight || "");
+    setTempError(null);
+    setBpError(null);
+    setPulseError(null);
+    setRespError(null);
+    setSpo2Error(null);
+    setWeightError(null);
     setIsVitalsModalOpen(true);
   };
 
   // Vitals submit
   const handleVitalsSubmit = async () => {
     if (!selectedPatientId) return;
+
+    let hasError = false;
+    let firstErrorMsg: string | null = null;
+
+    // Validate Temperature (optional)
+    if (temp && temp.trim()) {
+      if (temp.trim().length > 10) {
+        setTempError("Maximum allowed character limit exceeded");
+        hasError = true;
+        firstErrorMsg = firstErrorMsg || "Maximum allowed character limit exceeded";
+      } else {
+        const err = validateTemperature(temp.trim());
+        if (err) {
+          setTempError(err);
+          hasError = true;
+          firstErrorMsg = firstErrorMsg || err;
+        } else {
+          setTempError(null);
+        }
+      }
+    } else {
+      setTempError(null);
+    }
+
+    // Validate Blood Pressure (optional)
+    if (bp && bp.trim()) {
+      if (bp.trim().length > 10) {
+        setBpError("Maximum allowed character limit exceeded");
+        hasError = true;
+        firstErrorMsg = firstErrorMsg || "Maximum allowed character limit exceeded";
+      } else {
+        const err = validateBloodPressure(bp.trim());
+        if (err) {
+          setBpError(err);
+          hasError = true;
+          firstErrorMsg = firstErrorMsg || err;
+        } else {
+          setBpError(null);
+        }
+      }
+    } else {
+      setBpError(null);
+    }
+
+    // Validate Pulse Rate (optional)
+    if (pulse && pulse.trim()) {
+      if (pulse.trim().length > 5) {
+        setPulseError("Maximum allowed character limit exceeded");
+        hasError = true;
+        firstErrorMsg = firstErrorMsg || "Maximum allowed character limit exceeded";
+      } else {
+        const err = validatePulseRate(pulse.trim());
+        if (err) {
+          setPulseError(err);
+          hasError = true;
+          firstErrorMsg = firstErrorMsg || err;
+        } else {
+          setPulseError(null);
+        }
+      }
+    } else {
+      setPulseError(null);
+    }
+
+    // Validate Respiratory Rate (optional)
+    if (resp && resp.trim()) {
+      if (resp.trim().length > 5) {
+        setRespError("Maximum allowed character limit exceeded");
+        hasError = true;
+        firstErrorMsg = firstErrorMsg || "Maximum allowed character limit exceeded";
+      } else {
+        const err = validateRespiratoryRate(resp.trim());
+        if (err) {
+          setRespError(err);
+          hasError = true;
+          firstErrorMsg = firstErrorMsg || err;
+        } else {
+          setRespError(null);
+        }
+      }
+    } else {
+      setRespError(null);
+    }
+
+    // Validate Oxygen Saturation (optional)
+    if (spo2 && spo2.trim()) {
+      if (spo2.trim().length > 5) {
+        setSpo2Error("Maximum allowed character limit exceeded");
+        hasError = true;
+        firstErrorMsg = firstErrorMsg || "Maximum allowed character limit exceeded";
+      } else {
+        const err = validateOxygenSaturation(spo2.trim());
+        if (err) {
+          setSpo2Error(err);
+          hasError = true;
+          firstErrorMsg = firstErrorMsg || err;
+        } else {
+          setSpo2Error(null);
+        }
+      }
+    } else {
+      setSpo2Error(null);
+    }
+
+    // Validate Weight (optional)
+    if (weight && weight.trim()) {
+      if (weight.trim().length > 6) {
+        setWeightError("Maximum allowed character limit exceeded");
+        hasError = true;
+        firstErrorMsg = firstErrorMsg || "Maximum allowed character limit exceeded";
+      } else {
+        const err = validateWeight(weight.trim());
+        if (err) {
+          setWeightError(err);
+          hasError = true;
+          firstErrorMsg = firstErrorMsg || err;
+        } else {
+          setWeightError(null);
+        }
+      }
+    } else {
+      setWeightError(null);
+    }
+
+    if (hasError) {
+      if (firstErrorMsg) toast.error(firstErrorMsg);
+      return;
+    }
+
     try {
       await saveVitalsMutation.mutateAsync({
         patientId: selectedPatientId,
-        temperature: temp,
-        bloodPressure: bp,
-        pulseRate: pulse,
-        respiratoryRate: resp,
-        oxygenSaturation: spo2,
-        weight
+        temperature: temp.trim(),
+        bloodPressure: bp.trim(),
+        pulseRate: pulse.trim(),
+        respiratoryRate: resp.trim(),
+        oxygenSaturation: spo2.trim(),
+        weight: weight.trim()
       });
       toast.success("Vitals updated successfully!");
       setIsVitalsModalOpen(false);
-    } catch (err) {
-      toast.error("Failed to save vitals.");
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Failed to save vitals.";
+      toast.error(msg);
     }
+  };
+
+  const clearMedErrors = () => {
+    setDrugNameError(null);
+    setStrengthError(null);
+    setDosageError(null);
+    setFrequencyError(null);
+    setDurationError(null);
+  };
+
+  const validateDrugNameField = (val: string) => {
+    const trimmed = (val || "").trim();
+    if (!trimmed) return "Please fill out this field";
+    if (trimmed.length > 150) return "Maximum allowed character limit exceeded";
+    if (!/[a-zA-Z0-9]/.test(trimmed) || /<[^>]*>|javascript:/i.test(trimmed)) {
+      return "Please enter valid data";
+    }
+    return null;
+  };
+
+  const validateStrengthField = (val: string) => {
+    const trimmed = (val || "").trim();
+    if (!trimmed) return null;
+    if (trimmed.length > 50) return "Maximum allowed character limit exceeded";
+    if (!/[a-zA-Z0-9]/.test(trimmed) || /<[^>]*>|javascript:/i.test(trimmed)) {
+      return "Please enter valid data";
+    }
+    return null;
+  };
+
+  const validateDosageField = (val: string) => {
+    const trimmed = (val || "").trim();
+    if (!trimmed) return null;
+    if (trimmed.length > 50) return "Maximum allowed character limit exceeded";
+    if (!/[a-zA-Z0-9]/.test(trimmed) || /<[^>]*>|javascript:/i.test(trimmed)) {
+      return "Please enter valid data";
+    }
+    return null;
+  };
+
+  const validateFrequencyField = (val: string) => {
+    const trimmed = (val || "").trim();
+    if (!trimmed) return null;
+    if (trimmed.length > 50) return "Maximum allowed character limit exceeded";
+    if (!/[a-zA-Z0-9]/.test(trimmed) || /<[^>]*>|javascript:/i.test(trimmed)) {
+      return "Please enter valid data";
+    }
+    return null;
+  };
+
+  const validateDurationField = (val: string) => {
+    const trimmed = (val || "").trim();
+    if (!trimmed) return null;
+    if (trimmed.length > 50) return "Maximum allowed character limit exceeded";
+    const isPureLetters = /^[a-zA-Z\s]+$/.test(trimmed) && !/\b(day|days|week|weeks|month|months)\b/i.test(trimmed);
+    const isZeroOrNegative = /^-\d+|^\s*0+(\s*(day|days))?\s*$/i.test(trimmed);
+    if (!/[a-zA-Z0-9]/.test(trimmed) || /<[^>]*>|javascript:/i.test(trimmed) || isPureLetters || isZeroOrNegative) {
+      return "Please enter valid data";
+    }
+    return null;
   };
 
   // Open medication modal
@@ -510,6 +805,7 @@ export function IPManagementPage() {
     setMorning(false);
     setAfternoon(false);
     setNight(false);
+    clearMedErrors();
     setIsInlineFormOpen(true);
   };
 
@@ -550,13 +846,32 @@ export function IPManagementPage() {
     setAfternoon(isAfternoon);
     setNight(isNight);
     setMedNotes(cleanNotes);
+    clearMedErrors();
 
     setIsInlineFormOpen(true);
   };
 
   // Medication submit
   const handleMedSubmit = async () => {
-    if (!selectedPatientId || !drugName.trim()) return;
+    if (!selectedPatientId) return;
+
+    const dNameErr = validateDrugNameField(drugName);
+    const sErr = validateStrengthField(strength);
+    const dosErr = validateDosageField(dosage);
+    const fErr = validateFrequencyField(frequency);
+    const durErr = validateDurationField(duration);
+
+    setDrugNameError(dNameErr);
+    setStrengthError(sErr);
+    setDosageError(dosErr);
+    setFrequencyError(fErr);
+    setDurationError(durErr);
+
+    const firstErr = dNameErr || sErr || dosErr || fErr || durErr;
+    if (firstErr) {
+      toast.error(firstErr);
+      return;
+    }
 
     // Combine drugName and strength
     const combinedDrugName = strength.trim() ? `${drugName.trim()} ${strength.trim()}` : drugName.trim();
@@ -579,9 +894,9 @@ export function IPManagementPage() {
           medicationId: medIdToEdit,
           action: "modify",
           drugName: combinedDrugName,
-          dosage,
-          frequency,
-          duration,
+          dosage: dosage.trim(),
+          frequency: frequency.trim(),
+          duration: duration.trim(),
           route,
           notes: notesToSave
         });
@@ -590,17 +905,18 @@ export function IPManagementPage() {
         await addMedicationMutation.mutateAsync({
           patientId: selectedPatientId,
           drugName: combinedDrugName,
-          dosage,
-          frequency,
-          duration,
+          dosage: dosage.trim(),
+          frequency: frequency.trim(),
+          duration: duration.trim(),
           route,
           notes: notesToSave
         });
         toast.success("New medication ordered!");
       }
       setIsInlineFormOpen(false);
-    } catch (err) {
-      toast.error("Failed to save medication order.");
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Failed to save medication order.";
+      toast.error(msg);
     }
   };
 
@@ -916,7 +1232,14 @@ export function IPManagementPage() {
                           <InputField
                             label="Medicine Name *"
                             value={drugName}
-                            onChange={(e) => setDrugName(e.target.value)}
+                            charCount={drugName.length}
+                            maxLength={150}
+                            error={drugNameError}
+                            onChange={(e) => {
+                              setDrugName(e.target.value);
+                              if (drugNameError) setDrugNameError(null);
+                            }}
+                            onBlur={() => setDrugNameError(validateDrugNameField(drugName))}
                             placeholder="e.g. Amoxicillin"
                             list="ip-med-datalist-inline"
                           />
@@ -935,14 +1258,25 @@ export function IPManagementPage() {
                           <IPMedicineStrengthSelect
                             medicineName={drugName}
                             value={strength}
-                            onChange={(val) => setStrength(val)}
+                            error={strengthError}
+                            onChange={(val) => {
+                              setStrength(val);
+                              if (strengthError) setStrengthError(null);
+                            }}
                           />
                         </div>
                         <div>
                           <InputField
                             label="Dosage"
                             value={dosage}
-                            onChange={(e) => setDosage(e.target.value)}
+                            charCount={dosage.length}
+                            maxLength={50}
+                            error={dosageError}
+                            onChange={(e) => {
+                              setDosage(e.target.value);
+                              if (dosageError) setDosageError(null);
+                            }}
+                            onBlur={() => setDosageError(validateDosageField(dosage))}
                             placeholder="e.g. 1"
                           />
                         </div>
@@ -950,7 +1284,14 @@ export function IPManagementPage() {
                           <InputField
                             label="Frequency"
                             value={frequency}
-                            onChange={(e) => setFrequency(e.target.value)}
+                            charCount={frequency.length}
+                            maxLength={50}
+                            error={frequencyError}
+                            onChange={(e) => {
+                              setFrequency(e.target.value);
+                              if (frequencyError) setFrequencyError(null);
+                            }}
+                            onBlur={() => setFrequencyError(validateFrequencyField(frequency))}
                             placeholder="e.g. 3"
                           />
                         </div>
@@ -958,7 +1299,14 @@ export function IPManagementPage() {
                           <InputField
                             label="Duration"
                             value={duration}
-                            onChange={(e) => setDuration(e.target.value)}
+                            charCount={duration.length}
+                            maxLength={50}
+                            error={durationError}
+                            onChange={(e) => {
+                              setDuration(e.target.value);
+                              if (durationError) setDurationError(null);
+                            }}
+                            onBlur={() => setDurationError(validateDurationField(duration))}
                             placeholder="e.g. 5"
                           />
                         </div>
@@ -1025,6 +1373,8 @@ export function IPManagementPage() {
                         <TextareaField
                           label="Special Instructions / Notes"
                           value={medNotes}
+                          charCount={medNotes.length}
+                          maxLength={500}
                           onChange={(e) => setMedNotes(e.target.value)}
                           placeholder="e.g. Take after meals"
                           rows={2}
@@ -1042,7 +1392,7 @@ export function IPManagementPage() {
                         <Button
                           variant="primary"
                           onClick={handleMedSubmit}
-                          disabled={addMedicationMutation.isPending || updateMedicationMutation.isPending || !drugName.trim()}
+                          disabled={addMedicationMutation.isPending || updateMedicationMutation.isPending}
                           size="sm"
                         >
                           {addMedicationMutation.isPending || updateMedicationMutation.isPending ? "Saving..." : "Save Medication"}
@@ -1308,7 +1658,19 @@ export function IPManagementPage() {
                     <option value="STAT">STAT / Emergency</option>
                   </SelectField>
 
-                  <TextareaField label="Clinical Notes / Indications" value={radioNotes} onChange={(e) => setRadioNotes(e.target.value)} placeholder="e.g. Suspected fracture right forearm" rows={2} />
+                  <TextareaField
+                    label="Clinical Notes / Indications"
+                    value={radioNotes}
+                    charCount={radioNotes.length}
+                    maxLength={500}
+                    error={radioNotesError}
+                    onChange={(e) => {
+                      setRadioNotes(e.target.value);
+                      if (radioNotesError) setRadioNotesError(null);
+                    }}
+                    placeholder="e.g. Suspected fracture right forearm"
+                    rows={2}
+                  />
 
                   <Button type="submit" variant="primary" disabled={radiologyMutation.isPending || selectedRadiologyStudies.length === 0}>
                     {radiologyMutation.isPending ? "Submitting..." : "Submit Request"}
@@ -1436,19 +1798,40 @@ export function IPManagementPage() {
                             <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Fill Discharge Summary</p>
                             <div className="grid grid-cols-2 gap-4">
                               <div className="col-span-2">
-                                <label className="block text-xs font-semibold text-slate-500 mb-1">Diagnosis at Discharge <span className="text-red-500">*</span></label>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="block text-xs font-semibold text-slate-500">Diagnosis at Discharge <span className="text-red-500">*</span></label>
+                                  <span className="text-[10px] text-slate-400 font-mono font-sans">{getDischargeField(p._id, "diagnosis").length}/200</span>
+                                </div>
                                 <input
                                   type="text"
                                   value={getDischargeField(p._id, "diagnosis")}
-                                  onChange={e => setDischargeField(p._id, "diagnosis", e.target.value)}
-                                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                                  maxLength={200}
+                                  onChange={e => {
+                                    setDischargeField(p._id, "diagnosis", e.target.value);
+                                    if (dischargeErrors[p._id]?.diagnosis) {
+                                      setDischargeErrors(prev => ({
+                                        ...prev,
+                                        [p._id]: { ...(prev[p._id] || {}), diagnosis: null }
+                                      }));
+                                    }
+                                  }}
+                                  className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+                                    dischargeErrors[p._id]?.diagnosis ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-rose-100" : "border-slate-200 focus:ring-navy-200"
+                                  }`}
                                   placeholder="e.g. Acute Viral Fever, Resolved"
                                 />
+                                {dischargeErrors[p._id]?.diagnosis && (
+                                  <p className="mt-1 text-xs font-medium text-rose-500">{dischargeErrors[p._id]?.diagnosis}</p>
+                                )}
                               </div>
                               <div className="col-span-2">
-                                <label className="block text-xs font-semibold text-slate-500 mb-1">Discharge Medications</label>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="block text-xs font-semibold text-slate-500">Discharge Medications</label>
+                                  <span className="text-[10px] text-slate-400 font-mono font-sans">{getDischargeField(p._id, "medications").length}/1000</span>
+                                </div>
                                 <textarea
                                   value={getDischargeField(p._id, "medications")}
+                                  maxLength={1000}
                                   onChange={e => setDischargeField(p._id, "medications", e.target.value)}
                                   rows={3}
                                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-navy-200"
@@ -1456,20 +1839,28 @@ export function IPManagementPage() {
                                 />
                               </div>
                               <div>
-                                <label className="block text-xs font-semibold text-slate-500 mb-1">Follow-up Instructions</label>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="block text-xs font-semibold text-slate-500">Follow-up Instructions</label>
+                                  <span className="text-[10px] text-slate-400 font-mono font-sans">{getDischargeField(p._id, "followUp").length}/500</span>
+                                </div>
                                 <input
                                   type="text"
                                   value={getDischargeField(p._id, "followUp")}
+                                  maxLength={500}
                                   onChange={e => setDischargeField(p._id, "followUp", e.target.value)}
                                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
                                   placeholder="e.g. OPD after 2 weeks"
                                 />
                               </div>
                               <div>
-                                <label className="block text-xs font-semibold text-slate-500 mb-1">Special Instructions</label>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="block text-xs font-semibold text-slate-500">Special Instructions</label>
+                                  <span className="text-[10px] text-slate-400 font-mono font-sans">{getDischargeField(p._id, "specialInstructions").length}/500</span>
+                                </div>
                                 <input
                                   type="text"
                                   value={getDischargeField(p._id, "specialInstructions")}
+                                  maxLength={500}
                                   onChange={e => setDischargeField(p._id, "specialInstructions", e.target.value)}
                                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
                                   placeholder="e.g. Rest, avoid heavy lifting"
@@ -1516,13 +1907,25 @@ export function IPManagementPage() {
               <InputField
                 label="Temperature (°F)"
                 value={temp}
-                onChange={(e) => setTemp(e.target.value)}
+                charCount={temp.length}
+                maxLength={10}
+                error={tempError}
+                onChange={(e) => {
+                  setTemp(e.target.value);
+                  if (tempError) setTempError(null);
+                }}
                 placeholder="e.g. 98.6"
               />
               <InputField
                 label="Blood Pressure (mmHg)"
                 value={bp}
-                onChange={(e) => setBp(e.target.value)}
+                charCount={bp.length}
+                maxLength={10}
+                error={bpError}
+                onChange={(e) => {
+                  setBp(e.target.value);
+                  if (bpError) setBpError(null);
+                }}
                 placeholder="e.g. 120/80"
               />
             </div>
@@ -1530,13 +1933,25 @@ export function IPManagementPage() {
               <InputField
                 label="Pulse Rate (bpm)"
                 value={pulse}
-                onChange={(e) => setPulse(e.target.value)}
+                charCount={pulse.length}
+                maxLength={5}
+                error={pulseError}
+                onChange={(e) => {
+                  setPulse(e.target.value);
+                  if (pulseError) setPulseError(null);
+                }}
                 placeholder="e.g. 72"
               />
               <InputField
                 label="Respiratory Rate (/min)"
                 value={resp}
-                onChange={(e) => setResp(e.target.value)}
+                charCount={resp.length}
+                maxLength={5}
+                error={respError}
+                onChange={(e) => {
+                  setResp(e.target.value);
+                  if (respError) setRespError(null);
+                }}
                 placeholder="e.g. 16"
               />
             </div>
@@ -1544,13 +1959,25 @@ export function IPManagementPage() {
               <InputField
                 label="Oxygen Saturation SpO₂ (%)"
                 value={spo2}
-                onChange={(e) => setSpo2(e.target.value)}
+                charCount={spo2.length}
+                maxLength={5}
+                error={spo2Error}
+                onChange={(e) => {
+                  setSpo2(e.target.value);
+                  if (spo2Error) setSpo2Error(null);
+                }}
                 placeholder="e.g. 98"
               />
               <InputField
                 label="Weight (kg)"
                 value={weight}
-                onChange={(e) => setWeight(e.target.value)}
+                charCount={weight.length}
+                maxLength={6}
+                error={weightError}
+                onChange={(e) => {
+                  setWeight(e.target.value);
+                  if (weightError) setWeightError(null);
+                }}
                 placeholder="e.g. 70"
               />
             </div>

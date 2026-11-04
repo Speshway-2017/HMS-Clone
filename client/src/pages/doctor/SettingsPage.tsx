@@ -77,14 +77,12 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-navy-500 focus:ring-offset-2 ${
-          checked ? "bg-navy-700" : "bg-slate-200"
-        }`}
+        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-navy-500 focus:ring-offset-2 ${checked ? "bg-navy-700" : "bg-slate-200"
+          }`}
       >
         <span
-          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform ${
-            checked ? "translate-x-5" : "translate-x-0"
-          }`}
+          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform ${checked ? "translate-x-5" : "translate-x-0"
+            }`}
         />
       </button>
     </div>
@@ -98,32 +96,32 @@ interface NotificationItem {
 }
 
 const NOTIFICATION_ITEMS: NotificationItem[] = [
-  { key: "newAppointment",      label: "New appointment booked",         group: "Appointments" },
-  { key: "appointmentReminder", label: "Appointment reminder (1h before)",group: "Appointments" },
-  { key: "labResults",          label: "Lab results ready",              group: "Clinical"     },
-  { key: "radiologyReports",    label: "Radiology reports available",    group: "Clinical"     },
-  { key: "emergencyAlerts",     label: "Emergency case alerts",          group: "Clinical"     },
-  { key: "patientMessages",     label: "Patient messages",               group: "Messages"     },
-  { key: "weeklyReport",        label: "Weekly performance report",      group: "Reports"      },
-  { key: "systemUpdates",       label: "System updates & announcements", group: "System"       },
+  { key: "newAppointment", label: "New appointment booked", group: "Appointments" },
+  { key: "appointmentReminder", label: "Appointment reminder (1h before)", group: "Appointments" },
+  { key: "labResults", label: "Lab results ready", group: "Clinical" },
+  { key: "radiologyReports", label: "Radiology reports available", group: "Clinical" },
+  { key: "emergencyAlerts", label: "Emergency case alerts", group: "Clinical" },
+  { key: "patientMessages", label: "Patient messages", group: "Messages" },
+  { key: "weeklyReport", label: "Weekly performance report", group: "Reports" },
+  { key: "systemUpdates", label: "System updates & announcements", group: "System" },
 ];
 
 const TABS = [
-  { id: "profile",       label: "Profile",        icon: <User className="h-4 w-4" /> },
-  { id: "security",      label: "Security",       icon: <KeyRound className="h-4 w-4" /> },
-  { id: "availability",  label: "Availability",   icon: <Clock className="h-4 w-4" /> },
-  { id: "notifications", label: "Notifications",  icon: <Bell className="h-4 w-4" /> },
-  { id: "preferences",   label: "Preferences",    icon: <Globe className="h-4 w-4" /> },
+  { id: "profile", label: "Profile", icon: <User className="h-4 w-4" /> },
+  { id: "security", label: "Security", icon: <KeyRound className="h-4 w-4" /> },
+  { id: "availability", label: "Availability", icon: <Clock className="h-4 w-4" /> },
+  { id: "notifications", label: "Notifications", icon: <Bell className="h-4 w-4" /> },
+  { id: "preferences", label: "Preferences", icon: <Globe className="h-4 w-4" /> },
 ];
 
 const WORKING_HOURS = [
-  { day: "Monday",    from: "09:00", to: "17:00", active: true  },
-  { day: "Tuesday",   from: "09:00", to: "17:00", active: true  },
-  { day: "Wednesday", from: "09:00", to: "13:00", active: true  },
-  { day: "Thursday",  from: "09:00", to: "17:00", active: true  },
-  { day: "Friday",    from: "09:00", to: "17:00", active: true  },
-  { day: "Saturday",  from: "10:00", to: "13:00", active: false },
-  { day: "Sunday",    from: "—",     to: "—",     active: false },
+  { day: "Monday", from: "09:00", to: "17:00", active: true },
+  { day: "Tuesday", from: "09:00", to: "17:00", active: true },
+  { day: "Wednesday", from: "09:00", to: "13:00", active: true },
+  { day: "Thursday", from: "09:00", to: "17:00", active: true },
+  { day: "Friday", from: "09:00", to: "17:00", active: true },
+  { day: "Saturday", from: "10:00", to: "13:00", active: false },
+  { day: "Sunday", from: "—", to: "—", active: false },
 ];
 
 export function DoctorSettingsPage() {
@@ -131,7 +129,7 @@ export function DoctorSettingsPage() {
   const { mutate, isPending } = useChangePassword();
 
   // Security tab state
-  const [newPassword, setNewPassword]         = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
@@ -140,40 +138,40 @@ export function DoctorSettingsPage() {
 
   // Profile tab state
   const [profileForm, setProfileForm] = useState({
-    name:           user?.name ?? "",
-    email:          user?.email ?? "",
-    phone:          "",
+    name: user?.name ?? "",
+    email: user?.email ?? "",
+    phone: "",
     specialization: "",
-    qualification:  "",
-    licenseNo:      "",
-    bio:            "",
-    consultationFee:"500",
-    languages:      "English, Hindi",
-    opExpiryLimit:  10,
+    qualification: "",
+    licenseNo: "",
+    bio: "",
+    consultationFee: "500",
+    languages: "English, Hindi",
+    opExpiryLimit: 10,
   });
 
   // Notification state
   const [notif, setNotif] = useState({
-    newAppointment:   true,
+    newAppointment: true,
     appointmentReminder: true,
-    labResults:       true,
+    labResults: true,
     radiologyReports: true,
-    emergencyAlerts:  true,
-    patientMessages:  false,
-    weeklyReport:     true,
-    systemUpdates:    false,
+    emergencyAlerts: true,
+    patientMessages: false,
+    weeklyReport: true,
+    systemUpdates: false,
   });
 
   // Preference state
   const [prefs, setPrefs] = useState({
-    darkMode:         false,
-    compactView:      false,
-    autoSaveNotes:    true,
+    darkMode: false,
+    compactView: false,
+    autoSaveNotes: true,
     showPatientPhoto: true,
-    defaultView:      "queue",
-    language:         "en",
-    dateFormat:       "DD/MM/YYYY",
-    timeFormat:       "12h",
+    defaultView: "queue",
+    language: "en",
+    dateFormat: "DD/MM/YYYY",
+    timeFormat: "12h",
   });
 
   // Availability state
@@ -224,7 +222,7 @@ export function DoctorSettingsPage() {
         bio: doctorProfile.bio || "",
         consultationFee: doctorProfile.consultationFee ? String(doctorProfile.consultationFee).replace(/[^0-9.]/g, "") : "500",
         languages: doctorProfile.languages || "English, Hindi",
-        opExpiryLimit: doctorProfile.opExpiryLimit ?? 10,
+        opExpiryLimit: Number(doctorProfile.opExpiryLimit ?? 10),
       });
       if (doctorProfile.workingHours && doctorProfile.workingHours.length > 0) {
         setHours(doctorProfile.workingHours);
@@ -241,13 +239,169 @@ export function DoctorSettingsPage() {
   }, [doctorProfile]);
 
   // ─── Derived states ──────────────────────────────────────────────────────────
-  const passwordsMatch   = newPassword !== "" && newPassword === confirmPassword;
+  const passwordsMatch = newPassword !== "" && newPassword === confirmPassword;
   const passwordsMismatch = confirmPassword !== "" && newPassword !== confirmPassword;
 
   function showToast(type: "success" | "error", message: string) {
     setToast({ type, message });
     setTimeout(() => setToast(null), 4500);
   }
+
+  const validateProfileField = (key: string, value: any): string | null => {
+    const str = typeof value === "string" ? value : String(value ?? "");
+    const trimmed = str.trim();
+
+    switch (key) {
+      case "name": {
+        if (!trimmed) {
+          return "Please enter a valid full name.";
+        }
+        if (str.length > 100) {
+          return "Full Name must not exceed 100 characters.";
+        }
+        if (!/^[\p{L}\s'-]+$/u.test(trimmed)) {
+          return "Please enter a valid full name.";
+        }
+        return null;
+      }
+
+      case "email": {
+        if (!trimmed) {
+          return "Please enter a valid email address.";
+        }
+        if (str.length > 254) {
+          return "Email address is too long.";
+        }
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!emailRegex.test(trimmed) || trimmed.includes("..")) {
+          return "Please enter a valid email address.";
+        }
+        return null;
+      }
+
+      case "phone": {
+        if (!trimmed) {
+          return "Phone Number is required.";
+        }
+        const digitsOnly = trimmed.replace(/\D/g, "");
+        if (str.length > 10 || digitsOnly.length > 10) {
+          return "Phone Number must contain exactly 10 digits.";
+        }
+        if (!/^[6-9]\d{9}$/.test(trimmed)) {
+          return "Please enter a valid phone number.";
+        }
+        return null;
+      }
+
+      case "languages": {
+        if (!trimmed) {
+          return "Languages is required.";
+        }
+        if (str.length > 200) {
+          return "Languages exceeds the maximum allowed length.";
+        }
+        if (!/^[a-zA-Z\s,]+$/.test(trimmed)) {
+          return "Please enter or select valid languages.";
+        }
+        return null;
+      }
+
+      case "specialization": {
+        if (!trimmed) {
+          return "Specialization is required.";
+        }
+        if (str.length > 100) {
+          return "Specialization exceeds the maximum allowed length.";
+        }
+        if (!/^[a-zA-Z\s,.\-&/]+$/.test(trimmed) || !/[a-zA-Z]/.test(trimmed)) {
+          return "Please enter a valid specialization.";
+        }
+        return null;
+      }
+
+      case "qualification": {
+        if (!trimmed) {
+          return "Qualification is required.";
+        }
+        if (str.length > 200) {
+          return "Qualification exceeds the maximum allowed length.";
+        }
+        if (!/^[a-zA-Z0-9\s,.\-&/]+$/.test(trimmed) || !/[a-zA-Z]/.test(trimmed)) {
+          return "Please enter a valid qualification.";
+        }
+        return null;
+      }
+
+      case "licenseNo": {
+        if (!trimmed) {
+          return "License Number is required.";
+        }
+        if (str.length > 50) {
+          return "License Number exceeds the maximum allowed length.";
+        }
+        if (!/^[a-zA-Z0-9\-\/]+$/.test(trimmed)) {
+          return "Please enter a valid license number.";
+        }
+        return null;
+      }
+
+      case "consultationFee": {
+        if (!trimmed) {
+          return "Consultation Fee is required.";
+        }
+        const cleanFee = trimmed.replace(/^[₹$]\s*/, "");
+        if (!/^\d+(\.\d{1,2})?$/.test(cleanFee)) {
+          return "Please enter a valid consultation fee.";
+        }
+        const numFee = Number(cleanFee);
+        if (isNaN(numFee) || numFee < 0 || !isFinite(numFee)) {
+          return "Please enter a valid consultation fee.";
+        }
+        if (numFee > 100000 || cleanFee.length > 8) {
+          return "Consultation Fee exceeds the maximum allowed value.";
+        }
+        return null;
+      }
+
+      case "opExpiryLimit": {
+        if (!trimmed && trimmed !== "0") {
+          return "OP Consultation Expiry Limit is required.";
+        }
+        if (!/^\d+$/.test(trimmed)) {
+          return "Please enter a valid number of days.";
+        }
+        const numDays = Number(trimmed);
+        if (isNaN(numDays) || numDays < 0 || !isFinite(numDays)) {
+          return "Please enter a valid number of days.";
+        }
+        if (numDays > 365 || trimmed.length > 3) {
+          return "OP Consultation Expiry Limit exceeds the allowed range.";
+        }
+        return null;
+      }
+
+      default:
+        return null;
+    }
+  };
+
+  const validateMaxPatients = (val: string): string | null => {
+    const trimmed = val.trim();
+    if (!trimmed) {
+      return "Max Patients / Day is required.";
+    }
+    if (!/^\d+$/.test(trimmed)) {
+      return "Please enter a valid number of patients.";
+    }
+    const num = Number(trimmed);
+    if (isNaN(num) || num <= 0 || !isFinite(num)) {
+      return "Please enter a valid number of patients.";
+    }
+    if (num > 100 || trimmed.length > 3) {
+      return "Max Patients / Day exceeds the allowed limit.";
+    }
+    return null;
+  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -291,7 +445,7 @@ export function DoctorSettingsPage() {
   function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
     if (passwordsMismatch) { showToast("error", "Passwords do not match."); return; }
-    if (!newPassword)      { showToast("error", "New password cannot be empty."); return; }
+    if (!newPassword) { showToast("error", "New password cannot be empty."); return; }
     mutate(
       { newPassword, confirmPassword },
       {
@@ -359,11 +513,10 @@ export function DoctorSettingsPage() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === tab.id
-                ? "border-navy-700 text-navy-700"
-                : "border-transparent text-slate-500 hover:text-slate-700"
-            }`}
+            className={`flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 ${activeTab === tab.id
+              ? "border-navy-700 text-navy-700"
+              : "border-transparent text-slate-500 hover:text-slate-700"
+              }`}
           >
             {tab.icon} {tab.label}
           </button>
@@ -376,10 +529,10 @@ export function DoctorSettingsPage() {
           <Section title="Personal Information" subtitle="Your basic personal and contact details." icon={<User className="h-5 w-5 text-navy-700" />}>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {[
-                { label: "Full Name",       key: "name",           icon: <User className="h-4 w-4" /> },
-                { label: "Email Address",   key: "email",          icon: <Mail className="h-4 w-4" /> },
-                { label: "Phone Number",    key: "phone",          icon: <Phone className="h-4 w-4" /> },
-                { label: "Languages",       key: "languages",      icon: <Globe className="h-4 w-4" /> },
+                { label: "Full Name", key: "name", icon: <User className="h-4 w-4" /> },
+                { label: "Email Address", key: "email", icon: <Mail className="h-4 w-4" /> },
+                { label: "Phone Number", key: "phone", icon: <Phone className="h-4 w-4" /> },
+                { label: "Languages", key: "languages", icon: <Globe className="h-4 w-4" /> },
               ].map((f) => (
                 <div key={f.key} className="flex flex-col gap-1.5">
                   <label className="flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-400">
@@ -398,11 +551,11 @@ export function DoctorSettingsPage() {
           <Section title="Professional Details" subtitle="Your medical credentials and specialization." icon={<Stethoscope className="h-5 w-5 text-navy-700" />}>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {[
-                { label: "Specialization",    key: "specialization" },
-                { label: "Qualification",     key: "qualification"  },
-                { label: "License Number",    key: "licenseNo"      },
-                { label: "Consultation Fee",  key: "consultationFee"},
-                { label: "OP Consultation Expiry Limit (Days)", key: "opExpiryLimit"},
+                { label: "Specialization", key: "specialization" },
+                { label: "Qualification", key: "qualification" },
+                { label: "License Number", key: "licenseNo" },
+                { label: "Consultation Fee", key: "consultationFee" },
+                { label: "OP Consultation Expiry Limit (Days)", key: "opExpiryLimit" },
               ].map((f) => (
                 <div key={f.key} className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold uppercase text-slate-400">{f.label}</label>
@@ -509,12 +662,14 @@ export function DoctorSettingsPage() {
           >
             <div className="space-y-3">
               {[
-                { label: "Account Role",     value: "Doctor",              color: "text-navy-700 bg-navy-100" },
-                { label: "Account Status",   value: "Active",              color: "text-emerald-700 bg-emerald-100" },
-                { label: "Hospital Access",  value: "Sunrise General",     color: "text-slate-700 bg-slate-100" },
-                { label: "Last Login",       value: user?.lastLogin
+                { label: "Account Role", value: "Doctor", color: "text-navy-700 bg-navy-100" },
+                { label: "Account Status", value: "Active", color: "text-emerald-700 bg-emerald-100" },
+                { label: "Hospital Access", value: "Sunrise General", color: "text-slate-700 bg-slate-100" },
+                {
+                  label: "Last Login", value: user?.lastLogin
                     ? new Date(user.lastLogin).toLocaleString()
-                    : "First session",                                       color: "text-slate-700 bg-slate-100" },
+                    : "First session", color: "text-slate-700 bg-slate-100"
+                },
               ].map((row) => (
                 <div key={row.label} className="flex items-center justify-between rounded-lg border border-slate-100 px-4 py-3">
                   <span className="text-sm font-medium text-slate-600">{row.label}</span>
@@ -765,9 +920,9 @@ export function DoctorSettingsPage() {
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {[
-                { label: "Default OP View",  key: "defaultView",  options: ["queue", "calendar", "list"] },
-                { label: "Date Format",      key: "dateFormat",   options: ["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"] },
-                { label: "Time Format",      key: "timeFormat",   options: ["12h", "24h"] },
+                { label: "Default OP View", key: "defaultView", options: ["queue", "calendar", "list"] },
+                { label: "Date Format", key: "dateFormat", options: ["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"] },
+                { label: "Time Format", key: "timeFormat", options: ["12h", "24h"] },
               ].map((f) => (
                 <div key={f.key} className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold uppercase text-slate-400">{f.label}</label>
@@ -819,9 +974,8 @@ export function DoctorSettingsPage() {
       {toast && (
         <div
           role="alert"
-          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-4 text-sm font-medium shadow-xl transition-all ${
-            toast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
-          }`}
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-4 text-sm font-medium shadow-xl transition-all ${toast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
+            }`}
         >
           {toast.type === "success"
             ? <CheckCircle2 className="h-5 w-5 shrink-0" />

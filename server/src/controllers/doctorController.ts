@@ -397,17 +397,91 @@ export const getDoctorProfileMe = catchAsync(async (req: Request, res: Response)
 });
 
 const updateDoctorMeSchema = z.object({
-  name: z.string().optional(),
-  phone: z.string().optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Please enter a valid full name.")
+    .max(100, "Full Name must not exceed 100 characters.")
+    .refine((v) => /^[\p{L}\s'-]+$/u.test(v), {
+      message: "Please enter a valid full name.",
+    })
+    .optional(),
+  email: z
+    .string()
+    .trim()
+    .max(254, "Email address is too long.")
+    .email("Please enter a valid email address.")
+    .optional(),
+  phone: z
+    .string()
+    .trim()
+    .min(1, "Phone Number is required.")
+    .refine((v) => v.length <= 10 && v.replace(/\D/g, "").length <= 10, {
+      message: "Phone Number must contain exactly 10 digits.",
+    })
+    .refine((v) => /^[6-9]\d{9}$/.test(v), {
+      message: "Please enter a valid phone number.",
+    })
+    .optional(),
   photoUrl: z.string().optional(),
-  specialization: z.string().optional(),
-  qualification: z.string().optional(),
-  licenseNo: z.string().optional(),
-  bio: z.string().optional(),
-  languages: z.string().optional(),
-  consultationFee: z.string().optional(),
+  specialization: z
+    .string()
+    .trim()
+    .min(1, "Specialization is required.")
+    .max(100, "Specialization exceeds the maximum allowed length.")
+    .refine((v) => /^[a-zA-Z\s,.\-&/]+$/.test(v) && /[a-zA-Z]/.test(v), {
+      message: "Please enter a valid specialization.",
+    })
+    .optional(),
+  qualification: z
+    .string()
+    .trim()
+    .min(1, "Qualification is required.")
+    .max(200, "Qualification exceeds the maximum allowed length.")
+    .refine((v) => /^[a-zA-Z0-9\s,.\-&/]+$/.test(v) && /[a-zA-Z]/.test(v), {
+      message: "Please enter a valid qualification.",
+    })
+    .optional(),
+  licenseNo: z
+    .string()
+    .trim()
+    .min(1, "License Number is required.")
+    .max(50, "License Number exceeds the maximum allowed length.")
+    .regex(/^[a-zA-Z0-9\-\/]+$/, "Please enter a valid license number.")
+    .optional(),
+  bio: z.string().max(500, "Bio cannot exceed 500 characters.").optional(),
+  languages: z
+    .string()
+    .trim()
+    .min(1, "Languages is required.")
+    .max(200, "Languages exceeds the maximum allowed length.")
+    .regex(/^[a-zA-Z\s,]+$/, "Please enter or select valid languages.")
+    .optional(),
+  consultationFee: z
+    .string()
+    .trim()
+    .min(1, "Consultation Fee is required.")
+    .refine((v) => {
+      const clean = v.replace(/^[₹$]\s*/, "");
+      return /^\d+(\.\d{1,2})?$/.test(clean) && !isNaN(Number(clean)) && Number(clean) >= 0;
+    }, { message: "Please enter a valid consultation fee." })
+    .refine((v) => {
+      const clean = v.replace(/^[₹$]\s*/, "");
+      return Number(clean) <= 100000 && clean.length <= 8;
+    }, { message: "Consultation Fee exceeds the maximum allowed value." })
+    .optional(),
   status: z.enum(DOCTOR_STATUSES).optional(),
-  opExpiryLimit: z.coerce.number().min(0).optional(),
+  opExpiryLimit: z
+    .union([z.number(), z.string()])
+    .refine((v) => {
+      const s = String(v).trim();
+      return s !== "" && /^\d+$/.test(s) && !isNaN(Number(s)) && Number(s) >= 0;
+    }, { message: "Please enter a valid number of days." })
+    .refine((v) => Number(v) <= 365, {
+      message: "OP Consultation Expiry Limit exceeds the allowed range.",
+    })
+    .transform((v) => Number(v))
+    .optional(),
   workingHours: z.array(z.object({
     day: z.string(),
     from: z.string(),
@@ -416,7 +490,16 @@ const updateDoctorMeSchema = z.object({
   })).optional(),
   consultationSettings: z.object({
     slotDuration: z.number(),
-    maxPatients: z.number(),
+    maxPatients: z
+      .union([z.number(), z.string()])
+      .refine((v) => {
+        const s = String(v).trim();
+        return s !== "" && /^\d+$/.test(s) && Number(s) > 0;
+      }, { message: "Please enter a valid number of patients." })
+      .refine((v) => Number(v) <= 100, {
+        message: "Max Patients / Day exceeds the allowed limit.",
+      })
+      .transform((v) => Number(v)),
     breakTime: z.string()
   }).optional(),
   monthlyAvailability: z.array(z.object({

@@ -1,4 +1,25 @@
 import { useState, useRef, useEffect } from "react";
+import {
+  CONSULTATION_LIMITS,
+  validateClinicalText,
+  validateTemperature,
+  validateBloodPressure,
+  validatePulseRate,
+  validateRespiratoryRate,
+  validateOxygenSaturation,
+  validateWeight,
+  validateMedicineName,
+  validateMedicineStrength,
+  validateDosage,
+  validateFrequency,
+  validateDuration,
+  validateRadiologyNotes,
+  validatePrimaryDiagnosis,
+  validateExpectedStay,
+  validateAdmissionReason,
+  validateAdmissionClinicalNotes,
+  validateSpecialInstructions,
+} from "../../utils/consultationValidation";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   useConsultationWorkspace,
@@ -170,10 +191,12 @@ function MedicineStrengthSelect({
   medicineName,
   value,
   onChange,
+  error,
 }: {
   medicineName: string;
   value: string;
   onChange: (val: string) => void;
+  error?: string | null;
 }) {
   const { data: variants } = useMedicineVariants(medicineName);
   const [isCustom, setIsCustom] = useState(false);
@@ -196,9 +219,10 @@ function MedicineStrengthSelect({
           <input
             type="text"
             value={value}
+            maxLength={CONSULTATION_LIMITS.MEDICINE_STRENGTH}
             onChange={(e) => onChange(e.target.value)}
             placeholder="e.g. 500mg"
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100"
+            className={`w-full rounded-xl border ${error ? "border-red-500 bg-red-50/20" : "border-slate-200 bg-white"} px-3 py-2 text-xs outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100`}
           />
           {hasVariants && (
             <button
@@ -211,6 +235,7 @@ function MedicineStrengthSelect({
             </button>
           )}
         </div>
+        {error && <p className="mt-1 text-[11px] text-red-600 font-medium leading-tight">{error}</p>}
       </div>
     );
   }
@@ -352,6 +377,35 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
       prev.includes(study) ? prev.filter((s) => s !== study) : [...prev, study]
     );
   };
+
+  // Validation error states - Phase 1: Clinical Assessment Notes
+  const [chiefComplaintError, setChiefComplaintError] = useState<string | null>(null);
+  const [diagnosisError, setDiagnosisError] = useState<string | null>(null);
+  const [symptomsError, setSymptomsError] = useState<string | null>(null);
+  const [clinicalNotesError, setClinicalNotesError] = useState<string | null>(null);
+  const [treatmentPlanError, setTreatmentPlanError] = useState<string | null>(null);
+  const [adviceError, setAdviceError] = useState<string | null>(null);
+
+  // Validation error states - Phase 2: Patient Vitals
+  const [temperatureError, setTemperatureError] = useState<string | null>(null);
+  const [bloodPressureError, setBloodPressureError] = useState<string | null>(null);
+  const [pulseRateError, setPulseRateError] = useState<string | null>(null);
+  const [respiratoryRateError, setRespiratoryRateError] = useState<string | null>(null);
+  const [oxygenSaturationError, setOxygenSaturationError] = useState<string | null>(null);
+  const [weightError, setWeightError] = useState<string | null>(null);
+
+  // Validation error states - Phase 3: Medication
+  const [medErrors, setMedErrors] = useState<Record<number, Record<string, string | null>>>({});
+
+  // Validation error states - Phase 4: Radiology
+  const [radioNotesError, setRadioNotesError] = useState<string | null>(null);
+
+  // Validation error states - Phase 5: Recommend Admission
+  const [admitDiagnosisError, setAdmitDiagnosisError] = useState<string | null>(null);
+  const [admitExpectedStayError, setAdmitExpectedStayError] = useState<string | null>(null);
+  const [admitReasonError, setAdmitReasonError] = useState<string | null>(null);
+  const [admitNotesError, setAdmitNotesError] = useState<string | null>(null);
+  const [admitSpecialInstructionsError, setAdmitSpecialInstructionsError] = useState<string | null>(null);
 
   // Admission form state
   const { data: wardsData } = useWards({ limit: 100 });
@@ -632,6 +686,25 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
       toast.error("No active draft session. Please start consultation.");
       return;
     }
+    const tErr = validateTemperature(temperature);
+    const bpErr = validateBloodPressure(bloodPressure);
+    const prErr = validatePulseRate(pulseRate);
+    const rrErr = validateRespiratoryRate(respiratoryRate);
+    const o2Err = validateOxygenSaturation(oxygenSaturation);
+    const wErr = validateWeight(weight);
+
+    setTemperatureError(tErr);
+    setBloodPressureError(bpErr);
+    setPulseRateError(prErr);
+    setRespiratoryRateError(rrErr);
+    setOxygenSaturationError(o2Err);
+    setWeightError(wErr);
+
+    const firstErr = tErr || bpErr || prErr || rrErr || o2Err || wErr;
+    if (firstErr) {
+      toast.error(firstErr);
+      return;
+    }
     try {
       await updateDraftMutation.mutateAsync({
         consultationId: workspaceData.draftSession._id,
@@ -651,6 +724,25 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
     e.preventDefault();
     if (!workspaceData?.draftSession) {
       toast.error("No active draft session. Please start consultation.");
+      return;
+    }
+    const dErr = validateClinicalText(diagnosis, "Diagnosis", CONSULTATION_LIMITS.DIAGNOSIS, true);
+    const ccErr = validateClinicalText(chiefComplaint, "Chief Complaint", CONSULTATION_LIMITS.CHIEF_COMPLAINT);
+    const sErr = validateClinicalText(symptoms, "Symptoms", CONSULTATION_LIMITS.SYMPTOMS);
+    const cnErr = validateClinicalText(clinicalNotes, "Clinical Notes", CONSULTATION_LIMITS.CLINICAL_NOTES);
+    const tpErr = validateClinicalText(treatmentPlan, "Treatment Plan", CONSULTATION_LIMITS.TREATMENT_PLAN);
+    const aErr = validateClinicalText(advice, "Advice / Follow-up Notes", CONSULTATION_LIMITS.ADVICE);
+
+    setDiagnosisError(dErr);
+    setChiefComplaintError(ccErr);
+    setSymptomsError(sErr);
+    setClinicalNotesError(cnErr);
+    setTreatmentPlanError(tpErr);
+    setAdviceError(aErr);
+
+    const firstErr = dErr || ccErr || sErr || cnErr || tpErr || aErr;
+    if (firstErr) {
+      toast.error(firstErr);
       return;
     }
     try {
@@ -814,6 +906,34 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
       return;
     }
 
+    let hasMedErr = false;
+    const newErrors: Record<number, Record<string, string | null>> = {};
+    for (let i = 0; i < prescriptionMeds.length; i++) {
+      const m = prescriptionMeds[i];
+      const nameErr = validateMedicineName(m.name || m.medicineName);
+      const strErr = validateMedicineStrength(m.strength);
+      const dosErr = validateDosage(m.dosage);
+      const freqErr = validateFrequency(m.frequency);
+      const durErr = validateDuration(m.duration);
+      if (nameErr || strErr || dosErr || freqErr || durErr) {
+        hasMedErr = true;
+        newErrors[i] = {
+          name: nameErr,
+          strength: strErr,
+          dosage: dosErr,
+          frequency: freqErr,
+          duration: durErr,
+        };
+      }
+    }
+    setMedErrors(newErrors);
+    if (hasMedErr) {
+      const firstRow = Object.values(newErrors)[0];
+      const firstErrMsg = firstRow.name || firstRow.strength || firstRow.dosage || firstRow.frequency || firstRow.duration;
+      if (firstErrMsg) toast.error(firstErrMsg);
+      return;
+    }
+
     try {
       if (workspaceData?.draftSession) {
         await updateDraftMutation.mutateAsync({
@@ -892,6 +1012,12 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
       toast.error("Please select at least one radiology study.");
       return;
     }
+    const rErr = validateRadiologyNotes(radioNotes);
+    setRadioNotesError(rErr);
+    if (rErr) {
+      toast.error(rErr);
+      return;
+    }
     try {
       await updateDraftMutation.mutateAsync({
         consultationId: workspaceData.draftSession._id,
@@ -914,6 +1040,23 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
     e.preventDefault();
     if (!workspaceData?.draftSession) {
       toast.error("No active draft session. Please start consultation.");
+      return;
+    }
+    const dErr = validatePrimaryDiagnosis(admitDiagnosis);
+    const sErr = validateExpectedStay(admitExpectedStay);
+    const rErr = validateAdmissionReason(admitReason);
+    const nErr = validateAdmissionClinicalNotes(admitNotes);
+    const iErr = validateSpecialInstructions(admitSpecialInstructions);
+
+    setAdmitDiagnosisError(dErr);
+    setAdmitExpectedStayError(sErr);
+    setAdmitReasonError(rErr);
+    setAdmitNotesError(nErr);
+    setAdmitSpecialInstructionsError(iErr);
+
+    const firstErr = dErr || sErr || rErr || nErr || iErr;
+    if (firstErr) {
+      toast.error(firstErr);
       return;
     }
     try {
@@ -1128,14 +1271,28 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                     <InputField
                       label="Chief Complaint"
                       value={chiefComplaint}
-                      onChange={(e) => setChiefComplaint(e.target.value)}
+                      charCount={chiefComplaint.length}
+                      maxLength={CONSULTATION_LIMITS.CHIEF_COMPLAINT}
+                      error={chiefComplaintError}
+                      onChange={(e) => {
+                        setChiefComplaint(e.target.value);
+                        setChiefComplaintError(validateClinicalText(e.target.value, "Chief Complaint", CONSULTATION_LIMITS.CHIEF_COMPLAINT));
+                      }}
+                      onBlur={() => setChiefComplaintError(validateClinicalText(chiefComplaint, "Chief Complaint", CONSULTATION_LIMITS.CHIEF_COMPLAINT))}
                       placeholder="Why is the patient here?"
                       rightElement={<SpeechToTextButton value={chiefComplaint} onChange={setChiefComplaint} disabled={isCompleted} />}
                     />
                     <InputField
                       label="Diagnosis"
                       value={diagnosis}
-                      onChange={(e) => setDiagnosis(e.target.value)}
+                      charCount={diagnosis.length}
+                      maxLength={CONSULTATION_LIMITS.DIAGNOSIS}
+                      error={diagnosisError}
+                      onChange={(e) => {
+                        setDiagnosis(e.target.value);
+                        setDiagnosisError(validateClinicalText(e.target.value, "Diagnosis", CONSULTATION_LIMITS.DIAGNOSIS, true));
+                      }}
+                      onBlur={() => setDiagnosisError(validateClinicalText(diagnosis, "Diagnosis", CONSULTATION_LIMITS.DIAGNOSIS, true))}
                       placeholder="e.g. Essential Hypertension"
                       required
                       rightElement={<SpeechToTextButton value={diagnosis} onChange={setDiagnosis} disabled={isCompleted} />}
@@ -1143,7 +1300,14 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                     <TextareaField
                       label="Symptoms"
                       value={symptoms}
-                      onChange={(e) => setSymptoms(e.target.value)}
+                      charCount={symptoms.length}
+                      maxLength={CONSULTATION_LIMITS.SYMPTOMS}
+                      error={symptomsError}
+                      onChange={(e) => {
+                        setSymptoms(e.target.value);
+                        setSymptomsError(validateClinicalText(e.target.value, "Symptoms", CONSULTATION_LIMITS.SYMPTOMS));
+                      }}
+                      onBlur={() => setSymptomsError(validateClinicalText(symptoms, "Symptoms", CONSULTATION_LIMITS.SYMPTOMS))}
                       placeholder="Enter details of symptoms..."
                       rows={2}
                       rightElement={<SpeechToTextButton value={symptoms} onChange={setSymptoms} disabled={isCompleted} />}
@@ -1151,7 +1315,14 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                     <TextareaField
                       label="Clinical Notes"
                       value={clinicalNotes}
-                      onChange={(e) => setClinicalNotes(e.target.value)}
+                      charCount={clinicalNotes.length}
+                      maxLength={CONSULTATION_LIMITS.CLINICAL_NOTES}
+                      error={clinicalNotesError}
+                      onChange={(e) => {
+                        setClinicalNotes(e.target.value);
+                        setClinicalNotesError(validateClinicalText(e.target.value, "Clinical Notes", CONSULTATION_LIMITS.CLINICAL_NOTES));
+                      }}
+                      onBlur={() => setClinicalNotesError(validateClinicalText(clinicalNotes, "Clinical Notes", CONSULTATION_LIMITS.CLINICAL_NOTES))}
                       placeholder="Attending doctor notes..."
                       rows={3}
                       rightElement={<SpeechToTextButton value={clinicalNotes} onChange={setClinicalNotes} disabled={isCompleted} />}
@@ -1159,7 +1330,14 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                     <TextareaField
                       label="Treatment Plan"
                       value={treatmentPlan}
-                      onChange={(e) => setTreatmentPlan(e.target.value)}
+                      charCount={treatmentPlan.length}
+                      maxLength={CONSULTATION_LIMITS.TREATMENT_PLAN}
+                      error={treatmentPlanError}
+                      onChange={(e) => {
+                        setTreatmentPlan(e.target.value);
+                        setTreatmentPlanError(validateClinicalText(e.target.value, "Treatment Plan", CONSULTATION_LIMITS.TREATMENT_PLAN));
+                      }}
+                      onBlur={() => setTreatmentPlanError(validateClinicalText(treatmentPlan, "Treatment Plan", CONSULTATION_LIMITS.TREATMENT_PLAN))}
                       placeholder="Enter next plan..."
                       rows={2}
                       rightElement={<SpeechToTextButton value={treatmentPlan} onChange={setTreatmentPlan} disabled={isCompleted} />}
@@ -1167,7 +1345,14 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                     <TextareaField
                       label="Advice / Follow-up notes"
                       value={advice}
-                      onChange={(e) => setAdvice(e.target.value)}
+                      charCount={advice.length}
+                      maxLength={CONSULTATION_LIMITS.ADVICE}
+                      error={adviceError}
+                      onChange={(e) => {
+                        setAdvice(e.target.value);
+                        setAdviceError(validateClinicalText(e.target.value, "Advice / Follow-up Notes", CONSULTATION_LIMITS.ADVICE));
+                      }}
+                      onBlur={() => setAdviceError(validateClinicalText(advice, "Advice / Follow-up Notes", CONSULTATION_LIMITS.ADVICE))}
                       placeholder="Enter instructions for patient..."
                       rows={2}
                       rightElement={<SpeechToTextButton value={advice} onChange={setAdvice} disabled={isCompleted} />}
@@ -1353,12 +1538,72 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                 <Card className="p-6 space-y-4">
                   <h3 className="text-sm font-bold text-slate-800 border-b pb-2">Record Patient Vitals</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    <InputField label="Temperature (°F)" value={temperature} onChange={(e) => setTemperature(e.target.value)} placeholder="e.g. 98.6" />
-                    <InputField label="BP (mmHg)" value={bloodPressure} onChange={(e) => setBloodPressure(e.target.value)} placeholder="e.g. 120/80" />
-                    <InputField label="Pulse Rate (bpm)" value={pulseRate} onChange={(e) => setPulseRate(e.target.value)} placeholder="e.g. 72" />
-                    <InputField label="Respiratory Rate (/min)" value={respiratoryRate} onChange={(e) => setRespiratoryRate(e.target.value)} placeholder="e.g. 16" />
-                    <InputField label="Oxygen Saturation (%)" value={oxygenSaturation} onChange={(e) => setOxygenSaturation(e.target.value)} placeholder="e.g. 98" />
-                    <InputField label="Weight (kg)" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="e.g. 68" />
+                    <InputField
+                      label="Temperature (°F)"
+                      value={temperature}
+                      error={temperatureError}
+                      onChange={(e) => {
+                        setTemperature(e.target.value);
+                        setTemperatureError(validateTemperature(e.target.value));
+                      }}
+                      onBlur={() => setTemperatureError(validateTemperature(temperature))}
+                      placeholder="e.g. 98.6"
+                    />
+                    <InputField
+                      label="BP (mmHg)"
+                      value={bloodPressure}
+                      error={bloodPressureError}
+                      onChange={(e) => {
+                        setBloodPressure(e.target.value);
+                        setBloodPressureError(validateBloodPressure(e.target.value));
+                      }}
+                      onBlur={() => setBloodPressureError(validateBloodPressure(bloodPressure))}
+                      placeholder="e.g. 120/80"
+                    />
+                    <InputField
+                      label="Pulse Rate (bpm)"
+                      value={pulseRate}
+                      error={pulseRateError}
+                      onChange={(e) => {
+                        setPulseRate(e.target.value);
+                        setPulseRateError(validatePulseRate(e.target.value));
+                      }}
+                      onBlur={() => setPulseRateError(validatePulseRate(pulseRate))}
+                      placeholder="e.g. 72"
+                    />
+                    <InputField
+                      label="Respiratory Rate (/min)"
+                      value={respiratoryRate}
+                      error={respiratoryRateError}
+                      onChange={(e) => {
+                        setRespiratoryRate(e.target.value);
+                        setRespiratoryRateError(validateRespiratoryRate(e.target.value));
+                      }}
+                      onBlur={() => setRespiratoryRateError(validateRespiratoryRate(respiratoryRate))}
+                      placeholder="e.g. 16"
+                    />
+                    <InputField
+                      label="Oxygen Saturation (%)"
+                      value={oxygenSaturation}
+                      error={oxygenSaturationError}
+                      onChange={(e) => {
+                        setOxygenSaturation(e.target.value);
+                        setOxygenSaturationError(validateOxygenSaturation(e.target.value));
+                      }}
+                      onBlur={() => setOxygenSaturationError(validateOxygenSaturation(oxygenSaturation))}
+                      placeholder="e.g. 98"
+                    />
+                    <InputField
+                      label="Weight (kg)"
+                      value={weight}
+                      error={weightError}
+                      onChange={(e) => {
+                        setWeight(e.target.value);
+                        setWeightError(validateWeight(e.target.value));
+                      }}
+                      onBlur={() => setWeightError(validateWeight(weight))}
+                      placeholder="e.g. 68"
+                    />
                   </div>
                   {!isCompleted && (
                     <div className="flex justify-end">
@@ -1408,7 +1653,22 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                             <InputField
                               label="Medicine Name"
                               value={med.name}
-                              onChange={(e) => handleMedChange(index, "name", e.target.value)}
+                              charCount={(med.name || "").length}
+                              maxLength={CONSULTATION_LIMITS.MEDICINE_NAME}
+                              error={medErrors[index]?.name}
+                              onChange={(e) => {
+                                handleMedChange(index, "name", e.target.value);
+                                setMedErrors((prev) => ({
+                                  ...prev,
+                                  [index]: { ...prev[index], name: validateMedicineName(e.target.value) },
+                                }));
+                              }}
+                              onBlur={() => {
+                                setMedErrors((prev) => ({
+                                  ...prev,
+                                  [index]: { ...prev[index], name: validateMedicineName(med.name) },
+                                }));
+                              }}
                               placeholder="e.g. Amoxicillin"
                               required
                               list={`med-datalist-${index}`}
@@ -1428,14 +1688,36 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                             <MedicineStrengthSelect
                               medicineName={med.name}
                               value={med.strength || ""}
-                              onChange={(val) => handleMedChange(index, "strength", val)}
+                              error={medErrors[index]?.strength}
+                              onChange={(val) => {
+                                handleMedChange(index, "strength", val);
+                                setMedErrors((prev) => ({
+                                  ...prev,
+                                  [index]: { ...prev[index], strength: validateMedicineStrength(val) },
+                                }));
+                              }}
                             />
                           </div>
                           <div className="w-24 shrink-0">
                             <InputField
                               label="Dosage"
                               value={med.dosage}
-                              onChange={(e) => handleMedChange(index, "dosage", e.target.value)}
+                              charCount={(med.dosage || "").length}
+                              maxLength={CONSULTATION_LIMITS.DOSAGE}
+                              error={medErrors[index]?.dosage}
+                              onChange={(e) => {
+                                handleMedChange(index, "dosage", e.target.value);
+                                setMedErrors((prev) => ({
+                                  ...prev,
+                                  [index]: { ...prev[index], dosage: validateDosage(e.target.value) },
+                                }));
+                              }}
+                              onBlur={() => {
+                                setMedErrors((prev) => ({
+                                  ...prev,
+                                  [index]: { ...prev[index], dosage: validateDosage(med.dosage) },
+                                }));
+                              }}
                               placeholder="e.g. 1"
                             />
                           </div>
@@ -1443,7 +1725,22 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                             <InputField
                               label="Frequency"
                               value={med.frequency}
-                              onChange={(e) => handleMedChange(index, "frequency", e.target.value)}
+                              charCount={(med.frequency || "").length}
+                              maxLength={CONSULTATION_LIMITS.FREQUENCY}
+                              error={medErrors[index]?.frequency}
+                              onChange={(e) => {
+                                handleMedChange(index, "frequency", e.target.value);
+                                setMedErrors((prev) => ({
+                                  ...prev,
+                                  [index]: { ...prev[index], frequency: validateFrequency(e.target.value) },
+                                }));
+                              }}
+                              onBlur={() => {
+                                setMedErrors((prev) => ({
+                                  ...prev,
+                                  [index]: { ...prev[index], frequency: validateFrequency(med.frequency) },
+                                }));
+                              }}
                               placeholder="e.g. 3"
                             />
                           </div>
@@ -1451,7 +1748,22 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                             <InputField
                               label="Duration"
                               value={med.duration}
-                              onChange={(e) => handleMedChange(index, "duration", e.target.value)}
+                              charCount={(med.duration || "").length}
+                              maxLength={CONSULTATION_LIMITS.DURATION}
+                              error={medErrors[index]?.duration}
+                              onChange={(e) => {
+                                handleMedChange(index, "duration", e.target.value);
+                                setMedErrors((prev) => ({
+                                  ...prev,
+                                  [index]: { ...prev[index], duration: validateDuration(e.target.value) },
+                                }));
+                              }}
+                              onBlur={() => {
+                                setMedErrors((prev) => ({
+                                  ...prev,
+                                  [index]: { ...prev[index], duration: validateDuration(med.duration) },
+                                }));
+                              }}
                               placeholder="e.g. 5"
                             />
                           </div>
@@ -1802,7 +2114,14 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                     <TextareaField
                       label="Clinical Notes / Indications"
                       value={radioNotes}
-                      onChange={(e) => setRadioNotes(e.target.value)}
+                      charCount={radioNotes.length}
+                      maxLength={CONSULTATION_LIMITS.RADIOLOGY_NOTES}
+                      error={radioNotesError}
+                      onChange={(e) => {
+                        setRadioNotes(e.target.value);
+                        setRadioNotesError(validateRadiologyNotes(e.target.value));
+                      }}
+                      onBlur={() => setRadioNotesError(validateRadiologyNotes(radioNotes))}
                       placeholder="e.g. Suspected fracture right forearm"
                       rows={2}
                       rightElement={<SpeechToTextButton value={radioNotes} onChange={setRadioNotes} disabled={isCompleted} />}
@@ -1912,7 +2231,14 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                         <InputField
                           label="Primary Diagnosis (Mandatory)"
                           value={admitDiagnosis}
-                          onChange={(e) => setAdmitDiagnosis(e.target.value)}
+                          charCount={admitDiagnosis.length}
+                          maxLength={CONSULTATION_LIMITS.PRIMARY_DIAGNOSIS}
+                          error={admitDiagnosisError}
+                          onChange={(e) => {
+                            setAdmitDiagnosis(e.target.value);
+                            setAdmitDiagnosisError(validatePrimaryDiagnosis(e.target.value));
+                          }}
+                          onBlur={() => setAdmitDiagnosisError(validatePrimaryDiagnosis(admitDiagnosis))}
                           placeholder="Enter diagnostic confirmation..."
                           required
                           rightElement={<SpeechToTextButton value={admitDiagnosis} onChange={setAdmitDiagnosis} disabled={isCompleted} />}
@@ -1935,7 +2261,14 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                         <InputField
                           label="Expected Stay Duration"
                           value={admitExpectedStay}
-                          onChange={(e) => setAdmitExpectedStay(e.target.value)}
+                          charCount={admitExpectedStay.length}
+                          maxLength={CONSULTATION_LIMITS.EXPECTED_STAY}
+                          error={admitExpectedStayError}
+                          onChange={(e) => {
+                            setAdmitExpectedStay(e.target.value);
+                            setAdmitExpectedStayError(validateExpectedStay(e.target.value));
+                          }}
+                          onBlur={() => setAdmitExpectedStayError(validateExpectedStay(admitExpectedStay))}
                           placeholder="e.g. 3 Days, 1 Week"
                         />
                       </div>
@@ -1990,7 +2323,14 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                         <InputField
                           label="Admission Reason"
                           value={admitReason}
-                          onChange={(e) => setAdmitReason(e.target.value)}
+                          charCount={admitReason.length}
+                          maxLength={CONSULTATION_LIMITS.ADMISSION_REASON}
+                          error={admitReasonError}
+                          onChange={(e) => {
+                            setAdmitReason(e.target.value);
+                            setAdmitReasonError(validateAdmissionReason(e.target.value));
+                          }}
+                          onBlur={() => setAdmitReasonError(validateAdmissionReason(admitReason))}
                           placeholder="Clinical reason for ward admission"
                           rightElement={<SpeechToTextButton value={admitReason} onChange={setAdmitReason} disabled={isCompleted} />}
                         />
@@ -2000,7 +2340,14 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                         <TextareaField
                           label="Clinical Notes / Diagnosis Remarks"
                           value={admitNotes}
-                          onChange={(e) => setAdmitNotes(e.target.value)}
+                          charCount={admitNotes.length}
+                          maxLength={CONSULTATION_LIMITS.ADMISSION_CLINICAL_NOTES}
+                          error={admitNotesError}
+                          onChange={(e) => {
+                            setAdmitNotes(e.target.value);
+                            setAdmitNotesError(validateAdmissionClinicalNotes(e.target.value));
+                          }}
+                          onBlur={() => setAdmitNotesError(validateAdmissionClinicalNotes(admitNotes))}
                           placeholder="Describe clinical symptoms and observations..."
                           rows={3}
                           rightElement={<SpeechToTextButton value={admitNotes} onChange={setAdmitNotes} disabled={isCompleted} />}
@@ -2011,7 +2358,14 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                         <TextareaField
                           label="Special Instructions"
                           value={admitSpecialInstructions}
-                          onChange={(e) => setAdmitSpecialInstructions(e.target.value)}
+                          charCount={admitSpecialInstructions.length}
+                          maxLength={CONSULTATION_LIMITS.SPECIAL_INSTRUCTIONS}
+                          error={admitSpecialInstructionsError}
+                          onChange={(e) => {
+                            setAdmitSpecialInstructions(e.target.value);
+                            setAdmitSpecialInstructionsError(validateSpecialInstructions(e.target.value));
+                          }}
+                          onBlur={() => setAdmitSpecialInstructionsError(validateSpecialInstructions(admitSpecialInstructions))}
                           placeholder="Nursing guidance, diet directives..."
                           rows={3}
                         />

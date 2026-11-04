@@ -2010,8 +2010,39 @@ export const finalizeDischarge = catchAsync(async (req: Request, res: Response) 
   const { admissionId } = req.params;
   const { diagnosisAtDischarge, dischargeMedications, followUp, specialInstructions } = req.body;
 
-  if (!diagnosisAtDischarge) {
-    throw new AppError("Diagnosis at discharge is required.", 400);
+  const dTrimmed = typeof diagnosisAtDischarge === "string" ? diagnosisAtDischarge.trim() : "";
+  if (!dTrimmed) {
+    throw new AppError("Please fill out this field", 400);
+  }
+  if (dTrimmed.length > 200) {
+    throw new AppError("Maximum allowed character limit exceeded", 400);
+  }
+  if (!/[a-zA-Z0-9]/.test(dTrimmed) || /<[^>]*>|javascript:/i.test(dTrimmed)) {
+    throw new AppError("Please enter valid data", 400);
+  }
+
+  if (dischargeMedications && typeof dischargeMedications === "string" && dischargeMedications.trim()) {
+    const medTrimmed = dischargeMedications.trim();
+    if (medTrimmed.length > 1000) throw new AppError("Maximum allowed character limit exceeded", 400);
+    if (!/[a-zA-Z0-9]/.test(medTrimmed) || /<[^>]*>|javascript:/i.test(medTrimmed)) {
+      throw new AppError("Please enter valid data", 400);
+    }
+  }
+
+  if (followUp && typeof followUp === "string" && followUp.trim()) {
+    const fuTrimmed = followUp.trim();
+    if (fuTrimmed.length > 500) throw new AppError("Maximum allowed character limit exceeded", 400);
+    if (!/[a-zA-Z0-9]/.test(fuTrimmed) || /<[^>]*>|javascript:/i.test(fuTrimmed)) {
+      throw new AppError("Please enter valid data", 400);
+    }
+  }
+
+  if (specialInstructions && typeof specialInstructions === "string" && specialInstructions.trim()) {
+    const siTrimmed = specialInstructions.trim();
+    if (siTrimmed.length > 500) throw new AppError("Maximum allowed character limit exceeded", 400);
+    if (!/[a-zA-Z0-9]/.test(siTrimmed) || /<[^>]*>|javascript:/i.test(siTrimmed)) {
+      throw new AppError("Please enter valid data", 400);
+    }
   }
 
   const doctor = await getLoggedDoctor(req);
@@ -2754,6 +2785,43 @@ export const addInpatientMedication = catchAsync(async (req: Request, res: Respo
   const { drugName, dosage, frequency, duration, route, notes } = req.body;
   const doctor = await getLoggedDoctor(req);
 
+  const drugTrimmed = typeof drugName === "string" ? drugName.trim() : "";
+  if (!drugTrimmed) {
+    throw new AppError("Please fill out this field", 400);
+  }
+  if (drugTrimmed.length > 150) {
+    throw new AppError("Maximum allowed character limit exceeded", 400);
+  }
+  if (!/[a-zA-Z0-9]/.test(drugTrimmed) || /<[^>]*>|javascript:/i.test(drugTrimmed)) {
+    throw new AppError("Please enter valid data", 400);
+  }
+
+  if (dosage && typeof dosage === "string" && dosage.trim()) {
+    const dTrimmed = dosage.trim();
+    if (dTrimmed.length > 50) throw new AppError("Maximum allowed character limit exceeded", 400);
+    if (!/[a-zA-Z0-9]/.test(dTrimmed) || /<[^>]*>|javascript:/i.test(dTrimmed)) {
+      throw new AppError("Please enter valid data", 400);
+    }
+  }
+
+  if (frequency && typeof frequency === "string" && frequency.trim()) {
+    const fTrimmed = frequency.trim();
+    if (fTrimmed.length > 50) throw new AppError("Maximum allowed character limit exceeded", 400);
+    if (!/[a-zA-Z0-9]/.test(fTrimmed) || /<[^>]*>|javascript:/i.test(fTrimmed)) {
+      throw new AppError("Please enter valid data", 400);
+    }
+  }
+
+  if (duration && typeof duration === "string" && duration.trim()) {
+    const durTrimmed = duration.trim();
+    if (durTrimmed.length > 50) throw new AppError("Maximum allowed character limit exceeded", 400);
+    const isPureLetters = /^[a-zA-Z\s]+$/.test(durTrimmed) && !/\b(day|days|week|weeks|month|months)\b/i.test(durTrimmed);
+    const isZeroOrNegative = /^-\d+|^\s*0+(\s*(day|days))?\s*$/i.test(durTrimmed);
+    if (!/[a-zA-Z0-9]/.test(durTrimmed) || /<[^>]*>|javascript:/i.test(durTrimmed) || isPureLetters || isZeroOrNegative) {
+      throw new AppError("Please enter valid data", 400);
+    }
+  }
+
   const activeAdmission = await findActiveAdmission(hospitalId, targetId);
 
   if (!activeAdmission) {
@@ -2856,6 +2924,45 @@ export const updateInpatientMedication = catchAsync(async (req: Request, res: Re
       description: `Medication resumed by Dr. ${doctor.name}: ${med.drugName}`
     });
   } else if (action === "modify") {
+    if (drugName !== undefined) {
+      const drugTrimmed = typeof drugName === "string" ? drugName.trim() : "";
+      if (!drugTrimmed) {
+        throw new AppError("Please fill out this field", 400);
+      }
+      if (drugTrimmed.length > 150) {
+        throw new AppError("Maximum allowed character limit exceeded", 400);
+      }
+      if (!/[a-zA-Z0-9]/.test(drugTrimmed) || /<[^>]*>|javascript:/i.test(drugTrimmed)) {
+        throw new AppError("Please enter valid data", 400);
+      }
+    }
+
+    if (dosage && typeof dosage === "string" && dosage.trim()) {
+      const dTrimmed = dosage.trim();
+      if (dTrimmed.length > 50) throw new AppError("Maximum allowed character limit exceeded", 400);
+      if (!/[a-zA-Z0-9]/.test(dTrimmed) || /<[^>]*>|javascript:/i.test(dTrimmed)) {
+        throw new AppError("Please enter valid data", 400);
+      }
+    }
+
+    if (frequency && typeof frequency === "string" && frequency.trim()) {
+      const fTrimmed = frequency.trim();
+      if (fTrimmed.length > 50) throw new AppError("Maximum allowed character limit exceeded", 400);
+      if (!/[a-zA-Z0-9]/.test(fTrimmed) || /<[^>]*>|javascript:/i.test(fTrimmed)) {
+        throw new AppError("Please enter valid data", 400);
+      }
+    }
+
+    if (duration && typeof duration === "string" && duration.trim()) {
+      const durTrimmed = duration.trim();
+      if (durTrimmed.length > 50) throw new AppError("Maximum allowed character limit exceeded", 400);
+      const isPureLetters = /^[a-zA-Z\s]+$/.test(durTrimmed) && !/\b(day|days|week|weeks|month|months)\b/i.test(durTrimmed);
+      const isZeroOrNegative = /^-\d+|^\s*0+(\s*(day|days))?\s*$/i.test(durTrimmed);
+      if (!/[a-zA-Z0-9]/.test(durTrimmed) || /<[^>]*>|javascript:/i.test(durTrimmed) || isPureLetters || isZeroOrNegative) {
+        throw new AppError("Please enter valid data", 400);
+      }
+    }
+
     med.status = "modified";
     med.modifiedAt = new Date();
     med.drugName = drugName || med.drugName;
@@ -2893,6 +3000,49 @@ export const saveInpatientVitals = catchAsync(async (req: Request, res: Response
   const targetId = req.params.id;
   const { temperature, bloodPressure, pulseRate, respiratoryRate, oxygenSaturation, weight } = req.body;
   const doctor = await getLoggedDoctor(req);
+
+  // Validate vitals (each field is optional, but if entered must be valid and within limits)
+  if (temperature && typeof temperature === "string" && temperature.trim()) {
+    const tTrimmed = temperature.trim();
+    if (tTrimmed.length > 10) throw new AppError("Maximum allowed character limit exceeded", 400);
+    const err = validateTemperature(tTrimmed);
+    if (err) throw new AppError(err, 400);
+  }
+
+  if (bloodPressure && typeof bloodPressure === "string" && bloodPressure.trim()) {
+    const bpTrimmed = bloodPressure.trim();
+    if (bpTrimmed.length > 10) throw new AppError("Maximum allowed character limit exceeded", 400);
+    const err = validateBloodPressure(bpTrimmed);
+    if (err) throw new AppError(err, 400);
+  }
+
+  if (pulseRate && typeof pulseRate === "string" && pulseRate.trim()) {
+    const prTrimmed = pulseRate.trim();
+    if (prTrimmed.length > 5) throw new AppError("Maximum allowed character limit exceeded", 400);
+    const err = validatePulseRate(prTrimmed);
+    if (err) throw new AppError(err, 400);
+  }
+
+  if (respiratoryRate && typeof respiratoryRate === "string" && respiratoryRate.trim()) {
+    const rrTrimmed = respiratoryRate.trim();
+    if (rrTrimmed.length > 5) throw new AppError("Maximum allowed character limit exceeded", 400);
+    const err = validateRespiratoryRate(rrTrimmed);
+    if (err) throw new AppError(err, 400);
+  }
+
+  if (oxygenSaturation && typeof oxygenSaturation === "string" && oxygenSaturation.trim()) {
+    const o2Trimmed = oxygenSaturation.trim();
+    if (o2Trimmed.length > 5) throw new AppError("Maximum allowed character limit exceeded", 400);
+    const err = validateOxygenSaturation(o2Trimmed);
+    if (err) throw new AppError(err, 400);
+  }
+
+  if (weight && typeof weight === "string" && weight.trim()) {
+    const wTrimmed = weight.trim();
+    if (wTrimmed.length > 6) throw new AppError("Maximum allowed character limit exceeded", 400);
+    const err = validateWeight(wTrimmed);
+    if (err) throw new AppError(err, 400);
+  }
 
   const activeAdmission = await findActiveAdmission(hospitalId, targetId);
 

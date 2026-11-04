@@ -9,11 +9,11 @@ const doctorSchema = new Schema(
     department: { type: Schema.Types.ObjectId, ref: "Department", default: null },
     name: { type: String, required: true, trim: true, maxlength: 100 },
     gender: { type: String, enum: ["Male", "Female", "Other", "male", "female", "other"], default: "Male", required: true },
-    email: { type: String, default: "", maxlength: 100 },
+    email: { type: String, default: "", maxlength: 254 },
     phone: { type: String, default: "", maxlength: 10 },
     photoUrl: { type: String, default: "", maxlength: 500 },
     specialization: { type: String, default: "", maxlength: 100 },
-    qualification: { type: String, default: "", maxlength: 100 },
+    qualification: { type: String, default: "", maxlength: 200 },
     licenseNo: { type: String, default: "", maxlength: 50 },
     bio: { type: String, default: "", maxlength: 500 },
     workingHours: {
@@ -58,7 +58,7 @@ const doctorSchema = new Schema(
       ],
       default: []
     },
-    languages: { type: String, default: "English, Hindi" },
+    languages: { type: String, default: "English, Hindi", maxlength: 200 },
     consultationFee: { type: String, default: "₹500" },
     opExpiryLimit: { type: Number, default: 10 },
     status: { type: String, enum: DOCTOR_STATUSES, default: "ACTIVE" },
