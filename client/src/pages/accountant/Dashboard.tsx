@@ -15,22 +15,28 @@ import {
 import { useAccountantDashboard } from "../../features/accountantDashboard";
 import { socket } from "../../lib/socket";
 import { useQueryClient } from "@tanstack/react-query";
-import { roundCurrency } from "../../lib/currency";
+import { formatINR, formatCount, roundCurrency } from "../../lib/currency";
+import { AnimatedCounter } from "../../components/ui/AnimatedCounter";
 import { Badge } from "../../components/ui/Badge";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function fmt(n: number) {
-  return roundCurrency(n).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 
 function fmtShort(n: number) {
   if (n >= 10_00_000) return `₹${(n / 10_00_000).toFixed(1)}L`;
   if (n >= 1_000) return `₹${(n / 1_000).toFixed(1)}K`;
   return `₹${n.toFixed(0)}`;
+}
+
+/**
+ * Responsive font sizing for KPI card amounts to prevent UI overflow or wrapping.
+ */
+function getKpiFontSize(val: number | null | undefined): string {
+  const num = Number(val) || 0;
+  const str = formatINR(num);
+  if (str.length > 20) return "text-lg sm:text-xl";
+  if (str.length > 15) return "text-xl sm:text-2xl";
+  if (str.length > 12) return "text-2xl sm:text-2xl";
+  return "text-2xl sm:text-3xl";
 }
 
 const BILLING_TYPE_LABEL: Record<string, string> = {
@@ -88,10 +94,11 @@ function KpiSkeleton() {
 // ── Stat tile ──────────────────────────────────────────────────────────────────
 
 function StatTile({
-  label, value, sub, icon, tone = "default", to,
+  label, value, sub, icon, tone = "default", to = "/accountant/billing", refreshKey,
 }: {
   label: string; value: string | number; sub?: string;
   icon: React.ReactNode; tone?: "success" | "warning" | "danger" | "info" | "default"; to?: string;
+  refreshKey?: number;
 }) {
   const toneClass = {
     success: "bg-emerald-50 text-emerald-700",
@@ -101,35 +108,40 @@ function StatTile({
     default: "bg-navy-50 text-navy-700",
   }[tone];
 
+  const numVal = typeof value === "number" ? value : Number(value) || 0;
+
   const inner = (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3 hover:border-navy-300 hover:shadow-sm transition group h-full">
+    <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3 hover:border-navy-300 hover:shadow-sm transition group h-full overflow-hidden min-w-0">
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${toneClass}`}>
         {icon}
       </div>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide truncate">{label}</p>
-        <p className="text-lg font-bold text-slate-900 truncate">{value}</p>
+        <p className="text-base sm:text-lg font-bold text-slate-900 truncate" title={formatCount(numVal)}>
+          <AnimatedCounter value={numVal} type="count" key={refreshKey} />
+        </p>
         {sub && <p className="text-[10px] text-slate-400 truncate">{sub}</p>}
       </div>
     </div>
   );
 
-  return to ? <Link to={to} className="block">{inner}</Link> : inner;
+  return to ? <Link to={to} className="block cursor-pointer">{inner}</Link> : inner;
 }
 
 // ── Collection cell ────────────────────────────────────────────────────────────
 
 function CollCell({
-  label, value, highlight = false, warn = false,
-}: { label: string; value: number; highlight?: boolean; warn?: boolean }) {
-  return (
-    <div className={`p-3 rounded-lg border ${warn ? "bg-amber-50 border-amber-200" : highlight ? "bg-navy-700 border-navy-700 text-white shadow-sm" : "bg-white border-slate-200"}`}>
-      <span className={`block uppercase text-[9px] leading-tight mb-1 tracking-wide font-semibold ${highlight ? "text-navy-200" : "text-slate-400"}`}>{label}</span>
-      <span className={`text-sm font-bold font-mono ${warn ? "text-amber-700" : highlight ? "text-white" : "text-slate-800"}`}>
-        ₹{fmt(value)}
+  label, value, highlight = false, warn = false, to = "/accountant/billing", refreshKey,
+}: { label: string; value: number; highlight?: boolean; warn?: boolean; to?: string; refreshKey?: number }) {
+  const content = (
+    <div className={`p-3 rounded-lg border transition hover:shadow-sm overflow-hidden min-w-0 ${warn ? "bg-amber-50 border-amber-200 hover:border-amber-300" : highlight ? "bg-navy-700 border-navy-700 text-white shadow-sm hover:bg-navy-800" : "bg-white border-slate-200 hover:border-slate-300"}`}>
+      <span className={`block uppercase text-[9px] leading-tight mb-1 tracking-wide font-semibold truncate ${highlight ? "text-navy-200" : "text-slate-400"}`}>{label}</span>
+      <span className={`text-xs sm:text-sm font-bold font-mono block max-w-full truncate ${warn ? "text-amber-700" : highlight ? "text-white" : "text-slate-800"}`} title={formatINR(value)}>
+        <AnimatedCounter value={value} type="currency" key={refreshKey} />
       </span>
     </div>
   );
+  return to ? <Link to={to} className="block cursor-pointer">{content}</Link> : content;
 }
 
 // ── Error state ────────────────────────────────────────────────────────────────
@@ -160,6 +172,7 @@ export function AccountantDashboard() {
 
   const [secondsAgo, setSecondsAgo] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Live seconds-since-last-update counter
   useEffect(() => {
@@ -190,6 +203,7 @@ export function AccountantDashboard() {
     setIsRefreshing(true);
     await refetch();
     setSecondsAgo(0);
+    setRefreshKey((k) => k + 1);
     setIsRefreshing(false);
   }, [refetch]);
 
@@ -243,47 +257,81 @@ export function AccountantDashboard() {
         ) : (
           <>
             {/* 1. Total Revenue */}
-            <div className="bg-navy-700 text-white rounded-xl p-5 space-y-1 shadow">
+            <Link
+              to="/accountant/billing"
+              className="bg-navy-700 text-white rounded-xl p-5 space-y-1 shadow hover:bg-navy-800 transition block text-left min-w-0 overflow-hidden cursor-pointer"
+            >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wide text-navy-200">Total Revenue (Paid)</span>
-                <TrendingUp className="h-5 w-5 text-navy-300" />
+                <TrendingUp className="h-5 w-5 text-navy-300 shrink-0" />
               </div>
-              <p className="text-2xl font-bold">₹{fmt(kpi?.netRevenue ?? 0)}</p>
-              <p className="text-xs text-navy-300">{kpi?.paidCount ?? 0} invoices paid</p>
-            </div>
+              <p
+                className={`font-bold font-mono tracking-tight truncate max-w-full ${getKpiFontSize(kpi?.netRevenue)}`}
+                title={formatINR(kpi?.netRevenue ?? 0)}
+              >
+                <AnimatedCounter value={kpi?.netRevenue ?? 0} type="currency" key={refreshKey} />
+              </p>
+              <p className="text-xs text-navy-300 truncate">
+                <AnimatedCounter value={kpi?.paidCount ?? 0} type="count" key={refreshKey} /> {(kpi?.paidCount ?? 0) === 1 ? "invoice" : "invoices"} paid
+              </p>
+            </Link>
 
             {/* 2. Pending Payments */}
-            <Link to="/accountant/billing" className="bg-white border border-slate-200 rounded-xl p-5 space-y-1 hover:border-navy-300 hover:shadow-sm transition block text-left">
+            <Link
+              to="/accountant/billing"
+              className="bg-white border border-slate-200 rounded-xl p-5 space-y-1 hover:border-navy-300 hover:shadow-sm transition block text-left min-w-0 overflow-hidden cursor-pointer"
+            >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pending Payments</span>
-                <Clock className="h-5 w-5 text-amber-500" />
+                <Clock className="h-5 w-5 text-amber-500 shrink-0" />
               </div>
-              <p className="text-2xl font-bold text-slate-900">₹{fmt(kpi?.outstandingAmount ?? 0)}</p>
-              <p className="text-xs text-amber-600">
-                {kpi?.pendingCount ?? 0} invoice{(kpi?.pendingCount ?? 0) !== 1 ? "s" : ""} outstanding
+              <p
+                className={`font-bold font-mono tracking-tight text-slate-900 truncate max-w-full ${getKpiFontSize(kpi?.outstandingAmount)}`}
+                title={formatINR(kpi?.outstandingAmount ?? 0)}
+              >
+                <AnimatedCounter value={kpi?.outstandingAmount ?? 0} type="currency" key={refreshKey} />
+              </p>
+              <p className="text-xs text-amber-600 truncate">
+                <AnimatedCounter value={kpi?.pendingCount ?? 0} type="count" key={refreshKey} /> {(kpi?.pendingCount ?? 0) === 1 ? "invoice" : "invoices"} outstanding
               </p>
             </Link>
 
             {/* 3. Pending Insurance Claims */}
-            <Link to="/accountant/claims" className="bg-white border border-slate-200 rounded-xl p-5 space-y-1 hover:border-navy-300 hover:shadow-sm transition block text-left">
+            <Link
+              to="/accountant/claims"
+              className="bg-white border border-slate-200 rounded-xl p-5 space-y-1 hover:border-navy-300 hover:shadow-sm transition block text-left min-w-0 overflow-hidden cursor-pointer"
+            >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pending Claims</span>
-                <ShieldAlert className="h-5 w-5 text-sky-500" />
+                <ShieldAlert className="h-5 w-5 text-sky-500 shrink-0" />
               </div>
-              <p className="text-2xl font-bold text-slate-900">₹{fmt(kpi?.pendingClaimsValue ?? 0)}</p>
-              <p className="text-xs text-sky-600">
-                {kpi?.pendingClaimsCount ?? 0} claim{(kpi?.pendingClaimsCount ?? 0) !== 1 ? "s" : ""} pending verification
+              <p
+                className={`font-bold font-mono tracking-tight text-slate-900 truncate max-w-full ${getKpiFontSize(kpi?.pendingClaimsValue)}`}
+                title={formatINR(kpi?.pendingClaimsValue ?? 0)}
+              >
+                <AnimatedCounter value={kpi?.pendingClaimsValue ?? 0} type="currency" key={refreshKey} />
+              </p>
+              <p className="text-xs text-sky-600 truncate">
+                <AnimatedCounter value={kpi?.pendingClaimsCount ?? 0} type="count" key={refreshKey} /> {(kpi?.pendingClaimsCount ?? 0) === 1 ? "claim" : "claims"} pending verification
               </p>
             </Link>
 
             {/* 4. Monthly Expenses */}
-            <Link to="/accountant/expenses" className="bg-white border border-slate-200 rounded-xl p-5 space-y-1 hover:border-navy-300 hover:shadow-sm transition block text-left">
+            <Link
+              to="/accountant/expenses"
+              className="bg-white border border-slate-200 rounded-xl p-5 space-y-1 hover:border-navy-300 hover:shadow-sm transition block text-left min-w-0 overflow-hidden cursor-pointer"
+            >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Monthly Expenses</span>
-                <ClipboardList className="h-5 w-5 text-red-500" />
+                <ClipboardList className="h-5 w-5 text-red-500 shrink-0" />
               </div>
-              <p className="text-2xl font-bold text-slate-900">₹{fmt(kpi?.monthlyExpenses ?? 0)}</p>
-              <p className="text-xs text-red-500">Calculated from expense logs</p>
+              <p
+                className={`font-bold font-mono tracking-tight text-slate-900 truncate max-w-full ${getKpiFontSize(kpi?.monthlyExpenses)}`}
+                title={formatINR(kpi?.monthlyExpenses ?? 0)}
+              >
+                <AnimatedCounter value={kpi?.monthlyExpenses ?? 0} type="currency" key={refreshKey} />
+              </p>
+              <p className="text-xs text-red-500 truncate">Calculated from expense logs</p>
             </Link>
           </>
         )}
@@ -309,22 +357,24 @@ export function AccountantDashboard() {
           <>
             {/* Revenue by type */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-              <CollCell label="Total Collection" value={today?.totalCollection ?? 0} highlight />
-              <CollCell label="Consultation" value={today?.consultationRevenue ?? 0} />
-              <CollCell label="Pharmacy" value={today?.pharmacyRevenue ?? 0} />
-              <CollCell label="Laboratory" value={today?.labRevenue ?? 0} />
-              <CollCell label="IP Billing" value={today?.ipRevenue ?? 0} />
+              <CollCell label="Total Collection" value={today?.totalCollection ?? 0} highlight to="/accountant/billing" refreshKey={refreshKey} />
+              <CollCell label="Consultation" value={today?.consultationRevenue ?? 0} to="/accountant/billing" refreshKey={refreshKey} />
+              <CollCell label="Pharmacy" value={today?.pharmacyRevenue ?? 0} to="/accountant/billing" refreshKey={refreshKey} />
+              <CollCell label="Laboratory" value={today?.labRevenue ?? 0} to="/accountant/billing" refreshKey={refreshKey} />
+              <CollCell label="IP Billing" value={today?.ipRevenue ?? 0} to="/accountant/billing" refreshKey={refreshKey} />
             </div>
             {/* Payment methods */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-              <CollCell label="Cash" value={today?.cash ?? 0} />
-              <CollCell label="UPI" value={today?.upi ?? 0} />
-              <CollCell label="Card" value={today?.card ?? 0} />
-              <CollCell label="Net Banking" value={today?.netBanking ?? 0} />
+              <CollCell label="Cash" value={today?.cash ?? 0} to="/accountant/billing" refreshKey={refreshKey} />
+              <CollCell label="UPI" value={today?.upi ?? 0} to="/accountant/billing" refreshKey={refreshKey} />
+              <CollCell label="Card" value={today?.card ?? 0} to="/accountant/billing" refreshKey={refreshKey} />
+              <CollCell label="Net Banking" value={today?.netBanking ?? 0} to="/accountant/billing" refreshKey={refreshKey} />
               <CollCell
                 label="Outstanding Balance"
                 value={kpi?.outstandingAmount ?? 0}
                 warn={(kpi?.outstandingAmount ?? 0) > 0}
+                to="/accountant/billing"
+                refreshKey={refreshKey}
               />
             </div>
           </>
@@ -342,16 +392,16 @@ export function AccountantDashboard() {
             Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-20" />)
           ) : (
             <>
-              <StatTile label="OP Invoices" value={summary?.op ?? 0} icon={<Receipt className="h-4 w-4" />} to="/accountant/billing" />
-              <StatTile label="IP Invoices" value={summary?.ip ?? 0} icon={<Building2 className="h-4 w-4" />} tone="info" to="/accountant/billing" />
-              <StatTile label="Pharmacy" value={summary?.pharmacy ?? 0} icon={<Wallet className="h-4 w-4" />} tone="success" to="/accountant/billing" />
-              <StatTile label="Laboratory" value={summary?.lab ?? 0} icon={<FlaskConical className="h-4 w-4" />} tone="warning" to="/accountant/billing" />
-              <StatTile label="Radiology" value={summary?.radiology ?? 0} icon={<Activity className="h-4 w-4" />} to="/accountant/billing" />
-              <StatTile label="Paid" value={summary?.paid ?? 0} icon={<CheckCircle2 className="h-4 w-4" />} tone="success" />
-              <StatTile label="Pending" value={summary?.pending ?? 0} icon={<Clock className="h-4 w-4" />} tone="warning" to="/accountant/billing" />
-              <StatTile label="Partially Paid" value={summary?.partiallyPaid ?? 0} icon={<Timer className="h-4 w-4" />} tone="info" />
-              <StatTile label="Cancelled" value={summary?.cancelled ?? 0} icon={<XCircle className="h-4 w-4" />} tone="danger" />
-              <StatTile label="Emergency" value={summary?.emergency ?? 0} icon={<Ambulance className="h-4 w-4" />} tone="danger" />
+              <StatTile label="OP Invoices" value={summary?.op ?? 0} icon={<Receipt className="h-4 w-4" />} to="/accountant/billing" refreshKey={refreshKey} />
+              <StatTile label="IP Invoices" value={summary?.ip ?? 0} icon={<Building2 className="h-4 w-4" />} tone="info" to="/accountant/billing" refreshKey={refreshKey} />
+              <StatTile label="Pharmacy" value={summary?.pharmacy ?? 0} icon={<Wallet className="h-4 w-4" />} tone="success" to="/accountant/billing" refreshKey={refreshKey} />
+              <StatTile label="Laboratory" value={summary?.lab ?? 0} icon={<FlaskConical className="h-4 w-4" />} tone="warning" to="/accountant/billing" refreshKey={refreshKey} />
+              <StatTile label="Radiology" value={summary?.radiology ?? 0} icon={<Activity className="h-4 w-4" />} to="/accountant/billing" refreshKey={refreshKey} />
+              <StatTile label="Paid" value={summary?.paid ?? 0} icon={<CheckCircle2 className="h-4 w-4" />} tone="success" to="/accountant/billing" refreshKey={refreshKey} />
+              <StatTile label="Pending" value={summary?.pending ?? 0} icon={<Clock className="h-4 w-4" />} tone="warning" to="/accountant/billing" refreshKey={refreshKey} />
+              <StatTile label="Partially Paid" value={summary?.partiallyPaid ?? 0} icon={<Timer className="h-4 w-4" />} tone="info" to="/accountant/billing" refreshKey={refreshKey} />
+              <StatTile label="Cancelled" value={summary?.cancelled ?? 0} icon={<XCircle className="h-4 w-4" />} tone="danger" to="/accountant/billing" refreshKey={refreshKey} />
+              <StatTile label="Emergency" value={summary?.emergency ?? 0} icon={<Ambulance className="h-4 w-4" />} tone="danger" to="/accountant/billing" refreshKey={refreshKey} />
             </>
           )}
         </div>
@@ -378,7 +428,7 @@ export function AccountantDashboard() {
                   <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748b" }} />
                   <YAxis tick={{ fontSize: 10, fill: "#64748b" }} tickFormatter={fmtShort} />
                   <Tooltip
-                    formatter={(v: number) => [`₹${fmt(v)}`, "Revenue"]}
+                    formatter={(v: number) => [formatINR(v), "Revenue"]}
                     labelStyle={{ fontWeight: 600 }}
                   />
                   <Bar dataKey="revenue" fill="#1e3a8a" radius={[4, 4, 0, 0]} maxBarSize={48} />
@@ -419,7 +469,7 @@ export function AccountantDashboard() {
                       />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number) => [`₹${fmt(v)}`]} />
+                  <Tooltip formatter={(v: number) => [formatINR(v)]} />
                   <Legend
                     formatter={(value) => <span className="text-xs text-slate-650 font-medium">{value}</span>}
                   />
@@ -465,7 +515,7 @@ export function AccountantDashboard() {
                       />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number) => [`₹${fmt(v)}`]} />
+                  <Tooltip formatter={(v: number) => [formatINR(v)]} />
                   <Legend
                     formatter={(value) => <span className="text-[10px] text-slate-650 font-medium truncate max-w-[100px] inline-block">{value}</span>}
                   />
@@ -531,7 +581,7 @@ export function AccountantDashboard() {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="category" tick={{ fontSize: 9, fill: "#64748b" }} />
                   <YAxis tick={{ fontSize: 10, fill: "#64748b" }} tickFormatter={fmtShort} />
-                  <Tooltip formatter={(v: number) => [`₹${fmt(v)}`, "Spent"]} />
+                  <Tooltip formatter={(v: number) => [formatINR(v), "Spent"]} />
                   <Bar dataKey="amount" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={32} />
                 </BarChart>
               </ResponsiveContainer>
@@ -559,7 +609,7 @@ export function AccountantDashboard() {
                 <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748b" }} />
                 <YAxis tick={{ fontSize: 10, fill: "#64748b" }} tickFormatter={fmtShort} />
                 <Tooltip
-                  formatter={(v: number, name: string) => [`₹${fmt(v)}`, name]}
+                  formatter={(v: number, name: string) => [formatINR(v), name]}
                   labelStyle={{ fontWeight: 600 }}
                 />
                 <Legend formatter={(value) => <span className="text-xs text-slate-650 font-semibold">{value}</span>} />
@@ -604,7 +654,7 @@ export function AccountantDashboard() {
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                 <XAxis type="number" tick={{ fontSize: 10, fill: "#64748b" }} tickFormatter={fmtShort} />
                 <YAxis type="category" dataKey="label" tick={{ fontSize: 11, fill: "#64748b" }} width={58} />
-                <Tooltip formatter={(v: number) => [`₹${fmt(v)}`, "Revenue"]} />
+                <Tooltip formatter={(v: number) => [formatINR(v), "Revenue"]} />
                 <Bar dataKey="amount" radius={[0, 4, 4, 0]} maxBarSize={20}>
                   {charts?.billingTypeDistribution?.map((entry, i) => (
                     <Cell
@@ -696,7 +746,7 @@ export function AccountantDashboard() {
                         {t.paymentMethod}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-bold text-slate-850">₹{fmt(t.amount)}</td>
+                    <td className="px-4 py-3 font-bold text-slate-850 font-mono">{formatINR(t.amount)}</td>
                     <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
                       <span className="flex items-center gap-1">
                         <User className="h-3.5 w-3.5 text-slate-400" />
@@ -774,7 +824,7 @@ export function AccountantDashboard() {
                     <td className="px-4 py-3 text-xs text-slate-700 truncate max-w-xs" title={e.description}>
                       {e.description || "—"}
                     </td>
-                    <td className="px-4 py-3 font-bold text-slate-850">₹{fmt(e.amount)}</td>
+                    <td className="px-4 py-3 font-bold text-slate-850 font-mono">{formatINR(e.amount)}</td>
                     <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
                       <span className="flex items-center gap-1">
                         <User className="h-3.5 w-3.5 text-slate-400" />
@@ -797,7 +847,7 @@ export function AccountantDashboard() {
         </div>
       </div>
 
-      {/* ── Quick Actions ────────────────────────────────────────────── */}
+      {/* ── Quick Actions ────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
           { to: "/accountant/billing", label: "Patient Billing", sub: "OP/IP/Lab invoices", icon: <Receipt className="h-5 w-5" />, color: "bg-navy-50 text-navy-700" },

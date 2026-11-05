@@ -61,24 +61,80 @@ const medicalHistoryEntrySchema = z.object({
 });
 
 const patientSchema = z.object({
-  name: z.string().min(1),
-  email: z.string().optional().default(""),
-  phone: z.string().optional().default(""),
-  age: z.coerce.number().min(0, "Age must be at least 0").max(150, "Age cannot exceed 150 years").optional().nullable(),
+  name: z
+    .string()
+    .min(1, "Error message should be displayed as:\nPlease fill out this field. Field is required. Please enter valid data.")
+    .max(100, "It should not accept too long data. Characters limit: 100. Too long text is not accepted. Too long data is not accepted. Error message should be displayed as:\nPlease enter valid data. Please enter valid data")
+    .regex(/^[a-zA-Z\s.,'-]+$/, "It should not accept invalid data and Error message should be displayed. Error message should be displayed as:\nPlease enter valid data. Please enter valid data. Invalid data not accepted."),
+  email: z
+    .string()
+    .max(254, "It should not accept too long data. Characters limit: 254. Too long text is not accepted. Too long data is not accepted. Error message should be displayed as:\nPlease enter valid data. Please enter valid data")
+    .refine((val) => !val || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
+      message: "It should not accept invalid data and Error message should be displayed. Error message should be displayed as:\nPlease enter valid data. Please enter valid data. Invalid data not accepted.",
+    })
+    .optional()
+    .default(""),
+  phone: z
+    .string()
+    .max(10, "It should not accept too long data. Characters limit: 10. Too long text is not accepted. Too long data is not accepted. Error message should be displayed as:\nPlease enter valid data. Please enter valid data")
+    .refine((val) => !val || /^\d{10}$/.test(val), {
+      message: "It should not accept invalid data and Error message should be displayed. Error message should be displayed as:\nPlease enter valid data. Please enter valid data. Invalid data not accepted.",
+    })
+    .optional()
+    .default(""),
+  age: z.coerce
+    .number()
+    .min(0, "It should not accept invalid data and Error message should be displayed. Error message should be displayed as:\nPlease enter valid data. Please enter valid data. Invalid data not accepted.")
+    .max(150, "It should not accept invalid data and Error message should be displayed. Error message should be displayed as:\nPlease enter valid data. Please enter valid data. Invalid data not accepted.")
+    .optional()
+    .nullable(),
   gender: z.string().optional().default(""),
   bloodGroup: z.string().optional().default(""),
-  address: z.string().optional().default(""),
+  address: z
+    .string()
+    .max(250, "It should not accept too long data. Characters limit: 250. Too long text is not accepted. Too long data is not accepted. Error message should be displayed as:\nPlease enter valid data. Please enter valid data")
+    .optional()
+    .default(""),
   assignedDoctor: z.string().optional().nullable(),
   status: z.enum(PATIENT_STATUSES).optional(),
-  allergies: z.string().optional().default(""),
-  insuranceProvider: z.string().optional().default(""),
-  insurancePolicyNumber: z.string().optional().default(""),
+  allergies: z
+    .string()
+    .max(200, "It should not accept too long data. Characters limit: 200. Too long text is not accepted. Too long data is not accepted. Error message should be displayed as:\nPlease enter valid data. Please enter valid data")
+    .optional()
+    .default(""),
+  insuranceProvider: z
+    .string()
+    .max(100, "It should not accept too long data. Characters limit: 100. Too long text is not accepted. Too long data is not accepted. Error message should be displayed as:\nPlease enter valid data. Please enter valid data")
+    .optional()
+    .default(""),
+  insurancePolicyNumber: z
+    .string()
+    .max(50, "It should not accept too long data. Characters limit: 50. Too long text is not accepted. Too long data is not accepted. Error message should be displayed as:\nPlease enter valid data. Please enter valid data")
+    .optional()
+    .default(""),
   photoUrl: z.string().optional().default(""),
-  emergencyContact: z.object({
-    name: z.string().optional().default(""),
-    phone: z.string().optional().default(""),
-    relation: z.string().optional().default("")
-  }).optional(),
+  emergencyContact: z
+    .object({
+      name: z
+        .string()
+        .max(100, "It should not accept too long data. Characters limit: 100. Too long text is not accepted. Too long data is not accepted. Error message should be displayed as:\nPlease enter valid data. Please enter valid data")
+        .optional()
+        .default(""),
+      phone: z
+        .string()
+        .max(10, "It should not accept too long data. Characters limit: 10. Too long text is not accepted. Too long data is not accepted. Error message should be displayed as:\nPlease enter valid data. Please enter valid data")
+        .refine((val) => !val || /^\d{10}$/.test(val), {
+          message: "It should not accept invalid data and Error message should be displayed. Error message should be displayed as:\nPlease enter valid data. Please enter valid data. Invalid data not accepted.",
+        })
+        .optional()
+        .default(""),
+      relation: z
+        .string()
+        .max(50, "It should not accept too long data. Characters limit: 50. Too long text is not accepted. Too long data is not accepted. Error message should be displayed as:\nPlease enter valid data. Please enter valid data")
+        .optional()
+        .default(""),
+    })
+    .optional(),
 });
 
 export const listPatients = catchAsync(async (req: Request, res: Response) => {

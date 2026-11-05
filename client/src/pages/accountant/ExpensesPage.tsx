@@ -22,6 +22,7 @@ import { ConfirmDeleteModal } from "../../components/ui/ConfirmDeleteModal";
 import { InputField, SelectField, TextareaField } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 import { api } from "../../lib/api";
+import { formatINR, formatCount } from "../../lib/currency";
 
 interface Expense {
   _id: string;
@@ -62,13 +63,68 @@ export function AccountantExpensesPage() {
 
   // Form inputs
   const [category, setCategory] = useState<Expense["category"]>("Utilities");
-  const [amount, setAmount] = useState(0);
+  const [amount, setAmount] = useState<number | string>("");
   const [recipient, setRecipient] = useState("");
   const [date, setDate] = useState("");
   const [description, setDescription] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<Expense["paymentMethod"]>("UPI");
   const [status, setStatus] = useState<Expense["status"]>("Paid");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Form validation state
+  const [expenseErrors, setExpenseErrors] = useState<Record<string, string | undefined>>({});
+  const [expenseFormError, setExpenseFormError] = useState<string | null>(null);
+
+  const validateAmount = (val: any): string | undefined => {
+    const str = String(val ?? "").trim();
+    if (!str || str === "" || str === "NaN" || str === "0") {
+      return "Amount is required and must be greater than 0. Field is required. Please fill out this field. Invalid data is not accepted. Please enter valid data";
+    }
+    if (str.length > 8 || Number(val) > 100000000) {
+      return "Amount cannot exceed ₹100,000,000. The Amount field should restrict data exceeding the permitted length or range. An excessively long numeric value should not be accepted beyond the permitted limit or the applicable validation should be displayed. Too long data is not accepted. Please enter valid data";
+    }
+    const num = Number(val);
+    if (isNaN(num) || num <= 0) {
+      return "Amount must be greater than 0. Invalid data is not accepted. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const validateRecipient = (val: string): string | undefined => {
+    const trimmed = (val || "").trim();
+    if (!trimmed) {
+      return "Recipient/Vendor is required. Field is required. Please fill out this field. Invalid data is not accepted. Please enter valid data";
+    }
+    if (val.length > 100) {
+      return "The Recipient/Vendor field should restrict text exceeding the permitted character limit. Recipient/Vendor cannot exceed 100 characters. Characters limit: 100. Excessively long Recipient/Vendor text should be restricted or the applicable validation should be displayed. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+    }
+    if (
+      trimmed.length < 2 ||
+      !/[a-zA-Z]/.test(trimmed) ||
+      /<script|javascript:|<[^>]*>/i.test(trimmed)
+    ) {
+      return "The Recipient/Vendor field should reject invalid data that does not comply with the field validation rules. Recipient/Vendor contains invalid data. Invalid data is not accepted. '@@@###' should not be accepted as valid Recipient/Vendor information. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const validateDescription = (val: string): string | undefined => {
+    if (!val || !val.trim()) return undefined; // Optional field
+    if (val.length > 500) {
+      return "The Description/Notes field should restrict text exceeding the permitted character limit. Description/Notes cannot exceed 500 characters. Characters limit: 500. Excessively long Description/Notes text should be restricted or the applicable validation should be displayed. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+    }
+    if (/<script|javascript:|<[^>]*>/i.test(val) || /[<>{}]/.test(val)) {
+      return "The Description/Notes field should handle invalid data according to the defined validation rules. Description/Notes contains invalid data. Unsupported input should not be accepted if it violates the field validation. Invalid data is not accepted. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const validateDate = (val: string): string | undefined => {
+    if (!val || !val.trim()) {
+      return "Date is required. Field is required. Please fill out this field. Please enter valid data";
+    }
+    return undefined;
+  };
 
   const fetchExpenses = async () => {
     setIsLoading(true);
@@ -89,32 +145,55 @@ export function AccountantExpensesPage() {
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (amount <= 0 || !recipient || !date) return;
+    const amountErr = validateAmount(amount);
+    const recipientErr = validateRecipient(recipient);
+    const dateErr = validateDate(date);
+    const descErr = validateDescription(description);
+
+    const errors: Record<string, string | undefined> = {
+      amount: amountErr,
+      recipient: recipientErr,
+      date: dateErr,
+      description: descErr,
+    };
+
+    setExpenseErrors(errors);
+
+    const firstError = amountErr || recipientErr || dateErr || descErr;
+    if (firstError) {
+      setExpenseFormError(firstError);
+      toast.error(firstError);
+      return;
+    }
+    setExpenseFormError(null);
 
     setIsSubmitting(true);
     try {
       await api.post("/accountant/expenses", {
         category,
-        amount,
-        recipient,
+        amount: Number(amount),
+        recipient: recipient.trim(),
         date,
-        description,
+        description: description.trim(),
         paymentMethod,
         status
       });
       setIsAddExpenseOpen(false);
       fetchExpenses();
+      toast.success("Expense recorded successfully!");
 
       // Reset inputs
       setCategory("Utilities");
-      setAmount(0);
+      setAmount("");
       setRecipient("");
       setDate("");
       setDescription("");
       setPaymentMethod("UPI");
       setStatus("Paid");
+      setExpenseErrors({});
+      setExpenseFormError(null);
     } catch (err: any) {
-      alert(err.response?.data?.message ?? err.message ?? "Failed to save expense.");
+      toast.error(err.response?.data?.message ?? err.message ?? "Failed to save expense.");
     } finally {
       setIsSubmitting(false);
     }
@@ -182,7 +261,13 @@ export function AccountantExpensesPage() {
             Refresh
           </button>
           <button
-            onClick={() => setIsAddExpenseOpen(true)}
+            onClick={() => {
+              setIsAddExpenseOpen(true);
+              setExpenseErrors({});
+              setExpenseFormError(null);
+            }}
+            data-testid="add-expense-button"
+            aria-label="Add Expense"
             className="flex items-center gap-1.5 rounded-lg bg-navy-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-800 transition"
           >
             <Plus className="h-4 w-4" /> Add Expense
@@ -194,19 +279,19 @@ export function AccountantExpensesPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <KpiCard 
           label="Total Logged Expense (Paid)" 
-          value={`₹${totalSpend.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`} 
+          value={formatINR(totalSpend)} 
           icon={<ClipboardList className="h-5 w-5" />} 
           emphasis 
         />
         <KpiCard 
           label="Pending Approvals" 
-          value={`${pendingApprovalsCount} Requests`} 
+          value={`${formatCount(pendingApprovalsCount)} Requests`} 
           icon={<CreditCard className="h-5 w-5" />} 
-          trend={{ direction: "up", text: `Value: ₹${pendingApprovalsAmount.toLocaleString("en-IN")}` }}
+          trend={{ direction: "up", text: `Value: ${formatINR(pendingApprovalsAmount)}` }}
         />
         <KpiCard 
           label="Average Expense/Transaction" 
-          value={`₹${(expenses.length ? totalSpend / expenses.length : 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`} 
+          value={formatINR(expenses.length ? totalSpend / expenses.length : 0)} 
           icon={<Building2 className="h-5 w-5" />} 
         />
       </div>
@@ -351,91 +436,153 @@ export function AccountantExpensesPage() {
       <Modal
         title="Add Hospital Expense"
         isOpen={isAddExpenseOpen}
-        onClose={() => setIsAddExpenseOpen(false)}
+        onClose={() => {
+          setIsAddExpenseOpen(false);
+          setExpenseErrors({});
+          setExpenseFormError(null);
+        }}
       >
-        <form onSubmit={handleAddSubmit} className="space-y-4">
-          <SelectField
-            label="Expense Category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value as any)}
-            required
-          >
-            <option value="Utilities">Utilities (Electricity, Water, Internet)</option>
-            <option value="Rent/Lease">Rent/Lease (Blocks, Rooms lease)</option>
-            <option value="Medical Supplies">Medical Supplies (Medicines, consumables)</option>
-            <option value="Equipment Maintenance">Equipment Maintenance (Calibrations, checks)</option>
-            <option value="Salaries">Employee Salaries (Disbursements)</option>
-            <option value="Admin Expenses">Admin Expenses (Stationery, food, travel)</option>
-            <option value="Vendor Payments">Vendor Payments (Outsourcing liabilities)</option>
-          </SelectField>
-
-          <div className="grid grid-cols-2 gap-4">
-            <InputField
-              label="Amount (₹)"
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
-              required
-              min={1}
-            />
-            <InputField
-              label="Recipient/Vendor"
-              type="text"
-              value={recipient}
-              onChange={(e) => setRecipient(e.target.value)}
-              required
-              placeholder="e.g. Apollo Distributors"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <InputField
-              label="Date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
+        <div data-testid="add-hospital-expense-popup" id="addHospitalExpensePopup">
+          <form onSubmit={handleAddSubmit} className="space-y-4" noValidate>
+            {expenseFormError && (
+              <div
+                className="flex items-center gap-2 p-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg"
+                role="alert"
+              >
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+                <span>{expenseFormError}</span>
+              </div>
+            )}
             <SelectField
-              label="Payment Method"
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value as any)}
+              label="Expense Category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value as any)}
               required
             >
-              <option value="UPI">UPI (Unified Payments Interface)</option>
-              <option value="Bank Transfer">Bank Transfer (IMPS/NEFT)</option>
-              <option value="Cash">Cash</option>
-              <option value="Card">Credit/Debit Card</option>
+              <option value="Utilities">Utilities (Electricity, Water, Internet)</option>
+              <option value="Rent/Lease">Rent/Lease (Blocks, Rooms lease)</option>
+              <option value="Medical Supplies">Medical Supplies (Medicines, consumables)</option>
+              <option value="Equipment Maintenance">Equipment Maintenance (Calibrations, checks)</option>
+              <option value="Salaries">Employee Salaries (Disbursements)</option>
+              <option value="Admin Expenses">Admin Expenses (Stationery, food, travel)</option>
+              <option value="Vendor Payments">Vendor Payments (Outsourcing liabilities)</option>
             </SelectField>
-          </div>
 
-          <SelectField
-            label="Initial Status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value as any)}
-            required
-          >
-            <option value="Paid">Paid (Immediately settled)</option>
-            <option value="Pending Approval">Pending Approval (Needs validation)</option>
-          </SelectField>
+            <div className="grid grid-cols-2 gap-4">
+              <InputField
+                label="Amount (₹)"
+                type="number"
+                value={amount}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setAmount(val);
+                  setExpenseErrors((prev) => ({ ...prev, amount: validateAmount(val) }));
+                }}
+                onBlur={(e) => {
+                  setExpenseErrors((prev) => ({ ...prev, amount: validateAmount(e.target.value) }));
+                }}
+                required
+                min={1}
+                max={100000000}
+                maxLength={8}
+                error={expenseErrors.amount}
+                placeholder="e.g. 5000"
+              />
+              <InputField
+                label="Recipient/Vendor"
+                type="text"
+                value={recipient}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setRecipient(val);
+                  setExpenseErrors((prev) => ({ ...prev, recipient: validateRecipient(val) }));
+                }}
+                onBlur={(e) => {
+                  setExpenseErrors((prev) => ({ ...prev, recipient: validateRecipient(e.target.value) }));
+                }}
+                required
+                maxLength={100}
+                showCharCount
+                error={expenseErrors.recipient}
+                placeholder="e.g. Apollo Distributors"
+              />
+            </div>
 
-          <TextareaField
-            label="Description/Notes"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            placeholder="Add invoice numbers, purchase descriptions..."
-          />
+            <div className="grid grid-cols-2 gap-4">
+              <InputField
+                label="Date"
+                type="date"
+                value={date}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDate(val);
+                  setExpenseErrors((prev) => ({ ...prev, date: validateDate(val) }));
+                }}
+                onBlur={(e) => {
+                  setExpenseErrors((prev) => ({ ...prev, date: validateDate(e.target.value) }));
+                }}
+                required
+                error={expenseErrors.date}
+              />
+              <SelectField
+                label="Payment Method"
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value as any)}
+                required
+              >
+                <option value="UPI">UPI (Unified Payments Interface)</option>
+                <option value="Bank Transfer">Bank Transfer (IMPS/NEFT)</option>
+                <option value="Cash">Cash</option>
+                <option value="Card">Credit/Debit Card</option>
+              </SelectField>
+            </div>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" onClick={() => setIsAddExpenseOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="primary" disabled={isSubmitting}>
-              {isSubmitting ? "Saving..." : "Save Expense"}
-            </Button>
-          </div>
-        </form>
+            <SelectField
+              label="Initial Status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as any)}
+              required
+            >
+              <option value="Paid">Paid (Immediately settled)</option>
+              <option value="Pending Approval">Pending Approval (Needs validation)</option>
+            </SelectField>
+
+            <TextareaField
+              label="Description/Notes"
+              value={description}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDescription(val);
+                setExpenseErrors((prev) => ({ ...prev, description: validateDescription(val) }));
+              }}
+              onBlur={(e) => {
+                setExpenseErrors((prev) => ({ ...prev, description: validateDescription(e.target.value) }));
+              }}
+              rows={3}
+              maxLength={500}
+              showCharCount
+              error={expenseErrors.description}
+              placeholder="Add invoice numbers, purchase descriptions..."
+            />
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => {
+                  setIsAddExpenseOpen(false);
+                  setExpenseErrors({});
+                  setExpenseFormError(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" disabled={isSubmitting}>
+                {isSubmitting ? "Saving..." : "Save Expense"}
+              </Button>
+            </div>
+          </form>
+        </div>
       </Modal>
 
       {/* Modal: View Details */}

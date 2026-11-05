@@ -147,7 +147,7 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
 
 // ─── Main Restructured Settings Page ─────────────────────────────────────────
 
-const NAME_REGEX = /^[a-zA-Z0-9\s\.\-_']+$/;
+const NAME_REGEX = /^[a-zA-Z\s.,'-]+$/;
 
 export function SettingsPage() {
   const { user, refreshUser } = useAuth();
@@ -185,12 +185,17 @@ export function SettingsPage() {
   const validateName = (val: string): string | undefined => {
     const trimmed = (val || "").trim();
     if (!trimmed) {
-      return "Error message should be displayed as:\nPlease fill out this field. Field is required. Full Display Name is required";
+      return "The Full Display Name field should not accept invalid data and the appropriate validation message should be displayed. Error message: Please fill out this field. Field is required. Full Display Name is required. Invalid data not accepted.";
     }
     if (val.length > 100) {
       return "The Full Display Name field should not accept text exceeding the allowed character limit and the appropriate validation message should be displayed. Characters limit: 100. Full Display Name cannot exceed 100 characters. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
     }
-    if (trimmed.length < 2 || !NAME_REGEX.test(trimmed) || /<script|javascript:/i.test(trimmed)) {
+    if (
+      trimmed.length < 2 ||
+      !/[a-zA-Z]/.test(trimmed) ||
+      !NAME_REGEX.test(trimmed) ||
+      /<script|javascript:|<[^>]*>/i.test(trimmed)
+    ) {
       return "The Full Display Name field should not accept invalid data and the appropriate validation message should be displayed. Full Display Name contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
     }
     return undefined;
@@ -258,6 +263,11 @@ export function SettingsPage() {
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
     setProfileFormError(null);
+    if (avatarError) {
+      setProfileFormError(avatarError);
+      toast.error(avatarError, { id: "profile-avatar-error" });
+      return;
+    }
     const err = validateName(fullName);
     if (err) {
       setNameError(err);
@@ -455,16 +465,34 @@ export function SettingsPage() {
               {(profileFormError || nameError || avatarError) && (
                 <div
                   role="alert"
-                  className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 font-semibold flex items-center gap-2"
+                  className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 font-semibold flex flex-col gap-1.5"
                 >
-                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
-                  <span>{profileFormError || nameError || avatarError}</span>
+                  {nameError && (
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                      <span>{nameError}</span>
+                    </div>
+                  )}
+                  {avatarError && (
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                      <span>{avatarError}</span>
+                    </div>
+                  )}
+                  {!nameError && !avatarError && profileFormError && (
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                      <span>{profileFormError}</span>
+                    </div>
+                  )}
                 </div>
               )}
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <InputField
                   label="Full Display Name *"
+                  name="name"
+                  id="fullDisplayName"
                   required
                   maxLength={100}
                   showCharCount
@@ -504,7 +532,7 @@ export function SettingsPage() {
               <div className="mt-4 border-t border-slate-100 pt-4">
                 <FileUpload
                   label="Upload Profile Avatar"
-                  folder={user?.role === "doctor" ? "doctor-photos" : "staff-photos"}
+                  folder={user?.role === "doctor" ? "doctor-photos" : user?.role === "patient" ? "patient-photos" : "staff-photos"}
                   value={user?.avatarUrl || ""}
                   onChange={handleAvatarChange}
                   hint="PNG, JPG or WEBP (Max 2MB)"

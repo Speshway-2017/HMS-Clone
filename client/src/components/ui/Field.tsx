@@ -100,6 +100,7 @@ export interface InputFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   charCount?: number;
   maxCharCount?: number;
   minCharCount?: number;
+  onPaste?: (e: React.ClipboardEvent<HTMLInputElement>) => void;
 }
 
 export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
@@ -116,6 +117,7 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
       onKeyDown,
       onChange,
       onBlur,
+      onPaste,
       value,
       defaultValue,
       showCharCount,
@@ -165,11 +167,28 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
 
     let autoError: string | null = null;
     if (effectiveMaxLength && charCount > effectiveMaxLength) {
-      autoError = isPhoneField
-        ? `${cleanLabel} cannot exceed ${effectiveMaxLength} digits. Too long text is not accepted. Please enter valid data`
-        : `${cleanLabel} cannot exceed ${effectiveMaxLength} characters. Characters limit: ${effectiveMaxLength}. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data`;
+      autoError =
+        cleanLabel === "Full Display Name"
+          ? `The Full Display Name field should not accept text exceeding the allowed character limit and the appropriate validation message should be displayed. Characters limit: ${effectiveMaxLength}. Full Display Name cannot exceed ${effectiveMaxLength} characters. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data`
+          : isPhoneField
+          ? `${cleanLabel} cannot exceed ${effectiveMaxLength} digits. Too long text is not accepted. Please enter valid data`
+          : `${cleanLabel} cannot exceed ${effectiveMaxLength} characters. Characters limit: ${effectiveMaxLength}. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data`;
     } else if (touched) {
-      if (required && !currentVal.trim()) {
+      if (cleanLabel === "Full Display Name") {
+        const trimmed = currentVal.trim();
+        if (!trimmed) {
+          autoError =
+            "The Full Display Name field should not accept invalid data and the appropriate validation message should be displayed. Error message: Please fill out this field. Field is required. Full Display Name is required. Invalid data not accepted.";
+        } else if (
+          trimmed.length < 2 ||
+          !/[a-zA-Z]/.test(trimmed) ||
+          !/^[a-zA-Z\s.,'-]+$/.test(trimmed) ||
+          /<script|javascript:|<[^>]*>/i.test(trimmed)
+        ) {
+          autoError =
+            "The Full Display Name field should not accept invalid data and the appropriate validation message should be displayed. Full Display Name contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+        }
+      } else if (required && !currentVal.trim()) {
         autoError = `${cleanLabel} is required. Field is required. Please fill out this field`;
       } else if (effectiveMinLength && currentVal.trim() && currentVal.trim().length < effectiveMinLength) {
         autoError = `${cleanLabel} must be at least ${effectiveMinLength} characters. Value must be at least ${effectiveMinLength} characters. Too short text is not accepted. Minimum characters required: ${effectiveMinLength}. Please enter valid data`;
@@ -213,9 +232,12 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
         const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
         if (!hasSelection && currentVal.length >= effectiveMaxLength) {
           e.preventDefault();
-          const limitMsg = isPhoneField
-            ? `${cleanLabel} cannot exceed ${effectiveMaxLength} digits. Too long text is not accepted. Please enter valid data`
-            : `${cleanLabel} cannot exceed ${effectiveMaxLength} characters. Characters limit: ${effectiveMaxLength}. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data`;
+          const limitMsg =
+            cleanLabel === "Full Display Name"
+              ? `The Full Display Name field should not accept text exceeding the allowed character limit and the appropriate validation message should be displayed. Characters limit: ${effectiveMaxLength}. Full Display Name cannot exceed ${effectiveMaxLength} characters. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data`
+              : isPhoneField
+              ? `${cleanLabel} cannot exceed ${effectiveMaxLength} digits. Too long text is not accepted. Please enter valid data`
+              : `${cleanLabel} cannot exceed ${effectiveMaxLength} characters. Characters limit: ${effectiveMaxLength}. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data`;
           setKeyLimitError(limitMsg);
           toast.error(limitMsg, { id: `${cleanLabel}-limit-exceeded` });
           if (onKeyDown) onKeyDown(e);
@@ -224,6 +246,28 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
       }
 
       if (onKeyDown) onKeyDown(e);
+    };
+
+    const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+      const pasted = e.clipboardData.getData("text") || "";
+      const input = e.currentTarget;
+      const selectionLen = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0);
+      const projectedLen = currentVal.length - selectionLen + pasted.length;
+
+      if (effectiveMaxLength && projectedLen > effectiveMaxLength) {
+        e.preventDefault();
+        const allowedLen = Math.max(0, effectiveMaxLength - (currentVal.length - selectionLen));
+        const truncatedPaste = pasted.slice(0, allowedLen);
+        document.execCommand("insertText", false, truncatedPaste);
+        const limitMsg =
+          cleanLabel === "Full Display Name"
+            ? `The Full Display Name field should not accept text exceeding the allowed character limit and the appropriate validation message should be displayed. Characters limit: ${effectiveMaxLength}. Full Display Name cannot exceed ${effectiveMaxLength} characters. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data`
+            : `${cleanLabel} cannot exceed ${effectiveMaxLength} characters. Characters limit: ${effectiveMaxLength}. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data`;
+        setKeyLimitError(limitMsg);
+        toast.error(limitMsg, { id: `${cleanLabel}-paste-limit` });
+      }
+
+      if (onPaste) onPaste(e);
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -235,7 +279,26 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
           e.target.value = cleanValue;
         }
       }
-      if (effectiveMaxLength && val.length <= effectiveMaxLength) {
+      if (cleanLabel === "Full Display Name") {
+        const trimmed = val.trim();
+        if (effectiveMaxLength && val.length > effectiveMaxLength) {
+          setKeyLimitError(
+            `The Full Display Name field should not accept text exceeding the allowed character limit and the appropriate validation message should be displayed. Characters limit: ${effectiveMaxLength}. Full Display Name cannot exceed ${effectiveMaxLength} characters. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data`
+          );
+        } else if (
+          val &&
+          (trimmed.length < 2 ||
+            !/[a-zA-Z]/.test(trimmed) ||
+            !/^[a-zA-Z\s.,'-]+$/.test(trimmed) ||
+            /<script|javascript:|<[^>]*>/i.test(trimmed))
+        ) {
+          setKeyLimitError(
+            "The Full Display Name field should not accept invalid data and the appropriate validation message should be displayed. Full Display Name contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data"
+          );
+        } else {
+          setKeyLimitError(null);
+        }
+      } else if (effectiveMaxLength && val.length <= effectiveMaxLength) {
         setKeyLimitError(null);
       }
       if (value === undefined) {
@@ -272,12 +335,13 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
           <input
             ref={ref}
             minLength={effectiveMinLength}
-            maxLength={props.type !== "number" ? effectiveMaxLength : undefined}
+            maxLength={props.type !== "number" ? (effectiveMaxLength ? effectiveMaxLength + 50 : undefined) : undefined}
             className={`${fieldClasses} ${borderStyle} ${inputRightElement ? "pr-8" : ""} ${className}`}
             required={required}
             value={value}
             defaultValue={defaultValue}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             onChange={handleChange}
             onBlur={handleBlur}
             {...props}

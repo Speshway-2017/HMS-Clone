@@ -642,7 +642,10 @@ export const getPaymentHistory = catchAsync(async (req: Request, res: Response) 
   const combinedPayments = [...opPayments, ...mappedIpPayments];
   combinedPayments.sort((a: any, b: any) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime());
 
-  const totalAmount = combinedPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+  const totalAmount = combinedPayments.reduce((sum: number, p: any) => {
+    const amt = Number(p.amount) || 0;
+    return Number.isFinite(amt) && amt > 0 && amt <= 100000000 ? sum + amt : sum;
+  }, 0);
   res.json({ status: "success", data: { payments: combinedPayments, total: combinedPayments.length, totalAmount } });
 });
 

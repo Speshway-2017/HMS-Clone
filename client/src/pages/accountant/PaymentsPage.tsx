@@ -14,6 +14,7 @@ import { Card } from "../../components/ui/Card";
 import { KpiCard } from "../../components/ui/KpiCard";
 import { Badge } from "../../components/ui/Badge";
 import { Modal } from "../../components/ui/Modal";
+import { formatINR, formatCount } from "../../lib/currency";
 
 const STATUS_TONE = { 
   paid: "success", 
@@ -99,23 +100,23 @@ export function AccountantPaymentsPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard 
           label="Total Collections" 
-          value={`₹${totalCollections.toLocaleString("en-IN")}`} 
+          value={formatINR(totalCollections)} 
           icon={<IndianRupee className="h-5 w-5" />} 
           emphasis 
         />
         <KpiCard 
           label="Paid Bills" 
-          value={paidCount} 
+          value={formatCount(paidCount)} 
           icon={<CheckCircle className="h-5 w-5" />} 
         />
         <KpiCard 
           label="Pending Bills" 
-          value={pendingCount} 
+          value={formatCount(pendingCount)} 
           icon={<Clock className="h-5 w-5" />} 
         />
         <KpiCard 
           label="Overdue Bills" 
-          value={overdueCount} 
+          value={formatCount(overdueCount)} 
           icon={<AlertCircle className="h-5 w-5" />} 
         />
       </div>

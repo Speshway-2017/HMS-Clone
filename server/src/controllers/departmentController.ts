@@ -111,6 +111,11 @@ import { Branch } from "../models/Branch";
 export const listDepartments = catchAsync(async (req: Request, res: Response) => {
   const filter: Record<string, unknown> = { ...req.hospitalFilter };
 
+  if (req.user?.role === "patient" || !filter.hospital) {
+    delete filter.hospital;
+    delete filter.branch;
+  }
+
   if (req.query.activeOnly === "true" || req.query.active === "true") {
     filter.isDisabled = { $ne: true };
   }

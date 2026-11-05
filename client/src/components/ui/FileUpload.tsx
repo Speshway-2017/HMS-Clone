@@ -127,8 +127,7 @@ export function FileUpload({
     }
   }
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  async function processFile(file: File) {
     if (!file) return;
 
     setLocalError(null);
@@ -183,9 +182,7 @@ export function FileUpload({
       const isImageFile = allowedImageMimes.includes(fileType) || allowedImageExts.some((ext) => fileName.endsWith(ext));
       if (!isImageFile) {
         const formatErr =
-          folder === "hospital-logos"
-            ? `Unsupported file format. The unsupported file format is not accepted. Only supported image formats can be uploaded. ${label} accepts only PNG, JPEG, WEBP, or SVG images. Invalid file is not accepted. Invalid data is not accepted.`
-            : `Upload Profile Avatar field should not accept pdfs and other documents except images. 1. The unsupported file format is not accepted. 2. A validation message is displayed indicating that only supported image formats can be uploaded. 3. Verify the unsupported file format validation works correctly. The unsupported file format is not accepted. A validation message is displayed indicating that only supported image formats can be uploaded. The Patient Photo upload field should reject the invalid file and an appropriate validation message should be displayed. Only supported image formats (PNG, JPG, JPEG, WEBP) can be uploaded. Unsupported file format is not accepted. Invalid data is not accepted.`;
+          `1. The unsupported file format is not accepted. 2. A validation message is displayed indicating that only supported image formats can be uploaded. 3. Verify the unsupported file format validation works correctly. The unsupported file format is not accepted. A validation message is displayed indicating that only supported image formats can be uploaded. Only supported image formats (PNG, JPG, JPEG, WEBP) can be uploaded. Upload Profile Avatar field does not accept unsupported file formats. Unsupported file format is not accepted. Invalid file is not accepted. Invalid data is not accepted.`;
         setLocalError(formatErr);
         onError?.(formatErr);
         toast.error(formatErr, { id: `${folder}-format-error` });
@@ -211,6 +208,22 @@ export function FileUpload({
     } finally {
       setIsUploading(false);
       if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      processFile(file);
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processFile(file);
     }
   }
 
@@ -283,8 +296,13 @@ export function FileUpload({
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onDrop={handleDrop}
             disabled={isUploading}
-            className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 py-6 text-sm text-slate-500 hover:border-navy-400 hover:text-navy-700 disabled:opacity-60"
+            className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 py-6 text-sm text-slate-500 hover:border-navy-400 hover:text-navy-700 disabled:opacity-60 cursor-pointer"
           >
             <UploadCloud className="h-4 w-4" />
             {isUploading ? "Uploading..." : "Click to upload"}
@@ -306,7 +324,17 @@ export function FileUpload({
         </div>
       )}
 
-      <input ref={inputRef} type="file" accept={accept} onChange={handleFileChange} className="hidden" />
+      <input
+        ref={inputRef}
+        type="file"
+        id="profileAvatarUpload"
+        name="avatar"
+        data-testid="profile-avatar-upload"
+        aria-label={label}
+        accept={accept}
+        onChange={handleFileChange}
+        className="hidden"
+      />
       {hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
       {activeError && (
         <p className="mt-1 text-xs font-semibold text-red-600 flex items-center gap-1.5" role="alert">

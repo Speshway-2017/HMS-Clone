@@ -1,5 +1,5 @@
-import {
-  useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 // @ts-ignore
 import html2pdf from "html2pdf.js";
@@ -15,6 +15,7 @@ import {
   CheckCircle,
   Eye,
   AlertTriangle,
+  AlertCircle,
   RefreshCw,
   X,
   User,
@@ -111,7 +112,18 @@ const groupIPCharges = (charges: any[]) => {
 };
 
 export function AccountantBillingPage() {
-  const [activeTab, setActiveTab] = useState<"all" | "op" | "ip" | "pharmacy" | "laboratory" | "statement">("all");
+  const [searchParams] = useSearchParams();
+  const queryTab = searchParams.get("tab")?.toLowerCase();
+  const validTabs = ["all", "op", "ip", "pharmacy", "laboratory", "statement"];
+  const [activeTab, setActiveTab] = useState<"all" | "op" | "ip" | "pharmacy" | "laboratory" | "statement">(
+    queryTab && validTabs.includes(queryTab) ? (queryTab as any) : "all"
+  );
+
+  useEffect(() => {
+    if (queryTab && validTabs.includes(queryTab) && queryTab !== activeTab) {
+      setActiveTab(queryTab as any);
+    }
+  }, [queryTab]);
   const [ipSubTab, setIpSubTab] = useState<"workspace" | "history">("workspace");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -254,18 +266,137 @@ export function AccountantBillingPage() {
   // Custom Charge form state
   const [customCategory, setCustomCategory] = useState("Admission Charges");
   const [customServiceName, setCustomServiceName] = useState("");
-  const [customQty, setCustomQty] = useState(1);
-  const [customPrice, setCustomPrice] = useState(0);
-  const [customDiscount, setCustomDiscount] = useState(0);
-  const [customTax, setCustomTax] = useState(0);
+  const [customQty, setCustomQty] = useState<number | string>(1);
+  const [customPrice, setCustomPrice] = useState<number | string>(0);
+  const [customDiscount, setCustomDiscount] = useState<number | string>(0);
+  const [customTax, setCustomTax] = useState<number | string>(0);
   const [customRemarks, setCustomRemarks] = useState("");
 
   // Payment / Advance form state
   const [showAdvanceModal, setShowAdvanceModal] = useState(false);
-  const [advanceAmount, setAdvanceAmount] = useState(0);
+  const [advanceAmount, setAdvanceAmount] = useState<number | string>(0);
   const [advanceMethod, setAdvanceMethod] = useState("UPI");
   const [advanceTxId, setAdvanceTxId] = useState("");
   const [advanceType, setAdvanceType] = useState<"advance" | "refund">("advance");
+
+  // Custom Charge form validation errors
+  const [chargeErrors, setChargeErrors] = useState<Record<string, string | undefined>>({});
+  const [chargeFormError, setChargeFormError] = useState<string | null>(null);
+
+  // Advance Payment form validation errors
+  const [advanceErrors, setAdvanceErrors] = useState<Record<string, string | undefined>>({});
+  const [advanceFormError, setAdvanceFormError] = useState<string | null>(null);
+
+  const validateServiceName = (val: string): string | undefined => {
+    const trimmed = (val || "").trim();
+    if (!trimmed) {
+      return "Service / Item Name is required. Field is required. Please fill out this field. Invalid data is not accepted. Please enter valid data";
+    }
+    if (val.length > 100) {
+      return "Service / Item Name cannot exceed 100 characters. Too long text is not accepted. Too long data is not accepted. It should not accept too long data. Please enter valid data";
+    }
+    if (trimmed.length < 2 || /<script|javascript:|<[^>]*>/i.test(trimmed)) {
+      return "Service / Item Name contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const validateQuantity = (val: any): string | undefined => {
+    const str = String(val ?? "").trim();
+    if (!str || str === "" || str === "NaN") {
+      return "Quantity is required. Field is required. Please fill out this field. Invalid data is not accepted. Please enter valid data";
+    }
+    if (str.length > 5 || Number(val) > 9999) {
+      return "Quantity cannot exceed 9,999. Too long text is not accepted. Too long data is not accepted. It should not accept too long data. Please enter valid data";
+    }
+    const num = Number(val);
+    if (isNaN(num) || num <= 0 || !Number.isInteger(num)) {
+      return "Quantity must be a positive whole number. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const validateUnitPrice = (val: any): string | undefined => {
+    const str = String(val ?? "").trim();
+    if (!str || str === "" || str === "NaN" || str === "0") {
+      return "Unit Price is required and must be greater than 0. Field is required. Please fill out this field. Invalid data is not accepted. Please enter valid data";
+    }
+    if (str.length > 10 || Number(val) > 100000000) {
+      return "Unit Price cannot exceed ₹100,000,000. Too long text is not accepted. Too long data is not accepted. It should not accept too long data. Please enter valid data";
+    }
+    const num = Number(val);
+    if (isNaN(num) || num <= 0) {
+      return "Unit Price must be greater than 0. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const validateDiscount = (val: any, price: number, qty: number): string | undefined => {
+    const str = String(val ?? "").trim();
+    if (!str || str === "" || str === "0") return undefined;
+    if (str.length > 10 || Number(val) > 100000000) {
+      return "Discount cannot exceed ₹100,000,000. Too long text is not accepted. Too long data is not accepted. It should not accept too long data. Please enter valid data";
+    }
+    const num = Number(val);
+    if (isNaN(num) || num < 0) {
+      return "Discount cannot be negative. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    if (num > (price * qty)) {
+      return "Discount cannot exceed total item price. Invalid data is not accepted. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const validateTaxAmount = (val: any): string | undefined => {
+    const str = String(val ?? "").trim();
+    if (!str || str === "" || str === "0") return undefined;
+    if (str.length > 10 || Number(val) > 100000000) {
+      return "Tax Amount cannot exceed ₹100,000,000. Too long text is not accepted. Too long data is not accepted. It should not accept too long data. Please enter valid data";
+    }
+    const num = Number(val);
+    if (isNaN(num) || num < 0) {
+      return "Tax Amount cannot be negative. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const validateRemarks = (val: string): string | undefined => {
+    if (!val) return undefined;
+    if (val.length > 250) {
+      return "Remarks cannot exceed 250 characters. Too long text is not accepted. Too long data is not accepted. It should not accept too long data. Please enter valid data";
+    }
+    if (/<script|javascript:|<[^>]*>/i.test(val) || /[<>{}]/.test(val)) {
+      return "Remarks contains invalid data. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const validateAdvanceAmount = (val: any): string | undefined => {
+    const str = String(val ?? "").trim();
+    if (!str || str === "" || str === "NaN" || str === "0") {
+      return "Transaction Amount is required and must be greater than 0. Field is required. Please fill out this field. Invalid data is not accepted. Please enter valid data";
+    }
+    if (str.length > 10 || Number(val) > 100000000) {
+      return "Transaction Amount cannot exceed ₹100,000,000. Too long text is not accepted. Too long data is not accepted. It should not accept too long data. Please enter valid data";
+    }
+    const num = Number(val);
+    if (isNaN(num) || num <= 0) {
+      return "Transaction Amount must be greater than 0. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const validateAdvanceTxId = (val: string): string | undefined => {
+    if (!val) return undefined;
+    if (val.length > 100) {
+      return "Transaction ID cannot exceed 100 characters. Too long text is not accepted. Too long data is not accepted. It should not accept too long data. Please enter valid data";
+    }
+    if (/<script|javascript:|<[^>]*>/i.test(val) || /[<>{}]/.test(val)) {
+      return "Transaction ID contains invalid data. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    return undefined;
+  };
+
 
   // Discount & Insurance splits state
   const [discountType, setDiscountType] = useState<"percentage" | "fixed">("fixed");
@@ -372,16 +503,41 @@ export function AccountantBillingPage() {
 
   const handleAddCustomCharge = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customServiceName || customPrice <= 0) return;
+    const serviceErr = validateServiceName(customServiceName);
+    const qtyErr = validateQuantity(customQty);
+    const priceErr = validateUnitPrice(customPrice);
+    const discountErr = validateDiscount(customDiscount, Number(customPrice) || 0, Number(customQty) || 1);
+    const taxErr = validateTaxAmount(customTax);
+    const remarksErr = validateRemarks(customRemarks);
+
+    const errors: Record<string, string | undefined> = {
+      serviceName: serviceErr,
+      qty: qtyErr,
+      price: priceErr,
+      discount: discountErr,
+      tax: taxErr,
+      remarks: remarksErr,
+    };
+
+    setChargeErrors(errors);
+
+    const firstError = serviceErr || qtyErr || priceErr || discountErr || taxErr || remarksErr;
+    if (firstError) {
+      setChargeFormError(firstError);
+      toast.error(firstError);
+      return;
+    }
+    setChargeFormError(null);
+
     try {
       await addChargeMutation.mutateAsync({
         category: customCategory,
-        serviceName: customServiceName,
-        quantity: customQty,
-        unitPrice: customPrice,
-        discount: customDiscount,
-        tax: customTax,
-        remarks: customRemarks
+        serviceName: customServiceName.trim(),
+        quantity: Number(customQty) || 1,
+        unitPrice: Number(customPrice) || 0,
+        discount: Number(customDiscount) || 0,
+        tax: Number(customTax) || 0,
+        remarks: customRemarks.trim()
       });
       setCustomServiceName("");
       setCustomQty(1);
@@ -389,6 +545,9 @@ export function AccountantBillingPage() {
       setCustomDiscount(0);
       setCustomTax(0);
       setCustomRemarks("");
+      setChargeErrors({});
+      setChargeFormError(null);
+      toast.success("Charge item added successfully!");
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || "Failed to add charge");
     }
@@ -414,17 +573,37 @@ export function AccountantBillingPage() {
 
   const handlePostAdvance = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (advanceAmount <= 0) return;
+    const amountErr = validateAdvanceAmount(advanceAmount);
+    const txIdErr = validateAdvanceTxId(advanceTxId);
+
+    const errors: Record<string, string | undefined> = {
+      amount: amountErr,
+      txId: txIdErr,
+    };
+
+    setAdvanceErrors(errors);
+
+    const firstError = amountErr || txIdErr;
+    if (firstError) {
+      setAdvanceFormError(firstError);
+      toast.error(firstError);
+      return;
+    }
+    setAdvanceFormError(null);
+
     try {
       await postPaymentMutation.mutateAsync({
-        amount: advanceAmount,
+        amount: Number(advanceAmount),
         paymentMethod: advanceMethod,
-        transactionId: advanceTxId || `TXN-${Date.now().toString().slice(-6)}`,
+        transactionId: advanceTxId.trim() || `TXN-${Date.now().toString().slice(-6)}`,
         type: advanceType
       });
       setShowAdvanceModal(false);
       setAdvanceAmount(0);
       setAdvanceTxId("");
+      setAdvanceErrors({});
+      setAdvanceFormError(null);
+      toast.success(advanceType === "advance" ? "Advance payment recorded successfully" : "Refund recorded successfully");
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || "Failed to post payment");
     }
@@ -474,11 +653,11 @@ export function AccountantBillingPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div data-testid="patient-billing-page" id="patientBillingInvoicesPage" className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Patient Billing & Invoices</h1>
+          <h1 data-testid="patient-billing-title" className="text-2xl font-bold text-slate-900">Patient Billing & Invoices</h1>
           <p className="text-sm text-slate-500">Manage OPD, IPD, laboratory diagnostics, and pharmacy bills.</p>
         </div>
 
@@ -517,13 +696,15 @@ export function AccountantBillingPage() {
         <div className="flex gap-2 p-1 bg-slate-100 rounded-lg max-w-xs border border-slate-200 shadow-inner">
           <button
             onClick={() => setIpSubTab("workspace")}
+            data-testid="ip-billing-workspace-subtab"
+            id="ipBillingWorkspaceTab"
             className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded-md transition-all ${
               ipSubTab === "workspace"
                 ? "bg-white text-navy-700 shadow-sm font-bold"
                 : "text-slate-500 hover:text-slate-700"
             }`}
           >
-            IP Billing Workspace
+            IP Running Billing Workspace
           </button>
           <button
             onClick={() => setIpSubTab("history")}
@@ -942,6 +1123,8 @@ export function AccountantBillingPage() {
                           <td className="px-4 py-3 text-right">
                             <button
                               onClick={() => setSelectedAdmissionId(adm._id)}
+                              data-testid="open-billing-button"
+                              aria-label="Open Billing"
                               className="inline-flex items-center gap-1 text-xs font-bold text-white bg-navy-700 hover:bg-navy-800 rounded-md px-3 py-1.5 transition shadow-sm"
                             >
                               Open Billing <ArrowRight className="h-3.5 w-3.5" />
@@ -962,8 +1145,12 @@ export function AccountantBillingPage() {
                 <div className="flex items-center gap-3">
                   <Layers className="h-6 w-6 text-navy-700 animate-pulse" />
                   <div>
-                    <h3 className="text-sm font-bold text-navy-800">
-                      IP Running Bill Workspace
+                    <h3
+                      data-testid="ip-running-billing-workspace-tab"
+                      id="ipRunningBillingWorkspaceTab"
+                      className="text-sm font-bold text-navy-800"
+                    >
+                      IP Running Billing Workspace
                     </h3>
                     <p className="text-xs text-navy-600">
                       Active: <span className="font-semibold">{ipDetails?.admission?.patient?.name}</span> ({ipDetails?.admission?.patient?.uhid})
@@ -1139,7 +1326,13 @@ export function AccountantBillingPage() {
                       <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                         <Plus className="h-4.5 w-4.5 text-navy-600" /> Post New Billable Charge
                       </h3>
-                      <form onSubmit={handleAddCustomCharge} className="space-y-3">
+                      <form onSubmit={handleAddCustomCharge} className="space-y-3" noValidate>
+                        {chargeFormError && (
+                          <div className="flex items-center gap-2 p-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg" role="alert">
+                            <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+                            <span>{chargeFormError}</span>
+                          </div>
+                        )}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <SelectField
                             label="Category"
@@ -1155,9 +1348,19 @@ export function AccountantBillingPage() {
                           <InputField
                             label="Service / Item Name"
                             value={customServiceName}
-                            onChange={(e) => setCustomServiceName(e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCustomServiceName(val);
+                              setChargeErrors(prev => ({ ...prev, serviceName: validateServiceName(val) }));
+                            }}
+                            onBlur={(e) => {
+                              setChargeErrors(prev => ({ ...prev, serviceName: validateServiceName(e.target.value) }));
+                            }}
                             placeholder="e.g. Daily Specialist Consultation, Dialysis Procedure..."
                             required
+                            maxLength={100}
+                            showCharCount
+                            error={chargeErrors.serviceName}
                           />
                         </div>
 
@@ -1166,36 +1369,82 @@ export function AccountantBillingPage() {
                             label="Quantity"
                             type="number"
                             value={customQty}
-                            onChange={(e) => setCustomQty(Number(e.target.value))}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCustomQty(val);
+                              setChargeErrors(prev => ({ ...prev, qty: validateQuantity(val) }));
+                            }}
+                            onBlur={(e) => {
+                              setChargeErrors(prev => ({ ...prev, qty: validateQuantity(e.target.value) }));
+                            }}
                             min="1"
+                            max="9999"
+                            maxLength={5}
                             required
+                            error={chargeErrors.qty}
                           />
                           <InputField
                             label="Unit Price (₹)"
                             type="number"
-                            value={customPrice || ""}
-                            onChange={(e) => setCustomPrice(Number(e.target.value))}
+                            value={customPrice === 0 ? "" : customPrice}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCustomPrice(val);
+                              setChargeErrors(prev => ({ ...prev, price: validateUnitPrice(val) }));
+                            }}
+                            onBlur={(e) => {
+                              setChargeErrors(prev => ({ ...prev, price: validateUnitPrice(e.target.value) }));
+                            }}
                             min="0"
+                            max="100000000"
+                            maxLength={10}
                             required
+                            error={chargeErrors.price}
                           />
                           <InputField
                             label="Discount (₹)"
                             type="number"
-                            value={customDiscount || ""}
-                            onChange={(e) => setCustomDiscount(Number(e.target.value))}
+                            value={customDiscount === 0 ? "" : customDiscount}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCustomDiscount(val);
+                              setChargeErrors(prev => ({
+                                ...prev,
+                                discount: validateDiscount(val, Number(customPrice) || 0, Number(customQty) || 1)
+                              }));
+                            }}
+                            onBlur={(e) => {
+                              setChargeErrors(prev => ({
+                                ...prev,
+                                discount: validateDiscount(e.target.value, Number(customPrice) || 0, Number(customQty) || 1)
+                              }));
+                            }}
                             min="0"
+                            max="100000000"
+                            maxLength={10}
+                            error={chargeErrors.discount}
                           />
                           <InputField
                             label="Tax Amount (₹)"
                             type="number"
-                            value={customTax || ""}
-                            onChange={(e) => setCustomTax(Number(e.target.value))}
+                            value={customTax === 0 ? "" : customTax}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCustomTax(val);
+                              setChargeErrors(prev => ({ ...prev, tax: validateTaxAmount(val) }));
+                            }}
+                            onBlur={(e) => {
+                              setChargeErrors(prev => ({ ...prev, tax: validateTaxAmount(e.target.value) }));
+                            }}
                             min="0"
+                            max="100000000"
+                            maxLength={10}
+                            error={chargeErrors.tax}
                           />
                           <div className="col-span-2 md:col-span-1">
                             <span className="block text-xs font-semibold text-slate-500 mb-1">Calculated Total</span>
                             <div className="h-9 flex items-center font-bold text-slate-800 text-sm bg-slate-50 px-3 border rounded-lg">
-                              {formatINR((customQty * customPrice) - customDiscount + customTax)}
+                              {formatINR(((Number(customQty) || 0) * (Number(customPrice) || 0)) - (Number(customDiscount) || 0) + (Number(customTax) || 0))}
                             </div>
                           </div>
                         </div>
@@ -1203,13 +1452,27 @@ export function AccountantBillingPage() {
                         <InputField
                           label="Remarks / Notes"
                           value={customRemarks}
-                          onChange={(e) => setCustomRemarks(e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCustomRemarks(val);
+                            setChargeErrors(prev => ({ ...prev, remarks: validateRemarks(val) }));
+                          }}
+                          onBlur={(e) => {
+                            setChargeErrors(prev => ({ ...prev, remarks: validateRemarks(e.target.value) }));
+                          }}
                           placeholder="Optional clinical notes or department approvals reference..."
+                          maxLength={250}
+                          showCharCount
+                          error={chargeErrors.remarks}
                         />
 
                         <div className="flex justify-end pt-1.5">
-                          <Button variant="primary" type="submit" disabled={addChargeMutation.isPending}>
-                            {addChargeMutation.isPending ? "Posting..." : "Confirm Post Charge"}
+                          <Button
+                            type="submit"
+                            className="bg-navy-600 hover:bg-navy-700 text-white text-xs font-bold py-2 px-4 shadow"
+                            disabled={addChargeMutation.isPending}
+                          >
+                            {addChargeMutation.isPending ? "Adding Charge..." : "Add Charge to Running Bill"}
                           </Button>
                         </div>
                       </form>
@@ -1254,22 +1517,24 @@ export function AccountantBillingPage() {
                           <span>Net Inpatient Bill:</span>
                           <span className="text-slate-900">{formatINR(netPayable)}</span>
                         </div>
-                        <div className="flex justify-between text-blue-700 font-medium pt-1">
-                          <span>Admission Advance Paid:</span>
-                          <span>{formatINR(advancePaid)}</span>
+                        <div className="flex justify-between items-center text-blue-700 font-medium pt-1 gap-2">
+                          <span className="shrink-0">Admission Advance Paid:</span>
+                          <span className="font-mono truncate max-w-[150px] text-right" title={formatINR(advancePaid)}>{formatINR(advancePaid)}</span>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <div>
+                      <div className="flex justify-between items-center gap-2">
+                        <div className="min-w-0 flex-1">
                           <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wide">Outstanding Balance</span>
-                          <span className={`text-lg font-black font-mono ${outstanding > 1 ? "text-red-600" : "text-emerald-700"}`}>
+                          <span className={`text-lg font-black font-mono truncate block ${outstanding > 1 ? "text-red-600" : "text-emerald-700"}`} title={formatINR(outstanding)}>
                             {formatINR(outstanding)}
                           </span>
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-1 shrink-0">
                           <Button
                             onClick={() => { setAdvanceType("advance"); setShowAdvanceModal(true); }}
                             className="w-full text-[10px] py-1 font-bold bg-navy-600 hover:bg-navy-700 text-white"
+                            data-testid="receive-payment-button"
+                            aria-label="Receive Payment"
                           >
                             Receive Payment
                           </Button>
@@ -1513,46 +1778,82 @@ export function AccountantBillingPage() {
       <Modal
         title={advanceType === "advance" ? "Receive Advance Payment" : "Process Refund Entry"}
         isOpen={showAdvanceModal}
-        onClose={() => setShowAdvanceModal(false)}
+        onClose={() => {
+          setShowAdvanceModal(false);
+          setAdvanceErrors({});
+          setAdvanceFormError(null);
+        }}
       >
-        <form onSubmit={handlePostAdvance} className="space-y-4">
-          <InputField
-            label="Transaction Amount (₹)"
-            type="number"
-            value={advanceAmount || ""}
-            onChange={(e) => setAdvanceAmount(Number(e.target.value))}
-            min="1"
-            required
-          />
+        <div data-testid="receive-advance-payment-tab" id="receiveAdvancePaymentTab">
+          <form onSubmit={handlePostAdvance} className="space-y-4" noValidate>
+            {advanceFormError && (
+              <div className="flex items-center gap-2 p-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg" role="alert">
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+                <span>{advanceFormError}</span>
+              </div>
+            )}
+            <InputField
+              label="Transaction Amount (₹)"
+              type="number"
+              value={advanceAmount === 0 ? "" : advanceAmount}
+              onChange={(e) => {
+                const val = e.target.value;
+                setAdvanceAmount(val);
+                setAdvanceErrors(prev => ({ ...prev, amount: validateAdvanceAmount(val) }));
+              }}
+              onBlur={(e) => {
+                setAdvanceErrors(prev => ({ ...prev, amount: validateAdvanceAmount(e.target.value) }));
+              }}
+              min="1"
+              max="100000000"
+              maxLength={10}
+              required
+              error={advanceErrors.amount}
+            />
 
-          <SelectField
-            label="Payment Mode"
-            value={advanceMethod}
-            onChange={(e) => setAdvanceMethod(e.target.value)}
-          >
-            <option value="UPI">UPI / QR Scan</option>
-            <option value="Cash">Cash Handover</option>
-            <option value="Card">Credit/Debit Card Terminal</option>
-            <option value="Net Banking">Net Banking</option>
-            <option value="Cheque">Physical Cheque</option>
-          </SelectField>
+            <SelectField
+              label="Payment Mode"
+              value={advanceMethod}
+              onChange={(e) => setAdvanceMethod(e.target.value)}
+            >
+              <option value="UPI">UPI / QR Scan</option>
+              <option value="Cash">Cash Handover</option>
+              <option value="Card">Credit/Debit Card Terminal</option>
+              <option value="Net Banking">Net Banking</option>
+              <option value="Cheque">Physical Cheque</option>
+            </SelectField>
 
-          <InputField
-            label="Transaction ID / Reference Number"
-            value={advanceTxId}
-            onChange={(e) => setAdvanceTxId(e.target.value)}
-            placeholder="e.g. Bank reference, bank trace number..."
-          />
+            <InputField
+              label="Transaction ID / Reference Number"
+              value={advanceTxId}
+              onChange={(e) => {
+                const val = e.target.value;
+                setAdvanceTxId(val);
+                setAdvanceErrors(prev => ({ ...prev, txId: validateAdvanceTxId(val) }));
+              }}
+              onBlur={(e) => {
+                setAdvanceErrors(prev => ({ ...prev, txId: validateAdvanceTxId(e.target.value) }));
+              }}
+              placeholder="e.g. Bank reference, bank trace number..."
+              maxLength={100}
+              showCharCount
+              error={advanceErrors.txId}
+            />
 
-          <div className="flex justify-end gap-2 pt-2 border-t">
-            <Button variant="secondary" type="button" onClick={() => setShowAdvanceModal(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" type="submit" disabled={postPaymentMutation.isPending}>
-              {postPaymentMutation.isPending ? "Processing..." : "Submit Transaction"}
-            </Button>
-          </div>
-        </form>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="secondary" type="button" onClick={() => {
+                setShowAdvanceModal(false);
+                setAdvanceErrors({});
+                setAdvanceFormError(null);
+              }}>
+                Cancel
+              </Button>
+              <Button variant="primary" type="submit" disabled={postPaymentMutation.isPending}>
+                {postPaymentMutation.isPending ? "Processing..." : "Submit Transaction"}
+              </Button>
+            </div>
+          </form>
+        </div>
       </Modal>
 
 

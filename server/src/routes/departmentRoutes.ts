@@ -13,11 +13,17 @@ import {
 
 const router = Router();
 
-router.use(protect, restrictTo("super_admin", "hospital_admin", "receptionist"), scopeToHospital);
+router.use(protect);
 
-router.route("/").get(listDepartments).post(createDepartment);
-router.get("/:id/metrics", getDepartmentMetrics);
+// Read-only department listing accessible to all authenticated roles (patient, doctor, receptionist, admin)
+router.get("/", scopeToHospital, listDepartments);
+router.get("/:id", scopeToHospital, getDepartment);
+router.get("/:id/metrics", scopeToHospital, getDepartmentMetrics);
+
+// Mutations restricted to administrators
+router.use(restrictTo("super_admin", "hospital_admin"), scopeToHospital);
+router.post("/", createDepartment);
 router.patch("/:id/toggle-status", toggleDepartmentStatus);
-router.route("/:id").get(getDepartment).patch(updateDepartment).delete(deleteDepartment);
+router.route("/:id").patch(updateDepartment).delete(deleteDepartment);
 
 export default router;

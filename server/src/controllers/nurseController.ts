@@ -422,6 +422,21 @@ export const saveNurseInpatientNote = catchAsync(async (req: Request, res: Respo
     additionalNotes
   } = req.body;
 
+  const rawNotes = additionalNotes !== undefined && additionalNotes !== null ? String(additionalNotes) : "";
+  const trimmedNotes = rawNotes.trim();
+  if (!trimmedNotes) {
+    throw new AppError("Please fill out this field", 400);
+  }
+  if (rawNotes.length > 500) {
+    throw new AppError("Clinical Note Content cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. It should not accept too long data. Please enter valid data", 400);
+  }
+  if (trimmedNotes.length < 2) {
+    throw new AppError("Clinical Note Content must be at least 2 characters. Too short text is not accepted. It should not accept invalid data. Please enter valid data", 400);
+  }
+  if (/<script\b|<[^>]+>|javascript:/i.test(trimmedNotes) || (!/[a-zA-Z0-9]/.test(trimmedNotes) && trimmedNotes.length > 0)) {
+    throw new AppError("Clinical Note Content contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data", 400);
+  }
+
   const activeAdmission = await Admission.findOne({
     hospital: hospitalId,
     patient: patientId,
@@ -512,6 +527,21 @@ export const updateNurseInpatientNote = catchAsync(async (req: Request, res: Res
     treatmentProgress,
     additionalNotes
   } = req.body;
+
+  const rawNotes = additionalNotes !== undefined && additionalNotes !== null ? String(additionalNotes) : "";
+  const trimmedNotes = rawNotes.trim();
+  if (!trimmedNotes) {
+    throw new AppError("Please fill out this field", 400);
+  }
+  if (rawNotes.length > 500) {
+    throw new AppError("Clinical Note Content cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. It should not accept too long data. Please enter valid data", 400);
+  }
+  if (trimmedNotes.length < 2) {
+    throw new AppError("Clinical Note Content must be at least 2 characters. Too short text is not accepted. It should not accept invalid data. Please enter valid data", 400);
+  }
+  if (/<script\b|<[^>]+>|javascript:/i.test(trimmedNotes) || (!/[a-zA-Z0-9]/.test(trimmedNotes) && trimmedNotes.length > 0)) {
+    throw new AppError("Clinical Note Content contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data", 400);
+  }
 
   const activeAdmission = await Admission.findOne({
     hospital: hospitalId,
@@ -1002,24 +1032,111 @@ export const completeShiftHandover = catchAsync(async (req: Request, res: Respon
   } = req.body;
 
   if (!incomingNurseId) {
-    throw new AppError("Incoming nurse selection is required.", 400);
+    throw new AppError("Incoming nurse selection is required. Please fill out this field", 400);
   }
 
-  if (!nurseSignature || !nurseSignature.trim()) {
-    throw new AppError("Outgoing Nurse Signature is required. Field is required. Please fill out this field", 400);
+  // 1. Patients Handed Over Count
+  const countRaw = patientsHandedOverCount !== undefined && patientsHandedOverCount !== null ? String(patientsHandedOverCount) : "";
+  const countStr = countRaw.trim();
+  if (!countStr) {
+    throw new AppError("Please fill out this field", 400);
   }
-  if (nurseSignature.length > 100) {
-    throw new AppError("Outgoing Nurse Signature cannot exceed 100 characters. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data", 400);
+  if (countRaw.length > 4 || Number(countStr) > 1000) {
+    throw new AppError("Patients Handed Over Count cannot exceed 4 digits. Characters limit: 4. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data", 400);
   }
-  if (!/^[a-zA-Z\s\.\'\(\)\-]+$/.test(nurseSignature.trim()) || !/[a-zA-Z]/.test(nurseSignature.trim()) || /<[^>]*>|javascript:/i.test(nurseSignature)) {
-    throw new AppError("Outgoing Nurse Signature contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data", 400);
+  if (!/^\d+$/.test(countStr) || Number(countStr) < 0) {
+    throw new AppError("Patients Handed Over Count contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data", 400);
   }
 
-  if (remarks && remarks.length > 500) {
-    throw new AppError("Handoff Remarks cannot exceed 500 characters. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data", 400);
+  // 2. Patients Roster Details
+  const detailsRaw = patientsHandedOverDetails !== undefined && patientsHandedOverDetails !== null ? String(patientsHandedOverDetails) : "";
+  const detailsStr = detailsRaw.trim();
+  if (!detailsStr) {
+    throw new AppError("Please fill out this field", 400);
   }
-  if (remarks && (/<[^>]*>|javascript:/i.test(remarks) || !/[a-zA-Z0-9]/.test(remarks))) {
-    throw new AppError("Handoff Remarks contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data", 400);
+  if (detailsRaw.length > 500) {
+    throw new AppError("Patients Roster Details cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data", 400);
+  }
+  if (detailsStr.length < 2 || /<[^>]*>|javascript:/i.test(detailsStr) || !/[a-zA-Z0-9]/.test(detailsStr)) {
+    throw new AppError("Patients Roster Details contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data", 400);
+  }
+
+  // 3. Pending Medications / Doses
+  const medsRaw = pendingMedication !== undefined && pendingMedication !== null ? String(pendingMedication) : "";
+  const medsStr = medsRaw.trim();
+  if (!medsStr) {
+    throw new AppError("Please fill out this field", 400);
+  }
+  if (medsRaw.length > 500) {
+    throw new AppError("Pending Medications / Doses cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data", 400);
+  }
+  if (medsStr.length < 2 || /<[^>]*>|javascript:/i.test(medsStr) || !/[a-zA-Z0-9]/.test(medsStr)) {
+    throw new AppError("Pending Medications / Doses contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data", 400);
+  }
+
+  // 4. Pending Procedures / Vitals
+  const procRaw = pendingProcedures !== undefined && pendingProcedures !== null ? String(pendingProcedures) : "";
+  const procStr = procRaw.trim();
+  if (!procStr) {
+    throw new AppError("Please fill out this field", 400);
+  }
+  if (procRaw.length > 500) {
+    throw new AppError("Pending Procedures / Vitals cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data", 400);
+  }
+  if (procStr.length < 2 || /<[^>]*>|javascript:/i.test(procStr) || !/[a-zA-Z0-9]/.test(procStr)) {
+    throw new AppError("Pending Procedures / Vitals contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data", 400);
+  }
+
+  // 5. Critical / High Priority Patients
+  const critRaw = criticalPatients !== undefined && criticalPatients !== null ? String(criticalPatients) : "";
+  const critStr = critRaw.trim();
+  if (!critStr) {
+    throw new AppError("Please fill out this field", 400);
+  }
+  if (critRaw.length > 500) {
+    throw new AppError("Critical / High Priority Patients cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data", 400);
+  }
+  if (critStr.length < 2 || /<[^>]*>|javascript:/i.test(critStr) || !/[a-zA-Z0-9]/.test(critStr)) {
+    throw new AppError("Critical / High Priority Patients contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data", 400);
+  }
+
+  // 6. Special Instructions
+  const specRaw = specialInstructions !== undefined && specialInstructions !== null ? String(specialInstructions) : "";
+  const specStr = specRaw.trim();
+  if (!specStr) {
+    throw new AppError("Please fill out this field", 400);
+  }
+  if (specRaw.length > 500) {
+    throw new AppError("Special Instructions cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data", 400);
+  }
+  if (specStr.length < 2 || /<[^>]*>|javascript:/i.test(specStr) || !/[a-zA-Z0-9]/.test(specStr)) {
+    throw new AppError("Special Instructions contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data", 400);
+  }
+
+  // 7. General Shift Remarks
+  const remarksRaw = remarks !== undefined && remarks !== null ? String(remarks) : "";
+  const remarksStr = remarksRaw.trim();
+  if (!remarksStr) {
+    throw new AppError("Please fill out this field", 400);
+  }
+  if (remarksRaw.length > 500) {
+    throw new AppError("General Shift Remarks cannot exceed 500 characters. Handoff Remarks cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data", 400);
+  }
+  if (remarksStr.length < 2 || /<[^>]*>|javascript:/i.test(remarksStr) || !/[a-zA-Z0-9]/.test(remarksStr)) {
+    throw new AppError("General Shift Remarks contains invalid data. Handoff Remarks contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data", 400);
+  }
+
+  // 8. Nurse Digital Signature
+  const sigRaw = nurseSignature !== undefined && nurseSignature !== null ? String(nurseSignature) : "";
+  const sigStr = sigRaw.trim();
+  if (!sigStr) {
+    throw new AppError("Please fill out this field", 400);
+  }
+  if (sigRaw.length > 100) {
+    throw new AppError("Nurse Digital Signature cannot exceed 100 characters. Outgoing Nurse Signature cannot exceed 100 characters. Characters limit: 100. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data", 400);
+  }
+  if (sigStr.length < 2 || !/^[a-zA-Z\s\.\'\(\)\-]+$/.test(sigStr) || !/[a-zA-Z]/.test(sigStr) || /<[^>]*>|javascript:/i.test(sigStr)) {
+    throw new AppError("Nurse Digital Signature contains invalid data. Outgoing Nurse Signature contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data", 400);
   }
 
   const incomingStaff = await Staff.findById(incomingNurseId);
@@ -1330,8 +1447,23 @@ export const sendNoteToAssignedDoctor = catchAsync(async (req: Request, res: Res
   const hospitalId = req.hospitalFilter!.hospital as Types.ObjectId;
   const { patientId, noteContent, observationType } = req.body;
 
-  if (!patientId || !noteContent) {
-    throw new AppError("Patient ID and Note Content are required.", 400);
+  if (!patientId || !String(patientId).trim()) {
+    throw new AppError("Please fill out this field", 400);
+  }
+
+  const rawContent = noteContent !== undefined && noteContent !== null ? String(noteContent) : "";
+  const trimmedContent = rawContent.trim();
+  if (!trimmedContent) {
+    throw new AppError("Please fill out this field", 400);
+  }
+  if (rawContent.length > 500) {
+    throw new AppError("Clinical Note Content cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. It should not accept too long data. Please enter valid data", 400);
+  }
+  if (trimmedContent.length < 2) {
+    throw new AppError("Clinical Note Content must be at least 2 characters. Too short text is not accepted. It should not accept invalid data. Please enter valid data", 400);
+  }
+  if (/<script\b|<[^>]+>|javascript:/i.test(trimmedContent) || (!/[a-zA-Z0-9]/.test(trimmedContent) && trimmedContent.length > 0)) {
+    throw new AppError("Clinical Note Content contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data", 400);
   }
 
   const staff = await Staff.findOne({ email: req.user!.email });

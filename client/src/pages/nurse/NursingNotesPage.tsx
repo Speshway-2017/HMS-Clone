@@ -5,10 +5,37 @@ import { useNurseInpatients, useSaveNurseNote, useSendNoteToDoctor } from "../..
 import { DataTable, Column } from "../../components/ui/DataTable";
 import { useStaffProfileMe } from "../../features/staff";
 
+// ----------------- Validation Functions for Clinical Note -----------------
+const validateClinicalNote = (val: string): string | null => {
+  const raw = val || "";
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return "Please fill out this field";
+  }
+  if (raw.length > 500) {
+    return "Clinical Note Content cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data";
+  }
+  if (trimmed.length < 2) {
+    return "Clinical Note Content must be at least 2 characters. Too short text is not accepted. It should not accept invalid data. Please enter valid data";
+  }
+  if (
+    /<[^>]*>|javascript:/i.test(trimmed) ||
+    !/[a-zA-Z0-9]/.test(trimmed) ||
+    !/^[a-zA-Z0-9\s.,?!'\-_/()&%#@+:;\n\r"*=°/±μ]+$/.test(trimmed)
+  ) {
+    return "Clinical Note Content contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data";
+  }
+  return null;
+};
+
 export function NursingNotesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{
+    patientId?: string | null;
+    additionalNotes?: string | null;
+  }>({});
   const [sendingNoteId, setSendingNoteId] = useState<string | null>(null);
   const [sentNotesMap, setSentNotesMap] = useState<Record<string, boolean>>({});
 
@@ -18,6 +45,24 @@ export function NursingNotesPage() {
     mobility: "Ambulatory",
     additionalNotes: "",
   });
+
+  const handleNotesKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (["Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Tab", "Enter"].includes(e.key)) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const textarea = e.currentTarget;
+    const selLength = (textarea.selectionEnd ?? 0) - (textarea.selectionStart ?? 0);
+    if (textarea.value.length >= 500 && selLength === 0) {
+      e.preventDefault();
+      toast.error("Clinical Note Content cannot exceed 500 characters. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data");
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsAddModalOpen(false);
+    setSelectedPatientId("");
+    setNoteForm({ observationType: "Shift Assessment", painAssessment: "Mild", mobility: "Ambulatory", additionalNotes: "" });
+    setFieldErrors({});
+  };
 
 
   const { data: inpatients = [], isLoading, refetch } = useNurseInpatients();
@@ -98,12 +143,17 @@ export function NursingNotesPage() {
   // Handler to save and send a new note
   const handleSaveNote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPatientId) {
-      toast.error("Please select a patient.");
-      return;
-    }
-    if (!noteForm.additionalNotes.trim()) {
-      toast.error("Please enter clinical note content.");
+
+    const patientErr = !selectedPatientId ? "Please fill out this field" : null;
+    const notesErr = validateClinicalNote(noteForm.additionalNotes);
+
+    if (patientErr || notesErr) {
+      setFieldErrors({
+        patientId: patientErr,
+        additionalNotes: notesErr,
+      });
+      const firstError = patientErr || notesErr;
+      toast.error(firstError || "Please fill out this field");
       return;
     }
 
@@ -113,17 +163,15 @@ export function NursingNotesPage() {
       // Automatically send note to assigned doctor as well
       await sendNoteToDoctorMutation.mutateAsync({
         patientId: selectedPatientId,
-        noteContent: noteForm.additionalNotes,
+        noteContent: noteForm.additionalNotes.trim(),
         observationType: noteForm.observationType
       });
 
       toast.success("Nursing note saved and sent to assigned doctor!");
-      setIsAddModalOpen(false);
-      setSelectedPatientId("");
-      setNoteForm({ observationType: "Shift Assessment", painAssessment: "Mild", mobility: "Ambulatory", additionalNotes: "" });
+      handleCloseModal();
       refetch();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Error saving nursing note.");
+      toast.error(err?.response?.data?.message || err?.message || "Error saving nursing note.");
     }
   };
 
@@ -265,7 +313,7 @@ export function NursingNotesPage() {
 
       {/* Add & Send Note Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-transparent animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-5 border border-slate-100">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
@@ -278,14 +326,15 @@ export function NursingNotesPage() {
                 </div>
               </div>
               <button
-                onClick={() => setIsAddModalOpen(false)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                type="button"
+                onClick={handleCloseModal}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveNote} className="space-y-4">
+            <form onSubmit={handleSaveNote} noValidate className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                   Select Inpatient Patient *
@@ -293,8 +342,23 @@ export function NursingNotesPage() {
                 <select
                   required
                   value={selectedPatientId}
-                  onChange={(e) => setSelectedPatientId(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold focus:border-navy-500 bg-white outline-none cursor-pointer"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedPatientId(val);
+                    if (fieldErrors.patientId) {
+                      setFieldErrors((prev) => ({ ...prev, patientId: !val ? "Please fill out this field" : null }));
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!selectedPatientId) {
+                      setFieldErrors((prev) => ({ ...prev, patientId: "Please fill out this field" }));
+                    }
+                  }}
+                  className={`w-full rounded-xl border px-3 py-2.5 text-xs font-semibold bg-white outline-none cursor-pointer transition-colors ${
+                    fieldErrors.patientId
+                      ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+                      : "border-slate-200 focus:border-navy-500"
+                  }`}
                 >
                   <option value="">Select Inpatient Patient...</option>
                   {inpatients.map((pt: any) => {
@@ -309,6 +373,11 @@ export function NursingNotesPage() {
                     );
                   })}
                 </select>
+                {fieldErrors.patientId && (
+                  <p className="mt-1 text-xs font-semibold text-rose-500 flex items-center gap-1" role="alert">
+                    <span>{fieldErrors.patientId}</span>
+                  </p>
+                )}
               </div>
 
               <div>
@@ -330,34 +399,59 @@ export function NursingNotesPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Clinical Note Content *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Clinical Note Content *
+                  </label>
+                  <span className={`text-[10px] font-mono ${noteForm.additionalNotes.length > 500 ? "text-red-600 font-bold" : "text-slate-400"}`}>
+                    {noteForm.additionalNotes.length}/500
+                  </span>
+                </div>
                 <textarea
                   required
                   rows={4}
+                  maxLength={500}
+                  onKeyDown={handleNotesKeyDown}
                   placeholder="Enter detailed nursing clinical observation or progress note..."
                   value={noteForm.additionalNotes}
-                  onChange={(e) => setNoteForm({ ...noteForm, additionalNotes: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 p-3 text-xs font-medium focus:border-navy-500 outline-none resize-none"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNoteForm({ ...noteForm, additionalNotes: val });
+                    if (fieldErrors.additionalNotes) {
+                      setFieldErrors((prev) => ({ ...prev, additionalNotes: validateClinicalNote(val) }));
+                    }
+                  }}
+                  onBlur={() => {
+                    setFieldErrors((prev) => ({ ...prev, additionalNotes: validateClinicalNote(noteForm.additionalNotes) }));
+                  }}
+                  className={`w-full rounded-xl border p-3 text-xs font-medium outline-none resize-none transition-colors ${
+                    fieldErrors.additionalNotes
+                      ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+                      : "border-slate-200 focus:border-navy-500"
+                  }`}
                 />
+                {fieldErrors.additionalNotes && (
+                  <p className="mt-1 text-xs font-semibold text-rose-500 flex items-center gap-1" role="alert">
+                    <span>{fieldErrors.additionalNotes}</span>
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={handleCloseModal}
                   className="px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-650 hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={saveNoteMutation.isPending}
+                  disabled={saveNoteMutation.isPending || sendNoteToDoctorMutation.isPending}
                   className="px-5 py-2.5 bg-navy-700 hover:bg-navy-800 text-white font-extrabold text-xs rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   <Send className="h-4 w-4" />
-                  {saveNoteMutation.isPending ? "Sending..." : "Save & Send to Doctor"}
+                  {saveNoteMutation.isPending || sendNoteToDoctorMutation.isPending ? "Sending..." : "Save & Send to Doctor"}
                 </button>
               </div>
             </form>

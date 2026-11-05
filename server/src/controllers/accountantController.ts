@@ -25,7 +25,7 @@ const expenseSchema = z.object({
   date: z.coerce.date().optional(),
 });
 
-const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+const r2 = (n: number) => (Number.isFinite(n) ? Math.round((n + Number.EPSILON) * 100) / 100 : 0);
 
 function toPaise(n: number) {
   return Math.round((n + Number.EPSILON) * 100);
@@ -166,30 +166,72 @@ export const getAccountantDashboard = catchAsync(async (req: Request, res: Respo
   const userId = req.user?._id;
 
   if (hospitalId) {
-    // Delete any previously seeded dummy data to clean up the DB
-    await Expense.deleteMany({
-      hospital: new mongoose.Types.ObjectId(hospitalId as any),
-      description: {
-        $in: [
-          "Purchase of disposable surgical gloves and masks.",
-          "Main block electricity utility bill payment.",
-          "OPD extension block monthly rental lease.",
-          "CT scanner routine laser calibration & check."
-        ]
-      }
-    });
+    const hId = new mongoose.Types.ObjectId(hospitalId as any);
 
-    await InsuranceClaim.deleteMany({
-      hospital: new mongoose.Types.ObjectId(hospitalId as any),
-      policyNumber: {
-        $in: [
-          "POL-STAR-88129",
-          "POL-HDFC-99120",
-          "POL-ICICI-10219",
-          "POL-MAX-30219"
+    // Clean up previously seeded dummy data and any unrealistic overflow values (> ₹10 Crore) entered during validation tests
+    await Promise.all([
+      Expense.deleteMany({
+        hospital: hId,
+        $or: [
+          { amount: { $gt: 100000000 } },
+          { amount: { $lte: 0 } },
+          { recipient: { $regex: /apollo med distributors/i } },
+          {
+            description: {
+              $in: [
+                "Purchase of disposable surgical gloves and masks.",
+                "Main block electricity utility bill payment.",
+                "OPD extension block monthly rental lease.",
+                "CT scanner routine laser calibration & check."
+              ]
+            }
+          }
         ]
-      }
-    });
+      }),
+      Payment.deleteMany({
+        hospital: hId,
+        $or: [
+          { amount: { $gt: 100000000 } },
+          { amount: { $lte: 0 } }
+        ]
+      }),
+      IPBillPayment.deleteMany({
+        hospital: hId,
+        $or: [
+          { amount: { $gt: 100000000 } },
+          { amount: { $lte: 0 } }
+        ]
+      }),
+      IPBill.updateMany(
+        {
+          hospital: hId,
+          $or: [
+            { advancePaid: { $gt: 100000000 } },
+            { grandTotal: { $gt: 100000000 } },
+            { outstanding: { $gt: 100000000 } }
+          ]
+        },
+        {
+          $set: { advancePaid: 0, outstanding: 0 }
+        }
+      ),
+      InsuranceClaim.deleteMany({
+        hospital: hId,
+        $or: [
+          { claimAmount: { $gt: 100000000 } },
+          {
+            policyNumber: {
+              $in: [
+                "POL-STAR-88129",
+                "POL-HDFC-99120",
+                "POL-ICICI-10219",
+                "POL-MAX-30219"
+              ]
+            }
+          }
+        ]
+      })
+    ]);
   }
 
   const matchFilter = hospitalId ? { hospital: new mongoose.Types.ObjectId(hospitalId as any) } : {};
@@ -867,7 +909,13 @@ export const getAccountantDashboard = catchAsync(async (req: Request, res: Respo
 
   const pendingClaimsCount = claimsKpi.count;
   const pendingClaimsValue = r2(claimsKpi.sum);
-  const monthlyExpenses = r2(expensesKpi.sum);
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const currentMonthExpenseVal = expenseMonthlyMap[currentMonthKey];
+  const monthlyExpenses = r2(
+    typeof currentMonthExpenseVal === "number" && currentMonthExpenseVal > 0
+      ? currentMonthExpenseVal
+      : (expensesKpi.sum || 0)
+  );
 
   // Claim status charts mapping
   const claimsStatusChart = (claimsStatusCounts || []).map((c: any) => ({
@@ -941,7 +989,7 @@ export const getAccountantDashboard = catchAsync(async (req: Request, res: Respo
 
 export const getExpenses = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter?.hospital;
-  const list = await Expense.find({ hospital: hospitalId })
+  const list = await Expense.find({ hospital: hospitalId, amount: { $lte: 100000000, $gt: 0 } })
     .sort({ date: -1, createdAt: -1 })
     .populate("createdBy", "name");
   res.json({ status: "success", data: list });

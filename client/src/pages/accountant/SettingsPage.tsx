@@ -10,13 +10,15 @@ import {
   Percent,
   Wallet,
   FileText,
-  Save
+  Save,
+  AlertCircle
 } from "lucide-react";
 import { useChangePassword } from "../../features/auth";
 import { useAuth } from "../../context/AuthContext";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import toast from "react-hot-toast";
+import { InputField, TextareaField } from "../../components/ui/Field";
 
 function Section({ title, subtitle, icon, children }: {
   title: string; subtitle: string; icon: React.ReactNode; children: React.ReactNode;
@@ -119,8 +121,10 @@ export function AccountantSettingsPage() {
   const passwordsMismatch = confirmPassword !== "" && newPassword !== confirmPassword;
 
   // Tax Settings State
-  const [taxRate, setTaxRate] = useState(5);
-  const [serviceFee, setServiceFee] = useState(150);
+  const [taxRate, setTaxRate] = useState<number | string>(5);
+  const [serviceFee, setServiceFee] = useState<number | string>(150);
+  const [taxErrors, setTaxErrors] = useState<Record<string, string | undefined>>({});
+  const [taxFormError, setTaxFormError] = useState<string | null>(null);
 
   // Payment Channels State
   const [channels, setChannels] = useState({
@@ -132,6 +136,66 @@ export function AccountantSettingsPage() {
   // Invoice Layout State
   const [headerText, setHeaderText] = useState("Sunrise General Hospital & Research Center");
   const [footerText, setFooterText] = useState("Terms: Invoice amounts must be paid within 15 days of issue.");
+  const [invoiceErrors, setInvoiceErrors] = useState<Record<string, string | undefined>>({});
+  const [invoiceFormError, setInvoiceFormError] = useState<string | null>(null);
+
+  const validateTaxRate = (val: any): string | undefined => {
+    const str = String(val ?? "").trim();
+    if (!str || str === "" || str === "NaN") {
+      return "Standard GST / Tax Rate is required. Field is required. Please fill out this field. Please enter valid data";
+    }
+    const num = Number(val);
+    if (isNaN(num) || num < 0) {
+      return "The value should not decrease below the configured minimum allowed value. Standard GST / Tax Rate cannot be negative. Minimum allowed value is 0%. Invalid data is not accepted. Please enter valid data";
+    }
+    if (str.length > 3 || num > 100) {
+      return "The field should restrict the input to the allowed length or display an appropriate validation message. Standard GST / Tax Rate cannot exceed 100%. Characters limit: 3. Too long text is not accepted. Too long data is not accepted. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const validateServiceFee = (val: any): string | undefined => {
+    const str = String(val ?? "").trim();
+    if (!str || str === "" || str === "NaN") {
+      return "Base Registration Service Fee is required. Field is required. Please fill out this field. Please enter valid data";
+    }
+    const num = Number(val);
+    if (isNaN(num) || num < 0) {
+      return "The value should not decrease below the configured minimum allowed value. Base Registration Service Fee cannot be negative. Minimum allowed value is ₹0. Invalid data is not accepted. Please enter valid data";
+    }
+    if (str.length > 6 || num > 100000) {
+      return "The field should restrict the input to the allowed length or display an appropriate validation message. Base Registration Service Fee cannot exceed ₹100,000. Characters limit: 6. Too long text is not accepted. Too long data is not accepted. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const validateHeaderText = (val: string): string | undefined => {
+    const trimmed = (val || "").trim();
+    if (!trimmed) {
+      return "The field should reject the invalid input or display an appropriate validation message. Invoice Header Brand Name is required. Field is required. Please fill out this field. Please enter valid data";
+    }
+    if (val.length > 100) {
+      return "The field should restrict the input to the allowed length or display an appropriate validation message. Invoice Header Brand Name cannot exceed 100 characters. Characters limit: 100. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+    }
+    if (trimmed.length < 2 || !/[a-zA-Z]/.test(trimmed) || /<script|javascript:|<[^>]*>/i.test(trimmed)) {
+      return "The field should reject the invalid input or display an appropriate validation message. Invoice Header Brand Name contains invalid input. Invalid data is not accepted. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const validateFooterText = (val: string): string | undefined => {
+    const trimmed = (val || "").trim();
+    if (!trimmed) {
+      return "The field should reject the invalid input or display an appropriate validation message. Invoice Footer Disclaimer Details is required. Field is required. Please fill out this field. Please enter valid data";
+    }
+    if (val.length > 300) {
+      return "The field should restrict the input to the allowed length or display an appropriate validation message. Invoice Footer Disclaimer Details cannot exceed 300 characters. Characters limit: 300. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+    }
+    if (trimmed.length < 2 || !/[a-zA-Z]/.test(trimmed) || /<script|javascript:|<[^>]*>/i.test(trimmed)) {
+      return "The field should reject the invalid input or display an appropriate validation message. Invoice Footer Disclaimer Details contains invalid input. Invalid data is not accepted. Please enter valid data";
+    }
+    return undefined;
+  };
 
   // Load from local storage
   useEffect(() => {
@@ -192,7 +256,24 @@ export function AccountantSettingsPage() {
 
   const handleSaveTax = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem("hms_settings_tax", JSON.stringify({ taxRate, serviceFee }));
+    const rateErr = validateTaxRate(taxRate);
+    const feeErr = validateServiceFee(serviceFee);
+
+    const errors: Record<string, string | undefined> = {
+      taxRate: rateErr,
+      serviceFee: feeErr,
+    };
+    setTaxErrors(errors);
+
+    const firstError = rateErr || feeErr;
+    if (firstError) {
+      setTaxFormError(firstError);
+      toast.error(firstError);
+      return;
+    }
+    setTaxFormError(null);
+
+    localStorage.setItem("hms_settings_tax", JSON.stringify({ taxRate: Number(taxRate), serviceFee: Number(serviceFee) }));
     toast.success("Tax configurations saved!");
   };
 
@@ -203,13 +284,30 @@ export function AccountantSettingsPage() {
 
   const handleSaveInvoice = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem("hms_settings_invoice", JSON.stringify({ headerText, footerText }));
+    const headErr = validateHeaderText(headerText);
+    const footErr = validateFooterText(footerText);
+
+    const errors: Record<string, string | undefined> = {
+      headerText: headErr,
+      footerText: footErr,
+    };
+    setInvoiceErrors(errors);
+
+    const firstError = headErr || footErr;
+    if (firstError) {
+      setInvoiceFormError(firstError);
+      toast.error(firstError);
+      return;
+    }
+    setInvoiceFormError(null);
+
+    localStorage.setItem("hms_settings_invoice", JSON.stringify({ headerText: headerText.trim(), footerText: footerText.trim() }));
     toast.success("Invoice templates updated!");
   };
 
   const TABS = [
     { id: "security", label: "Security & Password", icon: <KeyRound className="h-4 w-4" /> },
-    { id: "tax", label: "Tax Configurations", icon: <Percent className="h-4 w-4" /> },
+    { id: "tax", label: "% Tax Configurations", icon: <Percent className="h-4 w-4" /> },
     { id: "payment", label: "Payment Channels", icon: <Wallet className="h-4 w-4" /> },
     { id: "invoice", label: "Invoice Details", icon: <FileText className="h-4 w-4" /> }
   ];
@@ -265,13 +363,17 @@ export function AccountantSettingsPage() {
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id as any)}
+            data-testid={`accountant-settings-tab-${tab.id}`}
+            id={`accountantSettingsTab_${tab.id}`}
+            aria-label={tab.label}
+            title={tab.label}
             className={`flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 ${
               activeTab === tab.id
                 ? "border-navy-700 text-navy-700 font-semibold"
                 : "border-transparent text-slate-500 hover:text-slate-700"
             }`}
           >
-            {tab.icon} {tab.label}
+            {tab.icon} {tab.label.replace(/^%\s*/, '')}
           </button>
         ))}
       </div>
@@ -334,33 +436,54 @@ export function AccountantSettingsPage() {
 
       {/* ══════════════════ TAX TAB ══════════════════ */}
       {activeTab === "tax" && (
-        <div className="space-y-5">
+        <div className="space-y-5" data-testid="accountant-tax-configurations-tab" id="accountantTaxConfigurationsTab">
           <Section title="Tax & Service Fee Configurations" subtitle="Define standard tax rates and registration fees applied to billing invoices." icon={<Percent className="h-5 w-5 text-navy-700" />}>
-            <form onSubmit={handleSaveTax} className="space-y-5">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold uppercase text-slate-400">Standard GST / Tax Rate (%) *</label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    max={100}
-                    value={taxRate}
-                    onChange={(e) => setTaxRate(Number(e.target.value))}
-                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
-                  />
+            <form onSubmit={handleSaveTax} className="space-y-5" noValidate>
+              {taxFormError && (
+                <div className="flex items-center gap-2 p-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg" role="alert">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+                  <span>{taxFormError}</span>
                 </div>
+              )}
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold uppercase text-slate-400">Base Registration Service Fee (₹) *</label>
-                  <input
-                    type="number"
-                    required
-                    value={serviceFee}
-                    onChange={(e) => setServiceFee(Number(e.target.value))}
-                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
-                  />
-                </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <InputField
+                  label="Standard GST / Tax Rate (%) *"
+                  type="number"
+                  required
+                  min={0}
+                  max={100}
+                  maxLength={3}
+                  value={taxRate}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setTaxRate(val);
+                    setTaxErrors((prev) => ({ ...prev, taxRate: validateTaxRate(val) }));
+                  }}
+                  onBlur={(e) => {
+                    setTaxErrors((prev) => ({ ...prev, taxRate: validateTaxRate(e.target.value) }));
+                  }}
+                  error={taxErrors.taxRate}
+                />
+
+                <InputField
+                  label="Base Registration Service Fee (₹) *"
+                  type="number"
+                  required
+                  min={0}
+                  max={100000}
+                  maxLength={6}
+                  value={serviceFee}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setServiceFee(val);
+                    setTaxErrors((prev) => ({ ...prev, serviceFee: validateServiceFee(val) }));
+                  }}
+                  onBlur={(e) => {
+                    setTaxErrors((prev) => ({ ...prev, serviceFee: validateServiceFee(e.target.value) }));
+                  }}
+                  error={taxErrors.serviceFee}
+                />
               </div>
 
               <div className="flex justify-end pt-2 border-t border-slate-100">
@@ -415,30 +538,51 @@ export function AccountantSettingsPage() {
 
       {/* ══════════════════ INVOICE DETAILS TAB ══════════════════ */}
       {activeTab === "invoice" && (
-        <div className="space-y-5">
+        <div className="space-y-5" data-testid="accountant-invoice-details-tab" id="accountantInvoiceDetailsTab">
           <Section title="Invoice Template & Disclaimer Settings" subtitle="Configure textual layouts shown on generated billing prints." icon={<FileText className="h-5 w-5 text-navy-700" />}>
-            <form onSubmit={handleSaveInvoice} className="space-y-5">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold uppercase text-slate-400">Invoice Header Brand Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={headerText}
-                  onChange={(e) => setHeaderText(e.target.value)}
-                  className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
-                />
-              </div>
+            <form onSubmit={handleSaveInvoice} className="space-y-5" noValidate>
+              {invoiceFormError && (
+                <div className="flex items-center gap-2 p-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg" role="alert">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+                  <span>{invoiceFormError}</span>
+                </div>
+              )}
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold uppercase text-slate-400">Invoice Footer Disclaimer Details *</label>
-                <textarea
-                  rows={3}
-                  required
-                  value={footerText}
-                  onChange={(e) => setFooterText(e.target.value)}
-                  className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200 resize-none"
-                />
-              </div>
+              <InputField
+                label="Invoice Header Brand Name *"
+                type="text"
+                required
+                maxLength={100}
+                showCharCount
+                value={headerText}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setHeaderText(val);
+                  setInvoiceErrors((prev) => ({ ...prev, headerText: validateHeaderText(val) }));
+                }}
+                onBlur={(e) => {
+                  setInvoiceErrors((prev) => ({ ...prev, headerText: validateHeaderText(e.target.value) }));
+                }}
+                error={invoiceErrors.headerText}
+              />
+
+              <TextareaField
+                label="Invoice Footer Disclaimer Details *"
+                rows={3}
+                required
+                maxLength={300}
+                showCharCount
+                value={footerText}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFooterText(val);
+                  setInvoiceErrors((prev) => ({ ...prev, footerText: validateFooterText(val) }));
+                }}
+                onBlur={(e) => {
+                  setInvoiceErrors((prev) => ({ ...prev, footerText: validateFooterText(e.target.value) }));
+                }}
+                error={invoiceErrors.footerText}
+              />
 
               <div className="flex justify-end pt-2 border-t border-slate-100">
                 <button

@@ -68,10 +68,17 @@ const appointmentSchema = z.object({
   type: z.string().optional().default("Appointment"),
   status: z.enum(APPOINTMENT_STATUSES).optional(),
   meetingLink: z.string().optional().default(""),
-  notes: z.string().optional().default(""),
-
+  notes: z
+    .string()
+    .max(500, "Chief Complaints / Notes cannot exceed 500 characters. Characters limit: 500. Too long data and characters limit should be mentioned. Too long text is not accepted. Too long data is not accepted. Please enter valid data")
+    .optional()
+    .default(""),
+  chiefComplaint: z
+    .string()
+    .max(500, "Chief Complaints / Notes cannot exceed 500 characters. Characters limit: 500. Too long data and characters limit should be mentioned. Too long text is not accepted. Too long data is not accepted. Please enter valid data")
+    .optional()
+    .default(""),
   reason: z.string().optional().default(""),
-
   billingStatus: z.string().optional(),
   paymentMethod: z.string().optional(),
 });
@@ -177,6 +184,34 @@ export const listAppointments = catchAsync(async (req: Request, res: Response) =
 
 export const createAppointment = catchAsync(async (req: Request, res: Response) => {
   const body = appointmentSchema.parse(req.body);
+
+  const rawNotes = (body.notes || body.chiefComplaint || "").toString();
+  const trimmedNotes = rawNotes.trim();
+  if (trimmedNotes) {
+    if (rawNotes.length > 500) {
+      throw new AppError(
+        "Chief Complaints / Notes cannot exceed 500 characters. Characters limit: 500. Too long data and characters limit should be mentioned. Too long text is not accepted. Too long data is not accepted. Please enter valid data",
+        400
+      );
+    }
+    if (/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>|javascript:|<[^>]*>|[<>{}]/i.test(trimmedNotes)) {
+      throw new AppError(
+        "Chief Complaints / Notes contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+        400
+      );
+    }
+    if (!/^[a-zA-Z0-9\s,\.\-/'&()#:%+?!";*°@[\]_]+$/.test(trimmedNotes)) {
+      throw new AppError(
+        "Chief Complaints / Notes contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+        400
+      );
+    }
+    body.notes = trimmedNotes;
+    body.chiefComplaint = trimmedNotes;
+  } else {
+    body.notes = "";
+    body.chiefComplaint = "";
+  }
 
 
   // Normalize appointment type string to valid APPOINTMENT_TYPES enum
@@ -443,6 +478,36 @@ export const updateAppointment = catchAsync(async (req: Request, res: Response) 
   }
 
   const body = appointmentSchema.partial().parse(req.body);
+
+  if (body.notes !== undefined || body.chiefComplaint !== undefined) {
+    const rawNotes = (body.notes ?? body.chiefComplaint ?? "").toString();
+    const trimmedNotes = rawNotes.trim();
+    if (trimmedNotes) {
+      if (rawNotes.length > 500) {
+        throw new AppError(
+          "Chief Complaints / Notes cannot exceed 500 characters. Characters limit: 500. Too long data and characters limit should be mentioned. Too long text is not accepted. Too long data is not accepted. Please enter valid data",
+          400
+        );
+      }
+      if (/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>|javascript:|<[^>]*>|[<>{}]/i.test(trimmedNotes)) {
+        throw new AppError(
+          "Chief Complaints / Notes contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+          400
+        );
+      }
+      if (!/^[a-zA-Z0-9\s,\.\-/'&()#:%+?!";*°@[\]_]+$/.test(trimmedNotes)) {
+        throw new AppError(
+          "Chief Complaints / Notes contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data",
+          400
+        );
+      }
+      body.notes = trimmedNotes;
+      body.chiefComplaint = trimmedNotes;
+    } else {
+      body.notes = "";
+      body.chiefComplaint = "";
+    }
+  }
 
   const existingAppt = await Appointment.findOne(filter);
   if (!existingAppt) {

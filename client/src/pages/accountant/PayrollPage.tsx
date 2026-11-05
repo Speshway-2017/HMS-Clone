@@ -13,7 +13,11 @@ import {
   Sliders,
   CheckCircle2,
   Calendar,
+  AlertCircle,
+  X,
+  UserX,
 } from "lucide-react";
+import toast from "react-hot-toast";
 import {
   usePayrollSummary,
   useRecalculatePayroll,
@@ -48,12 +52,93 @@ export function AccountantPayrollPage() {
   const [calcDeductions, setCalcDeductions] = useState<number>(0);
 
   // Manual Adjustments Form State
-  const [specialAllowance, setSpecialAllowance] = useState<number>(0);
-  const [bonus, setBonus] = useState<number>(0);
-  const [incentives, setIncentives] = useState<number>(0);
-  const [recovery, setRecovery] = useState<number>(0);
-  const [professionalTax, setProfessionalTax] = useState<number>(200);
+  const [specialAllowance, setSpecialAllowance] = useState<number | string>(0);
+  const [bonus, setBonus] = useState<number | string>(0);
+  const [incentives, setIncentives] = useState<number | string>(0);
+  const [recovery, setRecovery] = useState<number | string>(0);
+  const [professionalTax, setProfessionalTax] = useState<number | string>(200);
   const [remarks, setRemarks] = useState<string>("");
+
+  // Adjustment form validation state
+  const [adjustmentErrors, setAdjustmentErrors] = useState<Record<string, string | undefined>>({});
+  const [adjustmentFormError, setAdjustmentFormError] = useState<string | null>(null);
+
+  // Adjustment field validators
+  const validateSpecialAllowance = (val: any): string | undefined => {
+    const str = String(val ?? "").trim();
+    if (!str || str === "" || str === "0") return undefined;
+    if (str.length > 8 || Number(val) > 10000000) {
+      return "Special Allowance cannot exceed ₹10,000,000. Data beyond permitted length or range. Excessively long numeric value is not accepted. Too long data is not accepted. The Special Allowance field should not accept data beyond the permitted length or range. Please enter valid data";
+    }
+    const num = Number(val);
+    if (isNaN(num) || num < 0) {
+      return "Special Allowance must be a valid positive amount or zero. Invalid data is not accepted. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const validateBonus = (val: any): string | undefined => {
+    const str = String(val ?? "").trim();
+    if (!str || str === "" || str === "0") return undefined;
+    if (str.length > 8 || Number(val) > 10000000) {
+      return "Bonus cannot exceed ₹10,000,000. Data beyond permitted length or range. Excessively long numeric value is not accepted. Too long data is not accepted. The Bonus field should not accept data beyond the permitted length or range. Please enter valid data";
+    }
+    const num = Number(val);
+    if (isNaN(num) || num < 0) {
+      return "Bonus must be a valid positive amount or zero. Invalid data is not accepted. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const validateIncentives = (val: any): string | undefined => {
+    const str = String(val ?? "").trim();
+    if (!str || str === "" || str === "0") return undefined;
+    if (str.length > 8 || Number(val) > 10000000) {
+      return "Incentives cannot exceed ₹10,000,000. Data beyond permitted length or range. Excessively long numeric value is not accepted. Too long data is not accepted. The Incentives field should not accept data beyond the permitted length or range. Please enter valid data";
+    }
+    const num = Number(val);
+    if (isNaN(num) || num < 0) {
+      return "Incentives must be a valid positive amount or zero. Invalid data is not accepted. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const validateRecovery = (val: any): string | undefined => {
+    const str = String(val ?? "").trim();
+    if (!str || str === "" || str === "0") return undefined;
+    if (str.length > 8 || Number(val) > 10000000) {
+      return "Recovery / Advance Deduction cannot exceed ₹10,000,000. Data beyond permitted length or range. Excessively long numeric value is not accepted. Too long data is not accepted. The Recovery / Advance Deduction field should not accept data beyond the permitted length or range. Please enter valid data";
+    }
+    const num = Number(val);
+    if (isNaN(num) || num < 0) {
+      return "Recovery / Advance Deduction must be a valid positive amount or zero. Invalid data is not accepted. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const validateProfessionalTax = (val: any): string | undefined => {
+    const str = String(val ?? "").trim();
+    if (!str || str === "" || str === "0") return undefined;
+    if (str.length > 6 || Number(val) > 50000) {
+      return "Professional Tax Override cannot exceed ₹50,000. Data beyond permitted length or range. Excessively long numeric value is not accepted. Too long data is not accepted. The Professional Tax Override field should not accept data beyond the permitted length or range. Please enter valid data";
+    }
+    const num = Number(val);
+    if (isNaN(num) || num < 0) {
+      return "Professional Tax Override must be a valid positive amount or zero. Invalid data is not accepted. Please enter valid data";
+    }
+    return undefined;
+  };
+
+  const validateAccountantRemarks = (val: string): string | undefined => {
+    if (!val || !val.trim()) return undefined; // Empty field is valid and handled as blank
+    if (val.length > 250) {
+      return "Accountant Remarks cannot exceed 250 characters. Characters limit: 250. Too long text is not accepted. Too long data is not accepted. The Accountant Remarks field should not accept text beyond the permitted character limit. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+    }
+    if (/<script|javascript:|<[^>]*>/i.test(val) || /[<>{}]/.test(val)) {
+      return "Accountant Remarks contains invalid data. Invalid data is not accepted. Invalid data not accepted. The Accountant Remarks field should handle invalid data according to the defined validation. Please enter valid data";
+    }
+    return undefined;
+  };
 
   // API Hooks
   const { data: payrollData, isLoading, refetch } = usePayrollSummary(payrollMonth);
@@ -83,10 +168,12 @@ export function AccountantPayrollPage() {
 
   // Filter employees
   const filteredEmployees = employees.filter((emp) => {
-    const matchesSearch =
-      emp.employeeName.toLowerCase().includes(search.toLowerCase()) ||
-      emp.employeeId.toLowerCase().includes(search.toLowerCase()) ||
-      emp.designation.toLowerCase().includes(search.toLowerCase());
+    const trimmed = (search || "").trim().toLowerCase();
+    const matchesSearch = !trimmed
+      ? true
+      : (emp.employeeName || "").toLowerCase().includes(trimmed) ||
+        (emp.employeeId || "").toLowerCase().includes(trimmed) ||
+        (emp.designation || "").toLowerCase().includes(trimmed);
 
     const matchesStatus =
       statusFilter === "All" ||
@@ -148,27 +235,63 @@ export function AccountantPayrollPage() {
     setRecovery(emp.salaryBreakdown.recovery || 0);
     setProfessionalTax(emp.salaryBreakdown.professionalTax ?? 200);
     setRemarks(emp.remarks || "");
+    setAdjustmentErrors({});
+    setAdjustmentFormError(null);
     setIsAdjustmentOpen(true);
   };
 
   const handleSaveAdjustments = async (targetStatus: "Draft" | "Calculated") => {
     if (!selectedSummary) return;
-    await saveAdjustmentsMutation.mutateAsync({
-      employeeId: selectedSummary.employeeId,
-      employeeRef: selectedSummary.employeeRef,
-      employeeType: selectedSummary.employeeType,
-      month: payrollMonth,
-      specialAllowance,
-      bonus,
-      incentives,
-      recovery,
-      professionalTax,
-      remarks,
-      status: targetStatus,
-    });
-    setIsAdjustmentOpen(false);
-    setSelectedSummary(null);
-    refetch();
+
+    const saErr = validateSpecialAllowance(specialAllowance);
+    const bonusErr = validateBonus(bonus);
+    const incErr = validateIncentives(incentives);
+    const recErr = validateRecovery(recovery);
+    const ptErr = validateProfessionalTax(professionalTax);
+    const remErr = validateAccountantRemarks(remarks);
+
+    const errors: Record<string, string | undefined> = {
+      specialAllowance: saErr,
+      bonus: bonusErr,
+      incentives: incErr,
+      recovery: recErr,
+      professionalTax: ptErr,
+      remarks: remErr,
+    };
+
+    setAdjustmentErrors(errors);
+
+    const firstError = saErr || bonusErr || incErr || recErr || ptErr || remErr;
+    if (firstError) {
+      setAdjustmentFormError(firstError);
+      toast.error(firstError);
+      return;
+    }
+    setAdjustmentFormError(null);
+
+    try {
+      await saveAdjustmentsMutation.mutateAsync({
+        employeeId: selectedSummary.employeeId,
+        employeeRef: selectedSummary.employeeRef,
+        employeeType: selectedSummary.employeeType,
+        month: payrollMonth,
+        specialAllowance: Number(specialAllowance) || 0,
+        bonus: Number(bonus) || 0,
+        incentives: Number(incentives) || 0,
+        recovery: Number(recovery) || 0,
+        professionalTax: Number(professionalTax) || 0,
+        remarks: remarks.trim(),
+        status: targetStatus,
+      });
+      setIsAdjustmentOpen(false);
+      setSelectedSummary(null);
+      setAdjustmentErrors({});
+      setAdjustmentFormError(null);
+      refetch();
+      toast.success(`Adjustments saved as ${targetStatus}`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to save adjustments");
+    }
   };
 
   const handleRecalculateSingle = async (emp: PayrollEmployeeSummary) => {
@@ -336,25 +459,41 @@ export function AccountantPayrollPage() {
       {/* Main Payroll Table Card - Matching Screenshot UI */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-5">
         {/* Top Controls: Search Bar & Status Filter */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 flex-wrap">
           {/* Pill Search Input */}
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
+          <div className="relative w-full max-w-md shrink-0">
+            <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
             <input
               type="text"
               placeholder="Search employee, ID, role..."
               value={search}
+              maxLength={200}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy-600 bg-slate-50/50 focus:bg-white transition-all placeholder:text-slate-400"
+              className="w-full pl-10 pr-8 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy-600 bg-slate-50/50 focus:bg-white transition-all placeholder:text-slate-400 truncate"
+              data-testid="payroll-search-input"
+              id="payrollSearchInput"
+              aria-label="Search employee, ID, role"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5 rounded-full"
+                title="Clear search"
+                aria-label="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Filter Pills */}
-          <div className="flex flex-wrap gap-1 bg-slate-100/70 p-1 rounded-xl border border-slate-200/60">
+          <div className="flex flex-wrap gap-1 bg-slate-100/70 p-1 rounded-xl border border-slate-200/60 shrink-0">
             {(["All", "Needs Recalculation", "Draft", "Calculated", "Locked", "Disbursed"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setStatusFilter(tab)}
+                data-testid={`status-filter-${tab.toLowerCase().replace(/\s+/g, '-')}`}
                 className={`px-3 py-1 text-[11px] font-medium rounded-lg transition-all ${
                   statusFilter === tab
                     ? "bg-white text-slate-900 shadow-sm font-semibold"
@@ -390,8 +529,16 @@ export function AccountantPayrollPage() {
                 </tr>
               ) : filteredEmployees.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400 font-medium">
-                    No matching employee records for {payrollMonth}.
+                  <td colSpan={7} className="py-12 text-center text-slate-500 font-medium" data-testid="no-matching-employees">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <UserX className="h-8 w-8 text-slate-300" />
+                      <p className="text-sm font-semibold text-slate-700">No matching employee record is available.</p>
+                      <p className="text-xs text-slate-400">
+                        {search.trim()
+                          ? `No employee records match "${search.trim()}". Please verify the employee ID, name, or role.`
+                          : `No matching employee records found for ${payrollMonth} with status filter "${statusFilter}".`}
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -463,6 +610,8 @@ export function AccountantPayrollPage() {
                               onClick={() => handleOpenAdjustment(emp)}
                               className="p-1.5 rounded-lg text-slate-400 hover:text-amber-700 hover:bg-amber-50 transition-colors"
                               title="Accountant Adjustments (Bonus, Special Allowance, Recovery)"
+                              data-testid="open-adjustments-button"
+                              aria-label="Accountant Salary Adjustments"
                             >
                               <Sliders className="h-4 w-4" />
                             </button>
@@ -627,10 +776,16 @@ export function AccountantPayrollPage() {
         onClose={() => {
           setIsAdjustmentOpen(false);
           setSelectedSummary(null);
+          setAdjustmentErrors({});
+          setAdjustmentFormError(null);
         }}
       >
         {selectedSummary && (
-          <div className="space-y-4 text-xs">
+          <div
+            className="space-y-4 text-xs"
+            data-testid="accountant-salary-adjustments-popup"
+            id="accountantSalaryAdjustmentsPopup"
+          >
             <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center">
               <div>
                 <h4 className="font-bold text-slate-900 text-sm">{selectedSummary.employeeName}</h4>
@@ -676,55 +831,174 @@ export function AccountantPayrollPage() {
               <h5 className="font-bold text-slate-800 uppercase tracking-wider text-[10px]">
                 Allowed Accountant Adjustments
               </h5>
+
+              {adjustmentFormError && (
+                <div
+                  className="flex items-center gap-2 p-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg"
+                  role="alert"
+                >
+                  <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+                  <span>{adjustmentFormError}</span>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <InputField
                   label="Special Allowance (₹)"
                   type="number"
                   min={0}
-                  value={specialAllowance}
-                  onChange={(e) => setSpecialAllowance(parseFloat(e.target.value) || 0)}
+                  max={10000000}
+                  maxLength={8}
+                  value={specialAllowance === 0 ? "" : specialAllowance}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSpecialAllowance(val);
+                    setAdjustmentErrors((prev) => ({
+                      ...prev,
+                      specialAllowance: validateSpecialAllowance(val),
+                    }));
+                  }}
+                  onBlur={(e) => {
+                    setAdjustmentErrors((prev) => ({
+                      ...prev,
+                      specialAllowance: validateSpecialAllowance(e.target.value),
+                    }));
+                  }}
+                  error={adjustmentErrors.specialAllowance}
+                  placeholder="0"
                 />
                 <InputField
                   label="Bonus (₹)"
                   type="number"
                   min={0}
-                  value={bonus}
-                  onChange={(e) => setBonus(parseFloat(e.target.value) || 0)}
+                  max={10000000}
+                  maxLength={8}
+                  value={bonus === 0 ? "" : bonus}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setBonus(val);
+                    setAdjustmentErrors((prev) => ({
+                      ...prev,
+                      bonus: validateBonus(val),
+                    }));
+                  }}
+                  onBlur={(e) => {
+                    setAdjustmentErrors((prev) => ({
+                      ...prev,
+                      bonus: validateBonus(e.target.value),
+                    }));
+                  }}
+                  error={adjustmentErrors.bonus}
+                  placeholder="0"
                 />
                 <InputField
                   label="Incentives (₹)"
                   type="number"
                   min={0}
-                  value={incentives}
-                  onChange={(e) => setIncentives(parseFloat(e.target.value) || 0)}
+                  max={10000000}
+                  maxLength={8}
+                  value={incentives === 0 ? "" : incentives}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setIncentives(val);
+                    setAdjustmentErrors((prev) => ({
+                      ...prev,
+                      incentives: validateIncentives(val),
+                    }));
+                  }}
+                  onBlur={(e) => {
+                    setAdjustmentErrors((prev) => ({
+                      ...prev,
+                      incentives: validateIncentives(e.target.value),
+                    }));
+                  }}
+                  error={adjustmentErrors.incentives}
+                  placeholder="0"
                 />
                 <InputField
                   label="Recovery / Advance Deduction (₹)"
                   type="number"
                   min={0}
-                  value={recovery}
-                  onChange={(e) => setRecovery(parseFloat(e.target.value) || 0)}
+                  max={10000000}
+                  maxLength={8}
+                  value={recovery === 0 ? "" : recovery}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setRecovery(val);
+                    setAdjustmentErrors((prev) => ({
+                      ...prev,
+                      recovery: validateRecovery(val),
+                    }));
+                  }}
+                  onBlur={(e) => {
+                    setAdjustmentErrors((prev) => ({
+                      ...prev,
+                      recovery: validateRecovery(e.target.value),
+                    }));
+                  }}
+                  error={adjustmentErrors.recovery}
+                  placeholder="0"
                 />
                 <InputField
                   label="Professional Tax Override (₹)"
                   type="number"
                   min={0}
-                  value={professionalTax}
-                  onChange={(e) => setProfessionalTax(parseFloat(e.target.value) || 0)}
+                  max={50000}
+                  maxLength={6}
+                  value={professionalTax === 0 ? "" : professionalTax}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setProfessionalTax(val);
+                    setAdjustmentErrors((prev) => ({
+                      ...prev,
+                      professionalTax: validateProfessionalTax(val),
+                    }));
+                  }}
+                  onBlur={(e) => {
+                    setAdjustmentErrors((prev) => ({
+                      ...prev,
+                      professionalTax: validateProfessionalTax(e.target.value),
+                    }));
+                  }}
+                  error={adjustmentErrors.professionalTax}
+                  placeholder="200"
                 />
               </div>
 
               <TextareaField
                 label="Accountant Remarks"
                 value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setRemarks(val);
+                  setAdjustmentErrors((prev) => ({
+                    ...prev,
+                    remarks: validateAccountantRemarks(val),
+                  }));
+                }}
+                onBlur={(e) => {
+                  setAdjustmentErrors((prev) => ({
+                    ...prev,
+                    remarks: validateAccountantRemarks(e.target.value),
+                  }));
+                }}
                 rows={2}
+                maxLength={250}
+                showCharCount
+                error={adjustmentErrors.remarks}
                 placeholder="e.g. Festival bonus applied as per HR approval..."
               />
             </div>
 
             <div className="flex justify-end gap-2 pt-3 border-t">
-              <Button variant="secondary" onClick={() => setIsAdjustmentOpen(false)}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsAdjustmentOpen(false);
+                  setAdjustmentErrors({});
+                  setAdjustmentFormError(null);
+                }}
+              >
                 Cancel
               </Button>
               <Button

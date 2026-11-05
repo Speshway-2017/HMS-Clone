@@ -16,6 +16,7 @@ export interface ConsultationSlipPDFProps {
     department?: any;
     patientName?: string;
     patientId?: string;
+    chiefComplaint?: string;
     reason?: string;
     symptoms?: string;
     notes?: string;
@@ -109,7 +110,7 @@ export const ConsultationSlipPDF: React.FC<ConsultationSlipPDFProps> = ({
         <Text style={styles.sectionTitle}>Chief Symptoms & Reason for Visit</Text>
         <View style={styles.notesBox}>
           <Text style={styles.notesText}>
-            {consultation.reason || consultation.symptoms || consultation.notes || "General OPD Consultation & Routine Medical Review."}
+            {consultation.chiefComplaint || consultation.reason || consultation.symptoms || consultation.notes || "General OPD Consultation & Routine Medical Review."}
           </Text>
         </View>
 

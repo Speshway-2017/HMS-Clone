@@ -52,11 +52,28 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
           {items.map((item) => {
             const currentFullPath = location.pathname + location.search;
-            const isActive = item.path.includes("?")
-              ? currentFullPath === item.path
+            const searchTab = new URLSearchParams(location.search).get("tab");
+            const itemPathWithoutQuery = item.path.split("?")[0];
+            const itemQueryTab = item.path.includes("?tab=") ? item.path.split("?tab=")[1] : null;
+
+            const isTabMatch = itemQueryTab
+              ? (searchTab === itemQueryTab || location.pathname === `/patient/${itemQueryTab}`)
+              : Boolean(searchTab && item.path.endsWith("/" + searchTab));
+
+            const isVideoActive = item.path === "/patient/telehealth" && (
+              location.pathname === "/patient/telehealth" ||
+              location.pathname === "/patient/video-consult" ||
+              location.pathname === "/patient/video-conference" ||
+              location.pathname === "/patient/conference"
+            );
+
+            const isActive = isVideoActive
+              ? true
+              : item.path.includes("?")
+              ? currentFullPath === item.path || isTabMatch
               : item.label === "Dashboard"
               ? (location.pathname === item.path && (!location.search || location.search === "?tab=overview" || location.search === "?tab=dashboard"))
-              : location.pathname === item.path || location.pathname.startsWith(item.path + "/");
+              : location.pathname === item.path || location.pathname.startsWith(item.path + "/") || isTabMatch;
 
             return (
               <NavLink

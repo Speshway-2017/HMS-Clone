@@ -720,9 +720,9 @@ const updateProfileSchema = z.object({
   name: z
     .string({ invalid_type_error: "The Full Display Name field should not accept invalid data and the appropriate validation message should be displayed. Full Display Name must be valid data. Please enter valid data" })
     .trim()
-    .min(1, "Error message should be displayed as:\nPlease fill out this field. Field is required. Full Display Name is required")
-    .max(100, "The Full Display Name field should not accept text exceeding the allowed character limit and the appropriate validation message should be displayed. Characters limit: 100. Full Display Name cannot exceed 100 characters. Too long text is not accepted. Too long data is not accepted. Please enter valid data")
-    .refine((val) => val.length >= 2 && /^[a-zA-Z0-9\s\.\-_']+$/.test(val) && !/<script|javascript:/i.test(val), {
+    .min(1, "The Full Display Name field should not accept invalid data and the appropriate validation message should be displayed. Error message: Please fill out this field. Field is required. Full Display Name is required. Invalid data not accepted.")
+    .max(100, "The Full Display Name field should not accept text exceeding the allowed character limit and the appropriate validation message should be displayed. Characters limit: 100. Full Display Name cannot exceed 100 characters. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data")
+    .refine((val) => val.length >= 2 && /[a-zA-Z]/.test(val) && /^[a-zA-Z\s.,'-]+$/.test(val) && !/<script|javascript:|<[^>]*>/i.test(val), {
       message: "The Full Display Name field should not accept invalid data and the appropriate validation message should be displayed. Full Display Name contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data",
     })
     .optional(),

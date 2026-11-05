@@ -28,34 +28,84 @@ import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 
 // ----------------- Validation Functions for Shift Handover -----------------
-const validateRemarks = (val: string): string | null => {
-  const trimmed = (val || "").trim();
-  if (!trimmed) return null; // optional field
-  if (val.length > 500) {
-    return "Handoff Remarks cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data";
+const validateFieldText = (val: string, fieldLabel: string, maxLength = 500): string | null => {
+  const raw = val || "";
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return "Please fill out this field";
+  }
+  if (raw.length > maxLength) {
+    return `${fieldLabel} cannot exceed ${maxLength} characters. Characters limit: ${maxLength}. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data`;
   }
   if (trimmed.length < 2) {
-    return "Handoff Remarks must be at least 2 characters. Too short text is not accepted. It should not accept invalid data. Please enter valid data";
+    return `${fieldLabel} must be at least 2 characters. Too short text is not accepted. It should not accept invalid data. Please enter valid data`;
   }
-  if (/<[^>]*>|javascript:/i.test(trimmed) || !/[a-zA-Z0-9]/.test(trimmed) || !/^[a-zA-Z0-9\s\.\-/'&,()%+!\n\r#@]+$/.test(trimmed)) {
-    return "Handoff Remarks contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data";
+  if (
+    /<[^>]*>|javascript:/i.test(trimmed) ||
+    !/[a-zA-Z0-9]/.test(trimmed) ||
+    !/^[a-zA-Z0-9\s.,?!'\-_/()&%#@+:;\n\r"*=°/±μ]+$/.test(trimmed)
+  ) {
+    return `${fieldLabel} contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data`;
+  }
+  return null;
+};
+
+const validatePatientsCount = (val: string | number): string | null => {
+  const str = String(val ?? "").trim();
+  if (!str) {
+    return "Please fill out this field";
+  }
+  if (str.length > 4 || Number(str) > 1000) {
+    return "Patients Handed Over Count cannot exceed 4 digits. Characters limit: 4. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data";
+  }
+  if (!/^\d+$/.test(str) || Number(str) < 0) {
+    return "Patients Handed Over Count contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data";
+  }
+  return null;
+};
+
+const validatePatientsDetails = (val: string) => validateFieldText(val, "Patients Roster Details", 500);
+const validatePendingMedication = (val: string) => validateFieldText(val, "Pending Medications / Doses", 500);
+const validatePendingProcedures = (val: string) => validateFieldText(val, "Pending Procedures / Vitals", 500);
+const validateCriticalPatients = (val: string) => validateFieldText(val, "Critical / High Priority Patients", 500);
+const validateSpecialInstructions = (val: string) => validateFieldText(val, "Special Instructions", 500);
+
+const validateRemarks = (val: string): string | null => {
+  const raw = val || "";
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return "Please fill out this field";
+  }
+  if (raw.length > 500) {
+    return "General Shift Remarks cannot exceed 500 characters. Handoff Remarks cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data";
+  }
+  if (trimmed.length < 2) {
+    return "General Shift Remarks must be at least 2 characters. Too short text is not accepted. It should not accept invalid data. Please enter valid data";
+  }
+  if (
+    /<[^>]*>|javascript:/i.test(trimmed) ||
+    !/[a-zA-Z0-9]/.test(trimmed) ||
+    !/^[a-zA-Z0-9\s.,?!'\-_/()&%#@+:;\n\r"*=°/±μ]+$/.test(trimmed)
+  ) {
+    return "General Shift Remarks contains invalid data. Handoff Remarks contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data";
   }
   return null;
 };
 
 const validateNurseSignature = (val: string): string | null => {
-  const trimmed = (val || "").trim();
+  const raw = val || "";
+  const trimmed = raw.trim();
   if (!trimmed) {
-    return "Outgoing Nurse Signature is required. Field is required. Please fill out this field";
+    return "Please fill out this field";
   }
-  if (val.length > 100) {
-    return "Outgoing Nurse Signature cannot exceed 100 characters. Characters limit: 100. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data";
+  if (raw.length > 100) {
+    return "Nurse Digital Signature cannot exceed 100 characters. Outgoing Nurse Signature cannot exceed 100 characters. Characters limit: 100. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data";
   }
   if (trimmed.length < 2) {
-    return "Outgoing Nurse Signature must be at least 2 characters. Value must be at least 2 characters. It should not accept invalid data. Please enter valid data";
+    return "Nurse Digital Signature must be at least 2 characters. Outgoing Nurse Signature must be at least 2 characters. Value must be at least 2 characters. It should not accept invalid data. Please enter valid data";
   }
   if (!/^[a-zA-Z\s\.\'\(\)\-]+$/.test(trimmed) || !/[a-zA-Z]/.test(trimmed) || /<[^>]*>|javascript:/i.test(trimmed)) {
-    return "Outgoing Nurse Signature contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data";
+    return "Nurse Digital Signature contains invalid data. Outgoing Nurse Signature contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data";
   }
   return null;
 };
@@ -110,31 +160,30 @@ export default function ShiftHandover() {
   const [nurseSignature, setNurseSignature] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [handoverErrors, setHandoverErrors] = useState<{
+    incomingNurseId?: string | null;
+    patientsCount?: string | null;
+    patientsDetails?: string | null;
+    pendingMedication?: string | null;
+    pendingProcedures?: string | null;
+    criticalPatients?: string | null;
+    specialInstructions?: string | null;
     remarks?: string | null;
     nurseSignature?: string | null;
   }>({});
 
-  const handleRemarksKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab", "Enter"].includes(e.key)) return;
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    const input = e.currentTarget;
-    const selLength = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0);
-    if (input.value.length >= 500 && selLength === 0) {
-      e.preventDefault();
-      toast.error("Handoff Remarks cannot exceed 500 characters. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted.");
-    }
+  const createKeyLimitHandler = (max: number, fieldLabel: string) => {
+    return (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      if (["Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Tab", "Enter"].includes(e.key)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.currentTarget;
+      const selLength = (el.selectionEnd ?? 0) - (el.selectionStart ?? 0);
+      if (el.value.length >= max && selLength === 0) {
+        e.preventDefault();
+        toast.error(`${fieldLabel} cannot exceed ${max} ${max <= 10 ? "digits" : "characters"}. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data`);
+      }
+    };
   };
 
-  const handleSignatureKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab", "Enter"].includes(e.key)) return;
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    const input = e.currentTarget;
-    const selLength = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0);
-    if (input.value.length >= 100 && selLength === 0) {
-      e.preventDefault();
-      toast.error("Outgoing Nurse Signature cannot exceed 100 characters. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted.");
-    }
-  };
   const [selectedAdmissionIds, setSelectedAdmissionIds] = useState<string[]>([]);
   const [showPatientDropdown, setShowPatientDropdown] = useState(false);
 
@@ -147,7 +196,6 @@ export default function ShiftHandover() {
 
   // Search/Filter for History Timeline
   const [searchQuery, setSearchQuery] = useState("");
-
 
   // Handle Form Autofill from Active Inpatients
   const handleAutofill = () => {
@@ -184,34 +232,72 @@ export default function ShiftHandover() {
     }).filter(Boolean).join("\n");
     setPendingMedication(pendingMedsList || "No active pending prescriptions today.");
 
+    setPendingProcedures("Routine vitals checks and observation continued.");
+    setSpecialInstructions("Standard nursing protocol, dietary and isolation guidelines followed.");
+    setRemarks("Smooth shift round, wards running on optimal nurse ratios.");
+
     // Sign with user name
     if (user?.name) {
       setNurseSignature(`${user.name}, RN`);
     }
 
+    setHandoverErrors({});
     toast.success("Autofilled form context from current inpatients database roster!");
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const incomingNurseErr = !selectedIncomingNurseId ? "Please fill out this field" : null;
+    const countErr = validatePatientsCount(patientsCount);
+    const detailsErr = validatePatientsDetails(patientsDetails);
+    const medErr = validatePendingMedication(pendingMedication);
+    const procErr = validatePendingProcedures(pendingProcedures);
+    const critErr = validateCriticalPatients(criticalPatients);
+    const specErr = validateSpecialInstructions(specialInstructions);
     const remarksErr = validateRemarks(remarks);
     const signatureErr = validateNurseSignature(nurseSignature);
 
-    if (remarksErr || signatureErr) {
-      setHandoverErrors({
-        remarks: remarksErr,
-        nurseSignature: signatureErr,
-      });
-      toast.error(signatureErr || remarksErr || "Please fix validation errors.");
+    const errorsObj = {
+      incomingNurseId: incomingNurseErr,
+      patientsCount: countErr,
+      patientsDetails: detailsErr,
+      pendingMedication: medErr,
+      pendingProcedures: procErr,
+      criticalPatients: critErr,
+      specialInstructions: specErr,
+      remarks: remarksErr,
+      nurseSignature: signatureErr,
+    };
+
+    if (
+      incomingNurseErr ||
+      countErr ||
+      detailsErr ||
+      medErr ||
+      procErr ||
+      critErr ||
+      specErr ||
+      remarksErr ||
+      signatureErr
+    ) {
+      setHandoverErrors(errorsObj);
+      const firstErr =
+        countErr ||
+        detailsErr ||
+        medErr ||
+        procErr ||
+        critErr ||
+        specErr ||
+        remarksErr ||
+        signatureErr ||
+        incomingNurseErr;
+      toast.error(firstErr || "Please fill out this field");
       return;
     }
 
-    if (!selectedIncomingNurseId) {
-      toast.error("Please select an incoming nurse to transfer duties.");
-      return;
-    }
-    if (!nurseSignature.trim()) {
-      toast.error("Handover report requires outgoing nurse signature validation");
+    if (selectedAdmissionIds.length === 0) {
+      toast.error("Please select at least one assigned patient to hand over.");
       return;
     }
 
@@ -257,21 +343,30 @@ export default function ShiftHandover() {
     }
   };
 
-
-
-  // Filter Handovers History
-  const filteredHandovers = (handovers || []).filter((h) => {
-    if (!searchQuery.trim()) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      h.currentShift.toLowerCase().includes(query) ||
-      h.nextShift.toLowerCase().includes(query) ||
-      h.loggedByName.toLowerCase().includes(query) ||
-      h.nurseSignature.toLowerCase().includes(query) ||
-      (h.remarks || "").toLowerCase().includes(query) ||
-      (h.specialInstructions || "").toLowerCase().includes(query)
-    );
-  });
+  // Filter Handovers History - by default when search is blank, all data table is displayed
+  const filteredHandovers = useMemo(() => {
+    const list = handovers || [];
+    if (!searchQuery || !searchQuery.trim()) {
+      return list;
+    }
+    const query = searchQuery.toLowerCase().trim();
+    return list.filter((h) => {
+      return (
+        h.currentShift?.toLowerCase().includes(query) ||
+        h.nextShift?.toLowerCase().includes(query) ||
+        h.loggedByName?.toLowerCase().includes(query) ||
+        h.nurseSignature?.toLowerCase().includes(query) ||
+        (h.remarks || "").toLowerCase().includes(query) ||
+        (h.specialInstructions || "").toLowerCase().includes(query) ||
+        (h.incomingNurseName || "").toLowerCase().includes(query) ||
+        (h.patientsHandedOverDetails || "").toLowerCase().includes(query) ||
+        (h.criticalPatients || "").toLowerCase().includes(query) ||
+        (h.pendingMedication || "").toLowerCase().includes(query) ||
+        (h.pendingProcedures || "").toLowerCase().includes(query) ||
+        String(h.patientsHandedOverCount || "").includes(query)
+      );
+    });
+  }, [handovers, searchQuery]);
 
   return (
     <div className="space-y-8 font-sans pb-10">
@@ -324,7 +419,7 @@ export default function ShiftHandover() {
               </h3>
             </div>
 
-            <form onSubmit={handleFormSubmit} className="space-y-4 text-xs font-semibold text-slate-655">
+            <form onSubmit={handleFormSubmit} noValidate className="space-y-4 text-xs font-semibold text-slate-655">
               
               {/* Part A: Incoming Nurse Selection Dropdown Selector */}
               <div>
@@ -333,8 +428,21 @@ export default function ShiftHandover() {
                 </label>
                 <select
                   value={selectedIncomingNurseId}
-                  onChange={(e) => setSelectedIncomingNurseId(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 focus:border-indigo-500 outline-none cursor-pointer bg-white font-bold text-slate-700 text-xs"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedIncomingNurseId(val);
+                    if (handoverErrors.incomingNurseId) {
+                      setHandoverErrors((prev) => ({ ...prev, incomingNurseId: !val ? "Please fill out this field" : null }));
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!selectedIncomingNurseId) {
+                      setHandoverErrors((prev) => ({ ...prev, incomingNurseId: "Please fill out this field" }));
+                    }
+                  }}
+                  className={`w-full rounded-xl border px-3 py-2.5 focus:border-indigo-500 outline-none cursor-pointer bg-white font-bold text-slate-700 text-xs transition ${
+                    handoverErrors.incomingNurseId ? "border-rose-400 bg-rose-50/20 focus:border-rose-500" : "border-slate-200"
+                  }`}
                 >
                   <option value="">-- Select Incoming Nurse --</option>
                   {availableNurses.map((nurse: any) => (
@@ -343,7 +451,14 @@ export default function ShiftHandover() {
                     </option>
                   ))}
                 </select>
-              </div>              {/* Part A2: Patient Assignment Checklist Selector (Collapsible Dropdown) */}
+                {handoverErrors.incomingNurseId && (
+                  <p className="text-xs font-medium text-rose-500 mt-1" role="alert">
+                    {handoverErrors.incomingNurseId}
+                  </p>
+                )}
+              </div>
+
+              {/* Part A2: Patient Assignment Checklist Selector (Collapsible Dropdown) */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">
                   Select Assigned Patients to Hand Over (Required)
@@ -435,81 +550,228 @@ export default function ShiftHandover() {
               {/* Patients Count & Details */}
               <div className="grid grid-cols-1 gap-4">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Patients Handed Over Count</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                      Patients Handed Over Count <span className="text-rose-500">*</span>
+                    </label>
+                    <span className={`text-[10px] font-mono ${patientsCount.length > 4 ? "text-red-600 font-bold" : "text-slate-400"}`}>
+                      {patientsCount.length}/4
+                    </span>
+                  </div>
                   <input
-                    type="number"
+                    type="text"
                     required
+                    maxLength={4}
                     placeholder="e.g. 5"
                     value={patientsCount}
-                    onChange={(e) => setPatientsCount(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 focus:border-indigo-500 outline-none"
+                    onKeyDown={createKeyLimitHandler(4, "Patients Handed Over Count")}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setPatientsCount(val);
+                      if (handoverErrors.patientsCount) {
+                        setHandoverErrors((prev) => ({ ...prev, patientsCount: validatePatientsCount(val) }));
+                      }
+                    }}
+                    onBlur={() => {
+                      setHandoverErrors((prev) => ({ ...prev, patientsCount: validatePatientsCount(patientsCount) }));
+                    }}
+                    className={`w-full rounded-xl border px-3 py-2 outline-none font-medium transition ${
+                      handoverErrors.patientsCount ? "border-rose-400 bg-rose-50/20 focus:border-rose-500" : "border-slate-200 focus:border-indigo-500"
+                    }`}
                   />
+                  {handoverErrors.patientsCount && (
+                    <p className="text-xs font-medium text-rose-500 mt-1" role="alert">
+                      {handoverErrors.patientsCount}
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Patients Roster Details</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                      Patients Roster Details <span className="text-rose-500">*</span>
+                    </label>
+                    <span className={`text-[10px] font-mono ${patientsDetails.length > 500 ? "text-red-600 font-bold" : "text-slate-400"}`}>
+                      {patientsDetails.length}/500
+                    </span>
+                  </div>
                   <textarea
                     rows={3}
+                    required
+                    maxLength={500}
                     placeholder="Provide a quick list of patients or bed/ward assignments..."
                     value={patientsDetails}
-                    onChange={(e) => setPatientsDetails(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 p-3 focus:border-indigo-500 outline-none resize-none font-medium"
+                    onKeyDown={createKeyLimitHandler(500, "Patients Roster Details")}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setPatientsDetails(val);
+                      if (handoverErrors.patientsDetails) {
+                        setHandoverErrors((prev) => ({ ...prev, patientsDetails: validatePatientsDetails(val) }));
+                      }
+                    }}
+                    onBlur={() => {
+                      setHandoverErrors((prev) => ({ ...prev, patientsDetails: validatePatientsDetails(patientsDetails) }));
+                    }}
+                    className={`w-full rounded-xl border p-3 outline-none resize-none font-medium transition ${
+                      handoverErrors.patientsDetails ? "border-rose-400 bg-rose-50/20 focus:border-rose-500" : "border-slate-200 focus:border-indigo-500"
+                    }`}
                   />
+                  {handoverErrors.patientsDetails && (
+                    <p className="text-xs font-medium text-rose-500 mt-1" role="alert">
+                      {handoverErrors.patientsDetails}
+                    </p>
+                  )}
                 </div>
               </div>
 
               {/* Pending Medications & Procedures */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center gap-1">
-                    <Pill className="h-3.5 w-3.5 text-indigo-500" /> Pending Medications / Doses
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                      <Pill className="h-3.5 w-3.5 text-indigo-500" /> Pending Medications / Doses <span className="text-rose-500">*</span>
+                    </label>
+                    <span className={`text-[10px] font-mono ${pendingMedication.length > 500 ? "text-red-600 font-bold" : "text-slate-400"}`}>
+                      {pendingMedication.length}/500
+                    </span>
+                  </div>
                   <textarea
                     rows={4}
+                    required
+                    maxLength={500}
                     placeholder="Detail any medication scheduled for next shift or missed doses..."
                     value={pendingMedication}
-                    onChange={(e) => setPendingMedication(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 p-3 focus:border-indigo-500 outline-none resize-none font-medium text-[11px]"
+                    onKeyDown={createKeyLimitHandler(500, "Pending Medications / Doses")}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setPendingMedication(val);
+                      if (handoverErrors.pendingMedication) {
+                        setHandoverErrors((prev) => ({ ...prev, pendingMedication: validatePendingMedication(val) }));
+                      }
+                    }}
+                    onBlur={() => {
+                      setHandoverErrors((prev) => ({ ...prev, pendingMedication: validatePendingMedication(pendingMedication) }));
+                    }}
+                    className={`w-full rounded-xl border p-3 outline-none resize-none font-medium text-[11px] transition ${
+                      handoverErrors.pendingMedication ? "border-rose-400 bg-rose-50/20 focus:border-rose-500" : "border-slate-200 focus:border-indigo-500"
+                    }`}
                   />
+                  {handoverErrors.pendingMedication && (
+                    <p className="text-xs font-medium text-rose-500 mt-1" role="alert">
+                      {handoverErrors.pendingMedication}
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center gap-1">
-                    <Activity className="h-3.5 w-3.5 text-rose-500" /> Pending Procedures / Vitals
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                      <Activity className="h-3.5 w-3.5 text-rose-500" /> Pending Procedures / Vitals <span className="text-rose-500">*</span>
+                    </label>
+                    <span className={`text-[10px] font-mono ${pendingProcedures.length > 500 ? "text-red-600 font-bold" : "text-slate-400"}`}>
+                      {pendingProcedures.length}/500
+                    </span>
+                  </div>
                   <textarea
                     rows={4}
+                    required
+                    maxLength={500}
                     placeholder="Detail dressing changes, pending labs, radiologies or diagnostics..."
                     value={pendingProcedures}
-                    onChange={(e) => setPendingProcedures(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 p-3 focus:border-indigo-500 outline-none resize-none font-medium text-[11px]"
+                    onKeyDown={createKeyLimitHandler(500, "Pending Procedures / Vitals")}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setPendingProcedures(val);
+                      if (handoverErrors.pendingProcedures) {
+                        setHandoverErrors((prev) => ({ ...prev, pendingProcedures: validatePendingProcedures(val) }));
+                      }
+                    }}
+                    onBlur={() => {
+                      setHandoverErrors((prev) => ({ ...prev, pendingProcedures: validatePendingProcedures(pendingProcedures) }));
+                    }}
+                    className={`w-full rounded-xl border p-3 outline-none resize-none font-medium text-[11px] transition ${
+                      handoverErrors.pendingProcedures ? "border-rose-400 bg-rose-50/20 focus:border-rose-500" : "border-slate-200 focus:border-indigo-500"
+                    }`}
                   />
+                  {handoverErrors.pendingProcedures && (
+                    <p className="text-xs font-medium text-rose-500 mt-1" role="alert">
+                      {handoverErrors.pendingProcedures}
+                    </p>
+                  )}
                 </div>
               </div>
 
               {/* Critical Patients & Special Instructions */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center gap-1">
-                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Critical / High Priority Patients
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Critical / High Priority Patients <span className="text-rose-500">*</span>
+                    </label>
+                    <span className={`text-[10px] font-mono ${criticalPatients.length > 500 ? "text-red-600 font-bold" : "text-slate-400"}`}>
+                      {criticalPatients.length}/500
+                    </span>
+                  </div>
                   <textarea
                     rows={4}
+                    required
+                    maxLength={500}
                     placeholder="List unstable, ICU cases, or emergency prioritizations..."
                     value={criticalPatients}
-                    onChange={(e) => setCriticalPatients(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 p-3 focus:border-indigo-500 outline-none resize-none font-medium text-[11px]"
+                    onKeyDown={createKeyLimitHandler(500, "Critical / High Priority Patients")}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCriticalPatients(val);
+                      if (handoverErrors.criticalPatients) {
+                        setHandoverErrors((prev) => ({ ...prev, criticalPatients: validateCriticalPatients(val) }));
+                      }
+                    }}
+                    onBlur={() => {
+                      setHandoverErrors((prev) => ({ ...prev, criticalPatients: validateCriticalPatients(criticalPatients) }));
+                    }}
+                    className={`w-full rounded-xl border p-3 outline-none resize-none font-medium text-[11px] transition ${
+                      handoverErrors.criticalPatients ? "border-rose-400 bg-rose-50/20 focus:border-rose-500" : "border-slate-200 focus:border-indigo-500"
+                    }`}
                   />
+                  {handoverErrors.criticalPatients && (
+                    <p className="text-xs font-medium text-rose-500 mt-1" role="alert">
+                      {handoverErrors.criticalPatients}
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center gap-1">
-                    <FileText className="h-3.5 w-3.5 text-violet-500" /> Special Instructions
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                      <FileText className="h-3.5 w-3.5 text-violet-500" /> Special Instructions <span className="text-rose-500">*</span>
+                    </label>
+                    <span className={`text-[10px] font-mono ${specialInstructions.length > 500 ? "text-red-600 font-bold" : "text-slate-400"}`}>
+                      {specialInstructions.length}/500
+                    </span>
+                  </div>
                   <textarea
                     rows={4}
+                    required
+                    maxLength={500}
                     placeholder="Notes from admitting doctors, dietary protocols, isolation alerts..."
                     value={specialInstructions}
-                    onChange={(e) => setSpecialInstructions(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 p-3 focus:border-indigo-500 outline-none resize-none font-medium text-[11px]"
+                    onKeyDown={createKeyLimitHandler(500, "Special Instructions")}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSpecialInstructions(val);
+                      if (handoverErrors.specialInstructions) {
+                        setHandoverErrors((prev) => ({ ...prev, specialInstructions: validateSpecialInstructions(val) }));
+                      }
+                    }}
+                    onBlur={() => {
+                      setHandoverErrors((prev) => ({ ...prev, specialInstructions: validateSpecialInstructions(specialInstructions) }));
+                    }}
+                    className={`w-full rounded-xl border p-3 outline-none resize-none font-medium text-[11px] transition ${
+                      handoverErrors.specialInstructions ? "border-rose-400 bg-rose-50/20 focus:border-rose-500" : "border-slate-200 focus:border-indigo-500"
+                    }`}
                   />
+                  {handoverErrors.specialInstructions && (
+                    <p className="text-xs font-medium text-rose-500 mt-1" role="alert">
+                      {handoverErrors.specialInstructions}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -517,30 +779,30 @@ export default function ShiftHandover() {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                    General Shift Remarks
+                    General Shift Remarks <span className="text-rose-500">*</span>
                   </label>
                   <span className={`text-[10px] font-mono ${remarks.length > 500 ? "text-red-600 font-bold" : "text-slate-400"}`}>
                     {remarks.length}/500
                   </span>
                 </div>
-                <input
-                  type="text"
+                <textarea
+                  rows={3}
+                  required
                   maxLength={500}
-                  onKeyDown={handleRemarksKeyDown}
+                  onKeyDown={createKeyLimitHandler(500, "General Shift Remarks")}
                   placeholder="e.g. Smooth shift round, wards running on optimal nurse ratios..."
                   value={remarks}
                   onChange={(e) => {
-                    setRemarks(e.target.value);
+                    const val = e.target.value;
+                    setRemarks(val);
                     if (handoverErrors.remarks) {
-                      setHandoverErrors((prev) => ({ ...prev, remarks: validateRemarks(e.target.value) }));
+                      setHandoverErrors((prev) => ({ ...prev, remarks: validateRemarks(val) }));
                     }
                   }}
                   onBlur={() => {
-                    if (remarks.trim()) {
-                      setHandoverErrors((prev) => ({ ...prev, remarks: validateRemarks(remarks) }));
-                    }
+                    setHandoverErrors((prev) => ({ ...prev, remarks: validateRemarks(remarks) }));
                   }}
-                  className={`w-full rounded-xl border px-3 py-2 outline-none font-medium transition ${
+                  className={`w-full rounded-xl border p-3 outline-none resize-none font-medium transition ${
                     handoverErrors.remarks
                       ? "border-rose-400 bg-rose-50/20 focus:border-rose-500"
                       : "border-slate-200 focus:border-indigo-500"
@@ -568,13 +830,14 @@ export default function ShiftHandover() {
                     type="text"
                     required
                     maxLength={100}
-                    onKeyDown={handleSignatureKeyDown}
+                    onKeyDown={createKeyLimitHandler(100, "Nurse Digital Signature")}
                     placeholder="Type Full Name with credentials (e.g. Clara Oswald, RN)"
                     value={nurseSignature}
                     onChange={(e) => {
-                      setNurseSignature(e.target.value);
+                      const val = e.target.value;
+                      setNurseSignature(val);
                       if (handoverErrors.nurseSignature) {
-                        setHandoverErrors((prev) => ({ ...prev, nurseSignature: validateNurseSignature(e.target.value) }));
+                        setHandoverErrors((prev) => ({ ...prev, nurseSignature: validateNurseSignature(val) }));
                       }
                     }}
                     onBlur={() => {
@@ -599,9 +862,9 @@ export default function ShiftHandover() {
               <div className="flex gap-3 pt-2">
                 <button
                   type="submit"
-                  disabled={isReadOnly || submitting || !selectedIncomingNurseId || Boolean(handoverErrors.remarks) || Boolean(handoverErrors.nurseSignature)}
+                  disabled={isReadOnly || submitting}
                   className={`flex-1 py-2.5 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm ${
-                    isReadOnly || submitting || !selectedIncomingNurseId
+                    isReadOnly || submitting
                       ? "bg-slate-300 cursor-not-allowed opacity-60 text-slate-500"
                       : "bg-indigo-600 hover:bg-indigo-700 active:scale-98 cursor-pointer"
                   }`}
@@ -635,8 +898,18 @@ export default function ShiftHandover() {
                 placeholder="Search audit trail logs..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 pl-8 pr-3 py-1.5 outline-none focus:border-indigo-500 text-xs font-medium"
+                className="w-full rounded-xl border border-slate-200 pl-8 pr-8 py-1.5 outline-none focus:border-indigo-500 text-xs font-medium"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+                  title="Clear search to display all records"
+                >
+                  ✕
+                </button>
+              )}
             </div>
 
             {/* Audit Timeline Scrollable Area */}

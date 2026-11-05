@@ -42,7 +42,7 @@ const APPOINTMENT_LIMITS = {
   REMARKS: 500,
 };
 
-const TEXT_GENERAL_REGEX = /^[a-zA-Z0-9\s,\.\-/'&()#]+$/;
+const TEXT_GENERAL_REGEX = /^[a-zA-Z0-9\s,\.\-/'&()#:%+?!";*°@[\]_]+$/;
 
 // Validation schema for booking form
 const appointmentSchema = z.object({
@@ -89,11 +89,15 @@ const appointmentSchema = z.object({
       `Chief Complaints / Notes cannot exceed ${APPOINTMENT_LIMITS.NOTES} characters. Characters limit: ${APPOINTMENT_LIMITS.NOTES}. Too long data and characters limit should be mentioned. Too long text is not accepted. Too long data is not accepted. Please enter valid data`
     )
     .refine(
-      (val: string) => !val || val.length >= APPOINTMENT_LIMITS.NOTES_MIN,
+      (val: string) => !val || !val.trim() || val.trim().length >= APPOINTMENT_LIMITS.NOTES_MIN,
       `Chief Complaints / Notes must be at least ${APPOINTMENT_LIMITS.NOTES_MIN} characters. Value must be at least ${APPOINTMENT_LIMITS.NOTES_MIN} characters. Minimum characters required: ${APPOINTMENT_LIMITS.NOTES_MIN}. Too short text is not accepted. Please enter valid data`
     )
     .refine(
-      (val: string) => !val || TEXT_GENERAL_REGEX.test(val),
+      (val: string) => !val || !val.trim() || !/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>|javascript:|<[^>]*>|[<>{}]/i.test(val),
+      "Chief Complaints / Notes contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
+    )
+    .refine(
+      (val: string) => !val || !val.trim() || TEXT_GENERAL_REGEX.test(val.trim()),
       "Chief Complaints / Notes contains invalid characters. Invalid data not accepted. Invalid data is not accepted. Please enter valid data"
     )
     .optional()
