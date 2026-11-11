@@ -53,6 +53,12 @@ function formatINR(amount: number | string | undefined) {
   }).format(numericVal);
 }
 
+function cleanDisplayVital(val: string | undefined | null): string | null {
+  if (!val || typeof val !== "string") return null;
+  const t = val.trim();
+  if (t.includes("@") || t.length > 15 || !/[0-9]/.test(t)) return null;
+  return t;
+}
 const TABS = ["Admitted Patients", "Daily Notes", "Treatment Plan", "Lab Records", "Radiology", "Medical Timeline", "Discharge"];
 
 function IPMedicineStrengthSelect({
@@ -567,12 +573,12 @@ export function IPManagementPage() {
   // Open vitals modal
   const openVitalsModal = () => {
     const latest = admissionDetails?.vitals?.[admissionDetails.vitals.length - 1] || {};
-    setTemp(latest.temperature || "");
-    setBp(latest.bloodPressure || "");
-    setPulse(latest.pulseRate || "");
-    setResp(latest.respiratoryRate || "");
-    setSpo2(latest.oxygenSaturation || "");
-    setWeight(latest.weight || "");
+    setTemp(cleanDisplayVital(latest.temperature) || "");
+    setBp(cleanDisplayVital(latest.bloodPressure) || "");
+    setPulse(cleanDisplayVital(latest.pulseRate) || "");
+    setResp(cleanDisplayVital(latest.respiratoryRate) || "");
+    setSpo2(cleanDisplayVital(latest.oxygenSaturation) || "");
+    setWeight(cleanDisplayVital(latest.weight) || "");
     setTempError(null);
     setBpError(null);
     setPulseError(null);
@@ -1111,12 +1117,19 @@ export function IPManagementPage() {
                 ) : (
                   <div className="relative">
                     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                      {[
-                        { label: "Blood Pressure", value: admissionDetails?.vitals?.[admissionDetails.vitals.length - 1]?.bloodPressure || "—", icon: <HeartPulse className="h-4 w-4 text-rose-500" /> },
-                        { label: "Pulse / HR", value: admissionDetails?.vitals?.[admissionDetails.vitals.length - 1]?.pulseRate ? `${admissionDetails.vitals[admissionDetails.vitals.length - 1].pulseRate} bpm` : "—", icon: <HeartPulse className="h-4 w-4 text-emerald-500" /> },
-                        { label: "Temperature", value: admissionDetails?.vitals?.[admissionDetails.vitals.length - 1]?.temperature ? `${admissionDetails.vitals[admissionDetails.vitals.length - 1].temperature}°F` : "—", icon: <Thermometer className="h-4 w-4 text-amber-500" /> },
-                        { label: "SpO₂ Status", value: admissionDetails?.vitals?.[admissionDetails.vitals.length - 1]?.oxygenSaturation ? `${admissionDetails.vitals[admissionDetails.vitals.length - 1].oxygenSaturation}%` : "—", icon: <Thermometer className="h-4 w-4 text-blue-500" /> },
-                      ].map((vital) => (
+                      {(() => {
+                        const lastV = admissionDetails?.vitals?.[admissionDetails.vitals.length - 1];
+                        const cBp = cleanDisplayVital(lastV?.bloodPressure);
+                        const cPulse = cleanDisplayVital(lastV?.pulseRate);
+                        const cTemp = cleanDisplayVital(lastV?.temperature);
+                        const cSpo2 = cleanDisplayVital(lastV?.oxygenSaturation);
+                        return [
+                          { label: "Blood Pressure", value: cBp || "—", icon: <HeartPulse className="h-4 w-4 text-rose-500" /> },
+                          { label: "Pulse / HR", value: cPulse ? `${cPulse} bpm` : "—", icon: <HeartPulse className="h-4 w-4 text-emerald-500" /> },
+                          { label: "Temperature", value: cTemp ? `${cTemp}°F` : "—", icon: <Thermometer className="h-4 w-4 text-amber-500" /> },
+                          { label: "SpO₂ Status", value: cSpo2 ? `${cSpo2}%` : "—", icon: <Thermometer className="h-4 w-4 text-blue-500" /> },
+                        ];
+                      })().map((vital) => (
                         <Card key={vital.label} className="p-3">
                           <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
                             {vital.icon} {vital.label}

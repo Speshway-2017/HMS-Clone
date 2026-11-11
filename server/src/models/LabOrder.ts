@@ -17,6 +17,7 @@ const labOrderSchema = new Schema(
       sampleType: { type: String, default: "Blood" },
       collectedBy: { type: String, default: "" },
       collectedAt: { type: Date, default: null },
+      remarks: { type: String, default: "" },
     },
     results: [
       {

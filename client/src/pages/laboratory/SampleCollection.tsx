@@ -26,6 +26,47 @@ interface TestRequest {
 import { useLaboratoryRequests, useCollectSample } from "../../features/laboratory";
 import toast from "react-hot-toast";
 
+const validateCollectorName = (val: string): string | null => {
+  const raw = val || "";
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return "Please fill out this field";
+  }
+  if (raw.length > 50) {
+    return "Collector / Phlebotomist cannot exceed 50 characters. Characters limit: 50. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
+  }
+  if (trimmed.length < 2) {
+    return "Collector / Phlebotomist must be at least 2 characters. Please enter valid data";
+  }
+  if (
+    !/^[a-zA-Z0-9\s\.\'-]+$/.test(trimmed) ||
+    !/[a-zA-Z]/.test(trimmed) ||
+    /<[^>]*>|javascript:/i.test(trimmed)
+  ) {
+    return "Collector / Phlebotomist contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+  }
+  return null;
+};
+
+const validateCollectionRemarks = (val: string): string | null => {
+  const raw = val || "";
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (raw.length > 250) {
+    return "Collection Remarks cannot exceed 250 characters. Characters limit: 250. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
+  }
+  if (
+    /<[^>]*>|javascript:/i.test(trimmed) ||
+    !/[a-zA-Z0-9]/.test(trimmed) ||
+    !/^[a-zA-Z0-9\s.,?!'\-_/()&%#@+:;"]+$/.test(trimmed)
+  ) {
+    return "Collection Remarks contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+  }
+  return null;
+};
+
 export function LaboratorySampleCollection() {
   const { data: realRequests = [], isLoading } = useLaboratoryRequests();
   const collectSampleMutation = useCollectSample();
@@ -39,6 +80,7 @@ export function LaboratorySampleCollection() {
   const [containerType, setContainerType] = useState("Purple Top Tube");
   const [collectorName, setCollectorName] = useState("Phlebotomist");
   const [remarks, setRemarks] = useState("");
+  const [errors, setErrors] = useState<{ collectorName?: string | null; remarks?: string | null }>({});
 
   // Barcode Print Modal
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
@@ -48,13 +90,130 @@ export function LaboratorySampleCollection() {
     setSelectedReq(req);
     setSampleType("Whole Blood (EDTA)");
     setContainerType("Purple Top Tube");
+    setCollectorName("Phlebotomist");
     setRemarks("");
+    setErrors({});
     setIsCollectModalOpen(true);
+  };
+
+  const handleCollectorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setCollectorName(val);
+    const err = validateCollectorName(val);
+    setErrors((prev) => ({ ...prev, collectorName: err }));
+  };
+
+  const handleCollectorBlur = () => {
+    const err = validateCollectorName(collectorName);
+    setErrors((prev) => ({ ...prev, collectorName: err }));
+  };
+
+  const handleCollectorKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const isNavigationKey = [
+      "Backspace",
+      "Delete",
+      "ArrowLeft",
+      "ArrowRight",
+      "ArrowUp",
+      "ArrowDown",
+      "Tab",
+      "Enter",
+      "Escape",
+      "Home",
+      "End",
+    ].includes(e.key);
+
+    if (e.ctrlKey || e.altKey || e.metaKey || isNavigationKey) {
+      return;
+    }
+
+    if (collectorName.length >= 50) {
+      const inputEl = e.currentTarget;
+      const hasSelection =
+        inputEl.selectionStart !== null &&
+        inputEl.selectionEnd !== null &&
+        inputEl.selectionEnd > inputEl.selectionStart;
+
+      if (!hasSelection) {
+        e.preventDefault();
+        const msg =
+          "Collector / Phlebotomist cannot exceed 50 characters. Characters limit: 50. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
+        setErrors((prev) => ({ ...prev, collectorName: msg }));
+        toast.error(
+          "Collector / Phlebotomist cannot exceed 50 characters. Characters limit: 50. Too long data is not accepted. It should not accept too long data. Please enter valid data",
+          { id: "collector-limit-toast" }
+        );
+      }
+    }
+  };
+
+  const handleRemarksChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setRemarks(val);
+    const err = validateCollectionRemarks(val);
+    setErrors((prev) => ({ ...prev, remarks: err }));
+  };
+
+  const handleRemarksBlur = () => {
+    const err = validateCollectionRemarks(remarks);
+    setErrors((prev) => ({ ...prev, remarks: err }));
+  };
+
+  const handleRemarksKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const isNavigationKey = [
+      "Backspace",
+      "Delete",
+      "ArrowLeft",
+      "ArrowRight",
+      "ArrowUp",
+      "ArrowDown",
+      "Tab",
+      "Enter",
+      "Escape",
+      "Home",
+      "End",
+    ].includes(e.key);
+
+    if (e.ctrlKey || e.altKey || e.metaKey || isNavigationKey) {
+      return;
+    }
+
+    if (remarks.length >= 250) {
+      const inputEl = e.currentTarget;
+      const hasSelection =
+        inputEl.selectionStart !== null &&
+        inputEl.selectionEnd !== null &&
+        inputEl.selectionEnd > inputEl.selectionStart;
+
+      if (!hasSelection) {
+        e.preventDefault();
+        const msg =
+          "Collection Remarks cannot exceed 250 characters. Characters limit: 250. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
+        setErrors((prev) => ({ ...prev, remarks: msg }));
+        toast.error(
+          "Collection Remarks cannot exceed 250 characters. Characters limit: 250. Too long data is not accepted. It should not accept too long data. Please enter valid data",
+          { id: "remarks-limit-toast" }
+        );
+      }
+    }
   };
 
   const handleCollectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedReq) return;
+
+    const collectorErr = validateCollectorName(collectorName);
+    const remarksErr = validateCollectionRemarks(remarks);
+
+    if (collectorErr || remarksErr) {
+      setErrors({
+        collectorName: collectorErr,
+        remarks: remarksErr,
+      });
+      const firstErr = collectorErr || remarksErr;
+      toast.error(firstErr!);
+      return;
+    }
 
     const sampleId = `SMP-${selectedReq.patientName ? selectedReq.patientName.slice(0, 3).toUpperCase() : "LAB"}-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -63,7 +222,8 @@ export function LaboratorySampleCollection() {
         requestId: selectedReq._id,
         sampleId,
         sampleType: `${sampleType} (${containerType})`,
-        collectedBy: collectorName
+        collectedBy: collectorName.trim(),
+        remarks: remarks.trim()
       });
 
       toast.success("Sample registered & status updated!");
@@ -73,10 +233,13 @@ export function LaboratorySampleCollection() {
         ...selectedReq,
         sampleId,
         sampleType: `${sampleType} (${containerType})`,
+        collectedBy: collectorName.trim(),
+        remarks: remarks.trim(),
         collectionTime: new Date().toLocaleString()
       });
       setIsBarcodeModalOpen(true);
       setSelectedReq(null);
+      setErrors({});
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || "Failed to register sample collection.");
     }
@@ -170,6 +333,7 @@ export function LaboratorySampleCollection() {
               type="text"
               placeholder="Search sample ID, patient..."
               value={search}
+              maxLength={100}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-lg border border-slate-350 bg-slate-50 pl-9 pr-4 py-2 text-xs outline-none focus:border-blue-500 focus:bg-white"
             />
@@ -268,14 +432,28 @@ export function LaboratorySampleCollection() {
               label="Collector / Phlebotomist"
               required
               value={collectorName}
-              onChange={(e) => setCollectorName(e.target.value)}
+              maxLength={50}
+              showCharCount
+              charCount={collectorName.length}
+              maxCharCount={50}
+              error={errors.collectorName}
+              onChange={handleCollectorChange}
+              onBlur={handleCollectorBlur}
+              onKeyDown={handleCollectorKeyDown}
             />
 
             <InputField
               label="Collection Remarks"
               placeholder="E.g., Smooth collection. Fasting verification confirmed."
               value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
+              maxLength={250}
+              showCharCount
+              charCount={remarks.length}
+              maxCharCount={250}
+              error={errors.remarks}
+              onChange={handleRemarksChange}
+              onBlur={handleRemarksBlur}
+              onKeyDown={handleRemarksKeyDown}
             />
 
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">

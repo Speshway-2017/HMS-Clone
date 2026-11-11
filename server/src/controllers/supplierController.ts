@@ -5,12 +5,63 @@ import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 
 const supplierSchema = z.object({
-  name: z.string().min(1, "Supplier name is required"),
-  contactPerson: z.string().optional().default(""),
-  email: z.string().optional().default(""),
-  phone: z.string().optional().default(""),
-  address: z.string().optional().default(""),
-  outstandingBalance: z.coerce.number().optional().default(0),
+  name: z
+    .string({ required_error: "Please fill out this field" })
+    .trim()
+    .min(1, "Please fill out this field")
+    .min(2, "Supplier Company Name must be at least 2 characters. Please enter valid data")
+    .max(100, "Supplier Company Name cannot exceed 100 characters. Please enter valid data")
+    .refine((val) => /^[a-zA-Z0-9\s\.\-/'&,()%+]+$/.test(val) && /[a-zA-Z0-9]/.test(val), {
+      message: "Supplier Company Name contains invalid data. Please enter valid data",
+    }),
+  contactPerson: z
+    .string()
+    .trim()
+    .max(100, "Contact Person cannot exceed 100 characters. Please enter valid data")
+    .refine(
+      (val) => !val || (/^[a-zA-Z\s\.\'-]+$/.test(val) && /[a-zA-Z]/.test(val)),
+      { message: "Contact Person contains invalid data. Please enter valid data" }
+    )
+    .optional()
+    .default(""),
+  email: z
+    .string()
+    .trim()
+    .max(100, "Email Address cannot exceed 100 characters. Please enter valid data")
+    .refine(
+      (val) => !val || (/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(val) && !val.includes("..")),
+      { message: "Please enter a valid email address. Please enter valid data" }
+    )
+    .optional()
+    .default(""),
+  phone: z
+    .string({ required_error: "Please fill out this field" })
+    .trim()
+    .min(1, "Please fill out this field")
+    .refine(
+      (val) => {
+        const digits = val.replace(/\D/g, "");
+        return digits.length === 10 && /^[6-9]\d{9}$/.test(digits) && !/^(\d)\1{9}$/.test(digits);
+      },
+      { message: "Please enter a valid 10-digit phone number. Please enter valid data" }
+    ),
+  address: z
+    .string()
+    .trim()
+    .max(250, "Address cannot exceed 250 characters. Please enter valid data")
+    .refine(
+      (val) => !val || (!/<[^>]*>|javascript:/i.test(val) && /[a-zA-Z0-9]/.test(val)),
+      { message: "Address contains invalid data. Please enter valid data" }
+    )
+    .optional()
+    .default(""),
+  outstandingBalance: z
+    .coerce
+    .number()
+    .min(0, "Outstanding Balance cannot be negative. Please enter valid data")
+    .max(10000000, "Outstanding Balance cannot exceed 10,000,000. Please enter valid data")
+    .optional()
+    .default(0),
   status: z.enum(["active", "inactive"]).optional().default("active"),
 });
 
@@ -32,7 +83,8 @@ export const listSuppliers = catchAsync(async (req: Request, res: Response) => {
   const filter: Record<string, unknown> = { ...req.hospitalFilter };
 
   if (search && search.trim()) {
-    const searchRegex = new RegExp(search.trim(), "i");
+    const escaped = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const searchRegex = new RegExp(escaped, "i");
     filter.$or = [
       { name: searchRegex },
       { contactPerson: searchRegex },
@@ -63,7 +115,12 @@ export const getSupplier = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const createSupplier = catchAsync(async (req: Request, res: Response) => {
-  const body = supplierSchema.parse(req.body);
+  const result = supplierSchema.safeParse(req.body);
+  if (!result.success) {
+    const firstIssue = result.error.issues[0];
+    throw new AppError(firstIssue.message, 400);
+  }
+  const body = result.data;
   const supplierId = await generateSupplierId(req.hospitalFilter as Record<string, unknown>);
 
   const supplier = await Supplier.create({
@@ -79,7 +136,12 @@ export const createSupplier = catchAsync(async (req: Request, res: Response) => 
 });
 
 export const updateSupplier = catchAsync(async (req: Request, res: Response) => {
-  const body = supplierSchema.partial().parse(req.body);
+  const result = supplierSchema.partial().safeParse(req.body);
+  if (!result.success) {
+    const firstIssue = result.error.issues[0];
+    throw new AppError(firstIssue.message, 400);
+  }
+  const body = result.data;
 
   const supplier = await Supplier.findOneAndUpdate(
     { _id: req.params.id, ...req.hospitalFilter },

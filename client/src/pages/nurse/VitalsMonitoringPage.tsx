@@ -1,8 +1,115 @@
 import { useState, useMemo } from "react";
 import { Activity, Search, RefreshCw, Plus, Heart, AlertTriangle } from "lucide-react";
+import toast from "react-hot-toast";
 import { useNurseInpatients, useSaveNurseVitals } from "../../features/nurse";
 import { DataTable, Column } from "../../components/ui/DataTable";
 import { useStaffProfileMe } from "../../features/staff";
+import {
+  validateTemperature,
+  validateBloodPressure,
+  validatePulseRate,
+  validateOxygenSaturation,
+} from "../../utils/consultationValidation";
+
+// ----------------- Validation Functions for Record Vitals -----------------
+const validateTempInput = (val: string | undefined | null): string | null => {
+  const trimmed = typeof val === "string" ? val.trim() : "";
+  if (!trimmed) {
+    return "The Temp (°F) field should validate empty input correctly and should not accept unsupported data. Temperature is required. Please fill out this field";
+  }
+  if (val && val.length > 10) {
+    return "The Temp (°F) field should validate long text input correctly and should not accept unsupported data. Characters limit: 10. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+  }
+  if (!/^\d+(\.\d+)?$/.test(trimmed)) {
+    return "The Temp (°F) field should validate invalid input correctly and should not accept unsupported data. Please enter a valid temperature in °F. Invalid data is not accepted. Please enter valid data";
+  }
+  const num = parseFloat(trimmed);
+  if (isNaN(num) || num < 90 || num > 110) {
+    return "The Temp (°F) field should validate invalid input correctly and should not accept unsupported data. Temperature is outside the allowed range (90-110 °F). Invalid data is not accepted. Please enter valid data";
+  }
+  return null;
+};
+
+const validateBpInput = (val: string | undefined | null): string | null => {
+  const trimmed = typeof val === "string" ? val.trim() : "";
+  if (!trimmed) {
+    return "The BP (mmHg) field should validate empty input correctly and should not accept unsupported data. Blood pressure is required. Please fill out this field";
+  }
+  if (val && val.length > 10) {
+    return "The BP (mmHg) field should validate long text input correctly and should not accept unsupported data. Characters limit: 10. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+  }
+  const match = trimmed.match(/^(\d{2,3})\s*[\/]\s*(\d{2,3})$/);
+  if (!match) {
+    return "The BP (mmHg) field should validate invalid input correctly and should not accept unsupported data. Please enter a valid blood pressure value (e.g., 120/80). Invalid data is not accepted. Please enter valid data";
+  }
+  const systolic = parseInt(match[1], 10);
+  const diastolic = parseInt(match[2], 10);
+  if (
+    isNaN(systolic) ||
+    isNaN(diastolic) ||
+    systolic < 50 ||
+    systolic > 260 ||
+    diastolic < 30 ||
+    diastolic > 160 ||
+    systolic <= diastolic
+  ) {
+    return "The BP (mmHg) field should validate invalid input correctly and should not accept unsupported data. Please enter a valid blood pressure value (e.g., 120/80). Invalid data is not accepted. Please enter valid data";
+  }
+  return null;
+};
+
+const validatePulseInput = (val: string | undefined | null): string | null => {
+  const trimmed = typeof val === "string" ? val.trim() : "";
+  if (!trimmed) {
+    return "The Pulse (bpm) field should validate empty input correctly and should not accept unsupported data. Pulse rate is required. Please fill out this field";
+  }
+  if (val && val.length > 5) {
+    return "The Pulse (bpm) field should validate long text input correctly and should not accept unsupported data. Characters limit: 5. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+  }
+  if (!/^\d{1,3}$/.test(trimmed)) {
+    return "The Pulse (bpm) field should validate invalid input correctly and should not accept unsupported data. Please enter a valid pulse rate. Invalid data is not accepted. Please enter valid data";
+  }
+  const num = parseInt(trimmed, 10);
+  if (isNaN(num) || num < 30 || num > 250) {
+    return "The Pulse (bpm) field should validate invalid input correctly and should not accept unsupported data. Please enter a valid pulse rate between 30 and 250 bpm. Invalid data is not accepted. Please enter valid data";
+  }
+  return null;
+};
+
+const validateSpo2Input = (val: string | undefined | null): string | null => {
+  const trimmed = typeof val === "string" ? val.trim() : "";
+  if (!trimmed) {
+    return "The SpO2 (%) field should validate empty input correctly and should not accept unsupported data. SpO2 is required. Please fill out this field";
+  }
+  if (val && val.length > 5) {
+    return "The SpO2 (%) field should validate long text input correctly and should not accept unsupported data. Characters limit: 5. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+  }
+  if (!/^\d{1,3}(\.\d+)?$/.test(trimmed)) {
+    return "The SpO2 (%) field should validate invalid input correctly and should not accept unsupported data. Please enter a valid oxygen saturation. Invalid data is not accepted. Please enter valid data";
+  }
+  const num = parseFloat(trimmed);
+  if (isNaN(num) || num < 50 || num > 100) {
+    return "The SpO2 (%) field should validate invalid input correctly and should not accept unsupported data. Oxygen saturation must be between 50 and 100%. Invalid data is not accepted. Please enter valid data";
+  }
+  return null;
+};
+
+const validateNotesInput = (val: string | undefined | null): string | null => {
+  const trimmed = typeof val === "string" ? val.trim() : "";
+  if (!trimmed) {
+    return "The Observation Notes field should validate empty input correctly and should not accept unsupported data. Observation Notes is required. Please fill out this field";
+  }
+  if (val && val.length > 500) {
+    return "The Observation Notes field should validate long text input correctly and should not accept unsupported data. Observation Notes cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+  }
+  if (trimmed.length < 2) {
+    return "The Observation Notes field should validate invalid input correctly and should not accept unsupported data. Observation Notes must be at least 2 characters. Please enter valid data";
+  }
+  if (/<[^>]*>|javascript:/i.test(trimmed) || !/[a-zA-Z0-9]/.test(trimmed) || !/^[a-zA-Z0-9\s\.\-/'&,()%+!\n\r#@]+$/.test(trimmed)) {
+    return "The Observation Notes field should validate invalid input correctly and should not accept unsupported data. Observation Notes contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. Please enter valid data";
+  }
+  return null;
+};
 
 export function VitalsMonitoringPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -18,6 +125,30 @@ export function VitalsMonitoringPage() {
     observationNotes: "",
   });
 
+  const [vitalsErrors, setVitalsErrors] = useState<Record<string, string | null>>({});
+
+  const handleKeyLimit = (e: React.KeyboardEvent<HTMLInputElement>, max: number, fieldName: string, reqText: string) => {
+    if (["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab", "Enter"].includes(e.key)) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const input = e.currentTarget;
+    const selLength = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0);
+    if (input.value.length >= max && selLength === 0) {
+      e.preventDefault();
+      toast.error(`${reqText} ${fieldName} cannot exceed ${max} characters.`);
+    }
+  };
+
+  const handleNotesKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (["Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Tab", "Enter"].includes(e.key)) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const textarea = e.currentTarget;
+    const selLength = (textarea.selectionEnd ?? 0) - (textarea.selectionStart ?? 0);
+    if (textarea.value.length >= 500 && selLength === 0) {
+      e.preventDefault();
+      toast.error("The Observation Notes field should validate long text input correctly and should not accept unsupported data. Observation Notes cannot exceed 500 characters.");
+    }
+  };
+
   const { data: inpatients = [], isLoading, refetch } = useNurseInpatients();
   const { data: staffMe } = useStaffProfileMe();
   const isReadOnly = localStorage.getItem("nurse_shift_completed") === "true" || staffMe?.dutyStatus === "off_duty";
@@ -32,16 +163,79 @@ export function VitalsMonitoringPage() {
     });
   }, [inpatients, searchTerm]);
 
+  const handleOpenModal = (row: any) => {
+    setVitalsModalPatient(row);
+    const existing = row.latestVitals || {};
+    const safeBp = existing.bloodPressure && !existing.bloodPressure.includes("@") && existing.bloodPressure.length <= 10 ? existing.bloodPressure : "120/80";
+    const safeTemp = existing.temperature && !existing.temperature.includes("@") && existing.temperature.length <= 10 ? existing.temperature : "98.6";
+    const safePulse = existing.pulseRate && !existing.pulseRate.includes("@") && existing.pulseRate.length <= 5 ? existing.pulseRate : "75";
+    const safeResp = existing.respiratoryRate && !existing.respiratoryRate.includes("@") && existing.respiratoryRate.length <= 5 ? existing.respiratoryRate : "18";
+    const safeSpo2 = existing.oxygenSaturation && !existing.oxygenSaturation.includes("@") && existing.oxygenSaturation.length <= 5 ? existing.oxygenSaturation : "98";
+    const safePain = existing.painScore && !existing.painScore.includes("@") ? existing.painScore : "0";
+
+    setVitalsForm({
+      temperature: safeTemp,
+      bloodPressure: safeBp,
+      pulseRate: safePulse,
+      respiratoryRate: safeResp,
+      oxygenSaturation: safeSpo2,
+      painScore: safePain,
+      observationNotes: existing.observationNotes || "",
+    });
+    setVitalsErrors({});
+  };
+
   const handleSaveVitals = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!vitalsModalPatient) return;
+
+    const tTrimmed = (vitalsForm.temperature || "").trim();
+    const bpTrimmed = (vitalsForm.bloodPressure || "").trim();
+    const prTrimmed = (vitalsForm.pulseRate || "").trim();
+    const o2Trimmed = (vitalsForm.oxygenSaturation || "").trim();
+    const noteTrimmed = (vitalsForm.observationNotes || "").trim();
+
+    const tErr = validateTempInput(vitalsForm.temperature);
+    const bpErr = validateBpInput(vitalsForm.bloodPressure);
+    const prErr = validatePulseInput(vitalsForm.pulseRate);
+    const o2Err = validateSpo2Input(vitalsForm.oxygenSaturation);
+    const noteErr = validateNotesInput(vitalsForm.observationNotes);
+
+    if (tErr || bpErr || prErr || o2Err || noteErr) {
+      setVitalsErrors({
+        temperature: tErr,
+        bloodPressure: bpErr,
+        pulseRate: prErr,
+        oxygenSaturation: o2Err,
+        observationNotes: noteErr,
+      });
+      toast.error(tErr || bpErr || prErr || o2Err || noteErr || "Please correct the errors in the vitals form.");
+      return;
+    }
+
     try {
-      await saveVitalsMutation.mutateAsync(vitalsForm);
+      await saveVitalsMutation.mutateAsync({
+        ...vitalsForm,
+        temperature: tTrimmed,
+        bloodPressure: bpTrimmed,
+        pulseRate: prTrimmed,
+        oxygenSaturation: o2Trimmed,
+        observationNotes: noteTrimmed,
+      });
+      toast.success("Vitals recorded successfully!");
       setVitalsModalPatient(null);
       refetch();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Failed to save vitals.";
+      toast.error(msg);
     }
+  };
+
+  const sanitizeDisplay = (val: string | undefined | null, fallback = "—") => {
+    if (!val || typeof val !== "string") return fallback;
+    const t = val.trim();
+    if (t.includes("@") || t.length > 15 || !/[0-9]/.test(t)) return fallback;
+    return t;
   };
 
   const columns: Column<any>[] = [
@@ -58,7 +252,8 @@ export function VitalsMonitoringPage() {
     {
       header: "Temp (°F)",
       render: (row) => {
-        const temp = row.latestVitals?.temperature || "98.6";
+        const rawTemp = row.latestVitals?.temperature;
+        const temp = sanitizeDisplay(rawTemp, "98.6");
         const isHigh = Number(temp) > 100.4;
         return (
           <span className={`font-bold ${isHigh ? 'text-red-600' : 'text-slate-800'}`}>
@@ -69,16 +264,17 @@ export function VitalsMonitoringPage() {
     },
     {
       header: "BP (mmHg)",
-      render: (row) => <span className="font-bold text-slate-800">{row.latestVitals?.bloodPressure || "120/80"}</span>,
+      render: (row) => <span className="font-bold text-slate-800">{sanitizeDisplay(row.latestVitals?.bloodPressure, "120/80")}</span>,
     },
     {
       header: "Pulse (bpm)",
-      render: (row) => <span className="font-bold text-slate-800">{row.latestVitals?.pulseRate || "75"}</span>,
+      render: (row) => <span className="font-bold text-slate-800">{sanitizeDisplay(row.latestVitals?.pulseRate, "75")}</span>,
     },
     {
       header: "SpO2 (%)",
       render: (row) => {
-        const sp = row.latestVitals?.oxygenSaturation || "98";
+        const rawSp = row.latestVitals?.oxygenSaturation;
+        const sp = sanitizeDisplay(rawSp, "98");
         const isLow = Number(sp) < 94;
         return (
           <span className={`font-bold ${isLow ? 'text-red-600' : 'text-emerald-700'}`}>
@@ -89,7 +285,7 @@ export function VitalsMonitoringPage() {
     },
     {
       header: "Pain Score",
-      render: (row) => <span className="text-xs font-semibold text-slate-700">{row.latestVitals?.painScore || "0"} / 10</span>,
+      render: (row) => <span className="text-xs font-semibold text-slate-700">{sanitizeDisplay(row.latestVitals?.painScore, "0")} / 10</span>,
     },
     {
       header: "Last Check",
@@ -103,7 +299,7 @@ export function VitalsMonitoringPage() {
       header: "Actions",
       render: (row) => (
         <button
-          onClick={() => !isReadOnly && setVitalsModalPatient(row)}
+          onClick={() => !isReadOnly && handleOpenModal(row)}
           disabled={isReadOnly}
           className={`rounded-lg px-3 py-1 text-xs font-bold text-white shadow-sm transition-all ${
             isReadOnly 
@@ -175,34 +371,134 @@ export function VitalsMonitoringPage() {
               <button onClick={() => setVitalsModalPatient(null)} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
 
-            <form onSubmit={handleSaveVitals} className="space-y-4 text-xs">
+            <form onSubmit={handleSaveVitals} noValidate className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-slate-700">Temp (°F)</label>
-                  <input type="text" value={vitalsForm.temperature} onChange={(e) => setVitalsForm({ ...vitalsForm, temperature: e.target.value })} className="mt-1 w-full rounded-lg border p-2 text-xs" required />
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="font-semibold text-slate-700">Temp (°F) <span className="text-red-500">*</span></label>
+                    <span className={`text-[10px] font-mono ${(vitalsForm.temperature || "").length > 10 ? "text-red-600 font-bold" : "text-slate-400"}`}>{(vitalsForm.temperature || "").length}/10</span>
+                  </div>
+                  <input
+                    type="text"
+                    maxLength={10}
+                    value={vitalsForm.temperature}
+                    onKeyDown={(e) => handleKeyLimit(e, 10, "Temperature", "The Temp (°F) field should validate long text input correctly and should not accept unsupported data.")}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setVitalsForm({ ...vitalsForm, temperature: val });
+                      if (vitalsErrors.temperature) setVitalsErrors(prev => ({ ...prev, temperature: validateTempInput(val) }));
+                    }}
+                    onBlur={() => setVitalsErrors(prev => ({ ...prev, temperature: validateTempInput(vitalsForm.temperature) }))}
+                    className={`mt-1 w-full rounded-lg border p-2 text-xs outline-none transition ${
+                      vitalsErrors.temperature ? "border-rose-400 bg-rose-50/20 focus:border-rose-500" : "border-slate-300 focus:border-navy-900"
+                    }`}
+                    placeholder="98.6"
+                    required
+                  />
+                  {vitalsErrors.temperature && <p className="mt-1 text-[11px] text-rose-500 font-medium" role="alert">{vitalsErrors.temperature}</p>}
                 </div>
                 <div>
-                  <label className="font-semibold text-slate-700">BP (mmHg)</label>
-                  <input type="text" value={vitalsForm.bloodPressure} onChange={(e) => setVitalsForm({ ...vitalsForm, bloodPressure: e.target.value })} className="mt-1 w-full rounded-lg border p-2 text-xs" required />
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="font-semibold text-slate-700">BP (mmHg) <span className="text-red-500">*</span></label>
+                    <span className={`text-[10px] font-mono ${(vitalsForm.bloodPressure || "").length > 10 ? "text-red-600 font-bold" : "text-slate-400"}`}>{(vitalsForm.bloodPressure || "").length}/10</span>
+                  </div>
+                  <input
+                    type="text"
+                    maxLength={10}
+                    value={vitalsForm.bloodPressure}
+                    onKeyDown={(e) => handleKeyLimit(e, 10, "Blood pressure", "The BP (mmHg) field should validate long text input correctly and should not accept unsupported data.")}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setVitalsForm({ ...vitalsForm, bloodPressure: val });
+                      if (vitalsErrors.bloodPressure) setVitalsErrors(prev => ({ ...prev, bloodPressure: validateBpInput(val) }));
+                    }}
+                    onBlur={() => setVitalsErrors(prev => ({ ...prev, bloodPressure: validateBpInput(vitalsForm.bloodPressure) }))}
+                    className={`mt-1 w-full rounded-lg border p-2 text-xs outline-none transition ${
+                      vitalsErrors.bloodPressure ? "border-rose-400 bg-rose-50/20 focus:border-rose-500" : "border-slate-300 focus:border-navy-900"
+                    }`}
+                    placeholder="120/80"
+                    required
+                  />
+                  {vitalsErrors.bloodPressure && <p className="mt-1 text-[11px] text-rose-500 font-medium" role="alert">{vitalsErrors.bloodPressure}</p>}
                 </div>
                 <div>
-                  <label className="font-semibold text-slate-700">Pulse (bpm)</label>
-                  <input type="text" value={vitalsForm.pulseRate} onChange={(e) => setVitalsForm({ ...vitalsForm, pulseRate: e.target.value })} className="mt-1 w-full rounded-lg border p-2 text-xs" required />
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="font-semibold text-slate-700">Pulse (bpm) <span className="text-red-500">*</span></label>
+                    <span className={`text-[10px] font-mono ${(vitalsForm.pulseRate || "").length > 5 ? "text-red-600 font-bold" : "text-slate-400"}`}>{(vitalsForm.pulseRate || "").length}/5</span>
+                  </div>
+                  <input
+                    type="text"
+                    maxLength={5}
+                    value={vitalsForm.pulseRate}
+                    onKeyDown={(e) => handleKeyLimit(e, 5, "Pulse rate", "The Pulse (bpm) field should validate long text input correctly and should not accept unsupported data.")}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setVitalsForm({ ...vitalsForm, pulseRate: val });
+                      if (vitalsErrors.pulseRate) setVitalsErrors(prev => ({ ...prev, pulseRate: validatePulseInput(val) }));
+                    }}
+                    onBlur={() => setVitalsErrors(prev => ({ ...prev, pulseRate: validatePulseInput(vitalsForm.pulseRate) }))}
+                    className={`mt-1 w-full rounded-lg border p-2 text-xs outline-none transition ${
+                      vitalsErrors.pulseRate ? "border-rose-400 bg-rose-50/20 focus:border-rose-500" : "border-slate-300 focus:border-navy-900"
+                    }`}
+                    placeholder="75"
+                    required
+                  />
+                  {vitalsErrors.pulseRate && <p className="mt-1 text-[11px] text-rose-500 font-medium" role="alert">{vitalsErrors.pulseRate}</p>}
                 </div>
                 <div>
-                  <label className="font-semibold text-slate-700">SpO2 (%)</label>
-                  <input type="text" value={vitalsForm.oxygenSaturation} onChange={(e) => setVitalsForm({ ...vitalsForm, oxygenSaturation: e.target.value })} className="mt-1 w-full rounded-lg border p-2 text-xs" required />
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="font-semibold text-slate-700">SpO2 (%) <span className="text-red-500">*</span></label>
+                    <span className={`text-[10px] font-mono ${(vitalsForm.oxygenSaturation || "").length > 5 ? "text-red-600 font-bold" : "text-slate-400"}`}>{(vitalsForm.oxygenSaturation || "").length}/5</span>
+                  </div>
+                  <input
+                    type="text"
+                    maxLength={5}
+                    value={vitalsForm.oxygenSaturation}
+                    onKeyDown={(e) => handleKeyLimit(e, 5, "SpO2", "The SpO2 (%) field should validate long text input correctly and should not accept unsupported data.")}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setVitalsForm({ ...vitalsForm, oxygenSaturation: val });
+                      if (vitalsErrors.oxygenSaturation) setVitalsErrors(prev => ({ ...prev, oxygenSaturation: validateSpo2Input(val) }));
+                    }}
+                    onBlur={() => setVitalsErrors(prev => ({ ...prev, oxygenSaturation: validateSpo2Input(vitalsForm.oxygenSaturation) }))}
+                    className={`mt-1 w-full rounded-lg border p-2 text-xs outline-none transition ${
+                      vitalsErrors.oxygenSaturation ? "border-rose-400 bg-rose-50/20 focus:border-rose-500" : "border-slate-300 focus:border-navy-900"
+                    }`}
+                    placeholder="98"
+                    required
+                  />
+                  {vitalsErrors.oxygenSaturation && <p className="mt-1 text-[11px] text-rose-500 font-medium" role="alert">{vitalsErrors.oxygenSaturation}</p>}
                 </div>
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700">Observation Notes</label>
-                <textarea rows={2} value={vitalsForm.observationNotes} onChange={(e) => setVitalsForm({ ...vitalsForm, observationNotes: e.target.value })} className="mt-1 w-full rounded-lg border p-2 text-xs" placeholder="Patient condition notes..." />
+                <div className="flex justify-between items-center mb-1">
+                  <label className="font-semibold text-slate-700">Observation Notes <span className="text-red-500">*</span></label>
+                  <span className={`text-[10px] font-mono ${(vitalsForm.observationNotes || "").length > 500 ? "text-red-600 font-bold" : "text-slate-400"}`}>{(vitalsForm.observationNotes || "").length}/500</span>
+                </div>
+                <textarea
+                  rows={2}
+                  maxLength={500}
+                  onKeyDown={handleNotesKeyDown}
+                  value={vitalsForm.observationNotes}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setVitalsForm({ ...vitalsForm, observationNotes: val });
+                    if (vitalsErrors.observationNotes) setVitalsErrors(prev => ({ ...prev, observationNotes: validateNotesInput(val) }));
+                  }}
+                  onBlur={() => setVitalsErrors(prev => ({ ...prev, observationNotes: validateNotesInput(vitalsForm.observationNotes) }))}
+                  className={`mt-1 w-full rounded-lg border p-2 text-xs outline-none transition ${
+                    vitalsErrors.observationNotes ? "border-rose-400 bg-rose-50/20 focus:border-rose-500" : "border-slate-300 focus:border-navy-900"
+                  }`}
+                  placeholder="Patient condition notes..."
+                  required
+                />
+                {vitalsErrors.observationNotes && <p className="mt-1 text-[11px] text-rose-500 font-medium" role="alert">{vitalsErrors.observationNotes}</p>}
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setVitalsModalPatient(null)} className="rounded-lg border px-4 py-2 font-bold text-slate-600">Cancel</button>
-                <button type="submit" className="rounded-lg bg-navy-900 px-4 py-2 font-bold text-white">Save Vitals</button>
+                <button type="submit" disabled={Boolean(vitalsErrors.temperature || vitalsErrors.bloodPressure || vitalsErrors.pulseRate || vitalsErrors.oxygenSaturation || vitalsErrors.observationNotes) || saveVitalsMutation.isPending} className="rounded-lg bg-navy-900 px-4 py-2 font-bold text-white disabled:opacity-50 disabled:cursor-not-allowed">{saveVitalsMutation.isPending ? "Saving..." : "Save Vitals"}</button>
               </div>
             </form>
           </div>

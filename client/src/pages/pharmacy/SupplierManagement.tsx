@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Plus, Search, Eye, ShoppingBag, CheckCircle, Pencil, Trash2 } from "lucide-react";
+import toast from "react-hot-toast";
 import { Card } from "../../components/ui/Card";
 import { DataTable } from "../../components/ui/DataTable";
 import { Badge } from "../../components/ui/Badge";
@@ -22,6 +23,68 @@ interface PurchaseOrder {
   totalCost: number;
   status: "Pending" | "Ordered" | "Delivered" | "Cancelled";
 }
+
+// ----------------- Validation Functions -----------------
+const validateSupplierName = (val: string): string | null => {
+  const trimmed = (val || "").trim();
+  if (!trimmed) return "Please fill out this field";
+  if (trimmed.length < 2) return "Supplier Company Name must be at least 2 characters. Please enter valid data";
+  if (trimmed.length > 100) return "Supplier Company Name cannot exceed 100 characters. Please enter valid data";
+  if (!/^[a-zA-Z0-9\s\.\-/'&,()%+]+$/.test(trimmed) || !/[a-zA-Z0-9]/.test(trimmed) || /<[^>]*>|javascript:/i.test(trimmed)) {
+    return "Supplier Company Name contains invalid data. Please enter valid data";
+  }
+  return null;
+};
+
+const validateContactPerson = (val: string): string | null => {
+  const trimmed = (val || "").trim();
+  if (!trimmed) return null; // optional
+  if (trimmed.length < 2) return "Contact Person must be at least 2 characters. Please enter valid data";
+  if (trimmed.length > 100) return "Contact Person cannot exceed 100 characters. Please enter valid data";
+  if (!/^[a-zA-Z\s\.\'-]+$/.test(trimmed) || !/[a-zA-Z]/.test(trimmed)) {
+    return "Contact Person contains invalid data. Please enter valid data";
+  }
+  return null;
+};
+
+const validateSupplierEmail = (val: string): string | null => {
+  const trimmed = (val || "").trim();
+  if (!trimmed) return null; // optional
+  if (trimmed.length > 100) return "Email Address cannot exceed 100 characters. Please enter valid data";
+  if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(trimmed) || trimmed.includes("..")) {
+    return "Please enter a valid email address. Please enter valid data";
+  }
+  return null;
+};
+
+const validateSupplierPhone = (val: string): string | null => {
+  const trimmed = (val || "").trim();
+  if (!trimmed) return "Please fill out this field";
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length !== 10 || !/^[6-9]\d{9}$/.test(digits) || /^(\d)\1{9}$/.test(digits)) {
+    return "Please enter a valid 10-digit phone number. Please enter valid data";
+  }
+  return null;
+};
+
+const validateSupplierBalance = (val: any): string | null => {
+  if (val === "" || val === undefined || val === null) return null;
+  const num = Number(val);
+  if (isNaN(num)) return "Please enter valid data";
+  if (num < 0) return "Outstanding Balance cannot be negative. Please enter valid data";
+  if (num > 10000000) return "Outstanding Balance cannot exceed 10,000,000. Please enter valid data";
+  return null;
+};
+
+const validateSupplierAddress = (val: string): string | null => {
+  const trimmed = (val || "").trim();
+  if (!trimmed) return null; // optional
+  if (trimmed.length > 250) return "Address cannot exceed 250 characters. Please enter valid data";
+  if (/<script\b|javascript:/i.test(trimmed) || !/[a-zA-Z0-9]/.test(trimmed)) {
+    return "Address contains invalid data. Please enter valid data";
+  }
+  return null;
+};
 
 export function PharmacySupplierManagement() {
   const [activeTab, setActiveTab] = useState<"suppliers" | "orders">("suppliers");
@@ -49,14 +112,19 @@ export function PharmacySupplierManagement() {
   const [supEmail, setSupEmail] = useState("");
   const [supPhone, setSupPhone] = useState("");
   const [supAddress, setSupAddress] = useState("");
-  const [supBalance, setSupBalance] = useState(0);
+  const [supBalance, setSupBalance] = useState<number | string>(0);
   const [supStatus, setSupStatus] = useState<"active" | "inactive">("active");
+
+  // Errors state
+  const [formErrors, setFormErrors] = useState<Record<string, string | null>>({});
 
   // New Order Form State
   const [orderSupplier, setOrderSupplier] = useState("");
+  const [orderSupplierError, setOrderSupplierError] = useState<string | null>(null);
   const [orderItems, setOrderItems] = useState<{ name: string; quantity: number; cost: number }[]>([
     { name: "", quantity: 10, cost: 0 },
   ]);
+  const [orderItemErrors, setOrderItemErrors] = useState<Array<{ name?: string; quantity?: string; cost?: string }>>([]);
 
   useEffect(() => {
     // Clear old localStorage supplier data to ensure pure DB sync
@@ -87,61 +155,93 @@ export function PharmacySupplierManagement() {
     setSupAddress("");
     setSupBalance(0);
     setSupStatus("active");
+    setFormErrors({});
     setIsAddSupplierOpen(true);
   };
 
   const handleOpenEditModal = (supplier: Supplier) => {
     setEditingSupplier(supplier);
-    setSupName(supplier.name);
+    setSupName(supplier.name || "");
     setSupContact(supplier.contactPerson || "");
     setSupEmail(supplier.email || "");
     setSupPhone(supplier.phone || "");
     setSupAddress(supplier.address || "");
-    setSupBalance(supplier.outstandingBalance || 0);
+    setSupBalance(supplier.outstandingBalance ?? 0);
     setSupStatus(supplier.status || "active");
+    setFormErrors({});
     setIsEditSupplierOpen(true);
+  };
+
+  const validateAll = () => {
+    const nameErr = validateSupplierName(supName);
+    const contactErr = validateContactPerson(supContact);
+    const emailErr = validateSupplierEmail(supEmail);
+    const phoneErr = validateSupplierPhone(supPhone);
+    const balanceErr = validateSupplierBalance(supBalance);
+    const addressErr = validateSupplierAddress(supAddress);
+
+    const newErrors = {
+      name: nameErr,
+      contactPerson: contactErr,
+      email: emailErr,
+      phone: phoneErr,
+      outstandingBalance: balanceErr,
+      address: addressErr,
+    };
+    setFormErrors(newErrors);
+
+    const firstErr = nameErr || contactErr || emailErr || phoneErr || balanceErr || addressErr;
+    if (firstErr) {
+      toast.error(firstErr);
+      return false;
+    }
+    return true;
   };
 
   const handleAddSupplierSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supName || !supPhone) return;
+    if (!validateAll()) return;
 
     try {
       await createSupplierMutation.mutateAsync({
-        name: supName,
-        contactPerson: supContact,
-        email: supEmail,
-        phone: supPhone,
-        address: supAddress,
+        name: supName.trim(),
+        contactPerson: supContact.trim(),
+        email: supEmail.trim(),
+        phone: supPhone.replace(/\D/g, ""),
+        address: supAddress.trim(),
         outstandingBalance: Number(supBalance) || 0,
         status: supStatus,
       });
 
+      toast.success("Supplier profile created successfully!");
       setIsAddSupplierOpen(false);
     } catch (err: any) {
-      alert(err?.response?.data?.message || "Failed to create supplier");
+      const msg = err?.response?.data?.message || err?.message || "Failed to create supplier";
+      toast.error(msg);
     }
   };
 
   const handleEditSupplierSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingSupplier || !supName || !supPhone) return;
+    if (!editingSupplier || !validateAll()) return;
 
     try {
       await updateSupplierMutation.mutateAsync({
-        name: supName,
-        contactPerson: supContact,
-        email: supEmail,
-        phone: supPhone,
-        address: supAddress,
+        name: supName.trim(),
+        contactPerson: supContact.trim(),
+        email: supEmail.trim(),
+        phone: supPhone.replace(/\D/g, ""),
+        address: supAddress.trim(),
         outstandingBalance: Number(supBalance) || 0,
         status: supStatus,
       });
 
+      toast.success("Supplier profile updated successfully!");
       setIsEditSupplierOpen(false);
       setEditingSupplier(null);
     } catch (err: any) {
-      alert(err?.response?.data?.message || "Failed to update supplier");
+      const msg = err?.response?.data?.message || err?.message || "Failed to update supplier";
+      toast.error(msg);
     }
   };
 
@@ -150,14 +250,65 @@ export function PharmacySupplierManagement() {
 
     try {
       await deleteSupplierMutation.mutateAsync(id);
+      toast.success(`Supplier "${name}" deleted successfully.`);
     } catch (err: any) {
-      alert(err?.response?.data?.message || "Failed to delete supplier");
+      const msg = err?.response?.data?.message || err?.message || "Failed to delete supplier";
+      toast.error(msg);
     }
   };
 
   const handleAddOrderSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!orderSupplier || !orderItems[0].name) return;
+    let hasOrderError = false;
+
+    if (!orderSupplier.trim()) {
+      setOrderSupplierError("Please select a supplier");
+      hasOrderError = true;
+    } else {
+      setOrderSupplierError(null);
+    }
+
+    const itemErrors = orderItems.map((item) => {
+      const itErr: { name?: string; quantity?: string; cost?: string } = {};
+      const trimmedName = (item.name || "").trim();
+      if (!trimmedName) {
+        itErr.name = "Please enter medicine name";
+      } else if (trimmedName.length < 2) {
+        itErr.name = "Medicine name must be at least 2 characters";
+      } else if (trimmedName.length > 100) {
+        itErr.name = "Medicine name cannot exceed 100 characters";
+      } else if (!/^[a-zA-Z0-9\s\.\-/'&,()%+]+$/.test(trimmedName) || !/[a-zA-Z0-9]/.test(trimmedName)) {
+        itErr.name = "Please enter valid data";
+      }
+
+      const q = Number(item.quantity);
+      if (isNaN(q) || q < 1) {
+        itErr.quantity = "Quantity must be at least 1";
+      } else if (q > 1000000) {
+        itErr.quantity = "Quantity cannot exceed 1,000,000";
+      } else if (!Number.isInteger(q)) {
+        itErr.quantity = "Quantity must be a whole number";
+      }
+
+      const c = Number(item.cost);
+      if (isNaN(c) || c < 0) {
+        itErr.cost = "Cost cannot be negative";
+      } else if (c > 10000000) {
+        itErr.cost = "Cost cannot exceed 10,000,000";
+      }
+
+      if (itErr.name || itErr.quantity || itErr.cost) {
+        hasOrderError = true;
+      }
+      return itErr;
+    });
+
+    setOrderItemErrors(itemErrors);
+
+    if (hasOrderError) {
+      toast.error("Please resolve errors in the purchase order before submitting");
+      return;
+    }
 
     const total = orderItems.reduce((acc, curr) => acc + curr.quantity * curr.cost, 0);
     const newPO: PurchaseOrder = {
@@ -176,7 +327,9 @@ export function PharmacySupplierManagement() {
     // Reset Form
     setOrderSupplier("");
     setOrderItems([{ name: "", quantity: 10, cost: 0 }]);
+    setOrderItemErrors([]);
     setIsAddOrderOpen(false);
+    toast.success("Purchase order created successfully!");
   };
 
   const handleReceiveOrder = (poId: string) => {
@@ -192,6 +345,7 @@ export function PharmacySupplierManagement() {
     if (selectedOrder?._id === poId) {
       setSelectedOrder({ ...selectedOrder, status: "Delivered" });
     }
+    toast.success("Shipment delivery confirmed!");
   };
 
   const handleOrderItemChange = (index: number, field: keyof PurchaseOrder["items"][0], value: any) => {
@@ -201,10 +355,16 @@ export function PharmacySupplierManagement() {
       [field]: value,
     };
     setOrderItems(updated);
+    if (orderItemErrors[index]?.[field as "name" | "quantity" | "cost"]) {
+      const updatedErrors = [...orderItemErrors];
+      updatedErrors[index] = { ...updatedErrors[index], [field]: undefined };
+      setOrderItemErrors(updatedErrors);
+    }
   };
 
   const handleAddRow = () => {
     setOrderItems([...orderItems, { name: "", quantity: 10, cost: 0 }]);
+    setOrderItemErrors([...orderItemErrors, {}]);
   };
 
   const handleRemoveRow = (index: number) => {
@@ -212,6 +372,35 @@ export function PharmacySupplierManagement() {
     const updated = [...orderItems];
     updated.splice(index, 1);
     setOrderItems(updated);
+    const updatedErrors = [...orderItemErrors];
+    updatedErrors.splice(index, 1);
+    setOrderItemErrors(updatedErrors);
+  };
+
+  const handlePhoneKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(e.key)) return;
+    if (!/[\d]/.test(e.key)) {
+      e.preventDefault();
+      return;
+    }
+    const input = e.currentTarget;
+    const selLength = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0);
+    const currentDigits = input.value.replace(/\D/g, "");
+    if (currentDigits.length >= 10 && selLength === 0) {
+      e.preventDefault();
+      toast.error("Phone Number cannot exceed 10 digits. Please enter valid data");
+    }
+  };
+
+  const handleTextKeyDown = (maxLen: number, fieldLabel: string) => (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(e.key)) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const input = e.currentTarget;
+    const selLength = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0);
+    if (input.value.length >= maxLen && selLength === 0) {
+      e.preventDefault();
+      toast.error(`${fieldLabel} cannot exceed ${maxLen} characters. Please enter valid data`);
+    }
   };
 
   const filteredPOs = purchaseOrders.filter(
@@ -573,43 +762,111 @@ export function PharmacySupplierManagement() {
         isOpen={isAddSupplierOpen}
         onClose={() => setIsAddSupplierOpen(false)}
       >
-        <form onSubmit={handleAddSupplierSubmit} className="space-y-4">
+        <form onSubmit={handleAddSupplierSubmit} noValidate className="space-y-4">
           <InputField
             label="Supplier Company Name"
             required
             placeholder="e.g. Apollo Pharmacy Distributors"
             value={supName}
-            onChange={(e) => setSupName(e.target.value)}
+            maxLength={100}
+            showCharCount
+            charCount={supName.length}
+            minCharCount={2}
+            error={formErrors.name}
+            onKeyDown={handleTextKeyDown(100, "Supplier Company Name")}
+            onChange={(e) => {
+              setSupName(e.target.value);
+              if (formErrors.name) setFormErrors((prev) => ({ ...prev, name: null }));
+            }}
+            onBlur={() => {
+              const err = validateSupplierName(supName);
+              setFormErrors((prev) => ({ ...prev, name: err }));
+            }}
           />
+
           <InputField
             label="Contact Person"
             placeholder="e.g. John Doe"
             value={supContact}
-            onChange={(e) => setSupContact(e.target.value)}
+            maxLength={100}
+            showCharCount
+            charCount={supContact.length}
+            minCharCount={2}
+            error={formErrors.contactPerson}
+            onKeyDown={handleTextKeyDown(100, "Contact Person")}
+            onChange={(e) => {
+              setSupContact(e.target.value);
+              if (formErrors.contactPerson) setFormErrors((prev) => ({ ...prev, contactPerson: null }));
+            }}
+            onBlur={() => {
+              const err = validateContactPerson(supContact);
+              setFormErrors((prev) => ({ ...prev, contactPerson: err }));
+            }}
           />
+
           <div className="grid grid-cols-2 gap-4">
             <InputField
               label="Email Address"
               type="email"
               placeholder="supplier@email.com"
               value={supEmail}
-              onChange={(e) => setSupEmail(e.target.value)}
+              maxLength={100}
+              showCharCount
+              charCount={supEmail.length}
+              error={formErrors.email}
+              onKeyDown={handleTextKeyDown(100, "Email Address")}
+              onChange={(e) => {
+                setSupEmail(e.target.value);
+                if (formErrors.email) setFormErrors((prev) => ({ ...prev, email: null }));
+              }}
+              onBlur={() => {
+                const err = validateSupplierEmail(supEmail);
+                setFormErrors((prev) => ({ ...prev, email: err }));
+              }}
             />
             <InputField
               label="Phone Number"
               required
-              placeholder="e.g. +91-9999888877"
+              placeholder="e.g. 9999888877"
               value={supPhone}
-              onChange={(e) => setSupPhone(e.target.value)}
+              maxLength={10}
+              showCharCount
+              charCount={supPhone.length}
+              error={formErrors.phone}
+              onKeyDown={handlePhoneKeyDown}
+              onChange={(e) => {
+                const cleaned = e.target.value.replace(/\D/g, "").slice(0, 10);
+                setSupPhone(cleaned);
+                if (formErrors.phone) setFormErrors((prev) => ({ ...prev, phone: null }));
+              }}
+              onBlur={() => {
+                const err = validateSupplierPhone(supPhone);
+                setFormErrors((prev) => ({ ...prev, phone: err }));
+              }}
             />
           </div>
+
           <div className="grid grid-cols-2 gap-4">
             <InputField
               label="Outstanding Balance (₹)"
               type="number"
+              min={0}
+              max={10000000}
               placeholder="0"
               value={supBalance}
-              onChange={(e) => setSupBalance(Number(e.target.value))}
+              error={formErrors.outstandingBalance}
+              onKeyDown={(e) => {
+                if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault();
+              }}
+              onChange={(e) => {
+                const val = e.target.value === "" ? "" : Number(e.target.value);
+                setSupBalance(val);
+                if (formErrors.outstandingBalance) setFormErrors((prev) => ({ ...prev, outstandingBalance: null }));
+              }}
+              onBlur={() => {
+                const err = validateSupplierBalance(supBalance);
+                setFormErrors((prev) => ({ ...prev, outstandingBalance: err }));
+              }}
             />
             <SelectField
               label="Status"
@@ -620,12 +877,26 @@ export function PharmacySupplierManagement() {
               <option value="inactive">Inactive</option>
             </SelectField>
           </div>
+
           <InputField
             label="Full Business Address"
             placeholder="e.g. Office Suite 120, Trade Center, Delhi"
             value={supAddress}
-            onChange={(e) => setSupAddress(e.target.value)}
+            maxLength={250}
+            showCharCount
+            charCount={supAddress.length}
+            error={formErrors.address}
+            onKeyDown={handleTextKeyDown(250, "Address")}
+            onChange={(e) => {
+              setSupAddress(e.target.value);
+              if (formErrors.address) setFormErrors((prev) => ({ ...prev, address: null }));
+            }}
+            onBlur={() => {
+              const err = validateSupplierAddress(supAddress);
+              setFormErrors((prev) => ({ ...prev, address: err }));
+            }}
           />
+
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             <Button type="button" variant="secondary" onClick={() => setIsAddSupplierOpen(false)}>
               Cancel
@@ -647,38 +918,106 @@ export function PharmacySupplierManagement() {
             setEditingSupplier(null);
           }}
         >
-          <form onSubmit={handleEditSupplierSubmit} className="space-y-4">
+          <form onSubmit={handleEditSupplierSubmit} noValidate className="space-y-4">
             <InputField
               label="Supplier Company Name"
               required
               value={supName}
-              onChange={(e) => setSupName(e.target.value)}
+              maxLength={100}
+              showCharCount
+              charCount={supName.length}
+              minCharCount={2}
+              error={formErrors.name}
+              onKeyDown={handleTextKeyDown(100, "Supplier Company Name")}
+              onChange={(e) => {
+                setSupName(e.target.value);
+                if (formErrors.name) setFormErrors((prev) => ({ ...prev, name: null }));
+              }}
+              onBlur={() => {
+                const err = validateSupplierName(supName);
+                setFormErrors((prev) => ({ ...prev, name: err }));
+              }}
             />
+
             <InputField
               label="Contact Person"
               value={supContact}
-              onChange={(e) => setSupContact(e.target.value)}
+              maxLength={100}
+              showCharCount
+              charCount={supContact.length}
+              minCharCount={2}
+              error={formErrors.contactPerson}
+              onKeyDown={handleTextKeyDown(100, "Contact Person")}
+              onChange={(e) => {
+                setSupContact(e.target.value);
+                if (formErrors.contactPerson) setFormErrors((prev) => ({ ...prev, contactPerson: null }));
+              }}
+              onBlur={() => {
+                const err = validateContactPerson(supContact);
+                setFormErrors((prev) => ({ ...prev, contactPerson: err }));
+              }}
             />
+
             <div className="grid grid-cols-2 gap-4">
               <InputField
                 label="Email Address"
                 type="email"
                 value={supEmail}
-                onChange={(e) => setSupEmail(e.target.value)}
+                maxLength={100}
+                showCharCount
+                charCount={supEmail.length}
+                error={formErrors.email}
+                onKeyDown={handleTextKeyDown(100, "Email Address")}
+                onChange={(e) => {
+                  setSupEmail(e.target.value);
+                  if (formErrors.email) setFormErrors((prev) => ({ ...prev, email: null }));
+                }}
+                onBlur={() => {
+                  const err = validateSupplierEmail(supEmail);
+                  setFormErrors((prev) => ({ ...prev, email: err }));
+                }}
               />
               <InputField
                 label="Phone Number"
                 required
                 value={supPhone}
-                onChange={(e) => setSupPhone(e.target.value)}
+                maxLength={10}
+                showCharCount
+                charCount={supPhone.length}
+                error={formErrors.phone}
+                onKeyDown={handlePhoneKeyDown}
+                onChange={(e) => {
+                  const cleaned = e.target.value.replace(/\D/g, "").slice(0, 10);
+                  setSupPhone(cleaned);
+                  if (formErrors.phone) setFormErrors((prev) => ({ ...prev, phone: null }));
+                }}
+                onBlur={() => {
+                  const err = validateSupplierPhone(supPhone);
+                  setFormErrors((prev) => ({ ...prev, phone: err }));
+                }}
               />
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <InputField
                 label="Outstanding Balance (₹)"
                 type="number"
+                min={0}
+                max={10000000}
                 value={supBalance}
-                onChange={(e) => setSupBalance(Number(e.target.value))}
+                error={formErrors.outstandingBalance}
+                onKeyDown={(e) => {
+                  if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault();
+                }}
+                onChange={(e) => {
+                  const val = e.target.value === "" ? "" : Number(e.target.value);
+                  setSupBalance(val);
+                  if (formErrors.outstandingBalance) setFormErrors((prev) => ({ ...prev, outstandingBalance: null }));
+                }}
+                onBlur={() => {
+                  const err = validateSupplierBalance(supBalance);
+                  setFormErrors((prev) => ({ ...prev, outstandingBalance: err }));
+                }}
               />
               <SelectField
                 label="Status"
@@ -689,11 +1028,25 @@ export function PharmacySupplierManagement() {
                 <option value="inactive">Inactive</option>
               </SelectField>
             </div>
+
             <InputField
               label="Full Business Address"
               value={supAddress}
-              onChange={(e) => setSupAddress(e.target.value)}
+              maxLength={250}
+              showCharCount
+              charCount={supAddress.length}
+              error={formErrors.address}
+              onKeyDown={handleTextKeyDown(250, "Address")}
+              onChange={(e) => {
+                setSupAddress(e.target.value);
+                if (formErrors.address) setFormErrors((prev) => ({ ...prev, address: null }));
+              }}
+              onBlur={() => {
+                const err = validateSupplierAddress(supAddress);
+                setFormErrors((prev) => ({ ...prev, address: err }));
+              }}
             />
+
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
               <Button
                 type="button"
@@ -719,20 +1072,28 @@ export function PharmacySupplierManagement() {
         isOpen={isAddOrderOpen}
         onClose={() => setIsAddOrderOpen(false)}
       >
-        <form onSubmit={handleAddOrderSubmit} className="space-y-4">
-          <SelectField
-            label="Choose Supplier"
-            required
-            value={orderSupplier}
-            onChange={(e) => setOrderSupplier(e.target.value)}
-          >
-            <option value="">-- Select Supplier --</option>
-            {suppliers.map((s) => (
-              <option key={s._id} value={s.name}>
-                {s.name} ({s.supplierId || s._id.slice(-6)})
-              </option>
-            ))}
-          </SelectField>
+        <form onSubmit={handleAddOrderSubmit} noValidate className="space-y-4">
+          <div>
+            <SelectField
+              label="Choose Supplier"
+              required
+              value={orderSupplier}
+              onChange={(e) => {
+                setOrderSupplier(e.target.value);
+                if (orderSupplierError) setOrderSupplierError(null);
+              }}
+            >
+              <option value="">-- Select Supplier --</option>
+              {suppliers.map((s) => (
+                <option key={s._id} value={s.name}>
+                  {s.name} ({s.supplierId || s._id.slice(-6)})
+                </option>
+              ))}
+            </SelectField>
+            {orderSupplierError && (
+              <p className="mt-1 text-xs font-medium text-rose-500">{orderSupplierError}</p>
+            )}
+          </div>
 
           <div>
             <div className="flex justify-between items-center mb-2">
@@ -748,55 +1109,83 @@ export function PharmacySupplierManagement() {
             </div>
 
             <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
-              {orderItems.map((item, index) => (
-                <div key={index} className="flex gap-2 items-end bg-slate-50 p-2.5 rounded-lg border border-slate-150">
-                  <div className="flex-1">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Medicine Name</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Ibuprofen 400mg"
-                      value={item.name}
-                      onChange={(e) => handleOrderItemChange(index, "name", e.target.value)}
-                      className="w-full rounded border border-slate-350 bg-white p-1 text-xs text-slate-800 outline-none"
-                    />
-                  </div>
+              {orderItems.map((item, index) => {
+                const itErr = orderItemErrors[index] || {};
+                return (
+                  <div key={index} className="space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-150">
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Medicine Name *</label>
+                        <input
+                          type="text"
+                          required
+                          maxLength={100}
+                          placeholder="e.g. Ibuprofen 400mg"
+                          value={item.name}
+                          onChange={(e) => handleOrderItemChange(index, "name", e.target.value)}
+                          className={`w-full rounded border p-1 text-xs text-slate-800 outline-none ${
+                            itErr.name ? "border-rose-400 bg-rose-50/20" : "border-slate-350 bg-white"
+                          }`}
+                        />
+                      </div>
 
-                  <div className="w-20">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Qty</label>
-                    <input
-                      type="number"
-                      required
-                      min={1}
-                      value={item.quantity}
-                      onChange={(e) => handleOrderItemChange(index, "quantity", e.target.value)}
-                      className="w-full rounded border border-slate-350 bg-white p-1 text-xs text-slate-850 outline-none"
-                    />
-                  </div>
+                      <div className="w-20">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Qty *</label>
+                        <input
+                          type="number"
+                          required
+                          min={1}
+                          max={1000000}
+                          value={item.quantity}
+                          onKeyDown={(e) => {
+                            if (['-', '+', 'e', 'E', '.'].includes(e.key)) e.preventDefault();
+                          }}
+                          onChange={(e) => handleOrderItemChange(index, "quantity", e.target.value)}
+                          className={`w-full rounded border p-1 text-xs text-slate-850 outline-none ${
+                            itErr.quantity ? "border-rose-400 bg-rose-50/20" : "border-slate-350 bg-white"
+                          }`}
+                        />
+                      </div>
 
-                  <div className="w-20">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Cost (₹)</label>
-                    <input
-                      type="number"
-                      required
-                      min={0}
-                      value={item.cost}
-                      onChange={(e) => handleOrderItemChange(index, "cost", e.target.value)}
-                      className="w-full rounded border border-slate-350 bg-white p-1 text-xs text-slate-850 outline-none"
-                    />
-                  </div>
+                      <div className="w-24">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Cost (₹) *</label>
+                        <input
+                          type="number"
+                          required
+                          min={0}
+                          max={10000000}
+                          value={item.cost}
+                          onKeyDown={(e) => {
+                            if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault();
+                          }}
+                          onChange={(e) => handleOrderItemChange(index, "cost", e.target.value)}
+                          className={`w-full rounded border p-1 text-xs text-slate-850 outline-none ${
+                            itErr.cost ? "border-rose-400 bg-rose-50/20" : "border-slate-350 bg-white"
+                          }`}
+                        />
+                      </div>
 
-                  <Button
-                    type="button"
-                    variant="danger"
-                    onClick={() => handleRemoveRow(index)}
-                    className="p-1 px-2 text-xs py-1"
-                    disabled={orderItems.length === 1}
-                  >
-                    🗑
-                  </Button>
-                </div>
-              ))}
+                      <Button
+                        type="button"
+                        variant="danger"
+                        onClick={() => handleRemoveRow(index)}
+                        className="p-1 px-2 text-xs py-1"
+                        disabled={orderItems.length === 1}
+                      >
+                        🗑
+                      </Button>
+                    </div>
+
+                    {(itErr.name || itErr.quantity || itErr.cost) && (
+                      <div className="text-[10px] font-medium text-rose-500 space-y-0.5">
+                        {itErr.name && <p>Medicine Name: {itErr.name}</p>}
+                        {itErr.quantity && <p>Qty: {itErr.quantity}</p>}
+                        {itErr.cost && <p>Cost: {itErr.cost}</p>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 

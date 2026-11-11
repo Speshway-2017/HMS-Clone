@@ -207,8 +207,8 @@ export function usePatientReports(patientId: string | undefined) {
 export function useCollectSample() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ requestId, sampleId, sampleType, collectedBy }: { requestId: string; sampleId?: string; sampleType?: string; collectedBy?: string }) => {
-      const res = await api.post(`/laboratory/${requestId}/collect-sample`, { sampleId, sampleType, collectedBy });
+    mutationFn: async ({ requestId, sampleId, sampleType, collectedBy, remarks }: { requestId: string; sampleId?: string; sampleType?: string; collectedBy?: string; remarks?: string }) => {
+      const res = await api.post(`/laboratory/${requestId}/collect-sample`, { sampleId, sampleType, collectedBy, remarks });
       return res.data.data;
     },
     onSuccess: () => {

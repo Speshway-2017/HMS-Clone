@@ -17,21 +17,24 @@ const inventoryItemSchema = z.object({
   name: z
     .string({ invalid_type_error: "Please enter valid data" })
     .trim()
-    .min(1, "Please enter valid data")
-    .max(100, "Item Name cannot exceed 100 characters. Please enter valid data")
+    .min(1, "Please fill out this field")
+    .max(100, "Medicine Name cannot exceed 100 characters. Please enter valid data")
     .refine((val) => ITEM_NAME_REGEX.test(val), {
-      message: "Please enter valid data",
+      message: "Medicine Name contains invalid data. Please enter valid data",
     }),
   strength: z
     .string({ invalid_type_error: "Please enter valid data" })
     .trim()
-    .max(100, "Strength cannot exceed 100 characters. Please enter valid data")
+    .max(50, "Strength / Power cannot exceed 50 characters. Please enter valid data")
+    .refine((val) => !val || /^[a-zA-Z0-9\s\.\-/,%]+$/.test(val), {
+      message: "Strength / Power contains invalid data. Please enter valid data",
+    })
     .optional()
     .default(""),
   sku: z
     .string({ invalid_type_error: "Please enter valid data" })
     .trim()
-    .min(1, "Please enter valid data")
+    .min(1, "Please fill out this field")
     .max(50, "SKU cannot exceed 50 characters. Please enter valid data")
     .refine((val) => SKU_REGEX.test(val), {
       message: "Please enter valid data",
@@ -74,8 +77,8 @@ const inventoryItemSchema = z.object({
     .default(0),
   unitCost: z.coerce
     .number({ invalid_type_error: "Please enter valid data" })
-    .min(0, "Unit Cost cannot be negative. Please enter valid data")
-    .max(10000000, "Unit Cost cannot exceed 10,000,000. Please enter valid data")
+    .min(0, "Retail Unit Price cannot be negative. Please enter valid data")
+    .max(10000000, "Retail Unit Price cannot exceed 10,000,000. Please enter valid data")
     .optional()
     .default(0),
   supplier: z
@@ -107,12 +110,23 @@ function withComputedStatus(item: InstanceType<typeof InventoryItem>) {
 }
 
 export const listInventory = catchAsync(async (req: Request, res: Response) => {
-  const { page, limit, skip } = getPagination(req, 20);
+  const { page, limit, skip } = getPagination(req, 100);
   const { category, search } = req.query as Record<string, string | undefined>;
 
   const filter: Record<string, unknown> = { ...req.hospitalFilter };
-  if (category) filter.category = category;
-  if (search) filter.name = new RegExp(search, "i");
+  if (category && category !== "All") filter.category = category;
+  if (search && search.trim()) {
+    const safe = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(safe, "i");
+    filter.$or = [
+      { name: regex },
+      { sku: regex },
+      { strength: regex },
+      { storageCondition: regex },
+      { description: regex },
+      { supplier: regex },
+    ];
+  }
 
   const [items, total, allForHospital] = await Promise.all([
     InventoryItem.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),

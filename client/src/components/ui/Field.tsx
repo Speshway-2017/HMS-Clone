@@ -167,7 +167,7 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
     if (effectiveMaxLength && charCount > effectiveMaxLength) {
       autoError = isPhoneField
         ? `${cleanLabel} cannot exceed ${effectiveMaxLength} digits. Too long text is not accepted. Please enter valid data`
-        : `${cleanLabel} cannot exceed ${effectiveMaxLength} characters. Too long text is not accepted. Please enter valid data`;
+        : `${cleanLabel} cannot exceed ${effectiveMaxLength} characters. Characters limit: ${effectiveMaxLength}. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data`;
     } else if (touched) {
       if (required && !currentVal.trim()) {
         autoError = `${cleanLabel} is required. Field is required. Please fill out this field`;
@@ -215,7 +215,7 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
           e.preventDefault();
           const limitMsg = isPhoneField
             ? `${cleanLabel} cannot exceed ${effectiveMaxLength} digits. Too long text is not accepted. Please enter valid data`
-            : `${cleanLabel} cannot exceed ${effectiveMaxLength} characters. Too long text is not accepted. Please enter valid data`;
+            : `${cleanLabel} cannot exceed ${effectiveMaxLength} characters. Characters limit: ${effectiveMaxLength}. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data`;
           setKeyLimitError(limitMsg);
           toast.error(limitMsg, { id: `${cleanLabel}-limit-exceeded` });
           if (onKeyDown) onKeyDown(e);
@@ -377,7 +377,7 @@ export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>
 
     let autoError: string | null = null;
     if (effectiveMaxLength && charCount > effectiveMaxLength) {
-      autoError = `${cleanLabel} cannot exceed ${effectiveMaxLength} characters. Too long text is not accepted. Please enter valid data`;
+      autoError = `${cleanLabel} cannot exceed ${effectiveMaxLength} characters. Characters limit: ${effectiveMaxLength}. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data`;
     } else if (touched) {
       if (required && !currentVal.trim()) {
         autoError = `${cleanLabel} is required. Field is required. Please fill out this field`;
@@ -408,7 +408,7 @@ export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>
         const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
         if (!hasSelection && currentVal.length >= maxLength) {
           e.preventDefault();
-          const limitMsg = `${cleanLabel} cannot exceed ${maxLength} characters. Too long text is not accepted. Please enter valid data`;
+          const limitMsg = `${cleanLabel} cannot exceed ${maxLength} characters. Characters limit: ${maxLength}. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data`;
           setKeyLimitError(limitMsg);
           toast.error(limitMsg, { id: `${cleanLabel}-limit-exceeded` });
           if (onKeyDown) onKeyDown(e);

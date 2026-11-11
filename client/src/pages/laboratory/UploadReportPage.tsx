@@ -14,6 +14,47 @@ interface TestReportState {
   files: FileList | null;
 }
 
+const validateObservations = (val: string): string | null => {
+  const raw = val || "";
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return "Observations / Findings is required. Field is required. Please fill out this field";
+  }
+  if (raw.length > 500) {
+    return "Observations / Findings cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+  }
+  if (trimmed.length < 2) {
+    return "Observations / Findings must be at least 2 characters. Please enter valid data";
+  }
+  if (
+    /<[^>]*>|javascript:/i.test(trimmed) ||
+    !/[a-zA-Z0-9]/.test(trimmed) ||
+    !/^[a-zA-Z0-9\s.,?!'\-_/()&%#@+:;\n\r"]+$/.test(trimmed)
+  ) {
+    return "Observations / Findings contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data";
+  }
+  return null;
+};
+
+const validateRemarks = (val: string): string | null => {
+  const raw = val || "";
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (raw.length > 500) {
+    return "Technical Remarks / Recommendations cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+  }
+  if (
+    /<[^>]*>|javascript:/i.test(trimmed) ||
+    !/[a-zA-Z0-9]/.test(trimmed) ||
+    !/^[a-zA-Z0-9\s.,?!'\-_/()&%#@+:;\n\r"]+$/.test(trimmed)
+  ) {
+    return "Technical Remarks / Recommendations contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data";
+  }
+  return null;
+};
+
 export function UploadReportPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -24,6 +65,7 @@ export function UploadReportPage() {
   // Form State: record of { [testName: string]: TestReportState }
   const [testReports, setTestReports] = useState<Record<string, TestReportState>>({});
   const [isUploading, setIsUploading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, { observations?: string | null; remarks?: string | null }>>({});
 
   useEffect(() => {
     if (!request) {
@@ -41,8 +83,120 @@ export function UploadReportPage() {
 
   if (!request) return null;
 
+  const handleObservationsChange = (testName: string, val: string) => {
+    setTestReports(prev => ({
+      ...prev,
+      [testName]: { ...prev[testName], observations: val }
+    }));
+    const err = validateObservations(val);
+    setErrors(prev => ({
+      ...prev,
+      [testName]: { ...prev[testName], observations: err }
+    }));
+  };
+
+  const handleObservationsBlur = (testName: string) => {
+    const val = testReports[testName]?.observations || "";
+    const err = validateObservations(val);
+    setErrors(prev => ({
+      ...prev,
+      [testName]: { ...prev[testName], observations: err }
+    }));
+  };
+
+  const handleObservationsKeyDown = (testName: string, e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const isNavigationKey = [
+      "Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+      "Tab", "Enter", "Escape", "Home", "End"
+    ].includes(e.key);
+
+    if (e.ctrlKey || e.altKey || e.metaKey || isNavigationKey) return;
+
+    const currentObs = testReports[testName]?.observations || "";
+    if (currentObs.length >= 500) {
+      const inputEl = e.currentTarget;
+      const hasSelection = (inputEl.selectionEnd ?? 0) - (inputEl.selectionStart ?? 0) > 0;
+      if (!hasSelection) {
+        e.preventDefault();
+        const msg = "Observations / Findings cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+        setErrors(prev => ({
+          ...prev,
+          [testName]: { ...prev[testName], observations: msg }
+        }));
+        toast.error("Observations / Findings cannot exceed 500 characters. Too long text data not accepted.", { id: `obs-limit-${testName}` });
+      }
+    }
+  };
+
+  const handleRemarksChange = (testName: string, val: string) => {
+    setTestReports(prev => ({
+      ...prev,
+      [testName]: { ...prev[testName], remarks: val }
+    }));
+    const err = validateRemarks(val);
+    setErrors(prev => ({
+      ...prev,
+      [testName]: { ...prev[testName], remarks: err }
+    }));
+  };
+
+  const handleRemarksBlur = (testName: string) => {
+    const val = testReports[testName]?.remarks || "";
+    const err = validateRemarks(val);
+    setErrors(prev => ({
+      ...prev,
+      [testName]: { ...prev[testName], remarks: err }
+    }));
+  };
+
+  const handleRemarksKeyDown = (testName: string, e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const isNavigationKey = [
+      "Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+      "Tab", "Enter", "Escape", "Home", "End"
+    ].includes(e.key);
+
+    if (e.ctrlKey || e.altKey || e.metaKey || isNavigationKey) return;
+
+    const currentRem = testReports[testName]?.remarks || "";
+    if (currentRem.length >= 500) {
+      const inputEl = e.currentTarget;
+      const hasSelection = (inputEl.selectionEnd ?? 0) - (inputEl.selectionStart ?? 0) > 0;
+      if (!hasSelection) {
+        e.preventDefault();
+        const msg = "Technical Remarks / Recommendations cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+        setErrors(prev => ({
+          ...prev,
+          [testName]: { ...prev[testName], remarks: msg }
+        }));
+        toast.error("Technical Remarks / Recommendations cannot exceed 500 characters. Too long text data not accepted.", { id: `rem-limit-${testName}` });
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    let firstError: string | null = null;
+    const newErrors: Record<string, { observations?: string | null; remarks?: string | null }> = {};
+
+    for (const test of request.tests) {
+      const rep = testReports[test] || { observations: "", remarks: "", files: null };
+      const obsErr = validateObservations(rep.observations);
+      const remErr = validateRemarks(rep.remarks);
+
+      if (obsErr || remErr) {
+        newErrors[test] = { observations: obsErr, remarks: remErr };
+        if (!firstError) {
+          firstError = obsErr || remErr;
+        }
+      }
+    }
+
+    if (firstError) {
+      setErrors(prev => ({ ...prev, ...newErrors }));
+      toast.error(firstError);
+      return;
+    }
 
     // Check if each test has at least one file selected
     for (const test of request.tests) {
@@ -180,6 +334,7 @@ export function UploadReportPage() {
             <div className="space-y-4">
               {request.tests.map((testName: string) => {
                 const report = testReports[testName] || { observations: "", remarks: "", files: null };
+                const testErrors = errors[testName] || {};
                 return (
                   <Card key={testName} className="p-5 space-y-4">
                     <h3 className="font-bold text-base text-slate-800 border-b pb-2.5 flex items-center gap-2">
@@ -190,22 +345,30 @@ export function UploadReportPage() {
                     <TextareaField
                       label="Observations / Findings"
                       required
+                      maxLength={500}
+                      showCharCount
+                      charCount={report.observations.length}
+                      maxCharCount={500}
+                      error={testErrors.observations}
                       placeholder={`Enter specific diagnostic analysis and findings for ${testName}...`}
                       value={report.observations}
-                      onChange={(e) => setTestReports(prev => ({
-                        ...prev,
-                        [testName]: { ...prev[testName], observations: e.target.value }
-                      }))}
+                      onChange={(e) => handleObservationsChange(testName, e.target.value)}
+                      onBlur={() => handleObservationsBlur(testName)}
+                      onKeyDown={(e) => handleObservationsKeyDown(testName, e)}
                     />
 
                     <TextareaField
                       label="Technical Remarks / Recommendations"
+                      maxLength={500}
+                      showCharCount
+                      charCount={report.remarks.length}
+                      maxCharCount={500}
+                      error={testErrors.remarks}
                       placeholder={`Enter technical remarks or recommendations for ${testName}...`}
                       value={report.remarks}
-                      onChange={(e) => setTestReports(prev => ({
-                        ...prev,
-                        [testName]: { ...prev[testName], remarks: e.target.value }
-                      }))}
+                      onChange={(e) => handleRemarksChange(testName, e.target.value)}
+                      onBlur={() => handleRemarksBlur(testName)}
+                      onKeyDown={(e) => handleRemarksKeyDown(testName, e)}
                     />
 
                     <div className="pt-2">

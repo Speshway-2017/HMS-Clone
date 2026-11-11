@@ -31,6 +31,39 @@ import { DataTable, Column } from "../../components/ui/DataTable";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import { ChartCard } from "../../components/ui/ChartCard";
 
+// ----------------- Validation Functions for Shift Handover -----------------
+const validateRemarks = (val: string): string | null => {
+  const trimmed = (val || "").trim();
+  if (!trimmed) return null; // optional field
+  if (val.length > 500) {
+    return "Handoff Remarks cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data";
+  }
+  if (trimmed.length < 2) {
+    return "Handoff Remarks must be at least 2 characters. Too short text is not accepted. It should not accept invalid data. Please enter valid data";
+  }
+  if (/<[^>]*>|javascript:/i.test(trimmed) || !/[a-zA-Z0-9]/.test(trimmed) || !/^[a-zA-Z0-9\s\.\-/'&,()%+!\n\r#@]+$/.test(trimmed)) {
+    return "Handoff Remarks contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data";
+  }
+  return null;
+};
+
+const validateNurseSignature = (val: string): string | null => {
+  const trimmed = (val || "").trim();
+  if (!trimmed) {
+    return "Outgoing Nurse Signature is required. Field is required. Please fill out this field";
+  }
+  if (val.length > 100) {
+    return "Outgoing Nurse Signature cannot exceed 100 characters. Characters limit: 100. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data";
+  }
+  if (trimmed.length < 2) {
+    return "Outgoing Nurse Signature must be at least 2 characters. Value must be at least 2 characters. It should not accept invalid data. Please enter valid data";
+  }
+  if (!/^[a-zA-Z\s\.\'\(\)\-]+$/.test(trimmed) || !/[a-zA-Z]/.test(trimmed) || /<[^>]*>|javascript:/i.test(trimmed)) {
+    return "Outgoing Nurse Signature contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data";
+  }
+  return null;
+};
+
 export function NurseDashboardPage() {
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
@@ -55,6 +88,32 @@ export function NurseDashboardPage() {
   const [remarks, setRemarks] = useState("");
   const [nurseSignature, setNurseSignature] = useState("");
   const [submittingHandover, setSubmittingHandover] = useState(false);
+  const [handoverErrors, setHandoverErrors] = useState<{
+    remarks?: string | null;
+    nurseSignature?: string | null;
+  }>({});
+
+  const handleRemarksKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (["Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Tab", "Enter"].includes(e.key)) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const textarea = e.currentTarget;
+    const selLength = (textarea.selectionEnd ?? 0) - (textarea.selectionStart ?? 0);
+    if (textarea.value.length >= 500 && selLength === 0) {
+      e.preventDefault();
+      toast.error("Handoff Remarks cannot exceed 500 characters. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted.");
+    }
+  };
+
+  const handleSignatureKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab", "Enter"].includes(e.key)) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const input = e.currentTarget;
+    const selLength = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0);
+    if (input.value.length >= 100 && selLength === 0) {
+      e.preventDefault();
+      toast.error("Outgoing Nurse Signature cannot exceed 100 characters. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted.");
+    }
+  };
 
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -265,6 +324,18 @@ export function NurseDashboardPage() {
 
   const handleCompleteHandover = async (e: React.FormEvent) => {
     e.preventDefault();
+    const remarksErr = validateRemarks(remarks);
+    const signatureErr = validateNurseSignature(nurseSignature);
+
+    if (remarksErr || signatureErr) {
+      setHandoverErrors({
+        remarks: remarksErr,
+        nurseSignature: signatureErr,
+      });
+      toast.error(signatureErr || remarksErr || "Please fix validation errors.");
+      return;
+    }
+
     if (!selectedIncomingNurseId) {
       toast.error("Please select an incoming nurse to transfer duties.");
       return;
@@ -339,6 +410,7 @@ export function NurseDashboardPage() {
       setSelectedIncomingNurseId("");
       setRemarks("");
       setNurseSignature("");
+      setHandoverErrors({});
       refetchPatients();
     } catch (err: any) {
       toast.error(err.message || "Failed to process shift handover.", { id: loadingToastId });
@@ -1141,27 +1213,80 @@ export function NurseDashboardPage() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Handoff Remarks & Special Roster Notes (Optional)</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                    Handoff Remarks & Special Roster Notes (Optional)
+                  </label>
+                  <span className={`text-[10px] font-mono ${remarks.length > 500 ? "text-red-600 font-bold" : "text-slate-400"}`}>
+                    {remarks.length}/500
+                  </span>
+                </div>
                 <textarea
                   value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
+                  maxLength={500}
+                  onKeyDown={handleRemarksKeyDown}
+                  onChange={(e) => {
+                    setRemarks(e.target.value);
+                    if (handoverErrors.remarks) {
+                      setHandoverErrors((prev) => ({ ...prev, remarks: validateRemarks(e.target.value) }));
+                    }
+                  }}
+                  onBlur={() => {
+                    if (remarks.trim()) {
+                      setHandoverErrors((prev) => ({ ...prev, remarks: validateRemarks(remarks) }));
+                    }
+                  }}
                   placeholder="Enter details on patient updates, clinical checkpoints, or tasks to flag..."
                   rows={3}
-                  className="w-full rounded-lg border border-slate-200 p-2.5 outline-none focus:border-indigo-500 bg-white text-xs font-semibold text-slate-700"
+                  className={`w-full rounded-lg border p-2.5 outline-none focus:ring-2 bg-white text-xs font-semibold text-slate-700 transition ${
+                    handoverErrors.remarks
+                      ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-rose-100"
+                      : "border-slate-200 focus:border-indigo-500 focus:ring-indigo-100"
+                  }`}
                 />
+                {handoverErrors.remarks && (
+                  <p className="text-xs font-medium text-rose-500 mt-1" role="alert">
+                    {handoverErrors.remarks}
+                  </p>
+                )}
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">
-                  Outgoing Nurse Signature Sign-off (Required)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                    Outgoing Nurse Signature Sign-off (Required) <span className="text-rose-500">*</span>
+                  </label>
+                  <span className={`text-[10px] font-mono ${nurseSignature.length > 100 ? "text-red-600 font-bold" : "text-slate-400"}`}>
+                    {nurseSignature.length}/100
+                  </span>
+                </div>
                 <input
                   type="text"
+                  required
+                  maxLength={100}
                   value={nurseSignature}
-                  onChange={(e) => setNurseSignature(e.target.value)}
+                  onKeyDown={handleSignatureKeyDown}
+                  onChange={(e) => {
+                    setNurseSignature(e.target.value);
+                    if (handoverErrors.nurseSignature) {
+                      setHandoverErrors((prev) => ({ ...prev, nurseSignature: validateNurseSignature(e.target.value) }));
+                    }
+                  }}
+                  onBlur={() => {
+                    setHandoverErrors((prev) => ({ ...prev, nurseSignature: validateNurseSignature(nurseSignature) }));
+                  }}
                   placeholder="Type your name (e.g. Sarah Connor, RN) to sign off..."
-                  className="w-full rounded-lg border border-slate-200 p-2.5 outline-none focus:border-indigo-500 bg-white font-bold text-slate-700"
+                  className={`w-full rounded-lg border p-2.5 outline-none focus:ring-2 bg-white font-bold text-slate-700 transition ${
+                    handoverErrors.nurseSignature
+                      ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-rose-100"
+                      : "border-slate-200 focus:border-indigo-500 focus:ring-indigo-100"
+                  }`}
                 />
+                {handoverErrors.nurseSignature && (
+                  <p className="text-xs font-medium text-rose-500 mt-1" role="alert">
+                    {handoverErrors.nurseSignature}
+                  </p>
+                )}
               </div>
 
               {/* Part C: Action Control Buttons */}
@@ -1175,7 +1300,7 @@ export function NurseDashboardPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={!selectedIncomingNurseId || !nurseSignature.trim() || submittingHandover}
+                  disabled={!selectedIncomingNurseId || !nurseSignature.trim() || submittingHandover || Boolean(handoverErrors.remarks) || Boolean(handoverErrors.nurseSignature)}
                   className={`px-5 py-2 rounded-xl text-white font-bold cursor-pointer transition flex items-center gap-1.5 ${
                     !selectedIncomingNurseId || !nurseSignature.trim() || submittingHandover
                       ? "bg-slate-300 cursor-not-allowed opacity-60 text-slate-500"

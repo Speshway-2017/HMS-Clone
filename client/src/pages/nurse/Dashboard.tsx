@@ -2038,7 +2038,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                 </div>
 
                 {/* 5. Shift Status (Green) */}
-                <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 group flex flex-col justify-between">
+                <div onClick={() => setIsHandoverModalOpen(true)} className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 group flex flex-col justify-between cursor-pointer">
                   <div className="flex justify-between items-start">
                     <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider font-sans">Shift Status</span>
                     <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
