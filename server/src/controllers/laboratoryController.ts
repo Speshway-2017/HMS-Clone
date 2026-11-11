@@ -355,6 +355,28 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
       const createdReports = [];
 
       for (const rep of reportsList) {
+        // Validate observations and remarks
+        if (!rep.observations || !String(rep.observations).trim()) {
+          throw new AppError(`Observations / Findings is required for ${rep.testName}. Field is required. Please fill out this field`, 400);
+        }
+        const rawObs = String(rep.observations);
+        if (rawObs.length > 500) {
+          throw new AppError(`Observations / Findings cannot exceed 500 characters for ${rep.testName}. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Please enter valid data`, 400);
+        }
+        if (/<[^>]*>|javascript:/i.test(rawObs) || !/[a-zA-Z0-9]/.test(rawObs.trim())) {
+          throw new AppError(`Observations / Findings contains invalid data for ${rep.testName}. Invalid data not accepted. Invalid data is not accepted. Please enter valid data`, 400);
+        }
+
+        if (rep.remarks && String(rep.remarks).trim()) {
+          const rawRem = String(rep.remarks);
+          if (rawRem.length > 500) {
+            throw new AppError(`Technical Remarks / Recommendations cannot exceed 500 characters for ${rep.testName}. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Please enter valid data`, 400);
+          }
+          if (/<[^>]*>|javascript:/i.test(rawRem) || !/[a-zA-Z0-9]/.test(rawRem.trim())) {
+            throw new AppError(`Technical Remarks / Recommendations contains invalid data for ${rep.testName}. Invalid data not accepted. Invalid data is not accepted. Please enter valid data`, 400);
+          }
+        }
+
         // Find files matching this test
         const testFiles = files.filter(f => f.fieldname === `files_${rep.testName}`);
         const uploadedFiles = [];
@@ -1024,16 +1046,47 @@ export const getPatientReports = catchAsync(async (req: Request, res: Response) 
 export const collectSample = catchAsync(async (req: Request, res: Response) => {
   const { requestId } = req.params;
   const hospitalId = req.hospitalFilter!.hospital;
-  const { sampleId, sampleType, collectedBy } = req.body;
+  const { sampleId, sampleType, collectedBy, remarks } = req.body;
 
   const { order } = await findOrder(requestId, hospitalId);
   if (!order) throw new AppError("Request not found", 404);
 
+  // Validate collectedBy
+  if (collectedBy !== undefined && collectedBy !== null) {
+    const rawCollector = String(collectedBy);
+    const trimmed = rawCollector.trim();
+    if (!trimmed) {
+      throw new AppError("Collector / Phlebotomist is required. Please fill out this field", 400);
+    }
+    if (rawCollector.length > 50) {
+      throw new AppError("Collector / Phlebotomist cannot exceed 50 characters. Characters limit: 50. Too long data is not accepted. Please enter valid data", 400);
+    }
+    if (trimmed.length < 2) {
+      throw new AppError("Collector / Phlebotomist must be at least 2 characters. Please enter valid data", 400);
+    }
+    if (!/^[a-zA-Z0-9\s\.\'-]+$/.test(trimmed) || !/[a-zA-Z]/.test(trimmed) || /<[^>]*>|javascript:/i.test(trimmed)) {
+      throw new AppError("Collector / Phlebotomist contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data", 400);
+    }
+  }
+
+  // Validate remarks
+  if (remarks !== undefined && remarks !== null && String(remarks).trim()) {
+    const rawRemarks = String(remarks);
+    const trimmedRemarks = rawRemarks.trim();
+    if (rawRemarks.length > 250) {
+      throw new AppError("Collection Remarks cannot exceed 250 characters. Characters limit: 250. Too long data is not accepted. Please enter valid data", 400);
+    }
+    if (/<[^>]*>|javascript:/i.test(trimmedRemarks) || !/[a-zA-Z0-9]/.test(trimmedRemarks) || !/^[a-zA-Z0-9\s.,?!'\-_/()&%#@+:;"]+$/.test(trimmedRemarks)) {
+      throw new AppError("Collection Remarks contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data", 400);
+    }
+  }
+
   const sampleDetails = {
     sampleId: sampleId || `SMP-${Date.now().toString().slice(-6)}`,
     sampleType: sampleType || "Blood",
-    collectedBy: collectedBy || (req.user as any)?.name || "Lab Technician",
+    collectedBy: (collectedBy && String(collectedBy).trim()) || (req.user as any)?.name || "Lab Technician",
     collectedAt: new Date(),
+    remarks: remarks ? String(remarks).trim() : "",
   };
 
   if (order.appointment) {
@@ -1085,7 +1138,7 @@ export const submitResults = catchAsync(async (req: Request, res: Response) => {
 export const getCompletedReports = catchAsync(async (req: Request, res: Response) => {
   const filter = {
     ...buildBranchQuery(req.hospitalFilter),
-    status: { $in: ["completed", "report_uploaded", "verified"] }
+    status: { $in: ["completed", "report_uploaded", "verified", "Completed", "COMPLETED", "Verified", "Report_Uploaded", "Report Uploaded"] }
   };
 
   const reports = await DiagnosticReport.find(filter)

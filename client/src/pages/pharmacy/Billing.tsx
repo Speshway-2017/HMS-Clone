@@ -57,6 +57,7 @@ export function PharmacyBilling() {
 
   // Payment Form State
   const [payAmount, setPayAmount] = useState("");
+  const [payAmountError, setPayAmountError] = useState<string | null>(null);
   const [payMethod, setPayMethod] = useState("Cash");
   const [upiAmount, setUpiAmount] = useState("0");
   const [cashAmount, setCashAmount] = useState("0");
@@ -130,6 +131,7 @@ export function PharmacyBilling() {
         handledInvoiceIdRef.current = highlightInvoiceId;
         setSelectedInvoice(found);
         setPayAmount(found.patientBalance.toFixed(2));
+        setPayAmountError(null);
         setPayMethod("Cash");
         setUpiAmount("0");
         setCashAmount("0");
@@ -141,30 +143,45 @@ export function PharmacyBilling() {
     }
   }, [highlightInvoiceId, invoices, setSearchParams]);
 
+  const validatePaymentAmount = (val: string, maxBalance: number): string | null => {
+    const trimmed = (val || "").trim();
+    if (!trimmed) {
+      return "Please fill out this field";
+    }
+    const num = parseFloat(trimmed);
+    if (isNaN(num)) {
+      return "Please enter a valid payment amount";
+    }
+    if (num <= 0) {
+      return "Payment amount must be greater than zero. Please enter valid data";
+    }
+    const enteredPaise = toPaise(num);
+    const maxPaise = toPaise(maxBalance);
+    if (enteredPaise > maxPaise) {
+      return `Amount cannot exceed the remaining balance of ₹${roundCurrency(maxBalance).toFixed(2)}. Please enter valid data`;
+    }
+    const decimalParts = trimmed.split(".");
+    if (decimalParts.length > 1 && decimalParts[1].length > 2) {
+      return "Amount cannot have more than 2 decimal places. Please enter valid data";
+    }
+    return null;
+  };
+
   // Handle Payment Submit
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedInvoice) return;
 
-    const amt = parseFloat(payAmount);
-    if (isNaN(amt) || amt <= 0) {
-      toast.error("Payment amount must be greater than zero.");
+    const valErr = validatePaymentAmount(payAmount, selectedInvoice.patientBalance);
+    if (valErr) {
+      setPayAmountError(valErr);
+      toast.error(valErr);
       return;
     }
 
-    // Use paise (integer) comparison to completely eliminate floating-point precision issues.
-    // e.g. 201.60 entered vs 201.59999999998 stored → both become 20160 paise → equal → valid.
+    const amt = parseFloat(payAmount);
     const enteredPaise = toPaise(amt);
     const remainingPaise = toPaise(selectedInvoice.patientBalance);
-
-    if (enteredPaise > remainingPaise) {
-      const enteredDisplay = roundCurrency(amt).toFixed(2);
-      const remainingDisplay = roundCurrency(selectedInvoice.patientBalance).toFixed(2);
-      toast.error(
-        `Entered Amount:\n₹${enteredDisplay}\n\nRemaining Balance:\n₹${remainingDisplay}\n\nPlease enter an amount less than or equal to the remaining balance.`
-      );
-      return;
-    }
 
     if (payMethod === "Mixed") {
       const mixedSum = toPaise(Number(upiAmount)) + toPaise(Number(cashAmount)) + toPaise(Number(cardAmount));
@@ -352,6 +369,7 @@ export function PharmacyBilling() {
                       onClick={() => {
                         setSelectedInvoice(r);
                         setPayAmount(r.patientBalance.toFixed(2));
+                        setPayAmountError(null);
                         setPayMethod("Cash");
                         setUpiAmount("0");
                         setCashAmount("0");
@@ -377,7 +395,7 @@ export function PharmacyBilling() {
           isOpen={isPaymentModalOpen}
           onClose={() => setIsPaymentModalOpen(false)}
         >
-          <form onSubmit={handlePaymentSubmit} className="space-y-4 text-xs">
+          <form onSubmit={handlePaymentSubmit} noValidate className="space-y-4 text-xs">
             <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
               <div className="flex justify-between">
                 <span className="text-slate-500">Patient:</span>
@@ -405,7 +423,22 @@ export function PharmacyBilling() {
               step={0.01}
               max={roundCurrency(selectedInvoice.patientBalance)}
               value={payAmount}
-              onChange={(e) => setPayAmount(e.target.value)}
+              error={payAmountError}
+              onKeyDown={(e) => {
+                if (['-', '+', 'e', 'E'].includes(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+              onChange={(e) => {
+                const newVal = e.target.value;
+                setPayAmount(newVal);
+                const err = validatePaymentAmount(newVal, selectedInvoice.patientBalance);
+                setPayAmountError(err);
+              }}
+              onBlur={() => {
+                const err = validatePaymentAmount(payAmount, selectedInvoice.patientBalance);
+                setPayAmountError(err);
+              }}
             />
 
             <SelectField
@@ -568,6 +601,7 @@ export function PharmacyBilling() {
                   onClick={() => {
                     setIsInvoiceDetailsOpen(false);
                     setPayAmount(selectedInvoice.patientBalance.toFixed(2));
+                    setPayAmountError(null);
                     setPayMethod("Cash");
                     setUpiAmount("0");
                     setCashAmount("0");

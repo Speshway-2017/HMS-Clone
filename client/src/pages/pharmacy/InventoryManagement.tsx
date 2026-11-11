@@ -77,16 +77,20 @@ export function PharmacyInventoryManagement() {
   const [medStrength, setMedStrength] = useState("");
   const [category, setCategory] = useState("Analgesic");
   const [sku, setSku] = useState("");
-  const [stockQty, setStockQty] = useState(0);
-  const [reorderLevel, setReorderLevel] = useState(0);
+  const [stockQty, setStockQty] = useState<number | string>(0);
+  const [reorderLevel, setReorderLevel] = useState<number | string>(0);
   const [expiryDate, setExpiryDate] = useState("");
-  const [price, setPrice] = useState(0);
+  const [price, setPrice] = useState<number | string>(0);
   const [batchNo, setBatchNo] = useState("");
   const [supplier, setSupplier] = useState("");
 
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string | undefined>>({});
+  const [, setTouched] = useState<Record<string, boolean>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+
   // TanStack Query Hooks
   const { data: dbSuppliers = [] } = useSuppliers();
-  const { data: inventoryData, isLoading } = useInventory({ category: "medicines", search });
+  const { data: inventoryData, isLoading } = useInventory({ category: "medicines", limit: 500 });
   const createMutation = useCreateInventoryItem();
   const updateMutation = useUpdateInventoryItem(selectedMed?._id || "");
   const deleteMutation = useDeleteInventoryItem();
@@ -104,6 +108,345 @@ export function PharmacyInventoryManagement() {
     "Vaccine"
   ];
 
+  const validateField = (
+    field: "name" | "medStrength" | "sku" | "batchNo" | "stockQty" | "reorderLevel" | "price" | "supplier",
+    value: any
+  ): string | undefined => {
+    const rawVal = typeof value === "string" ? value : value !== undefined && value !== null ? String(value) : "";
+    const trimmed = rawVal.trim();
+
+    if (field === "name") {
+      if (!trimmed) {
+        return "Please fill out this field";
+      }
+      if (rawVal.length > 100) {
+        return "Medicine Name cannot exceed 100 characters. Please enter valid data";
+      }
+      if (trimmed.length < 2) {
+        return "Medicine Name must be at least 2 characters. Please enter valid data";
+      }
+      if (!/^[a-zA-Z0-9\s\.\-/'&,()%+]+$/.test(trimmed)) {
+        return "Medicine Name contains invalid data. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    if (field === "medStrength") {
+      if (!trimmed) {
+        return undefined; // Optional field
+      }
+      if (rawVal.length > 50) {
+        return "Strength / Power cannot exceed 50 characters. Please enter valid data";
+      }
+      if (!/^[a-zA-Z0-9\s\.\-/,%]+$/.test(trimmed)) {
+        return "Strength / Power contains invalid data. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    if (field === "stockQty") {
+      if (rawVal === "" || !trimmed) {
+        return "Please fill out this field";
+      }
+      if (!/^-?\d+(\.\d+)?$/.test(trimmed)) {
+        return "Please enter valid data";
+      }
+      if (trimmed.includes(".")) {
+        return "Stock Quantity must be a whole number. Please enter valid data";
+      }
+      const num = Number(trimmed);
+      if (isNaN(num)) {
+        return "Please enter valid data";
+      }
+      if (num < 0) {
+        return "Stock Quantity cannot be negative. Please enter valid data";
+      }
+      if (num > 1000000 || trimmed.length > 7) {
+        return "Stock Quantity cannot exceed 1,000,000. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    if (field === "reorderLevel") {
+      if (rawVal === "" || !trimmed) {
+        return "Please fill out this field";
+      }
+      if (!/^-?\d+(\.\d+)?$/.test(trimmed)) {
+        return "Please enter valid data";
+      }
+      if (trimmed.includes(".")) {
+        return "Reorder Level must be a whole number. Please enter valid data";
+      }
+      const num = Number(trimmed);
+      if (isNaN(num)) {
+        return "Please enter valid data";
+      }
+      if (num < 0) {
+        return "Reorder Level cannot be negative. Please enter valid data";
+      }
+      if (num > 1000000 || trimmed.length > 7) {
+        return "Reorder Level cannot exceed 1,000,000. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    if (field === "price") {
+      if (rawVal === "" || !trimmed) {
+        return "Please fill out this field";
+      }
+      if (!/^-?\d+(\.\d+)?$/.test(trimmed)) {
+        return "Please enter valid data";
+      }
+      const num = Number(trimmed);
+      if (isNaN(num)) {
+        return "Please enter valid data";
+      }
+      if (num < 0) {
+        return "Retail Unit Price cannot be negative. Please enter valid data";
+      }
+      if (num > 10000000 || trimmed.replace(/\..*$/, "").length > 8) {
+        return "Retail Unit Price cannot exceed 10,000,000. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    if (field === "sku") {
+      if (!trimmed) {
+        return "Please fill out this field";
+      }
+      if (rawVal.length > 50) {
+        return "SKU cannot exceed 50 characters. Please enter valid data";
+      }
+      if (!/^[a-zA-Z0-9\-_./]+$/.test(trimmed)) {
+        return "SKU contains invalid data. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    if (field === "batchNo") {
+      if (!trimmed) {
+        return "Please fill out this field";
+      }
+      if (rawVal.length > 50) {
+        return "Batch Number cannot exceed 50 characters. Please enter valid data";
+      }
+      if (!/^[a-zA-Z0-9\-_./]+$/.test(trimmed)) {
+        return "Batch Number contains invalid data. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    if (field === "supplier") {
+      if (!trimmed) {
+        return "Please fill out this field";
+      }
+      if (rawVal.length > 100) {
+        return "Supplier cannot exceed 100 characters. Please enter valid data";
+      }
+      return undefined;
+    }
+
+    return undefined;
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const allowedNavKeys = [
+      "Backspace", "Delete", "Tab", "Escape", "Enter",
+      "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"
+    ];
+    const input = e.currentTarget;
+    const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
+    if (
+      !hasSelection &&
+      name.length >= 100 &&
+      !allowedNavKeys.includes(e.key) &&
+      !e.ctrlKey && !e.metaKey && !e.altKey
+    ) {
+      e.preventDefault();
+      const limitMsg = "Medicine Name cannot exceed 100 characters. Please enter valid data";
+      setFieldErrors((prev) => ({ ...prev, name: limitMsg }));
+      toast.error(limitMsg, { id: "med-name-limit" });
+    }
+  };
+
+  const handleNameChange = (val: string) => {
+    let clean = val;
+    let limitErr: string | undefined;
+    if (val.length > 100) {
+      clean = val.slice(0, 100);
+      limitErr = "Medicine Name cannot exceed 100 characters. Please enter valid data";
+    }
+    setName(clean);
+    if (!selectedMed) {
+      setSku(generateAutoSku(clean, category));
+    }
+    const err = limitErr || validateField("name", clean);
+    setFieldErrors((prev) => ({ ...prev, name: err }));
+    if (limitErr) {
+      toast.error(limitErr, { id: "med-name-limit" });
+    }
+  };
+
+  const handleStrengthKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const allowedNavKeys = [
+      "Backspace", "Delete", "Tab", "Escape", "Enter",
+      "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"
+    ];
+    const input = e.currentTarget;
+    const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
+    if (
+      !hasSelection &&
+      medStrength.length >= 50 &&
+      !allowedNavKeys.includes(e.key) &&
+      !e.ctrlKey && !e.metaKey && !e.altKey
+    ) {
+      e.preventDefault();
+      const limitMsg = "Strength / Power cannot exceed 50 characters. Please enter valid data";
+      setFieldErrors((prev) => ({ ...prev, medStrength: limitMsg }));
+      toast.error(limitMsg, { id: "med-strength-limit" });
+    }
+  };
+
+  const handleStrengthChange = (val: string) => {
+    let clean = val;
+    let limitErr: string | undefined;
+    if (val.length > 50) {
+      clean = val.slice(0, 50);
+      limitErr = "Strength / Power cannot exceed 50 characters. Please enter valid data";
+    }
+    setMedStrength(clean);
+    const err = limitErr || validateField("medStrength", clean);
+    setFieldErrors((prev) => ({ ...prev, medStrength: err }));
+    if (limitErr) {
+      toast.error(limitErr, { id: "med-strength-limit" });
+    }
+  };
+
+  const handleStockQtyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const allowedNavKeys = [
+      "Backspace", "Delete", "Tab", "Escape", "Enter",
+      "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"
+    ];
+    if (["-", "e", "E", "+", "."].includes(e.key)) {
+      e.preventDefault();
+      const msg = e.key === "."
+        ? "Stock Quantity must be a whole number. Please enter valid data"
+        : "Stock Quantity cannot be negative. Please enter valid data";
+      setFieldErrors((prev) => ({ ...prev, stockQty: msg }));
+      toast.error(msg, { id: "stock-qty-invalid" });
+      return;
+    }
+    const input = e.currentTarget;
+    const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
+    if (
+      !hasSelection &&
+      String(stockQty).length >= 7 &&
+      /^[0-9]$/.test(e.key) &&
+      !allowedNavKeys.includes(e.key) &&
+      !e.ctrlKey && !e.metaKey
+    ) {
+      e.preventDefault();
+      const limitMsg = "Stock Quantity cannot exceed 1,000,000. Please enter valid data";
+      setFieldErrors((prev) => ({ ...prev, stockQty: limitMsg }));
+      toast.error(limitMsg, { id: "stock-qty-limit" });
+    }
+  };
+
+  const handleStockQtyChange = (val: string) => {
+    setStockQty(val);
+    const err = validateField("stockQty", val);
+    setFieldErrors((prev) => ({ ...prev, stockQty: err }));
+  };
+
+  const handleReorderLevelKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const allowedNavKeys = [
+      "Backspace", "Delete", "Tab", "Escape", "Enter",
+      "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"
+    ];
+    if (["-", "e", "E", "+", "."].includes(e.key)) {
+      e.preventDefault();
+      const msg = e.key === "."
+        ? "Reorder Level must be a whole number. Please enter valid data"
+        : "Reorder Level cannot be negative. Please enter valid data";
+      setFieldErrors((prev) => ({ ...prev, reorderLevel: msg }));
+      toast.error(msg, { id: "reorder-level-invalid" });
+      return;
+    }
+    const input = e.currentTarget;
+    const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
+    if (
+      !hasSelection &&
+      String(reorderLevel).length >= 7 &&
+      /^[0-9]$/.test(e.key) &&
+      !allowedNavKeys.includes(e.key) &&
+      !e.ctrlKey && !e.metaKey
+    ) {
+      e.preventDefault();
+      const limitMsg = "Reorder Level cannot exceed 1,000,000. Please enter valid data";
+      setFieldErrors((prev) => ({ ...prev, reorderLevel: limitMsg }));
+      toast.error(limitMsg, { id: "reorder-level-limit" });
+    }
+  };
+
+  const handleReorderLevelChange = (val: string) => {
+    setReorderLevel(val);
+    const err = validateField("reorderLevel", val);
+    setFieldErrors((prev) => ({ ...prev, reorderLevel: err }));
+  };
+
+  const handlePriceKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const allowedNavKeys = [
+      "Backspace", "Delete", "Tab", "Escape", "Enter",
+      "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"
+    ];
+    if (["-", "e", "E", "+"].includes(e.key)) {
+      e.preventDefault();
+      const msg = "Retail Unit Price cannot be negative. Please enter valid data";
+      setFieldErrors((prev) => ({ ...prev, price: msg }));
+      toast.error(msg, { id: "unit-price-invalid" });
+      return;
+    }
+    const input = e.currentTarget;
+    const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
+    if (
+      !hasSelection &&
+      String(price).replace(/\..*$/, "").length >= 8 &&
+      /^[0-9]$/.test(e.key) &&
+      !String(price).includes(".") &&
+      !allowedNavKeys.includes(e.key) &&
+      !e.ctrlKey && !e.metaKey
+    ) {
+      e.preventDefault();
+      const limitMsg = "Retail Unit Price cannot exceed 10,000,000. Please enter valid data";
+      setFieldErrors((prev) => ({ ...prev, price: limitMsg }));
+      toast.error(limitMsg, { id: "unit-price-limit" });
+    }
+  };
+
+  const handlePriceChange = (val: string) => {
+    setPrice(val);
+    const err = validateField("price", val);
+    setFieldErrors((prev) => ({ ...prev, price: err }));
+  };
+
+  const handleBlur = (
+    field: "name" | "medStrength" | "sku" | "batchNo" | "stockQty" | "reorderLevel" | "price" | "supplier"
+  ) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    let val: any = "";
+    if (field === "name") val = name;
+    else if (field === "medStrength") val = medStrength;
+    else if (field === "sku") val = sku;
+    else if (field === "batchNo") val = batchNo;
+    else if (field === "stockQty") val = stockQty;
+    else if (field === "reorderLevel") val = reorderLevel;
+    else if (field === "price") val = price;
+    else if (field === "supplier") val = supplier;
+
+    const err = validateField(field, val);
+    setFieldErrors((prev) => ({ ...prev, [field]: err }));
+  };
+
   const handleOpenAdd = () => {
     setSelectedMed(null);
     const initialCategory = "Analgesic";
@@ -117,14 +460,10 @@ export function PharmacyInventoryManagement() {
     setExpiryDate("");
     setPrice(0);
     setSupplier("");
+    setFieldErrors({});
+    setTouched({});
+    setFormError(null);
     setIsAddEditOpen(true);
-  };
-
-  const handleNameChange = (val: string) => {
-    setName(val);
-    if (!selectedMed) {
-      setSku(generateAutoSku(val, category));
-    }
   };
 
   const handleCategoryChange = (val: string) => {
@@ -146,6 +485,9 @@ export function PharmacyInventoryManagement() {
     setPrice(med.price);
     setBatchNo(med.batchNo);
     setSupplier(med.supplier);
+    setFieldErrors({});
+    setTouched({});
+    setFormError(null);
     setIsAddEditOpen(true);
   };
 
@@ -173,21 +515,69 @@ export function PharmacyInventoryManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting || createMutation.isPending || updateMutation.isPending) return;
-    if (!name || !sku || !batchNo) return;
+
+    setTouched({
+      name: true,
+      medStrength: true,
+      sku: true,
+      batchNo: true,
+      stockQty: true,
+      reorderLevel: true,
+      price: true,
+      supplier: true,
+    });
+
+    const nameErr = validateField("name", name);
+    const strengthErr = validateField("medStrength", medStrength);
+    const skuErr = validateField("sku", sku);
+    const batchErr = validateField("batchNo", batchNo);
+    const stockErr = validateField("stockQty", stockQty);
+    const reorderErr = validateField("reorderLevel", reorderLevel);
+    const priceErr = validateField("price", price);
+    const supplierErr = validateField("supplier", supplier);
+
+    const errs = {
+      name: nameErr,
+      medStrength: strengthErr,
+      sku: skuErr,
+      batchNo: batchErr,
+      stockQty: stockErr,
+      reorderLevel: reorderErr,
+      price: priceErr,
+      supplier: supplierErr,
+    };
+    setFieldErrors(errs);
+
+    const firstErr =
+      nameErr ||
+      strengthErr ||
+      stockErr ||
+      reorderErr ||
+      priceErr ||
+      skuErr ||
+      batchErr ||
+      supplierErr;
+
+    if (firstErr) {
+      setFormError(firstErr);
+      toast.error(firstErr, { id: "med-form-error" });
+      return;
+    }
+    setFormError(null);
 
     setIsSubmitting(true);
     const payload = {
-      name,
-      strength: medStrength,
-      sku,
+      name: name.trim(),
+      strength: medStrength.trim(),
+      sku: sku.trim().toUpperCase(),
       category: "medicines" as const,
       description: `${category} | ${expiryDate}`,
       unit: "units",
-      stockQty: Number(stockQty),
-      reorderLevel: Number(reorderLevel),
-      unitCost: Number(price),
-      supplier,
-      storageCondition: batchNo,
+      stockQty: Number(stockQty) || 0,
+      reorderLevel: Number(reorderLevel) || 0,
+      unitCost: Number(price) || 0,
+      supplier: supplier.trim(),
+      storageCondition: batchNo.trim(),
     };
 
     try {
@@ -207,16 +597,21 @@ export function PharmacyInventoryManagement() {
     }
   };
 
-  const filtered = medicines.filter(m => {
+  const filtered = medicines.filter((m) => {
+    const q = search.trim().toLowerCase();
     const matchesSearch =
-      m.name.toLowerCase().includes(search.toLowerCase()) ||
-      m.sku.toLowerCase().includes(search.toLowerCase()) ||
-      m.batchNo.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = filterCategory === "All" || m.category === filterCategory;
+      !q ||
+      m.name.toLowerCase().includes(q) ||
+      m.sku.toLowerCase().includes(q) ||
+      (m.strength && m.strength.toLowerCase().includes(q)) ||
+      m.batchNo.toLowerCase().includes(q) ||
+      m.category.toLowerCase().includes(q) ||
+      (m.supplier && m.supplier.toLowerCase().includes(q));
+    const matchesCategory = filterCategory === "All" || m.category.toLowerCase() === filterCategory.toLowerCase();
     return matchesSearch && matchesCategory;
   });
 
-  if (isLoading) {
+  if (isLoading && !inventoryData) {
     return (
       <div className="flex h-[400px] items-center justify-center">
         <div className="text-slate-500 font-medium">Loading inventory data...</div>
@@ -448,21 +843,31 @@ export function PharmacyInventoryManagement() {
         isOpen={isAddEditOpen}
         onClose={() => setIsAddEditOpen(false)}
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <InputField
               label="Medicine Name"
               required
+              maxLength={100}
+              showCharCount
               placeholder="e.g. Paracetamol"
               value={name}
+              error={fieldErrors.name}
               onChange={(e) => handleNameChange(e.target.value)}
+              onKeyDown={handleNameKeyDown}
+              onBlur={() => handleBlur("name")}
             />
 
             <InputField
               label="Strength / Power"
+              maxLength={50}
+              showCharCount
               placeholder="e.g. 500mg, 100mg, 10ml"
               value={medStrength}
-              onChange={(e) => setMedStrength(e.target.value)}
+              error={fieldErrors.medStrength}
+              onChange={(e) => handleStrengthChange(e.target.value)}
+              onKeyDown={handleStrengthKeyDown}
+              onBlur={() => handleBlur("medStrength")}
             />
 
             <SelectField
@@ -478,7 +883,9 @@ export function PharmacyInventoryManagement() {
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-bold text-slate-700 uppercase">SKU (Auto-Generated)</label>
+                <label className="text-xs font-bold text-slate-700 uppercase">
+                  SKU (Auto-Generated) <span className="text-red-500">*</span>
+                </label>
                 <button
                   type="button"
                   onClick={() => setSku(generateAutoSku(name, category))}
@@ -491,16 +898,29 @@ export function PharmacyInventoryManagement() {
               <input
                 type="text"
                 required
+                maxLength={50}
                 value={sku}
-                onChange={(e) => setSku(e.target.value)}
+                onChange={(e) => {
+                  setSku(e.target.value);
+                  const err = validateField("sku", e.target.value);
+                  setFieldErrors((prev) => ({ ...prev, sku: err }));
+                }}
+                onBlur={() => handleBlur("sku")}
                 placeholder="e.g. ANA-PAR-402"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono font-bold text-slate-800 outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100"
+                className={`w-full rounded-xl border bg-white px-3 py-2 text-xs font-mono font-bold text-slate-800 outline-none transition-colors ${
+                  fieldErrors.sku ? "border-red-500 focus:border-red-600 focus:ring-red-100" : "border-slate-200 focus:border-navy-600 focus:ring-navy-100"
+                } focus:ring-2`}
               />
+              {fieldErrors.sku && (
+                <p className="mt-1 text-xs font-medium text-red-600" role="alert">{fieldErrors.sku}</p>
+              )}
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-bold text-slate-700 uppercase">Batch Number (Auto-Generated)</label>
+                <label className="text-xs font-bold text-slate-700 uppercase">
+                  Batch Number (Auto-Generated) <span className="text-red-500">*</span>
+                </label>
                 <button
                   type="button"
                   onClick={() => setBatchNo(generateAutoBatchNo())}
@@ -513,11 +933,22 @@ export function PharmacyInventoryManagement() {
               <input
                 type="text"
                 required
+                maxLength={50}
                 value={batchNo}
-                onChange={(e) => setBatchNo(e.target.value)}
+                onChange={(e) => {
+                  setBatchNo(e.target.value);
+                  const err = validateField("batchNo", e.target.value);
+                  setFieldErrors((prev) => ({ ...prev, batchNo: err }));
+                }}
+                onBlur={() => handleBlur("batchNo")}
                 placeholder="e.g. B202608-4910"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono font-bold text-slate-800 outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100"
+                className={`w-full rounded-xl border bg-white px-3 py-2 text-xs font-mono font-bold text-slate-800 outline-none transition-colors ${
+                  fieldErrors.batchNo ? "border-red-500 focus:border-red-600 focus:ring-red-100" : "border-slate-200 focus:border-navy-600 focus:ring-navy-100"
+                } focus:ring-2`}
               />
+              {fieldErrors.batchNo && (
+                <p className="mt-1 text-xs font-medium text-red-600" role="alert">{fieldErrors.batchNo}</p>
+              )}
             </div>
 
             <InputField
@@ -525,8 +956,12 @@ export function PharmacyInventoryManagement() {
               type="number"
               required
               min={0}
+              max={1000000}
               value={stockQty}
-              onChange={(e) => setStockQty(Number(e.target.value))}
+              error={fieldErrors.stockQty}
+              onChange={(e) => handleStockQtyChange(e.target.value)}
+              onKeyDown={handleStockQtyKeyDown}
+              onBlur={() => handleBlur("stockQty")}
             />
 
             <InputField
@@ -534,8 +969,12 @@ export function PharmacyInventoryManagement() {
               type="number"
               required
               min={0}
+              max={1000000}
               value={reorderLevel}
-              onChange={(e) => setReorderLevel(Number(e.target.value))}
+              error={fieldErrors.reorderLevel}
+              onChange={(e) => handleReorderLevelChange(e.target.value)}
+              onKeyDown={handleReorderLevelKeyDown}
+              onBlur={() => handleBlur("reorderLevel")}
             />
 
             <InputField
@@ -544,8 +983,12 @@ export function PharmacyInventoryManagement() {
               step="0.01"
               required
               min={0}
+              max={10000000}
               value={price}
-              onChange={(e) => setPrice(Number(e.target.value))}
+              error={fieldErrors.price}
+              onChange={(e) => handlePriceChange(e.target.value)}
+              onKeyDown={handlePriceKeyDown}
+              onBlur={() => handleBlur("price")}
             />
 
             {dbSuppliers.length > 0 ? (
@@ -553,7 +996,13 @@ export function PharmacyInventoryManagement() {
                 label="Supplier"
                 required
                 value={supplier}
-                onChange={(e) => setSupplier(e.target.value)}
+                error={fieldErrors.supplier}
+                onChange={(e) => {
+                  setSupplier(e.target.value);
+                  const err = validateField("supplier", e.target.value);
+                  setFieldErrors((prev) => ({ ...prev, supplier: err }));
+                }}
+                onBlur={() => handleBlur("supplier")}
                 className="sm:col-span-2"
               >
                 <option value="">-- Select Registered Supplier --</option>
@@ -571,12 +1020,25 @@ export function PharmacyInventoryManagement() {
                 label="Supplier"
                 required
                 value={supplier}
-                onChange={(e) => setSupplier(e.target.value)}
+                error={fieldErrors.supplier}
+                onChange={(e) => {
+                  setSupplier(e.target.value);
+                  const err = validateField("supplier", e.target.value);
+                  setFieldErrors((prev) => ({ ...prev, supplier: err }));
+                }}
+                onBlur={() => handleBlur("supplier")}
                 placeholder="e.g. Apollo Pharmacy Distributors"
                 className="sm:col-span-2"
               />
             )}
           </div>
+
+          {formError && (
+            <div className="rounded-lg bg-red-50 border border-red-200 p-2.5 text-xs font-semibold text-red-700 flex items-center gap-2 animate-in fade-in duration-150">
+              <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+              <span>{formError}</span>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
             <Button type="button" variant="secondary" onClick={() => setIsAddEditOpen(false)}>

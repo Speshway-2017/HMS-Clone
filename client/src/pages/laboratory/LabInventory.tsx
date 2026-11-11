@@ -24,6 +24,168 @@ interface LabInventoryItem {
   storageTemp: string;
 }
 
+const validateField = (field: string, value: any): string | null => {
+  const rawVal = typeof value === "string" ? value : value !== undefined && value !== null ? String(value) : "";
+  const trimmed = rawVal.trim();
+
+  if (field === "name") {
+    if (!trimmed) {
+      return "Please fill out this field";
+    }
+    if (rawVal.length > 100) {
+      return "Item Name cannot exceed 100 characters. Characters limit: 100. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
+    }
+    if (trimmed.length < 2) {
+      return "Item Name must be at least 2 characters. Please enter valid data";
+    }
+    if (
+      !/^[a-zA-Z0-9\s\.\-/'&,()%+]+$/.test(trimmed) ||
+      !/[a-zA-Z0-9]/.test(trimmed) ||
+      /<[^>]*>|javascript:/i.test(trimmed)
+    ) {
+      return "Item Name contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    return null;
+  }
+
+  if (field === "sku") {
+    if (!trimmed) {
+      return "Please fill out this field";
+    }
+    if (rawVal.length > 50) {
+      return "SKU Code cannot exceed 50 characters. Characters limit: 50. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
+    }
+    if (trimmed.length < 2) {
+      return "SKU Code must be at least 2 characters. Please enter valid data";
+    }
+    if (
+      !/^[a-zA-Z0-9\-_./]+$/.test(trimmed) ||
+      !/[a-zA-Z0-9]/.test(trimmed) ||
+      /<[^>]*>|javascript:/i.test(trimmed)
+    ) {
+      return "SKU Code contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    return null;
+  }
+
+  if (field === "quantity") {
+    if (rawVal === "" || !trimmed) {
+      return "Please fill out this field";
+    }
+    if (!/^-?\d+(\.\d+)?$/.test(trimmed)) {
+      return "Quantity contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    if (trimmed.includes(".")) {
+      return "Quantity must be a whole number. Please enter valid data";
+    }
+    const num = Number(trimmed);
+    if (isNaN(num)) {
+      return "Quantity contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    if (num < 0) {
+      return "Quantity cannot be negative. Please enter valid data";
+    }
+    if (num > 1000000 || trimmed.length > 7) {
+      return "Quantity cannot exceed 1,000,000. Characters limit: 7. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
+    }
+    return null;
+  }
+
+  if (field === "unit") {
+    if (!trimmed) {
+      return "Please fill out this field";
+    }
+    if (rawVal.length > 50) {
+      return "Unit Label cannot exceed 50 characters. Characters limit: 50. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
+    }
+    if (trimmed.length < 2) {
+      return "Unit Label must be at least 2 characters. Please enter valid data";
+    }
+    if (
+      !/^[a-zA-Z0-9\s\.\-/()]+$/.test(trimmed) ||
+      !/[a-zA-Z0-9]/.test(trimmed) ||
+      /<[^>]*>|javascript:/i.test(trimmed)
+    ) {
+      return "Unit Label contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    return null;
+  }
+
+  if (field === "expiryDate") {
+    if (!trimmed) {
+      return "Please fill out this field";
+    }
+    if (rawVal.length > 10) {
+      return "Expiry Date cannot exceed 10 characters. Too long text is not accepted. Too long data is not accepted. Please enter valid data";
+    }
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(trimmed) || isNaN(Date.parse(trimmed))) {
+      return "Expiry Date contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    const year = parseInt(trimmed.slice(0, 4), 10);
+    if (year < 2000 || year > 2100) {
+      return "Expiry Date contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    return null;
+  }
+
+  if (field === "reorderLevel") {
+    if (rawVal === "" || !trimmed) {
+      return "Please fill out this field";
+    }
+    if (!/^-?\d+(\.\d+)?$/.test(trimmed)) {
+      return "Reorder Threshold contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    if (trimmed.includes(".")) {
+      return "Reorder Threshold must be a whole number. Please enter valid data";
+    }
+    const num = Number(trimmed);
+    if (isNaN(num)) {
+      return "Reorder Threshold contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    if (num < 0) {
+      return "Reorder Threshold cannot be negative. Please enter valid data";
+    }
+    if (num > 1000000 || trimmed.length > 7) {
+      return "Reorder Threshold cannot exceed 1,000,000. Characters limit: 7. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
+    }
+    return null;
+  }
+
+  if (field === "batchNo") {
+    if (!trimmed) {
+      return "Please fill out this field";
+    }
+    if (rawVal.length > 50) {
+      return "Batch Number cannot exceed 50 characters. Characters limit: 50. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
+    }
+    if (trimmed.length < 2) {
+      return "Batch Number must be at least 2 characters. Please enter valid data";
+    }
+    if (
+      !/^[a-zA-Z0-9\-_./]+$/.test(trimmed) ||
+      !/[a-zA-Z0-9]/.test(trimmed) ||
+      /<[^>]*>|javascript:/i.test(trimmed)
+    ) {
+      return "Batch Number contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    return null;
+  }
+
+  if (field === "search") {
+    if (!trimmed) return null;
+    if (rawVal.length > 100) {
+      return "Search cannot exceed 100 characters. Characters limit: 100. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
+    }
+    if (/<[^>]*>|javascript:/i.test(trimmed) || !/^[a-zA-Z0-9\s.,\-_/()#]+$/.test(trimmed)) {
+      return "Search contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data";
+    }
+    return null;
+  }
+
+  return null;
+};
+
 export function LaboratoryInventory() {
   const [inventory, setInventory] = useState<LabInventoryItem[]>([]);
   const [search, setSearch] = useState("");
@@ -37,10 +199,11 @@ export function LaboratoryInventory() {
   const [name, setName] = useState("");
   const [category, setCategory] = useState<"Reagent" | "Consumable">("Reagent");
   const [sku, setSku] = useState("");
-  const [quantity, setQuantity] = useState(0);
+  const [quantity, setQuantity] = useState<string | number>(0);
   const [unit, setUnit] = useState("vials");
   const [expiryDate, setExpiryDate] = useState("");
-  const [reorderLevel, setReorderLevel] = useState(10);
+  const [reorderLevel, setReorderLevel] = useState<string | number>(10);
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [batchNo, setBatchNo] = useState("");
   const [storageTemp, setStorageTemp] = useState("2 - 8°C");
 
@@ -78,6 +241,7 @@ export function LaboratoryInventory() {
     setReorderLevel(10);
     setBatchNo("");
     setStorageTemp("2 - 8°C");
+    setErrors({});
     setIsAddEditOpen(true);
   };
 
@@ -92,7 +256,232 @@ export function LaboratoryInventory() {
     setReorderLevel(item.reorderLevel);
     setBatchNo(item.batchNo);
     setStorageTemp(item.storageTemp);
+    setErrors({});
     setIsAddEditOpen(true);
+  };
+
+  const handleNameChange = (val: string) => {
+    setName(val);
+    const err = validateField("name", val);
+    setErrors(prev => ({ ...prev, name: err }));
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const isNavigationKey = [
+      "Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+      "Tab", "Enter", "Escape", "Home", "End"
+    ].includes(e.key);
+    if (e.ctrlKey || e.altKey || e.metaKey || isNavigationKey) return;
+    if (name.length >= 100) {
+      const inputEl = e.currentTarget;
+      const hasSelection = (inputEl.selectionEnd ?? 0) - (inputEl.selectionStart ?? 0) > 0;
+      if (!hasSelection) {
+        e.preventDefault();
+        const msg = "Item Name cannot exceed 100 characters. Characters limit: 100. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
+        setErrors(prev => ({ ...prev, name: msg }));
+        toast.error(msg, { id: "item-name-limit" });
+      }
+    }
+  };
+
+  const handleSkuChange = (val: string) => {
+    setSku(val);
+    const err = validateField("sku", val);
+    setErrors(prev => ({ ...prev, sku: err }));
+  };
+
+  const handleSkuKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const isNavigationKey = [
+      "Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+      "Tab", "Enter", "Escape", "Home", "End"
+    ].includes(e.key);
+    if (e.ctrlKey || e.altKey || e.metaKey || isNavigationKey) return;
+    if (sku.length >= 50) {
+      const inputEl = e.currentTarget;
+      const hasSelection = (inputEl.selectionEnd ?? 0) - (inputEl.selectionStart ?? 0) > 0;
+      if (!hasSelection) {
+        e.preventDefault();
+        const msg = "SKU Code cannot exceed 50 characters. Characters limit: 50. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
+        setErrors(prev => ({ ...prev, sku: msg }));
+        toast.error(msg, { id: "sku-limit" });
+      }
+    }
+  };
+
+  const handleQuantityChange = (val: string) => {
+    setQuantity(val);
+    const err = validateField("quantity", val);
+    setErrors(prev => ({ ...prev, quantity: err }));
+  };
+
+  const handleQuantityKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (["-", "e", "E", "+", "."].includes(e.key)) {
+      e.preventDefault();
+      const msg = e.key === "."
+        ? "Quantity must be a whole number. Please enter valid data"
+        : "Quantity cannot be negative. Please enter valid data";
+      setErrors(prev => ({ ...prev, quantity: msg }));
+      toast.error(msg, { id: "qty-invalid" });
+      return;
+    }
+    const isNavigationKey = [
+      "Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+      "Tab", "Enter", "Escape", "Home", "End"
+    ].includes(e.key);
+    if (e.ctrlKey || e.altKey || e.metaKey || isNavigationKey) return;
+    if (String(quantity).length >= 7 && /^[0-9]$/.test(e.key)) {
+      const inputEl = e.currentTarget;
+      const hasSelection = (inputEl.selectionEnd ?? 0) - (inputEl.selectionStart ?? 0) > 0;
+      if (!hasSelection) {
+        e.preventDefault();
+        const msg = "Quantity cannot exceed 1,000,000. Characters limit: 7. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
+        setErrors(prev => ({ ...prev, quantity: msg }));
+        toast.error(msg, { id: "qty-limit" });
+      }
+    }
+  };
+
+  const handleUnitChange = (val: string) => {
+    setUnit(val);
+    const err = validateField("unit", val);
+    setErrors(prev => ({ ...prev, unit: err }));
+  };
+
+  const handleUnitKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const isNavigationKey = [
+      "Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+      "Tab", "Enter", "Escape", "Home", "End"
+    ].includes(e.key);
+    if (e.ctrlKey || e.altKey || e.metaKey || isNavigationKey) return;
+    if (unit.length >= 50) {
+      const inputEl = e.currentTarget;
+      const hasSelection = (inputEl.selectionEnd ?? 0) - (inputEl.selectionStart ?? 0) > 0;
+      if (!hasSelection) {
+        e.preventDefault();
+        const msg = "Unit Label cannot exceed 50 characters. Characters limit: 50. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
+        setErrors(prev => ({ ...prev, unit: msg }));
+        toast.error(msg, { id: "unit-limit" });
+      }
+    }
+  };
+
+  const handleExpiryDateChange = (val: string) => {
+    setExpiryDate(val);
+    const err = validateField("expiryDate", val);
+    setErrors(prev => ({ ...prev, expiryDate: err }));
+  };
+
+  const handleExpiryDateKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const isNavigationKey = [
+      "Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+      "Tab", "Enter", "Escape", "Home", "End"
+    ].includes(e.key);
+    if (e.ctrlKey || e.altKey || e.metaKey || isNavigationKey) return;
+    if (expiryDate.length >= 10) {
+      const inputEl = e.currentTarget;
+      const hasSelection = (inputEl.selectionEnd ?? 0) - (inputEl.selectionStart ?? 0) > 0;
+      if (!hasSelection) {
+        e.preventDefault();
+        const msg = "Expiry Date cannot exceed 10 characters. Too long text is not accepted. Too long data is not accepted. Please enter valid data";
+        setErrors(prev => ({ ...prev, expiryDate: msg }));
+        toast.error(msg, { id: "expiry-limit" });
+      }
+    }
+  };
+
+  const handleReorderLevelChange = (val: string) => {
+    setReorderLevel(val);
+    const err = validateField("reorderLevel", val);
+    setErrors(prev => ({ ...prev, reorderLevel: err }));
+  };
+
+  const handleReorderLevelKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (["-", "e", "E", "+", "."].includes(e.key)) {
+      e.preventDefault();
+      const msg = e.key === "."
+        ? "Reorder Threshold must be a whole number. Please enter valid data"
+        : "Reorder Threshold cannot be negative. Please enter valid data";
+      setErrors(prev => ({ ...prev, reorderLevel: msg }));
+      toast.error(msg, { id: "reorder-invalid" });
+      return;
+    }
+    const isNavigationKey = [
+      "Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+      "Tab", "Enter", "Escape", "Home", "End"
+    ].includes(e.key);
+    if (e.ctrlKey || e.altKey || e.metaKey || isNavigationKey) return;
+    if (String(reorderLevel).length >= 7 && /^[0-9]$/.test(e.key)) {
+      const inputEl = e.currentTarget;
+      const hasSelection = (inputEl.selectionEnd ?? 0) - (inputEl.selectionStart ?? 0) > 0;
+      if (!hasSelection) {
+        e.preventDefault();
+        const msg = "Reorder Threshold cannot exceed 1,000,000. Characters limit: 7. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
+        setErrors(prev => ({ ...prev, reorderLevel: msg }));
+        toast.error(msg, { id: "reorder-limit" });
+      }
+    }
+  };
+
+  const handleBatchNoChange = (val: string) => {
+    setBatchNo(val);
+    const err = validateField("batchNo", val);
+    setErrors(prev => ({ ...prev, batchNo: err }));
+  };
+
+  const handleBatchNoKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const isNavigationKey = [
+      "Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+      "Tab", "Enter", "Escape", "Home", "End"
+    ].includes(e.key);
+    if (e.ctrlKey || e.altKey || e.metaKey || isNavigationKey) return;
+    if (batchNo.length >= 50) {
+      const inputEl = e.currentTarget;
+      const hasSelection = (inputEl.selectionEnd ?? 0) - (inputEl.selectionStart ?? 0) > 0;
+      if (!hasSelection) {
+        e.preventDefault();
+        const msg = "Batch Number cannot exceed 50 characters. Characters limit: 50. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
+        setErrors(prev => ({ ...prev, batchNo: msg }));
+        toast.error(msg, { id: "batch-limit" });
+      }
+    }
+  };
+
+  const handleBlur = (field: string) => {
+    let val: any;
+    if (field === "name") val = name;
+    else if (field === "sku") val = sku;
+    else if (field === "quantity") val = quantity;
+    else if (field === "unit") val = unit;
+    else if (field === "expiryDate") val = expiryDate;
+    else if (field === "reorderLevel") val = reorderLevel;
+    else if (field === "batchNo") val = batchNo;
+    else if (field === "search") val = search;
+    const err = validateField(field, val);
+    setErrors(prev => ({ ...prev, [field]: err }));
+  };
+
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    const err = validateField("search", val);
+    setErrors(prev => ({ ...prev, search: err }));
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const isNavigationKey = [
+      "Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+      "Tab", "Enter", "Escape", "Home", "End"
+    ].includes(e.key);
+    if (e.ctrlKey || e.altKey || e.metaKey || isNavigationKey) return;
+    if (search.length >= 100) {
+      const inputEl = e.currentTarget;
+      const hasSelection = (inputEl.selectionEnd ?? 0) - (inputEl.selectionStart ?? 0) > 0;
+      if (!hasSelection) {
+        e.preventDefault();
+        const msg = "Search cannot exceed 100 characters. Characters limit: 100. Too long text is not accepted. Too long data is not accepted. It should not accept too long data and characters limit should be mentioned. Please enter valid data";
+        setErrors(prev => ({ ...prev, search: msg }));
+        toast.error(msg, { id: "search-limit" });
+      }
+    }
   };
 
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
@@ -111,42 +500,70 @@ export function LaboratoryInventory() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !sku || !batchNo) return;
+
+    const nameErr = validateField("name", name);
+    const skuErr = validateField("sku", sku);
+    const qtyErr = validateField("quantity", quantity);
+    const unitErr = validateField("unit", unit);
+    const expErr = validateField("expiryDate", expiryDate);
+    const reorderErr = validateField("reorderLevel", reorderLevel);
+    const batchErr = validateField("batchNo", batchNo);
+
+    const newErrors = {
+      name: nameErr,
+      sku: skuErr,
+      quantity: qtyErr,
+      unit: unitErr,
+      expiryDate: expErr,
+      reorderLevel: reorderErr,
+      batchNo: batchErr,
+    };
+
+    setErrors(prev => ({ ...prev, ...newErrors }));
+
+    const firstErr = nameErr || skuErr || qtyErr || unitErr || expErr || reorderErr || batchErr;
+    if (firstErr) {
+      toast.error(firstErr);
+      return;
+    }
 
     if (selectedItem) {
       const updated = inventory.map(i => 
         i._id === selectedItem._id 
           ? { 
               ...i, 
-              name, 
+              name: typeof name === "string" ? name.trim() : name, 
               category, 
-              sku, 
+              sku: typeof sku === "string" ? sku.trim() : sku, 
               quantity: Number(quantity), 
-              unit, 
-              expiryDate, 
+              unit: typeof unit === "string" ? unit.trim() : unit, 
+              expiryDate: typeof expiryDate === "string" ? expiryDate.trim() : expiryDate, 
               reorderLevel: Number(reorderLevel), 
-              batchNo, 
+              batchNo: typeof batchNo === "string" ? batchNo.trim() : batchNo, 
               storageTemp 
             } 
           : i
       );
       saveInventory(updated);
+      toast.success("Lab inventory item updated successfully!");
     } else {
       const newItem: LabInventoryItem = {
         _id: `LAB-INV-${Math.floor(100 + Math.random() * 900)}`,
-        name,
+        name: typeof name === "string" ? name.trim() : name,
         category,
-        sku,
+        sku: typeof sku === "string" ? sku.trim() : sku,
         quantity: Number(quantity),
-        unit,
-        expiryDate,
+        unit: typeof unit === "string" ? unit.trim() : unit,
+        expiryDate: typeof expiryDate === "string" ? expiryDate.trim() : expiryDate,
         reorderLevel: Number(reorderLevel),
-        batchNo,
+        batchNo: typeof batchNo === "string" ? batchNo.trim() : batchNo,
         storageTemp
       };
       saveInventory([...inventory, newItem]);
+      toast.success("Lab inventory item added successfully!");
     }
     setIsAddEditOpen(false);
+    setErrors({});
   };
 
   const filtered = inventory.filter(i => {
@@ -277,10 +694,18 @@ export function LaboratoryInventory() {
           <input
             type="text"
             placeholder="Search analyte, SKU, batch..."
+            maxLength={100}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-slate-350 bg-slate-50 pl-9 pr-4 py-2 text-xs outline-none focus:border-blue-500 focus:bg-white"
+            onChange={(e) => handleSearchChange(e.target.value)}
+            onBlur={() => handleBlur("search")}
+            onKeyDown={handleSearchKeyDown}
+            className={`w-full rounded-lg border ${errors.search ? "border-red-500 text-red-900" : "border-slate-350"} bg-slate-50 pl-9 pr-4 py-2 text-xs outline-none focus:border-blue-500 focus:bg-white`}
           />
+          {errors.search && (
+            <p className="mt-1 text-[11px] font-medium text-red-600" role="alert">
+              {errors.search}
+            </p>
+          )}
         </div>
       </div>
 
@@ -380,9 +805,16 @@ export function LaboratoryInventory() {
             <InputField
               label="Item Name"
               required
+              maxLength={100}
+              showCharCount
+              charCount={typeof name === "string" ? name.length : 0}
+              maxCharCount={100}
+              error={errors.name}
               placeholder="e.g. Lipid Panel Kit"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => handleNameChange(e.target.value)}
+              onBlur={() => handleBlur("name")}
+              onKeyDown={handleNameKeyDown}
             />
 
             <SelectField
@@ -400,25 +832,44 @@ export function LaboratoryInventory() {
             <InputField
               label="SKU Code"
               required
+              maxLength={50}
+              showCharCount
+              charCount={typeof sku === "string" ? sku.length : 0}
+              maxCharCount={50}
+              error={errors.sku}
               placeholder="e.g. RE-LPD-03"
               value={sku}
-              onChange={(e) => setSku(e.target.value)}
+              onChange={(e) => handleSkuChange(e.target.value)}
+              onBlur={() => handleBlur("sku")}
+              onKeyDown={handleSkuKeyDown}
             />
 
             <InputField
               label="Quantity"
               required
               type="number"
+              min={0}
+              max={1000000}
+              error={errors.quantity}
               value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
+              onChange={(e) => handleQuantityChange(e.target.value)}
+              onBlur={() => handleBlur("quantity")}
+              onKeyDown={handleQuantityKeyDown}
             />
 
             <InputField
               label="Unit Label"
               required
+              maxLength={50}
+              showCharCount
+              charCount={typeof unit === "string" ? unit.length : 0}
+              maxCharCount={50}
+              error={errors.unit}
               placeholder="e.g. kits, vials"
               value={unit}
-              onChange={(e) => setUnit(e.target.value)}
+              onChange={(e) => handleUnitChange(e.target.value)}
+              onBlur={() => handleBlur("unit")}
+              onKeyDown={handleUnitKeyDown}
             />
           </div>
 
@@ -427,24 +878,39 @@ export function LaboratoryInventory() {
               label="Expiry Date"
               required
               type="date"
+              error={errors.expiryDate}
               value={expiryDate}
-              onChange={(e) => setExpiryDate(e.target.value)}
+              onChange={(e) => handleExpiryDateChange(e.target.value)}
+              onBlur={() => handleBlur("expiryDate")}
+              onKeyDown={handleExpiryDateKeyDown}
             />
 
             <InputField
               label="Reorder Threshold"
               required
               type="number"
+              min={0}
+              max={1000000}
+              error={errors.reorderLevel}
               value={reorderLevel}
-              onChange={(e) => setReorderLevel(Number(e.target.value))}
+              onChange={(e) => handleReorderLevelChange(e.target.value)}
+              onBlur={() => handleBlur("reorderLevel")}
+              onKeyDown={handleReorderLevelKeyDown}
             />
 
             <InputField
               label="Batch Number"
               required
+              maxLength={50}
+              showCharCount
+              charCount={typeof batchNo === "string" ? batchNo.length : 0}
+              maxCharCount={50}
+              error={errors.batchNo}
               placeholder="e.g. B-LP102"
               value={batchNo}
-              onChange={(e) => setBatchNo(e.target.value)}
+              onChange={(e) => handleBatchNoChange(e.target.value)}
+              onBlur={() => handleBlur("batchNo")}
+              onKeyDown={handleBatchNoKeyDown}
             />
           </div>
 

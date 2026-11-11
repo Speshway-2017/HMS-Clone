@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { UserPlus, UserCheck, UserX, Clock, CalendarOff, Star, Pencil, Trash2, Eye, Search, Filter, CalendarCheck, CalendarRange, FileSpreadsheet } from "lucide-react";
+import { UserPlus, UserCheck, Users, Star, Pencil, Trash2, Eye, Search, Filter } from "lucide-react";
 import { useStaffList, useTopStaff, useDeleteStaff } from "../../features/staff";
 import { useBranchContext } from "../../context/BranchContext";
 import { AllBranchesNoticeBanner } from "../../components/common/AllBranchesNoticeBanner";
@@ -159,27 +159,12 @@ export function StaffPage() {
       {/* Page Header with Action Buttons */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-4 border-slate-200">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Staff Management & HR Operations</h1>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Staff Management</h1>
           <p className="text-xs font-semibold text-slate-500 mt-1">
-            Real-time attendance monitoring, staff rosters, shift scheduling, and employee registry.
+            Employee registry, staff directory, and departmental team records.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Link to="/admin/staff/attendance">
-            <Button variant="secondary" size="sm" className="gap-1.5 font-bold">
-              <CalendarCheck className="h-4 w-4 text-emerald-600" /> Attendance Log
-            </Button>
-          </Link>
-          <Link to="/admin/staff/shifts">
-            <Button variant="secondary" size="sm" className="gap-1.5 font-bold">
-              <CalendarRange className="h-4 w-4 text-indigo-600" /> Shift Rosters
-            </Button>
-          </Link>
-          <Link to="/admin/staff/leaves">
-            <Button variant="secondary" size="sm" className="gap-1.5 font-bold">
-              <FileSpreadsheet className="h-4 w-4 text-amber-600" /> Leave Requests
-            </Button>
-          </Link>
           {!isAllBranches ? (
             <Link to="/admin/staff/new">
               <Button variant="primary" size="sm" className="gap-1.5 font-extrabold shadow">
@@ -195,11 +180,23 @@ export function StaffPage() {
       </div>
 
       {/* KPI Overview Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Present On Duty" value={data?.counts.present ?? 0} icon={<UserCheck className="h-5 w-5 text-emerald-600" />} emphasis />
-        <KpiCard label="Late Check-ins" value={data?.counts.late ?? 0} icon={<Clock className="h-5 w-5 text-amber-600" />} />
-        <KpiCard label="Off Duty / Shift Off" value={data?.counts.absent ?? 0} icon={<UserX className="h-5 w-5 text-slate-500" />} />
-        <KpiCard label="Approved Leave" value={data?.counts.onLeave ?? 0} icon={<CalendarOff className="h-5 w-5 text-rose-600" />} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <KpiCard
+          label="Total Registered Staff"
+          value={data?.pagination?.total || (data?.data ? data.data.length : 0)}
+          icon={<Users className="h-5 w-5 text-navy-600" />}
+          emphasis
+        />
+        <KpiCard
+          label="Active Personnel"
+          value={data?.counts?.present ?? (data?.data ? data.data.length : 0)}
+          icon={<UserCheck className="h-5 w-5 text-emerald-600" />}
+        />
+        <KpiCard
+          label="Top Performing Staff"
+          value={topStaff?.length ?? 0}
+          icon={<Star className="h-5 w-5 text-amber-500" />}
+        />
       </div>
 
       {/* Top Performers Section */}

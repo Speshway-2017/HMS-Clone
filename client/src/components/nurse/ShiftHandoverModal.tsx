@@ -36,6 +36,22 @@ const QUICK_HANDOVER_NOTES = [
   "Critical observation"
 ];
 
+// ----------------- Validation Functions for Shift Handover -----------------
+const validateRemarks = (val: string): string | null => {
+  const trimmed = (val || "").trim();
+  if (!trimmed) return null; // optional field
+  if (val.length > 500) {
+    return "Handoff Remarks cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. It should not accept too long data. Please enter valid data";
+  }
+  if (trimmed.length < 2) {
+    return "Handoff Remarks must be at least 2 characters. Too short text is not accepted. It should not accept invalid data. Please enter valid data";
+  }
+  if (/<[^>]*>|javascript:/i.test(trimmed) || !/[a-zA-Z0-9]/.test(trimmed) || !/^[a-zA-Z0-9\s\.\-/'&,()%+!\n\r#@]+$/.test(trimmed)) {
+    return "Handoff Remarks contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data";
+  }
+  return null;
+};
+
 export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({ isOpen, onClose }) => {
   const { data: inpatients = [] } = useNurseInpatients();
   const { data: currentNurse } = useStaffProfileMe();
@@ -46,6 +62,18 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({ isOpen, 
   const [currentShift, setCurrentShift] = useState("Morning");
   const [nextShift, setNextShift] = useState("Evening");
   const [remarks, setRemarks] = useState("");
+  const [remarksError, setRemarksError] = useState<string | null>(null);
+
+  const handleRemarksKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (["Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Tab", "Enter"].includes(e.key)) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const textarea = e.currentTarget;
+    const selLength = (textarea.selectionEnd ?? 0) - (textarea.selectionStart ?? 0);
+    if (textarea.value.length >= 500 && selLength === 0) {
+      e.preventDefault();
+      toast.error("Handoff Remarks cannot exceed 500 characters. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted.");
+    }
+  };
   const [selectedNoteChips, setSelectedNoteChips] = useState<string[]>([]);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [handoverItemsState, setHandoverItemsState] = useState<Record<string, boolean>>({});
@@ -361,16 +389,38 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({ isOpen, 
 
           {/* Shift Handover Remarks Text Area */}
           <div className="space-y-1">
-            <label className="text-xs font-extrabold text-slate-700 uppercase tracking-wider block font-sans">
-              Additional Handover Notes & Instructions
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-extrabold text-slate-700 uppercase tracking-wider block font-sans">
+                Additional Handover Notes & Instructions
+              </label>
+              <span className={`text-[10px] font-mono ${remarks.length > 500 ? "text-red-600 font-bold" : "text-slate-400"}`}>
+                {remarks.length}/500
+              </span>
+            </div>
             <textarea
               rows={3}
+              maxLength={500}
               value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
+              onKeyDown={handleRemarksKeyDown}
+              onChange={(e) => {
+                setRemarks(e.target.value);
+                if (remarksError) setRemarksError(validateRemarks(e.target.value));
+              }}
+              onBlur={() => {
+                if (remarks.trim()) setRemarksError(validateRemarks(remarks));
+              }}
               placeholder="Enter special bedside observations, pending lab results, or outgoing instructions for incoming shift..."
-              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:border-navy-600 focus:bg-white transition-all font-sans"
+              className={`w-full text-xs border rounded-xl p-3 outline-none transition-all font-sans ${
+                remarksError
+                  ? "border-rose-400 bg-rose-50/20 focus:border-rose-500"
+                  : "bg-slate-50 border-slate-200 focus:border-navy-600 focus:bg-white"
+              }`}
             />
+            {remarksError && (
+              <p className="text-xs font-medium text-rose-500 mt-1" role="alert">
+                {remarksError}
+              </p>
+            )}
           </div>
 
           {/* Mandatory Verification Confirmation Checkbox */}

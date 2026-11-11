@@ -17,6 +17,47 @@ const getDownloadUrl = (url: string) => {
   return url;
 };
 
+const validateObservations = (val: string): string | null => {
+  const raw = val || "";
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return "Observations / Findings is required. Field is required. Please fill out this field";
+  }
+  if (raw.length > 500) {
+    return "Observations / Findings cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+  }
+  if (trimmed.length < 2) {
+    return "Observations / Findings must be at least 2 characters. Please enter valid data";
+  }
+  if (
+    /<[^>]*>|javascript:/i.test(trimmed) ||
+    !/[a-zA-Z0-9]/.test(trimmed) ||
+    !/^[a-zA-Z0-9\s.,?!'\-_/()&%#@+:;\n\r"]+$/.test(trimmed)
+  ) {
+    return "Observations / Findings contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data";
+  }
+  return null;
+};
+
+const validateRemarks = (val: string): string | null => {
+  const raw = val || "";
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (raw.length > 500) {
+    return "Technical Remarks / Recommendations cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+  }
+  if (
+    /<[^>]*>|javascript:/i.test(trimmed) ||
+    !/[a-zA-Z0-9]/.test(trimmed) ||
+    !/^[a-zA-Z0-9\s.,?!'\-_/()&%#@+:;\n\r"]+$/.test(trimmed)
+  ) {
+    return "Technical Remarks / Recommendations contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. It should not accept invalid data. Please enter valid data";
+  }
+  return null;
+};
+
 export function LaboratoryCompletedReports() {
   const { data: reports = [], isLoading, refetch } = useCompletedReports();
   const editReportMutation = useEditReport();
@@ -30,12 +71,16 @@ export function LaboratoryCompletedReports() {
   const [editRemarks, setEditRemarks] = useState("");
   const [editFile, setEditFile] = useState<File | null>(null);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [editErrors, setEditErrors] = useState<{ observations?: string | null; remarks?: string | null }>({});
 
+  // By default (no search term), all data is displayed immediately
   const filteredReports = reports.filter(r => {
+    if (!search || !search.trim()) return true;
     const ptName = r.patient?.name || "";
     const uhid = r.patient?.uhid || "";
     const docName = r.doctor?.name || "";
-    const reqId = r.requestId || r._id || "";
+    const reqId = String(r.requestId || r._id || "");
     const test = r.testName || "";
     const q = search.toLowerCase().trim();
 
@@ -53,11 +98,109 @@ export function LaboratoryCompletedReports() {
     setEditObservations(rep.observations || "");
     setEditRemarks(rep.remarks || "");
     setEditFile(null);
+    setEditErrors({});
+  };
+
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    const trimmed = val.trim();
+    if (val.length > 100) {
+      setSearchError("Search cannot exceed 100 characters. Characters limit: 100. Too long text is not accepted. Too long data is not accepted. Please enter valid data");
+    } else if (trimmed && (/<[^>]*>|javascript:/i.test(trimmed) || !/^[a-zA-Z0-9\s.,\-_/()#]+$/.test(trimmed))) {
+      setSearchError("Search contains invalid data. Invalid data not accepted. Invalid data is not accepted. It should not accept invalid data. Please enter valid data");
+    } else {
+      setSearchError(null);
+    }
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const isNavigationKey = [
+      "Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+      "Tab", "Enter", "Escape", "Home", "End"
+    ].includes(e.key);
+    if (e.ctrlKey || e.altKey || e.metaKey || isNavigationKey) return;
+    if (search.length >= 100) {
+      const inputEl = e.currentTarget;
+      const hasSelection = (inputEl.selectionEnd ?? 0) - (inputEl.selectionStart ?? 0) > 0;
+      if (!hasSelection) {
+        e.preventDefault();
+        const msg = "Search cannot exceed 100 characters. Characters limit: 100. Too long text is not accepted. Too long data is not accepted. Please enter valid data";
+        setSearchError(msg);
+        toast.error(msg, { id: "search-limit" });
+      }
+    }
+  };
+
+  const handleEditObservationsChange = (val: string) => {
+    setEditObservations(val);
+    const err = validateObservations(val);
+    setEditErrors(prev => ({ ...prev, observations: err }));
+  };
+
+  const handleEditObservationsBlur = () => {
+    const err = validateObservations(editObservations);
+    setEditErrors(prev => ({ ...prev, observations: err }));
+  };
+
+  const handleEditObservationsKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const isNavigationKey = [
+      "Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+      "Tab", "Enter", "Escape", "Home", "End"
+    ].includes(e.key);
+    if (e.ctrlKey || e.altKey || e.metaKey || isNavigationKey) return;
+    if (editObservations.length >= 500) {
+      const inputEl = e.currentTarget;
+      const hasSelection = (inputEl.selectionEnd ?? 0) - (inputEl.selectionStart ?? 0) > 0;
+      if (!hasSelection) {
+        e.preventDefault();
+        const msg = "Observations / Findings cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+        setEditErrors(prev => ({ ...prev, observations: msg }));
+        toast.error(msg, { id: "edit-obs-limit" });
+      }
+    }
+  };
+
+  const handleEditRemarksChange = (val: string) => {
+    setEditRemarks(val);
+    const err = validateRemarks(val);
+    setEditErrors(prev => ({ ...prev, remarks: err }));
+  };
+
+  const handleEditRemarksBlur = () => {
+    const err = validateRemarks(editRemarks);
+    setEditErrors(prev => ({ ...prev, remarks: err }));
+  };
+
+  const handleEditRemarksKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const isNavigationKey = [
+      "Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+      "Tab", "Enter", "Escape", "Home", "End"
+    ].includes(e.key);
+    if (e.ctrlKey || e.altKey || e.metaKey || isNavigationKey) return;
+    if (editRemarks.length >= 500) {
+      const inputEl = e.currentTarget;
+      const hasSelection = (inputEl.selectionEnd ?? 0) - (inputEl.selectionStart ?? 0) > 0;
+      if (!hasSelection) {
+        e.preventDefault();
+        const msg = "Technical Remarks / Recommendations cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+        setEditErrors(prev => ({ ...prev, remarks: msg }));
+        toast.error(msg, { id: "edit-rem-limit" });
+      }
+    }
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingReport) return;
+
+    const obsErr = validateObservations(editObservations);
+    const remErr = validateRemarks(editRemarks);
+
+    if (obsErr || remErr) {
+      setEditErrors({ observations: obsErr, remarks: remErr });
+      toast.error((obsErr || remErr)!);
+      return;
+    }
 
     const formData = new FormData();
     formData.append("observations", editObservations);
@@ -111,10 +254,17 @@ export function LaboratoryCompletedReports() {
           <input
             type="text"
             placeholder="Search patient name, UHID, doctor, test name, or request ID..."
+            maxLength={100}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 bg-slate-50 pl-9 pr-4 py-2 text-xs outline-none focus:border-navy-500 focus:bg-white"
+            onChange={(e) => handleSearchChange(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            className={`w-full rounded-lg border ${searchError ? "border-red-500 text-red-900" : "border-slate-300"} bg-slate-50 pl-9 pr-4 py-2 text-xs outline-none focus:border-navy-500 focus:bg-white`}
           />
+          {searchError && (
+            <p className="mt-1 text-[11px] font-medium text-red-600" role="alert">
+              {searchError}
+            </p>
+          )}
         </div>
       </div>
 
@@ -366,16 +516,30 @@ export function LaboratoryCompletedReports() {
                 <TextareaField
                   label="Update Observations & Findings"
                   required
+                  maxLength={500}
+                  showCharCount
+                  charCount={editObservations.length}
+                  maxCharCount={500}
+                  error={editErrors.observations}
                   rows={3}
                   value={editObservations}
-                  onChange={(e) => setEditObservations(e.target.value)}
+                  onChange={(e) => handleEditObservationsChange(e.target.value)}
+                  onBlur={handleEditObservationsBlur}
+                  onKeyDown={handleEditObservationsKeyDown}
                 />
 
                 <TextareaField
                   label="Update Technical Remarks"
+                  maxLength={500}
+                  showCharCount
+                  charCount={editRemarks.length}
+                  maxCharCount={500}
+                  error={editErrors.remarks}
                   rows={2}
                   value={editRemarks}
-                  onChange={(e) => setEditRemarks(e.target.value)}
+                  onChange={(e) => handleEditRemarksChange(e.target.value)}
+                  onBlur={handleEditRemarksBlur}
+                  onKeyDown={handleEditRemarksKeyDown}
                 />
 
                 <div>

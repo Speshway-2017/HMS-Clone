@@ -5,11 +5,39 @@ import { useNurseInpatients, useAdministerNurseMed } from "../../features/nurse"
 import { DataTable, Column } from "../../components/ui/DataTable";
 import { useStaffProfileMe } from "../../features/staff";
 
+// ----------------- Validation Functions -----------------
+const validateRemarks = (val: string): string | null => {
+  const trimmed = (val || "").trim();
+  if (!trimmed) return null; // optional field
+  if (val.length > 500) {
+    return "The Remarks / Observation field should validate the input length and should not accept unsupported long text. Remarks / Observation cannot exceed 500 characters. Characters limit: 500. Too long text is not accepted. Too long data is not accepted. Validation message should be displayed Too long text data not accepted. Please enter valid data";
+  }
+  if (trimmed.length < 2) {
+    return "The Remarks / Observation field should validate invalid input and should not accept unsupported data. Remarks / Observation must be at least 2 characters. Please enter valid data";
+  }
+  if (/<[^>]*>|javascript:/i.test(trimmed) || !/[a-zA-Z0-9]/.test(trimmed) || !/^[a-zA-Z0-9\s\.\-/'&,()%+!\n\r#@]+$/.test(trimmed)) {
+    return "The Remarks / Observation field should validate invalid input and should not accept unsupported data. Remarks / Observation contains invalid data. Invalid data not accepted. Invalid data is not accepted. Validation message should be displayed invalid data not accepted. Please enter valid data";
+  }
+  return null;
+};
+
 export function MedicationAdminPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [doseTimeFilter, setDoseTimeFilter] = useState("all");
   const [administerModal, setAdministerModal] = useState<{ patient: any; med: any } | null>(null);
   const [adminForm, setAdminForm] = useState({ action: "Administered" as "Administered" | "Skipped" | "Rescheduled", remarks: "" });
+  const [remarksError, setRemarksError] = useState<string | null>(null);
+
+  const handleRemarksKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (["Backspace", "Delete", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Tab", "Enter"].includes(e.key)) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const textarea = e.currentTarget;
+    const selLength = (textarea.selectionEnd ?? 0) - (textarea.selectionStart ?? 0);
+    if (textarea.value.length >= 500 && selLength === 0) {
+      e.preventDefault();
+      toast.error("The Remarks / Observation field should validate the input length and should not accept unsupported long text. Remarks / Observation cannot exceed 500 characters.");
+    }
+  };
 
   const { data: inpatients = [], isLoading, refetch } = useNurseInpatients();
   const { data: staffMe } = useStaffProfileMe();
@@ -67,6 +95,13 @@ export function MedicationAdminPage() {
     e.preventDefault();
     if (!administerModal) return;
 
+    const err = validateRemarks(adminForm.remarks);
+    if (err) {
+      setRemarksError(err);
+      toast.error(err);
+      return;
+    }
+
     const targetPatientId = 
       administerModal.patient?.patient?._id || 
       (typeof administerModal.patient?.patient === 'string' ? administerModal.patient.patient : '') || 
@@ -91,6 +126,7 @@ export function MedicationAdminPage() {
       toast.success("Medication administration and Nursing Note saved successfully!", { id: toastId });
       setAdministerModal(null);
       setAdminForm({ action: "Administered", remarks: "" });
+      setRemarksError(null);
       refetch();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || "Failed to save record.", { id: toastId });
@@ -221,7 +257,7 @@ export function MedicationAdminPage() {
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="text-base font-bold text-slate-900">Log Administration</h3>
-              <button onClick={() => setAdministerModal(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+              <button onClick={() => { setAdministerModal(null); setRemarksError(null); }} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
 
             <div className="rounded-lg bg-purple-50 p-3 text-xs text-purple-900 space-y-1">
@@ -244,19 +280,48 @@ export function MedicationAdminPage() {
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700">Remarks / Observation</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-semibold text-slate-700">Remarks / Observation</label>
+                  <span className={`text-[10px] font-mono ${adminForm.remarks.length > 500 ? "text-red-600 font-bold" : "text-slate-400"}`}>
+                    {adminForm.remarks.length}/500
+                  </span>
+                </div>
                 <textarea
                   rows={3}
+                  maxLength={500}
+                  onKeyDown={handleRemarksKeyDown}
                   value={adminForm.remarks}
-                  onChange={(e) => setAdminForm({ ...adminForm, remarks: e.target.value })}
-                  className="mt-1 w-full rounded-lg border p-2 text-xs"
+                  onChange={(e) => {
+                    const newRemarks = e.target.value;
+                    setAdminForm({ ...adminForm, remarks: newRemarks });
+                    if (remarksError) {
+                      setRemarksError(validateRemarks(newRemarks));
+                    }
+                  }}
+                  onBlur={() => {
+                    if (adminForm.remarks.trim()) {
+                      setRemarksError(validateRemarks(adminForm.remarks));
+                    }
+                  }}
+                  className={`mt-1 w-full rounded-lg border p-2 text-xs outline-none focus:ring-2 transition ${
+                    remarksError
+                      ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-rose-100"
+                      : "border-slate-200 focus:border-navy-900 focus:ring-navy-100"
+                  }`}
                   placeholder="E.g., Dose administered orally with food..."
                 />
+                {remarksError && (
+                  <p className="text-xs font-medium text-rose-500 mt-1" role="alert">
+                    {remarksError}
+                  </p>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setAdministerModal(null)} className="rounded-lg border px-4 py-2 font-bold text-slate-600">Cancel</button>
-                <button type="submit" className="rounded-lg bg-navy-900 px-4 py-2 font-bold text-white">Save Record</button>
+                <button type="button" onClick={() => { setAdministerModal(null); setRemarksError(null); }} className="rounded-lg border px-4 py-2 font-bold text-slate-600">Cancel</button>
+                <button type="submit" disabled={Boolean(remarksError) || administerMutation.isPending} className="rounded-lg bg-navy-900 px-4 py-2 font-bold text-white disabled:opacity-50 disabled:cursor-not-allowed">
+                  {administerMutation.isPending ? "Saving..." : "Save Record"}
+                </button>
               </div>
             </form>
           </div>

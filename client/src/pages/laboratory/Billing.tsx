@@ -73,11 +73,34 @@ export function LaboratoryBilling() {
   const [selectedInvoiceForPay, setSelectedInvoiceForPay] = useState<any | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [payAmount, setPayAmount] = useState("");
+  const [payAmountError, setPayAmountError] = useState<string | null>(null);
   const [payMethod, setPayMethod] = useState("Cash");
 
   const printRef = useRef<HTMLDivElement>(null);
 
   const prices: Record<string, number> = (hospitalData as any)?.investigationPrices || {};
+
+  const validatePaymentAmount = (val: string, maxBalance: number): string | null => {
+    const trimmed = (val || "").trim();
+    if (!trimmed) {
+      return "Please fill out this field";
+    }
+    const num = parseFloat(trimmed);
+    if (isNaN(num)) {
+      return "Please enter a valid payment amount";
+    }
+    if (num <= 0) {
+      return "Payment amount must be greater than zero. Please enter valid data";
+    }
+    if (num > maxBalance + 0.001) {
+      return `Amount cannot exceed the remaining balance of ₹${Number(maxBalance).toFixed(2)}. Please enter valid data`;
+    }
+    const decimalParts = trimmed.split(".");
+    if (decimalParts.length > 1 && decimalParts[1].length > 2) {
+      return "Amount cannot have more than 2 decimal places. Please enter valid data";
+    }
+    return null;
+  };
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -518,7 +541,7 @@ export function LaboratoryBilling() {
           isOpen={isPaymentModalOpen}
           onClose={() => setIsPaymentModalOpen(false)}
         >
-          <form onSubmit={handlePaymentSubmit} className="space-y-4 text-xs">
+          <form onSubmit={handlePaymentSubmit} noValidate className="space-y-4 text-xs">
             <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
               <div className="flex justify-between">
                 <span className="text-slate-500">Patient:</span>
