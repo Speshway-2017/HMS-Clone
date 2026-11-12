@@ -12,8 +12,6 @@ import {
   RotateCcw,
   Eye,
   Sparkles,
-  UserPlus,
-  ArrowRightLeft,
   Ban,
   Activity,
   Wrench
@@ -397,30 +395,6 @@ export function BedsPage() {
         <div className="flex items-center gap-2">
           {!isAllBranches ? (
             <>
-              {b.status === "Available" && (
-                <button
-                  onClick={() => navigate(`/admin/ip?tab=new&bedId=${b._id}`)}
-                  className="text-xs bg-navy-700 text-white px-2 py-1 rounded hover:bg-navy-800 transition flex items-center gap-1 font-medium"
-                  title="Assign Patient"
-                >
-                  <UserPlus className="h-3 w-3" /> Assign
-                </button>
-              )}
-              {b.status === "Occupied" && (
-                <button
-                  onClick={() => {
-                    const admId = b.admission?._id || "";
-                    const target = admId
-                      ? `/admin/ip?tab=transfer&admissionId=${admId}&bedId=${b._id}`
-                      : `/admin/ip?tab=transfer&bedId=${b._id}`;
-                    navigate(target);
-                  }}
-                  className="text-xs bg-amber-600 text-white px-2 py-1 rounded hover:bg-amber-700 transition flex items-center gap-1 font-medium"
-                  title="Transfer Bed"
-                >
-                  <ArrowRightLeft className="h-3 w-3" /> Transfer
-                </button>
-              )}
               <button
                 onClick={() => navigate(`/admin/beds/edit-bed/${b._id}`)}
                 className="p-1.5 rounded text-slate-400 hover:text-navy-700 transition"
