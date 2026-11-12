@@ -574,7 +574,26 @@ export const forgotPassword = catchAsync(async (req: Request, res: Response) => 
   const logoUrl = hospital?.logoUrl || "";
 
   // Build reset link (pointing to frontend page)
-  const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+  const reqOrigin = req.get("origin");
+  const reqReferer = req.get("referer");
+  let clientUrl = process.env.CLIENT_URL;
+
+  // If the request comes from an active client domain (e.g. cms.speshway.site), prefer it
+  // over local defaults to ensure the reset email link works accurately
+  if (!clientUrl || clientUrl.includes("localhost")) {
+    if (reqOrigin) {
+      clientUrl = reqOrigin;
+    } else if (reqReferer) {
+      try {
+        clientUrl = new URL(reqReferer).origin;
+      } catch {}
+    }
+  }
+
+  if (!clientUrl) {
+    clientUrl = "http://localhost:5173";
+  }
+  clientUrl = clientUrl.replace(/\/+$/, "");
   const resetUrl = `${clientUrl}/reset-password/${resetToken}`;
 
   // Build HTML Email
@@ -626,12 +645,21 @@ export const forgotPassword = catchAsync(async (req: Request, res: Response) => 
   `;
 
   // Send the email (handles developer simulated fallback mode natively)
-  await sendEmail({
-    to: user.email,
-    subject: `Password Reset Request - ${hospitalName}`,
-    body: `Hello ${user.name},\n\nYou requested to reset your password for ${hospitalName}. Please use this link to reset it:\n${resetUrl}\n\nThis link is valid for 15 minutes.\nIf you did not request this, please ignore this email.\n\nBest regards,\n${hospitalName} System`,
-    html: emailHtml,
-  });
+  try {
+    await sendEmail({
+      to: user.email,
+      fromName: hospitalName,
+      subject: `Password Reset Request - ${hospitalName}`,
+      body: `Hello ${user.name},\n\nYou requested to reset your password for ${hospitalName}. Please use this link to reset it:\n${resetUrl}\n\nThis link is valid for 15 minutes.\nIf you did not request this, please ignore this email.\n\nBest regards,\n${hospitalName} System`,
+      html: emailHtml,
+    });
+  } catch (emailErr: any) {
+    console.error(`[Auth] Failed to send password reset email to ${user.email}:`, emailErr.message || emailErr);
+    throw new AppError(
+      "Failed to deliver password reset email. Please ensure your mail server or SMTP configuration is active.",
+      502
+    );
+  }
 
   res.status(200).json({ status: "success", message: genericMessage });
 });

@@ -204,8 +204,9 @@ export function ForgotPasswordPage() {
                   </div>
 
                   {error && (
-                    <div className="rounded-lg bg-red-50 border border-red-100 p-3 text-xs text-red-650 font-bold leading-normal">
-                      {error}
+                    <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 font-semibold leading-normal flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 shrink-0 text-rose-500 mt-0.5" />
+                      <span>{error}</span>
                     </div>
                   )}
 
