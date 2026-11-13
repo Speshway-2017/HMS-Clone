@@ -121,20 +121,20 @@ export function ReceptionistDashboard() {
             <KpiCard
               label="Active OP Queue"
               value={stats?.waitingQueue ?? 0}
-              icon={<Activity className="h-5 w-5 text-indigo-600" />}
+              icon={<Activity className="h-5 w-5 text-emerald-700" />}
               trend={stats?.emergencyQueue && stats.emergencyQueue > 0 ? { direction: "up", text: `${stats.emergencyQueue} Emergency` } : undefined}
               to="/receptionist/op/queue"
             />
             <KpiCard
               label="Current IP Admissions"
               value={stats?.todayIP ?? 0}
-              icon={<Building className="h-5 w-5 text-emerald-600" />}
+              icon={<Building className="h-5 w-5 text-emerald-700" />}
               to="/receptionist/ip/admissions"
             />
             <KpiCard
               label="Today's Collections"
               value={formatINR(stats?.todayCollections ?? 0)}
-              icon={<TrendingUp className="h-5 w-5 text-teal-600" />}
+              icon={<TrendingUp className="h-5 w-5 text-emerald-700" />}
               to="/receptionist/billing/collections"
             />
           </div>
@@ -143,25 +143,25 @@ export function ReceptionistDashboard() {
             <KpiCard
               label="Pending Payments"
               value={stats?.pendingPayments ?? 0}
-              icon={<AlertTriangle className="h-5 w-5 text-amber-500" />}
+              icon={<AlertTriangle className="h-5 w-5 text-amber-600" />}
               to="/receptionist/billing/pending"
             />
             <KpiCard
               label="Completed Payments"
               value={stats?.completedPayments ?? 0}
-              icon={<CreditCard className="h-5 w-5 text-green-500" />}
+              icon={<CreditCard className="h-5 w-5 text-emerald-700" />}
               to="/receptionist/billing/completed"
             />
             <KpiCard
               label="Available Rooms"
               value={stats?.roomsAvailable ?? 0}
-              icon={<LayoutGrid className="h-5 w-5 text-blue-500" />}
+              icon={<LayoutGrid className="h-5 w-5 text-emerald-700" />}
               to="/receptionist/ip/rooms"
             />
             <KpiCard
               label="Available Beds"
               value={stats?.bedsAvailable ?? 0}
-              icon={<Building className="h-5 w-5 text-violet-500" />}
+              icon={<Building className="h-5 w-5 text-emerald-700" />}
               to="/receptionist/ip/beds"
             />
           </div>
@@ -397,22 +397,22 @@ export function ReceptionistDashboard() {
                 <div className="space-y-2.5">
                   <Link to="/receptionist/patients/new" className="flex items-center justify-between rounded-lg border border-slate-200 px-3.5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">
                     <span className="flex items-center gap-2.5">
-                      <Users className="h-4.5 w-4.5 text-navy-700" /> Register New Patient
+                      <Users className="h-4.5 w-4.5 text-emerald-700" /> Register New Patient
                     </span>
                   </Link>
                   <Link to="/receptionist/appointments/new" className="flex items-center justify-between rounded-lg border border-slate-200 px-3.5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">
                     <span className="flex items-center gap-2.5">
-                      <CalendarCheck className="h-4.5 w-4.5 text-navy-700" /> Book OP Appointment
+                      <CalendarCheck className="h-4.5 w-4.5 text-emerald-700" /> Book OP Appointment
                     </span>
                   </Link>
                   <Link to="/receptionist/billing/consultation" className="flex items-center justify-between rounded-lg border border-slate-200 px-3.5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">
                     <span className="flex items-center gap-2.5">
-                      <CreditCard className="h-4.5 w-4.5 text-navy-700" /> consultation Billing
+                      <CreditCard className="h-4.5 w-4.5 text-emerald-700" /> consultation Billing
                     </span>
                   </Link>
                   <Link to="/receptionist/doctors/availability" className="flex items-center justify-between rounded-lg border border-slate-200 px-3.5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all">
                     <span className="flex items-center gap-2.5">
-                      <Stethoscope className="h-4.5 w-4.5 text-navy-700" /> Check Doctor Schedules
+                      <Stethoscope className="h-4.5 w-4.5 text-emerald-700" /> Check Doctor Schedules
                     </span>
                   </Link>
                 </div>
@@ -421,10 +421,10 @@ export function ReceptionistDashboard() {
               <Card>
                 <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
                   <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2" data-testid="notifications-requests-heading">
-                    <Bell className="h-4.5 w-4.5 text-navy-700" /> Notifications & Requests
+                    <Bell className="h-4.5 w-4.5 text-emerald-700" /> Notifications & Requests
                   </h3>
                   <span
-                    className="rounded-full bg-navy-100 px-2.5 py-0.5 text-xs font-bold text-navy-700"
+                    className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-700"
                     data-testid="notifications-count"
                     aria-label={`Notification count: ${notifications.length}`}
                   >

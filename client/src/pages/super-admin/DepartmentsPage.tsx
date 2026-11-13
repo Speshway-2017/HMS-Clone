@@ -72,7 +72,7 @@ function ThreeDotMenu({ department, onEdit, onToggleStatus, onDelete, isToggling
             onClick={handleEdit}
             className="flex w-full items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
           >
-            <Pencil className="h-3.5 w-3.5 text-navy-600" />
+            <Pencil className="h-3.5 w-3.5 text-emerald-600" />
             Edit Department
           </button>
 
@@ -215,19 +215,19 @@ export function DepartmentsPage() {
 
   return (
     <div className="space-y-6">
-      <AllBranchesNoticeBanner />
+      {!isSuperAdmin && <AllBranchesNoticeBanner />}
 
       {/* Header */}
-      <div className="flex flex-col justify-between gap-4 rounded-xl bg-navy-700 p-6 text-white sm:flex-row sm:items-center">
+      <div className="flex flex-col justify-between gap-4 rounded-xl bg-emerald-700 p-6 text-white sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold">Clinical Departments</h1>
-          <p className="mt-1 text-sm text-navy-100">
+          <p className="mt-1 text-sm text-emerald-100">
             {isSuperAdmin
               ? "Manage medical infrastructure and monitor departments across all registered hospitals."
               : "Manage medical infrastructure and monitor departments for your hospital."}
           </p>
         </div>
-        {!isAllBranches ? (
+        {(!isAllBranches || isSuperAdmin) ? (
           <Link to={`${basePath}/departments/new`}>
             <Button variant="secondary" className="bg-white">
               <Plus className="h-4 w-4" /> Add Department
@@ -286,6 +286,7 @@ export function DepartmentsPage() {
                       onEdit={() => setEditTarget(dept)}
                       onDeleteClick={() => handleDeleteClick(dept)}
                       isAllBranches={isAllBranches}
+                      isSuperAdmin={isSuperAdmin}
                     />
                   ))}
                 </div>
@@ -324,9 +325,10 @@ interface DepartmentCardProps {
   onEdit: () => void;
   onDeleteClick: () => void;
   isAllBranches: boolean;
+  isSuperAdmin?: boolean;
 }
 
-function DepartmentCard({ dept, basePath, onEdit, onDeleteClick, isAllBranches }: DepartmentCardProps) {
+function DepartmentCard({ dept, basePath, onEdit, onDeleteClick, isAllBranches, isSuperAdmin }: DepartmentCardProps) {
   const theme = getDepartmentTheme(dept.category);
   const status = STATUS_LABEL[dept.status] ?? STATUS_LABEL.operational;
   const toggleStatus = useToggleDepartmentStatus(dept._id);
@@ -350,7 +352,7 @@ function DepartmentCard({ dept, basePath, onEdit, onDeleteClick, isAllBranches }
         </div>
         <div className="flex items-center gap-2">
           {!dept.isDisabled && <Badge tone={status.tone}>{status.text}</Badge>}
-          {!isAllBranches && (
+          {(!isAllBranches || isSuperAdmin) && (
             <ThreeDotMenu
               department={dept}
               onEdit={onEdit}
@@ -363,7 +365,7 @@ function DepartmentCard({ dept, basePath, onEdit, onDeleteClick, isAllBranches }
       </div>
 
       {/* Name + description */}
-      <h3 className="text-lg font-semibold text-navy-700">{dept.name}</h3>
+      <h3 className="text-lg font-semibold text-emerald-700">{dept.name}</h3>
       <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
         {dept.code && <span className="font-mono">{dept.code}</span>}
         {dept.branch && typeof dept.branch === "object" && (
@@ -384,7 +386,7 @@ function DepartmentCard({ dept, basePath, onEdit, onDeleteClick, isAllBranches }
             </span>
           )}
           {dept.specialization && (
-            <span className="rounded-full bg-navy-50 px-2 py-0.5 text-xs font-medium text-navy-700">
+            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
               {dept.specialization}
             </span>
           )}
@@ -423,7 +425,7 @@ function DepartmentCard({ dept, basePath, onEdit, onDeleteClick, isAllBranches }
       <Link to={`${basePath}/departments/${dept._id}/metrics`}>
         <Button
           variant="secondary"
-          className="mt-4 w-full justify-center border-navy-200 text-navy-700"
+          className="mt-4 w-full justify-center border-emerald-200 text-emerald-700"
         >
           View Full Metrics <ArrowRight className="h-4 w-4" />
         </Button>

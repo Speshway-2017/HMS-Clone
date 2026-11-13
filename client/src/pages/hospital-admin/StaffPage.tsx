@@ -54,7 +54,7 @@ export function StaffPage() {
       header: "Staff Member",
       render: (s) => (
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-navy-100 text-xs font-extrabold text-navy-800 shadow-sm border border-navy-200">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-xs font-extrabold text-emerald-800 shadow-sm border border-emerald-200">
             {s.name ? s.name.slice(0, 2).toUpperCase() : "ST"}
           </div>
           <div>
@@ -120,7 +120,7 @@ export function StaffPage() {
         <div className="flex items-center gap-2">
           <Link
             to={`/admin/staff/${s._id}`}
-            className="rounded-lg p-1.5 text-slate-500 hover:bg-navy-50 hover:text-navy-700 transition-all"
+            className="rounded-lg p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700 transition-all"
             title="View Staff Details"
           >
             <Eye className="h-4 w-4" />
@@ -184,7 +184,7 @@ export function StaffPage() {
         <KpiCard
           label="Total Registered Staff"
           value={data?.pagination?.total || (data?.data ? data.data.length : 0)}
-          icon={<Users className="h-5 w-5 text-navy-600" />}
+          icon={<Users className="h-5 w-5 text-emerald-600" />}
           emphasis
         />
         <KpiCard
@@ -244,7 +244,7 @@ export function StaffPage() {
                   setSearch(e.target.value);
                   setPage(1);
                 }}
-                className="w-56 rounded-xl border border-slate-200 pl-9 pr-4 py-2 text-xs font-medium focus:border-navy-600 focus:outline-none shadow-sm"
+                className="w-56 rounded-xl border border-slate-200 pl-9 pr-4 py-2 text-xs font-medium focus:border-emerald-600 focus:outline-none shadow-sm"
               />
             </div>
 
@@ -257,7 +257,7 @@ export function StaffPage() {
                   setRoleFilter(e.target.value);
                   setPage(1);
                 }}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-navy-600 focus:outline-none shadow-sm"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-emerald-600 focus:outline-none shadow-sm"
               >
                 <option value="all">All Staff Roles</option>
                 <option value="nurse">Nurses</option>
@@ -283,7 +283,7 @@ export function StaffPage() {
           <p className="text-xs font-semibold text-slate-500">
             Showing Page <span className="font-extrabold text-slate-800">{data?.pagination?.page || page}</span> of{" "}
             <span className="font-extrabold text-slate-800">{data?.pagination?.totalPages || 1}</span> (Total Records:{" "}
-            <span className="font-extrabold text-navy-800">{data?.pagination?.total || (data?.data?.length || 0)}</span>)
+            <span className="font-extrabold text-emerald-800">{data?.pagination?.total || (data?.data?.length || 0)}</span>)
           </p>
           <Pagination page={page} totalPages={data?.pagination?.totalPages ?? 1} onPageChange={setPage} />
         </div>

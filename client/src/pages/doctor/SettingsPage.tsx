@@ -30,7 +30,7 @@ function PasswordInput({
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           autoComplete={autoComplete}
-          className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 pr-11 text-sm text-slate-800 placeholder:text-slate-400 shadow-sm outline-none transition focus:border-navy-500 focus:ring-2 focus:ring-navy-200"
+          className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 pr-11 text-sm text-slate-800 placeholder:text-slate-400 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
         />
         <button
           type="button"
@@ -53,7 +53,7 @@ function Section({ title, subtitle, icon, children }: {
   return (
     <Card>
       <div className="mb-5 flex items-center gap-3 pb-4 border-b border-slate-100">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy-100">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100">
           {icon}
         </div>
         <div>
@@ -77,7 +77,7 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-navy-500 focus:ring-offset-2 ${checked ? "bg-navy-700" : "bg-slate-200"
+        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-navy-500 focus:ring-offset-2 ${checked ? "bg-emerald-700" : "bg-slate-200"
           }`}
       >
         <span
@@ -493,7 +493,7 @@ export function DoctorSettingsPage() {
             )}
             <div>
               <p className="text-xl font-bold text-white">{user?.name ?? "Doctor"}</p>
-              <p className="text-sm text-navy-200">{user?.email}</p>
+              <p className="text-sm text-emerald-200">{user?.email}</p>
               <div className="mt-1 flex items-center gap-2">
                 <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-medium text-white">
                   {profileForm.specialization}
@@ -514,7 +514,7 @@ export function DoctorSettingsPage() {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 ${activeTab === tab.id
-              ? "border-navy-700 text-navy-700"
+              ? "border-emerald-700 text-emerald-700"
               : "border-transparent text-slate-500 hover:text-slate-700"
               }`}
           >
@@ -526,7 +526,7 @@ export function DoctorSettingsPage() {
       {/* ══════════════════ PROFILE TAB ══════════════════ */}
       {activeTab === "profile" && (
         <div className="space-y-5">
-          <Section title="Personal Information" subtitle="Your basic personal and contact details." icon={<User className="h-5 w-5 text-navy-700" />}>
+          <Section title="Personal Information" subtitle="Your basic personal and contact details." icon={<User className="h-5 w-5 text-emerald-700" />}>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {[
                 { label: "Full Name", key: "name", icon: <User className="h-4 w-4" /> },
@@ -541,14 +541,14 @@ export function DoctorSettingsPage() {
                   <input
                     value={profileForm[f.key as keyof typeof profileForm]}
                     onChange={(e) => setProfileForm((p) => ({ ...p, [f.key]: e.target.value }))}
-                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                   />
                 </div>
               ))}
             </div>
           </Section>
 
-          <Section title="Professional Details" subtitle="Your medical credentials and specialization." icon={<Stethoscope className="h-5 w-5 text-navy-700" />}>
+          <Section title="Professional Details" subtitle="Your medical credentials and specialization." icon={<Stethoscope className="h-5 w-5 text-emerald-700" />}>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {[
                 { label: "Specialization", key: "specialization" },
@@ -562,7 +562,7 @@ export function DoctorSettingsPage() {
                   <input
                     value={profileForm[f.key as keyof typeof profileForm]}
                     onChange={(e) => setProfileForm((p) => ({ ...p, [f.key]: e.target.value }))}
-                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                   />
                 </div>
               ))}
@@ -573,7 +573,7 @@ export function DoctorSettingsPage() {
                 value={profileForm.bio}
                 onChange={(e) => setProfileForm((p) => ({ ...p, bio: e.target.value }))}
                 rows={3}
-                className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-navy-200"
+                className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200"
               />
             </div>
             <div className="mt-4 flex justify-end">
@@ -581,7 +581,7 @@ export function DoctorSettingsPage() {
                 type="button"
                 onClick={handleSaveProfile}
                 disabled={updateProfileMutation.isPending}
-                className="flex items-center justify-center gap-2 w-full sm:w-auto rounded-lg bg-navy-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-2 w-full sm:w-auto rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {updateProfileMutation.isPending ? "Saving..." : <><Save className="h-4 w-4 shrink-0" /> Save Profile</>}
               </button>
@@ -597,7 +597,7 @@ export function DoctorSettingsPage() {
           <Section
             title="Change Password"
             subtitle="Set a strong new password for your account."
-            icon={<KeyRound className="h-5 w-5 text-navy-700" />}
+            icon={<KeyRound className="h-5 w-5 text-emerald-700" />}
           >
             <form onSubmit={handleChangePassword} className="space-y-5" noValidate>
               <PasswordInput
@@ -636,7 +636,7 @@ export function DoctorSettingsPage() {
                   id="btn-doctor-change-password"
                   type="submit"
                   disabled={isPending || !newPassword || !confirmPassword || passwordsMismatch}
-                  className="flex items-center justify-center gap-2 w-full sm:w-auto rounded-xl bg-navy-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-navy-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex items-center justify-center gap-2 w-full sm:w-auto rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isPending ? (
                     <>
@@ -658,11 +658,11 @@ export function DoctorSettingsPage() {
           <Section
             title="Account Security"
             subtitle="Your account security information."
-            icon={<ShieldCheck className="h-5 w-5 text-navy-700" />}
+            icon={<ShieldCheck className="h-5 w-5 text-emerald-700" />}
           >
             <div className="space-y-3">
               {[
-                { label: "Account Role", value: "Doctor", color: "text-navy-700 bg-navy-100" },
+                { label: "Account Role", value: "Doctor", color: "text-emerald-700 bg-emerald-100" },
                 { label: "Account Status", value: "Active", color: "text-emerald-700 bg-emerald-100" },
                 { label: "Hospital Access", value: "Sunrise General", color: "text-slate-700 bg-slate-100" },
                 {
@@ -690,7 +690,7 @@ export function DoctorSettingsPage() {
       {/* ══════════════════ AVAILABILITY TAB ══════════════════ */}
       {activeTab === "availability" && (
         <div className="space-y-5">
-          <Section title="Working Hours" subtitle="Set your available consultation hours for each day." icon={<Clock className="h-5 w-5 text-navy-700" />}>
+          <Section title="Working Hours" subtitle="Set your available consultation hours for each day." icon={<Clock className="h-5 w-5 text-emerald-700" />}>
             <div className="space-y-3">
               {hours.map((h, i) => (
                 <div key={h.day} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 rounded-xl border p-3.5 sm:px-4 sm:py-3 transition-colors ${h.active ? "border-slate-200 bg-white" : "border-slate-100 bg-slate-50/70 opacity-60"}`}>
@@ -712,7 +712,7 @@ export function DoctorSettingsPage() {
                       value={h.from === "—" ? "" : h.from}
                       disabled={!h.active}
                       onChange={(e) => setHours((prev) => prev.map((d, idx) => idx === i ? { ...d, from: e.target.value } : d))}
-                      className="w-full sm:w-auto rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs sm:text-sm text-slate-800 disabled:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-navy-200"
+                      className="w-full sm:w-auto rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs sm:text-sm text-slate-800 disabled:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-200"
                     />
                     <span className="text-xs text-slate-400 font-medium shrink-0">to</span>
                     <input
@@ -720,7 +720,7 @@ export function DoctorSettingsPage() {
                       value={h.to === "—" ? "" : h.to}
                       disabled={!h.active}
                       onChange={(e) => setHours((prev) => prev.map((d, idx) => idx === i ? { ...d, to: e.target.value } : d))}
-                      className="w-full sm:w-auto rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs sm:text-sm text-slate-800 disabled:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-navy-200"
+                      className="w-full sm:w-auto rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs sm:text-sm text-slate-800 disabled:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-200"
                     />
                   </div>
                   <label className="hidden sm:flex items-center gap-2 cursor-pointer shrink-0">
@@ -737,7 +737,7 @@ export function DoctorSettingsPage() {
             </div>
           </Section>
 
-          <Section title="Monthly Date Overrides & Exceptions" subtitle="Add specific dates when you are on leave or have different hours." icon={<Calendar className="h-5 w-5 text-navy-700" />}>
+          <Section title="Monthly Date Overrides & Exceptions" subtitle="Add specific dates when you are on leave or have different hours." icon={<Calendar className="h-5 w-5 text-emerald-700" />}>
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 items-end bg-slate-50 p-4 rounded-xl border border-slate-100">
                 <div className="flex flex-col gap-1">
@@ -783,7 +783,7 @@ export function DoctorSettingsPage() {
                   <button
                     type="button"
                     onClick={handleAddOverride}
-                    className="rounded-lg bg-navy-700 px-4 py-2 text-xs font-bold text-white hover:bg-navy-800 transition-colors"
+                    className="rounded-lg bg-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-800 transition-colors"
                   >
                     Add Override
                   </button>
@@ -826,14 +826,14 @@ export function DoctorSettingsPage() {
             </div>
           </Section>
 
-          <Section title="Consultation Settings" subtitle="Configure appointment slot duration and break times." icon={<Calendar className="h-5 w-5 text-navy-700" />}>
+          <Section title="Consultation Settings" subtitle="Configure appointment slot duration and break times." icon={<Calendar className="h-5 w-5 text-emerald-700" />}>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold uppercase text-slate-400">Slot Duration (min)</label>
                 <select
                   value={consultDuration}
                   onChange={(e) => setConsultDuration(e.target.value)}
-                  className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                  className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                 >
                   {["10", "15", "20", "30", "45", "60"].map((d) => (
                     <option key={d} value={d}>{d} minutes</option>
@@ -848,7 +848,7 @@ export function DoctorSettingsPage() {
                   onChange={(e) => setMaxPatients(parseInt(e.target.value) || 0)}
                   min={1}
                   max={60}
-                  className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                  className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -857,7 +857,7 @@ export function DoctorSettingsPage() {
                   type="time"
                   value={breakTime}
                   onChange={(e) => setBreakTime(e.target.value)}
-                  className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                  className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                 />
               </div>
             </div>
@@ -866,7 +866,7 @@ export function DoctorSettingsPage() {
                 type="button"
                 onClick={handleSaveSchedule}
                 disabled={updateProfileMutation.isPending}
-                className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {updateProfileMutation.isPending ? "Saving..." : <><Save className="h-4 w-4" /> Save Schedule</>}
               </button>
@@ -877,7 +877,7 @@ export function DoctorSettingsPage() {
 
       {/* ══════════════════ NOTIFICATIONS TAB ══════════════════ */}
       {activeTab === "notifications" && (
-        <Section title="Notification Preferences" subtitle="Choose what notifications you want to receive." icon={<Bell className="h-5 w-5 text-navy-700" />}>
+        <Section title="Notification Preferences" subtitle="Choose what notifications you want to receive." icon={<Bell className="h-5 w-5 text-emerald-700" />}>
           <div className="space-y-1">
             {NOTIFICATION_ITEMS.reduce((acc, item) => {
               const last = acc[acc.length - 1];
@@ -901,7 +901,7 @@ export function DoctorSettingsPage() {
             ))}
           </div>
           <div className="flex justify-end">
-            <button className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors">
+            <button className="flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors">
               <Save className="h-4 w-4" /> Save Preferences
             </button>
           </div>
@@ -911,7 +911,7 @@ export function DoctorSettingsPage() {
       {/* ══════════════════ PREFERENCES TAB ══════════════════ */}
       {activeTab === "preferences" && (
         <div className="space-y-5">
-          <Section title="Display & Interface" subtitle="Customize your dashboard appearance." icon={<Sun className="h-5 w-5 text-navy-700" />}>
+          <Section title="Display & Interface" subtitle="Customize your dashboard appearance." icon={<Sun className="h-5 w-5 text-emerald-700" />}>
             <div className="space-y-3 mb-4">
               <Toggle checked={prefs.darkMode} onChange={(v) => setPrefs((p) => ({ ...p, darkMode: v }))} label="Dark Mode" />
               <Toggle checked={prefs.compactView} onChange={(v) => setPrefs((p) => ({ ...p, compactView: v }))} label="Compact View (smaller cards)" />
@@ -929,7 +929,7 @@ export function DoctorSettingsPage() {
                   <select
                     value={prefs[f.key as keyof typeof prefs] as string}
                     onChange={(e) => setPrefs((p) => ({ ...p, [f.key]: e.target.value }))}
-                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                    className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                   >
                     {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
@@ -938,14 +938,14 @@ export function DoctorSettingsPage() {
             </div>
           </Section>
 
-          <Section title="Language & Region" subtitle="Set your language and regional settings." icon={<Globe className="h-5 w-5 text-navy-700" />}>
+          <Section title="Language & Region" subtitle="Set your language and regional settings." icon={<Globe className="h-5 w-5 text-emerald-700" />}>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold uppercase text-slate-400">Display Language</label>
                 <select
                   value={prefs.language}
                   onChange={(e) => setPrefs((p) => ({ ...p, language: e.target.value }))}
-                  className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                  className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                 >
                   <option value="en">English</option>
                   <option value="hi">Hindi</option>
@@ -962,7 +962,7 @@ export function DoctorSettingsPage() {
               </div>
             </div>
             <div className="mt-4 flex justify-end">
-              <button className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors">
+              <button className="flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors">
                 <Save className="h-4 w-4" /> Save Preferences
               </button>
             </div>

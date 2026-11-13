@@ -13,7 +13,7 @@ function Section({ title, subtitle, icon, children }: {
   return (
     <Card>
       <div className="mb-5 flex items-center gap-3 pb-4 border-b border-slate-100">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy-100 text-navy-700">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
           {icon}
         </div>
         <div>
@@ -86,7 +86,7 @@ function PasswordInput({
           className={`w-full rounded-lg border px-4 py-2.5 pr-11 text-sm text-slate-800 placeholder:text-slate-400 shadow-sm outline-none transition focus:ring-2 ${
             error
               ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-rose-100"
-              : "border-slate-200 bg-white focus:border-navy-500 focus:ring-navy-200"
+              : "border-slate-200 bg-white focus:border-emerald-500 focus:ring-emerald-200"
           }`}
         />
         <button
@@ -394,7 +394,7 @@ export function PharmacySettings() {
             )}
             <div>
               <p className="text-xl font-bold text-white">{pharmacyName}</p>
-              <p className="text-sm text-navy-200">{user?.email}</p>
+              <p className="text-sm text-emerald-200">{user?.email}</p>
               <div className="mt-1 flex items-center gap-2">
                 <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-medium text-white">
                   License: {licenseNumber}
@@ -417,7 +417,7 @@ export function PharmacySettings() {
             onClick={() => setActiveTab(tab.id as any)}
             className={`flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 ${
               activeTab === tab.id
-                ? "border-navy-700 text-navy-700 font-semibold"
+                ? "border-emerald-700 text-emerald-700 font-semibold"
                 : "border-transparent text-slate-500 hover:text-slate-700"
             }`}
           >
@@ -429,7 +429,7 @@ export function PharmacySettings() {
       {/* ══════════════════ GENERAL TAB ══════════════════ */}
       {activeTab === "general" && (
         <div className="space-y-5">
-          <Section title="General & Tax Configuration" subtitle="Pharmacy retail identity, tax rate, and contact phone details." icon={<Settings className="h-5 w-5 text-navy-700" />}>
+          <Section title="General & Tax Configuration" subtitle="Pharmacy retail identity, tax rate, and contact phone details." icon={<Settings className="h-5 w-5 text-emerald-700" />}>
             <form onSubmit={handleSaveConfig} noValidate className="space-y-5">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <InputField
@@ -572,7 +572,7 @@ export function PharmacySettings() {
               <div className="flex justify-end pt-2">
                 <button
                   type="submit"
-                  className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors"
+                  className="flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors"
                 >
                   <Save className="h-4 w-4" /> Save General Settings
                 </button>
@@ -585,7 +585,7 @@ export function PharmacySettings() {
       {/* ══════════════════ SECURITY TAB ══════════════════ */}
       {activeTab === "security" && (
         <div className="space-y-5">
-          <Section title="Change Password" subtitle="Set a strong new password for your pharmacy user account." icon={<KeyRound className="h-5 w-5 text-navy-700" />}>
+          <Section title="Change Password" subtitle="Set a strong new password for your pharmacy user account." icon={<KeyRound className="h-5 w-5 text-emerald-700" />}>
             <form onSubmit={handlePasswordSubmit} className="space-y-5" noValidate>
               <PasswordInput
                 id="pharmacy-new-password"
@@ -636,7 +636,7 @@ export function PharmacySettings() {
                 <button
                   type="submit"
                   disabled={changePasswordMutation.isPending || !newPassword || !confirmPassword}
-                  className="flex items-center gap-2 rounded-lg bg-navy-700 px-5 py-2 text-sm font-semibold text-white hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ShieldCheck className="h-4 w-4" />
                   {changePasswordMutation.isPending ? "Updating..." : "Update Password"}

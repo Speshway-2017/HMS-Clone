@@ -266,7 +266,7 @@ export function PharmacyMedicineDispensing() {
             </div>
             <div>
               <span className="text-slate-400 font-semibold block uppercase text-[10px]">UHID Number</span>
-              <span className="text-sm font-bold text-navy-700 font-mono">{foundRx.patient?.uhid || "N/A"}</span>
+              <span className="text-sm font-bold text-emerald-700 font-mono">{foundRx.patient?.uhid || "N/A"}</span>
             </div>
             <div>
               <span className="text-slate-400 font-semibold block uppercase text-[10px]">Age / Gender</span>
@@ -346,7 +346,7 @@ export function PharmacyMedicineDispensing() {
                             className={`w-16 rounded border p-1 text-center font-bold text-xs outline-none ${
                               hasStockWarning || hasPrescribedWarning || hasZeroWarning || hasDecimalWarning
                                 ? "border-red-500 focus:border-red-500 text-red-600 bg-red-50/20"
-                                : "border-slate-300 focus:border-navy-500"
+                                : "border-slate-300 focus:border-emerald-500"
                             } disabled:bg-slate-100 disabled:text-slate-400`}
                           />
                           {hasStockWarning && (
@@ -387,7 +387,7 @@ export function PharmacyMedicineDispensing() {
                     max={100}
                     value={taxRate}
                     onChange={(e) => setTaxRate(Number(e.target.value) || 0)}
-                    className="w-12 text-center rounded border border-slate-300 p-0.5 outline-none font-bold focus:border-navy-500"
+                    className="w-12 text-center rounded border border-slate-300 p-0.5 outline-none font-bold focus:border-emerald-500"
                   />
                 </div>
                 <div className="flex justify-between">
@@ -402,12 +402,12 @@ export function PharmacyMedicineDispensing() {
                     max={subtotal + taxAmount}
                     value={discount}
                     onChange={(e) => setDiscount(Number(e.target.value) || 0)}
-                    className="w-20 text-right rounded border border-slate-300 p-0.5 outline-none font-bold focus:border-navy-500"
+                    className="w-20 text-right rounded border border-slate-300 p-0.5 outline-none font-bold focus:border-emerald-500"
                   />
                 </div>
                 <div className="border-t border-dashed border-slate-200 my-2 pt-2 flex justify-between text-sm font-bold text-slate-800">
                   <span>Grand Total:</span>
-                  <span className="text-navy-700">₹{grandTotal.toFixed(2)}</span>
+                  <span className="text-emerald-700">₹{grandTotal.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -419,7 +419,7 @@ export function PharmacyMedicineDispensing() {
                     id="partial-dispense-checkbox"
                     checked={isPartial}
                     onChange={(e) => setIsPartial(e.target.checked)}
-                    className="mt-0.5 h-3.5 w-3.5 rounded border-slate-355 text-navy-600 focus:ring-navy-500 cursor-pointer"
+                    className="mt-0.5 h-3.5 w-3.5 rounded border-slate-355 text-emerald-600 focus:ring-navy-500 cursor-pointer"
                   />
                   <div>
                     <label htmlFor="partial-dispense-checkbox" className="text-xs font-bold text-slate-800 cursor-pointer select-none">
@@ -435,7 +435,7 @@ export function PharmacyMedicineDispensing() {
               <Button
                 type="submit"
                 disabled={!isValidationPassing() || dispenseMutation.isPending}
-                className="w-full bg-navy-700 hover:bg-navy-800 text-white font-bold"
+                className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold"
               >
                 {dispenseMutation.isPending ? "Generating Invoice..." : "Dispense Medicines"}
               </Button>
@@ -483,7 +483,7 @@ export function PharmacyMedicineDispensing() {
       <Card>
         <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-base font-semibold text-slate-800 flex items-center gap-1.5">
-            <History className="h-4 w-4 text-navy-700" /> Pharmacy Invoices History
+            <History className="h-4 w-4 text-emerald-700" /> Pharmacy Invoices History
           </h3>
         </div>
 
@@ -494,7 +494,7 @@ export function PharmacyMedicineDispensing() {
           columns={[
             {
               header: "Invoice ID",
-              render: (r) => <span className="font-bold text-navy-700 font-mono">{r._id}</span>
+              render: (r) => <span className="font-bold text-emerald-700 font-mono">{r._id}</span>
             },
             {
               header: "Patient",

@@ -129,7 +129,7 @@ export function NewPrescriptionPage() {
             <button
               type="button"
               onClick={handleAddMedicine}
-              className="flex items-center gap-1 text-xs font-semibold text-navy-700 hover:text-navy-800"
+              className="flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800"
             >
               <Plus className="h-4 w-4" /> Add Medicine
             </button>

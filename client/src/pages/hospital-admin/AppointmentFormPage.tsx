@@ -50,7 +50,7 @@ export function AppointmentFormPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <div className="text-sm text-slate-400">
-          <Link to="/admin/appointments" className="hover:text-navy-700">
+          <Link to="/admin/appointments" className="hover:text-emerald-700">
             Appointments
           </Link>{" "}
           &gt; Schedule Appointment

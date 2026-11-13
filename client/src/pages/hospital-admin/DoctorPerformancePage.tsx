@@ -17,7 +17,7 @@ export function DoctorPerformancePage() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm uppercase tracking-wide text-navy-600">Performance Management</p>
+        <p className="text-sm uppercase tracking-wide text-emerald-600">Performance Management</p>
         <h1 className="text-2xl font-bold text-slate-900">
           <Link to={`/admin/doctors/${id}`} className="hover:underline">
             {doctor.name}

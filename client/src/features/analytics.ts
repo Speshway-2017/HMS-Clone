@@ -1,24 +1,54 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../lib/api";
 
-interface GlobalAnalytics {
+export interface HospitalListItem {
+  _id: string;
+  name: string;
+  code: string;
+  address?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  status: string;
+  totalBranches: number;
+  totalSales: number;
+  totalInvoices: number;
+  createdAt?: string;
+}
+
+export interface SalesByHospitalItem {
+  name: string;
+  code: string;
+  sales: number;
+  invoices: number;
+}
+
+export interface SalesTrendItem {
+  date: string;
+  sales: number;
+}
+
+export interface GlobalAnalytics {
+  hospitals: {
+    total: number;
+    active: number;
+    inactive: number;
+    list: HospitalListItem[];
+  };
+  sales: {
+    totalSales: number;
+    todaySales: number;
+    thisMonthSales: number;
+    totalInvoices: number;
+    salesByHospital: SalesByHospitalItem[];
+    salesTrend: SalesTrendItem[];
+  };
   counts: {
     totalHospitals: number;
     activeHospitals: number;
-    totalBranches: number;
-    totalDepartments: number;
-    totalAdmins: number;
-    totalBedCapacity: number;
-  };
-  pending: {
-    totalRevenue: boolean;
-    activePatients: boolean;
-    avgWaitTime: boolean;
-    bedOccupancy: boolean;
-  };
-  charts: {
-    branchesPerHospital: { hospital: string; branches: number }[];
-    adminsByRole: { role: string; count: number }[];
+    totalSales: number;
+    todaySales: number;
+    thisMonthSales: number;
+    totalInvoices: number;
   };
 }
 
@@ -32,7 +62,7 @@ export function useGlobalAnalytics() {
   });
 }
 
-interface HospitalAnalytics {
+export interface HospitalAnalytics {
   counts: {
     totalDoctors: number;
     totalStaff: number;
@@ -45,13 +75,18 @@ interface HospitalAnalytics {
     bedOccupancyPercent: number;
     totalRevenue: number;
   };
+  sales?: {
+    totalSales: number;
+    paidInvoices: number;
+  };
 }
 
-export function useHospitalAnalytics() {
+export function useHospitalAnalytics(hospitalId?: string) {
   return useQuery({
-    queryKey: ["analytics", "hospital"],
+    queryKey: ["analytics", "hospital", hospitalId],
     queryFn: async () => {
-      const res = await api.get("/analytics/hospital");
+      const params = hospitalId ? { hospitalId } : undefined;
+      const res = await api.get("/analytics/hospital", { params });
       return res.data.data as HospitalAnalytics;
     },
   });

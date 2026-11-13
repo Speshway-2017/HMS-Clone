@@ -86,13 +86,13 @@ export function DoctorProfilePage() {
     <div className="space-y-6">
       {/* Breadcrumbs / Back navigation */}
       <nav className="flex items-center gap-2.5 text-xs font-semibold text-slate-500">
-        <Link to="/admin/doctors" className="flex items-center gap-1 hover:text-navy-700 font-bold transition-colors">
+        <Link to="/admin/doctors" className="flex items-center gap-1 hover:text-emerald-700 font-bold transition-colors">
           <ArrowLeft className="h-4 w-4" /> Back to Doctors
         </Link>
         <span className="text-slate-300">|</span>
-        <Link to="/admin" className="hover:text-navy-700 transition-colors">Dashboard</Link>
+        <Link to="/admin" className="hover:text-emerald-700 transition-colors">Dashboard</Link>
         <span className="text-slate-300">/</span>
-        <Link to="/admin/doctors" className="hover:text-navy-700 transition-colors">Doctors</Link>
+        <Link to="/admin/doctors" className="hover:text-emerald-700 transition-colors">Doctors</Link>
         <span className="text-slate-300">/</span>
         <span className="text-slate-800 font-bold">{doctor.name}</span>
       </nav>
@@ -102,7 +102,7 @@ export function DoctorProfilePage() {
           {doctor.photoUrl ? (
             <img src={doctor.photoUrl} alt={doctor.name} className="h-20 w-20 rounded-2xl object-cover" />
           ) : (
-            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-navy-100 text-xl font-semibold text-navy-700">
+            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-emerald-100 text-xl font-semibold text-emerald-700">
               {doctor.name.slice(0, 2).toUpperCase()}
             </div>
           )}
@@ -147,12 +147,12 @@ export function DoctorProfilePage() {
           </div>
         </Card>
 
-        <Card className="bg-navy-50">
-          <div className="flex items-center gap-2 text-navy-700">
+        <Card className="bg-emerald-50">
+          <div className="flex items-center gap-2 text-emerald-700">
             <Users2 className="h-5 w-5" />
             <span className="text-xs font-semibold uppercase tracking-wide">Patients Treated</span>
           </div>
-          <div className="mt-2 text-3xl font-bold text-navy-800">{stats.patientsTreated}</div>
+          <div className="mt-2 text-3xl font-bold text-emerald-800">{stats.patientsTreated}</div>
           <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
             <MapPin className="h-4 w-4" /> {doctor.email || "No email on file"}
           </div>
@@ -164,7 +164,7 @@ export function DoctorProfilePage() {
       <Card className="p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-3 mb-4">
           <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-            <History className="h-5 w-5 text-navy-700" />
+            <History className="h-5 w-5 text-emerald-700" />
             Patient Consultation History
           </h3>
           
@@ -181,7 +181,7 @@ export function DoctorProfilePage() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-navy-500"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-emerald-500"
               placeholder="Search by name or UHID..."
             />
           </div>
@@ -191,7 +191,7 @@ export function DoctorProfilePage() {
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-navy-500"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-emerald-500"
             />
           </div>
           <div>
@@ -200,7 +200,7 @@ export function DoctorProfilePage() {
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-navy-500"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-emerald-500"
             />
           </div>
           {(searchTerm || startDate || endDate) && (
@@ -236,7 +236,7 @@ export function DoctorProfilePage() {
                   key={patient._id} 
                   className={`border rounded-xl transition-all duration-200 overflow-hidden ${
                     isExpanded 
-                      ? "border-navy-200 bg-navy-50/10 shadow-sm" 
+                      ? "border-emerald-200 bg-emerald-50/10 shadow-sm" 
                       : "border-slate-200 hover:border-slate-300 bg-white"
                   }`}
                 >
@@ -246,7 +246,7 @@ export function DoctorProfilePage() {
                     className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 gap-4 cursor-pointer select-none"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-full bg-navy-50 text-navy-700 flex items-center justify-center font-bold text-xs">
+                      <div className="h-9 w-9 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs">
                         {patient.name ? patient.name.slice(0, 2).toUpperCase() : "PA"}
                       </div>
                       <div>
@@ -316,7 +316,7 @@ export function DoctorProfilePage() {
                                   {/* Assessment details */}
                                   <div className="space-y-2">
                                     <h5 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                                      <Stethoscope className="h-3.5 w-3.5 text-navy-700" /> Clinical Assessment
+                                      <Stethoscope className="h-3.5 w-3.5 text-emerald-700" /> Clinical Assessment
                                     </h5>
                                     <div className="bg-white border border-slate-200 rounded-lg p-3 text-xs space-y-1.5">
                                       <div>
@@ -325,7 +325,7 @@ export function DoctorProfilePage() {
                                       </div>
                                       <div className="border-t border-slate-100 pt-1.5 mt-1.5">
                                         <span className="text-[10px] font-bold text-slate-400 uppercase block">Diagnosis</span>
-                                        <span className="text-slate-800 font-bold text-navy-800">{prescription?.diagnosis || "No diagnosis logged"}</span>
+                                        <span className="text-slate-800 font-bold text-emerald-800">{prescription?.diagnosis || "No diagnosis logged"}</span>
                                       </div>
                                       <div className="border-t border-slate-100 pt-1.5 mt-1.5">
                                         <span className="text-[10px] font-bold text-slate-400 uppercase block">Clinical Notes</span>
@@ -337,7 +337,7 @@ export function DoctorProfilePage() {
                                   {/* Investigation details */}
                                   <div className="space-y-2">
                                     <h5 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                                      <FlaskConical className="h-3.5 w-3.5 text-navy-700" /> Ordered Investigations
+                                      <FlaskConical className="h-3.5 w-3.5 text-emerald-700" /> Ordered Investigations
                                     </h5>
                                     <div className="bg-white border border-slate-200 rounded-lg p-3 text-xs space-y-3">
                                       <div>
@@ -371,7 +371,7 @@ export function DoctorProfilePage() {
                                 {/* Medications Section */}
                                 <div className="space-y-2">
                                   <h5 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                                    <Pill className="h-3.5 w-3.5 text-navy-700" /> Prescribed Medications
+                                    <Pill className="h-3.5 w-3.5 text-emerald-700" /> Prescribed Medications
                                   </h5>
                                   {prescription?.medications && prescription.medications.length > 0 ? (
                                     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
@@ -410,7 +410,7 @@ export function DoctorProfilePage() {
                                 {/* Diagnostic Reports Section */}
                                 <div className="space-y-2">
                                   <h5 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                                    <FileCheck2 className="h-3.5 w-3.5 text-navy-700" /> Completed Diagnostic Reports
+                                    <FileCheck2 className="h-3.5 w-3.5 text-emerald-700" /> Completed Diagnostic Reports
                                   </h5>
                                   {reports.length > 0 ? (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -440,9 +440,9 @@ export function DoctorProfilePage() {
                                           <div className="border-t border-slate-100 pt-2.5 flex items-center justify-between gap-2">
                                             <button
                                               onClick={() => setSelectedReport(report)}
-                                              className="inline-flex items-center gap-1.5 bg-navy-50 text-navy-700 hover:bg-navy-100 border border-navy-200 rounded-lg px-2.5 py-1 text-xs font-extrabold transition-all cursor-pointer active:scale-95 shadow-sm"
+                                              className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg px-2.5 py-1 text-xs font-extrabold transition-all cursor-pointer active:scale-95 shadow-sm"
                                             >
-                                              <Eye className="h-3.5 w-3.5 text-navy-700" /> View Report
+                                              <Eye className="h-3.5 w-3.5 text-emerald-700" /> View Report
                                             </button>
                                             {report.files && report.files.length > 0 && (
                                               <div className="flex flex-wrap gap-1">
@@ -453,7 +453,7 @@ export function DoctorProfilePage() {
                                                     download
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 hover:border-navy-500 hover:text-navy-700 rounded-lg px-2 py-1 text-[10px] font-bold shadow-sm transition-colors"
+                                                    className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 hover:border-emerald-500 hover:text-emerald-700 rounded-lg px-2 py-1 text-[10px] font-bold shadow-sm transition-colors"
                                                   >
                                                     <Download className="h-3 w-3" />
                                                     {file.original_filename || `Download`}

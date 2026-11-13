@@ -74,11 +74,11 @@ const STATUS_BADGE: Record<string, { tone: "success" | "warning" | "info" | "neu
 };
 
 const CHART_COLORS = {
-  navy: ["#1e3a8a", "#2748a3", "#3660bf", "#5a80d0", "#8aa8e1"],
-  emerald: ["#059669", "#10b981", "#34d399", "#6ee7b7", "#a7f3d0"],
+  navy: ["#16a34a", "#15803d", "#22c55e", "#4ade80", "#86efac"],
+  emerald: ["#16a34a", "#15803d", "#22c55e", "#4ade80", "#86efac"],
   amber: ["#d97706", "#f59e0b", "#fbbf24", "#fcd34d", "#fef3c7"],
   rose: ["#e11d48", "#f43f5e", "#fb7185", "#fda4af", "#ffe4e6"],
-  indigo: ["#4f46e5", "#6366f1", "#818cf8", "#a5b4fc", "#e0e7ff"],
+  indigo: ["#15803d", "#16a34a", "#e11d48", "#f43f5e", "#86efac"],
 };
 
 // Premium Floating Tooltip Component
@@ -277,7 +277,7 @@ export function DoctorDashboard() {
     return (
       <div className="flex h-[80vh] items-center justify-center">
         <div className="flex flex-col items-center gap-2">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-navy-700 border-t-transparent"></div>
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-700 border-t-transparent"></div>
           <p className="text-xs text-slate-500 font-medium">Aggregating Clinical Analytics...</p>
         </div>
       </div>
@@ -311,7 +311,7 @@ export function DoctorDashboard() {
                 onClick={() => setDateRange(f.id)}
                 className={`rounded-md px-2.5 py-1 text-xs font-bold transition-all font-sans whitespace-nowrap ${
                   dateRange === f.id
-                    ? "bg-navy-700 text-white shadow-sm"
+                    ? "bg-emerald-700 text-white shadow-sm"
                     : "text-slate-600 hover:bg-slate-100"
                 }`}
               >
@@ -327,7 +327,7 @@ export function DoctorDashboard() {
               </button>
             </Link>
             <Link to="/doctor/op-management">
-              <button className="flex items-center gap-1.5 rounded-lg bg-navy-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-navy-800 transition-colors whitespace-nowrap font-sans">
+              <button className="flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-800 transition-colors whitespace-nowrap font-sans">
                 <Plus className="h-3.5 w-3.5" /> New Consultation
               </button>
             </Link>
@@ -344,7 +344,7 @@ export function DoctorDashboard() {
               type="date"
               value={customStartDate}
               onChange={(e) => setCustomStartDate(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-navy-500 font-sans"
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-emerald-500 font-sans"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -353,7 +353,7 @@ export function DoctorDashboard() {
               type="date"
               value={customEndDate}
               onChange={(e) => setCustomEndDate(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-navy-500 font-sans"
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-emerald-500 font-sans"
             />
           </div>
         </Card>
@@ -385,7 +385,7 @@ export function DoctorDashboard() {
             label: "Today's Appointments",
             data: metrics?.todayAppointments,
             icon: <Activity className="h-4 w-4" />,
-            color: "stroke-blue-600 bg-blue-50 text-blue-700",
+            color: "stroke-emerald-600 bg-emerald-50 text-emerald-700",
             to: "/doctor/appointments/today"
           },
           {
@@ -488,9 +488,9 @@ export function DoctorDashboard() {
         <Card className="lg:col-span-2 hover:border-slate-200 transition-all duration-300">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-sm font-black text-slate-800 flex items-center gap-1.5 font-sans">
-              <Calendar className="h-4 w-4 text-navy-700" /> Today's Clinical Schedule
+              <Calendar className="h-4 w-4 text-emerald-700" /> Today's Clinical Schedule
             </h3>
-            <Link to="/doctor/appointments/today" className="flex items-center gap-1 text-xs font-bold text-navy-700 hover:underline font-sans">
+            <Link to="/doctor/appointments/today" className="flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline font-sans">
               Full list <ChevronRight className="h-3 w-3" />
             </Link>
           </div>
@@ -533,9 +533,9 @@ export function DoctorDashboard() {
                             }`}
                           >
                             <div className="w-12 shrink-0">
-                              <p className="text-xs font-black text-navy-700 font-sans">{time}</p>
+                              <p className="text-xs font-black text-emerald-700 font-sans">{time}</p>
                             </div>
-                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-bold text-navy-700 font-sans">
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700 font-sans">
                               {initials}
                             </div>
                             <div className="flex-1 min-w-0">
@@ -555,7 +555,7 @@ export function DoctorDashboard() {
                             </Badge>
                             {["scheduled", "checked_in", "in_consultation"].includes(appt.status) && (
                               <Link to={`/doctor/consultation/${appt._id}`}>
-                                <button className="rounded-lg bg-navy-700 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-navy-800 transition-colors font-sans">
+                                <button className="rounded-lg bg-emerald-700 px-2.5 py-1 text-[10px] font-bold text-white hover:bg-emerald-800 transition-colors font-sans">
                                   Open
                                 </button>
                               </Link>
@@ -594,7 +594,7 @@ export function DoctorDashboard() {
                   onClick={() => handleQuickAction(action.type as any)}
                   className="flex flex-col gap-1 items-center justify-center rounded-lg border border-slate-200 p-3 text-slate-700 hover:bg-slate-50 hover:border-slate-350 transition-all text-center focus:outline-none"
                 >
-                  <div className="rounded-full bg-slate-100 p-2 text-navy-700">{action.icon}</div>
+                  <div className="rounded-full bg-slate-100 p-2 text-emerald-700">{action.icon}</div>
                   <span className="text-[10px] font-extrabold mt-1 text-slate-600 font-sans">{action.label}</span>
                 </button>
               ))}
@@ -607,7 +607,7 @@ export function DoctorDashboard() {
               <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1 font-sans">
                 <Bell className="h-4 w-4 text-rose-600" /> Clinical Notifications
               </h3>
-              <Link to="/doctor/notifications" className="text-xs font-bold text-navy-700 hover:underline font-sans">
+              <Link to="/doctor/notifications" className="text-xs font-bold text-emerald-700 hover:underline font-sans">
                 View ({analytics?.metrics?.notifications?.current ?? 0})
               </Link>
             </div>
@@ -740,7 +740,7 @@ export function DoctorDashboard() {
         <Card className="min-w-0 flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
           <div>
             <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-1.5 font-sans">
-              <Users className="h-4 w-4 text-navy-600" /> Patient Segment Analytics
+              <Users className="h-4 w-4 text-emerald-600" /> Patient Segment Analytics
             </h3>
             <p className="text-xs text-slate-400 mb-4 font-sans">Patient categories distribution</p>
           </div>
@@ -813,7 +813,7 @@ export function DoctorDashboard() {
                     key={tab}
                     onClick={() => setGrowthTab(tab)}
                     className={`rounded px-2.5 py-0.5 text-[10px] font-bold uppercase transition-all font-sans ${
-                      growthTab === tab ? "bg-white text-navy-700 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                      growthTab === tab ? "bg-white text-emerald-700 shadow-sm" : "text-slate-400 hover:text-slate-600"
                     }`}
                   >
                     {tab}
@@ -827,7 +827,7 @@ export function DoctorDashboard() {
                     key={type}
                     onClick={() => setChartType(type)}
                     className={`rounded px-2.5 py-0.5 text-[10px] font-bold uppercase transition-all font-sans ${
-                      chartType === type ? "bg-white text-navy-700 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                      chartType === type ? "bg-white text-emerald-700 shadow-sm" : "text-slate-400 hover:text-slate-600"
                     }`}
                   >
                     {type}
@@ -1074,7 +1074,7 @@ export function DoctorDashboard() {
         <Card className="min-w-0 flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
           <div>
             <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-1.5 font-sans">
-              <FileText className="h-4 w-4 text-blue-600" /> Prescriptions Issued
+              <FileText className="h-4 w-4 text-emerald-700" /> Prescriptions Issued
             </h3>
             <p className="text-xs text-slate-400 mb-4 font-sans">Therapeutic categories split</p>
           </div>
@@ -1126,9 +1126,9 @@ export function DoctorDashboard() {
 
           <div className="space-y-3">
             {[
-              { label: "Today's Follow-ups", val: analytics?.followupAnalytics?.today ?? 0, color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
+              { label: "Today's Follow-ups", val: analytics?.followupAnalytics?.today ?? 0, color: "text-emerald-700 bg-emerald-50 border-emerald-100" },
               { label: "Missed Follow-ups", val: analytics?.followupAnalytics?.missed ?? 0, color: "text-rose-600 bg-rose-50 border-rose-100" },
-              { label: "Upcoming Follow-ups", val: analytics?.followupAnalytics?.upcoming ?? 0, color: "text-blue-600 bg-blue-50 border-blue-100" }
+              { label: "Upcoming Follow-ups", val: analytics?.followupAnalytics?.upcoming ?? 0, color: "text-emerald-700 bg-emerald-50 border-emerald-100" }
             ].map((f) => (
               <div key={f.label} className={`flex items-center justify-between rounded-lg border p-2.5 ${f.color} transition-all duration-350 hover:shadow-sm`}>
                 <span className="text-xs font-bold font-sans">{f.label}</span>
@@ -1233,7 +1233,7 @@ export function DoctorDashboard() {
         <Card className="min-w-0 flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
           <div>
             <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-1.5 font-sans">
-              <Info className="h-4 w-4 text-blue-600" /> Live Audit Feed
+              <Info className="h-4 w-4 text-emerald-700" /> Live Audit Feed
             </h3>
             <p className="text-xs text-slate-400 mb-4 font-sans">Socket.IO real-time activity tracker</p>
           </div>
@@ -1244,10 +1244,10 @@ export function DoctorDashboard() {
                 <div key={index} className="flex gap-3 text-left">
                   <div className="relative flex flex-col items-center">
                     <div className={`h-2 w-2 rounded-full shrink-0 ${
-                      event.type === "appointment" ? "bg-blue-600" :
-                      event.type === "consultation" ? "bg-emerald-600" :
-                      event.type === "prescription" ? "bg-indigo-600" :
-                      event.type === "lab" ? "bg-purple-600" :
+                      event.type === "appointment" ? "bg-emerald-600" :
+                      event.type === "consultation" ? "bg-emerald-700" :
+                      event.type === "prescription" ? "bg-rose-600" :
+                      event.type === "lab" ? "bg-amber-600" :
                       "bg-slate-600"
                     }`} />
                     {index < analytics.timeline.length - 1 && (
@@ -1278,7 +1278,7 @@ export function DoctorDashboard() {
         <Card className="min-w-0 flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
           <div>
             <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-1.5 font-sans">
-              <Award className="h-4 w-4 text-navy-700" /> Performance Index
+              <Award className="h-4 w-4 text-emerald-700" /> Performance Index
             </h3>
             <p className="text-xs text-slate-400 mb-4 font-sans">Clinical score breakdown</p>
           </div>
@@ -1295,7 +1295,7 @@ export function DoctorDashboard() {
                 <PolarGrid stroke="#e2e8f0" />
                 <PolarAngleAxis dataKey="subject" stroke="#64748b" fontSize={9} fontFamily="Inter, sans-serif" fontWeight={600} />
                 <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="#e2e8f0" tick={false} />
-                <Radar name="Dr. Score" dataKey="A" stroke="#1e3a8a" fill="#1e3a8a" fillOpacity={0.15} isAnimationActive={true} animationDuration={1000} />
+                <Radar name="Dr. Score" dataKey="A" stroke="#16a34a" fill="#16a34a" fillOpacity={0.15} isAnimationActive={true} animationDuration={1000} />
               </RadarChart>
             </ResponsiveContainer>
           </div>
@@ -1307,7 +1307,7 @@ export function DoctorDashboard() {
             </div>
             <div className="bg-slate-50 rounded p-1">
               <span className="text-[8px] font-extrabold text-slate-400 uppercase">Rating</span>
-              <p className="text-sm font-extrabold text-navy-600">{analytics?.performance?.avgRating ?? "4.9"} ★</p>
+              <p className="text-sm font-extrabold text-emerald-600">{analytics?.performance?.avgRating ?? "4.9"} ★</p>
             </div>
             <div className="bg-slate-50 rounded p-1">
               <span className="text-[8px] font-extrabold text-slate-400 uppercase">Satisfaction</span>
@@ -1320,7 +1320,7 @@ export function DoctorDashboard() {
         <Card className="min-w-0 flex flex-col justify-between hover:border-slate-200 transition-all duration-300">
           <div>
             <h3 className="text-sm font-bold text-slate-800 mb-1 flex items-center gap-1.5 font-sans">
-              <CalendarClock className="h-4 w-4 text-blue-600" /> Source Analysis
+              <CalendarClock className="h-4 w-4 text-emerald-700" /> Source Analysis
             </h3>
             <p className="text-xs text-slate-400 mb-4 font-sans">Bookings source split</p>
           </div>
@@ -1335,9 +1335,9 @@ export function DoctorDashboard() {
                 <XAxis dataKey="name" stroke="#94a3b8" fontSize={9} fontFamily="Inter, sans-serif" fontWeight={500} tickLine={false} axisLine={false} dy={8} />
                 <YAxis stroke="#94a3b8" fontSize={9} fontFamily="Inter, sans-serif" fontWeight={500} tickLine={false} axisLine={false} dx={-8} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="value" fill="#3660bf" radius={[4, 4, 0, 0]} isAnimationActive={true} animationDuration={1000}>
+                <Bar dataKey="value" fill="#16a34a" radius={[4, 4, 0, 0]} isAnimationActive={true} animationDuration={1000}>
                   {(analytics?.appointmentAnalytics?.types ?? []).map((entry: any, index: number) => (
-                    <Cell key={`cell-appt-source-${index}`} fill={CHART_COLORS.navy[index % CHART_COLORS.navy.length]} />
+                    <Cell key={`cell-appt-source-${index}`} fill={CHART_COLORS.emerald[index % CHART_COLORS.emerald.length]} />
                   ))}
                 </Bar>
               </BarChart>
@@ -1346,7 +1346,7 @@ export function DoctorDashboard() {
 
           <div className="mt-2 text-[10px] text-slate-400 border-t border-slate-50 pt-2 flex justify-between items-center font-sans">
             <span>Aggregated source</span>
-            <span className="text-blue-700 bg-blue-50 px-2 py-0.5 rounded font-extrabold font-sans">Active</span>
+            <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-extrabold font-sans">Active</span>
           </div>
         </Card>
       </div>

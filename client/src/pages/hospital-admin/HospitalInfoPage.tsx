@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { useMyHospital, useUpdateMyHospital } from "../../features/hospitals";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
-import { Plus, Trash2, Globe, Heart, AlertCircle } from "lucide-react";
+import { Plus, Trash2, Globe, Heart, AlertCircle, Image as ImageIcon } from "lucide-react";
 import { InputField, TextareaField } from "../../components/ui/Field";
+import { FileUpload } from "../../components/ui/FileUpload";
 import toast from "react-hot-toast";
 
 export const HOSPITAL_INFO_LIMITS = {
@@ -602,8 +603,8 @@ export function HospitalInfoPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Hospital Website Info</h1>
-          <p className="text-sm text-slate-500">Customize all dynamic copy, links, contact details, and FAQs for your patient-facing website.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Website CMS &amp; Public Pages Control</h1>
+          <p className="text-sm text-slate-500">Super Admin Exclusive: Upload official hospital logo, configure dynamic landing page copy, FAQs, and public links.</p>
         </div>
         <Button onClick={() => window.open("/#home", "_blank")} variant="secondary" className="flex items-center gap-1.5 text-xs">
           <Globe className="h-4 w-4" /> View Public Site
@@ -626,7 +627,7 @@ export function HospitalInfoPage() {
       <form onSubmit={handleSubmit} noValidate className="space-y-6">
         <Card className="p-6 space-y-6">
           <h2 className="text-base font-bold text-slate-800 border-b pb-2 flex items-center gap-2">
-            <Heart className="h-5 w-5 text-navy-700" /> Core Identity &amp; Contact Parameters
+            <Heart className="h-5 w-5 text-emerald-700" /> Core Identity &amp; Contact Parameters
           </h2>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -645,19 +646,49 @@ export function HospitalInfoPage() {
               placeholder="e.g. Speshway Hospitals"
             />
 
-            <InputField
-              label="Logo URL"
-              name="logoUrl"
-              maxLength={HOSPITAL_INFO_LIMITS.LOGO_URL}
-              showCharCount
-              value={formData.logoUrl}
-              error={fieldErrors.logoUrl}
-              onChange={handleInputChange}
-              onKeyDown={(e) => handleKeyGuard(e, formData.logoUrl.length, HOSPITAL_INFO_LIMITS.LOGO_URL, "Logo URL")}
-              onPaste={(e) => handlePasteGuard(e, HOSPITAL_INFO_LIMITS.LOGO_URL, "Logo URL", formData.logoUrl.length)}
-              onBlur={() => handleBlur("logoUrl", formData.logoUrl)}
-              placeholder="https://example.com/logo.png"
-            />
+            {/* Direct Hospital Logo File Upload & Live Preview */}
+            <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <ImageIcon className="h-3.5 w-3.5 text-emerald-700" /> Hospital Brand Logo
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Upload official hospital logo. Used across the top navigation bar, public landing page, invoices, and clinical letterheads.
+                  </p>
+                </div>
+                {formData.logoUrl && (
+                  <div className="flex items-center gap-2.5 bg-white px-3 py-1.5 rounded-md border border-slate-200 shadow-2xs shrink-0">
+                    <img
+                      src={formData.logoUrl}
+                      alt="Brand Logo Preview"
+                      className="h-10 w-10 rounded-full object-contain border border-emerald-400/60 bg-white p-0.5 shadow-2xs"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = "/preethi_logo.jpg";
+                      }}
+                    />
+                    <div className="flex flex-col text-left">
+                      <span className="text-[11px] font-semibold text-slate-800">Current Logo</span>
+                      <span className="text-[10px] text-emerald-600 font-medium">Synchronized</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <FileUpload
+                label="Choose or Drag Hospital Logo (PNG, JPG, SVG, WebP)"
+                folder="hospital-logos"
+                value={formData.logoUrl}
+                onChange={(url) => {
+                  setFormData((prev) => ({ ...prev, logoUrl: url }));
+                  setFieldErrors((prev) => ({ ...prev, logoUrl: undefined }));
+                }}
+                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                hint="Recommended: square image (512x512px) with transparent or white background. Max size: 5MB."
+                error={fieldErrors.logoUrl}
+              />
+            </div>
 
             <InputField
               label="Contact Phone"
@@ -708,19 +739,42 @@ export function HospitalInfoPage() {
               />
             </div>
 
-            <InputField
-              label="Hero Banner URL (Optional)"
-              name="heroBannerUrl"
-              maxLength={HOSPITAL_INFO_LIMITS.HERO_BANNER_URL}
-              showCharCount
-              value={formData.heroBannerUrl}
-              error={fieldErrors.heroBannerUrl}
-              onChange={handleInputChange}
-              onKeyDown={(e) => handleKeyGuard(e, formData.heroBannerUrl.length, HOSPITAL_INFO_LIMITS.HERO_BANNER_URL, "Hero Banner URL")}
-              onPaste={(e) => handlePasteGuard(e, HOSPITAL_INFO_LIMITS.HERO_BANNER_URL, "Hero Banner URL", formData.heroBannerUrl.length)}
-              onBlur={() => handleBlur("heroBannerUrl", formData.heroBannerUrl)}
-              placeholder="https://example.com/banner.png"
-            />
+            {/* Hero Banner File Upload */}
+            <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <ImageIcon className="h-3.5 w-3.5 text-emerald-700" /> Hero Banner Image (Optional)
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Banner image displayed in the hero section of the public website.
+                  </p>
+                </div>
+                {formData.heroBannerUrl && (
+                  <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-md border border-slate-200 shadow-2xs shrink-0">
+                    <img
+                      src={formData.heroBannerUrl}
+                      alt="Banner Preview"
+                      className="h-9 w-16 rounded object-cover border border-slate-200"
+                    />
+                    <span className="text-[10px] text-slate-500">Preview</span>
+                  </div>
+                )}
+              </div>
+
+              <FileUpload
+                label="Choose or Drag Hero Banner Image (PNG, JPG, WebP)"
+                folder="hospital-logos"
+                value={formData.heroBannerUrl}
+                onChange={(url) => {
+                  setFormData((prev) => ({ ...prev, heroBannerUrl: url }));
+                  setFieldErrors((prev) => ({ ...prev, heroBannerUrl: undefined }));
+                }}
+                accept="image/png,image/jpeg,image/webp"
+                hint="Recommended: 1920x800px landscape image. Max size: 10MB."
+                error={fieldErrors.heroBannerUrl}
+              />
+            </div>
 
             <InputField
               label="Working Hours (OPD / Labs)"
@@ -885,7 +939,7 @@ export function HospitalInfoPage() {
               const descKey = `pillar_${idx + 1}_desc`;
               return (
                 <div key={idx} className="border border-slate-100 rounded-xl p-4 bg-slate-50/50 space-y-3">
-                  <span className="inline-block rounded bg-navy-50 px-2 py-0.5 text-[10px] font-bold text-navy-700 uppercase">
+                  <span className="inline-block rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 uppercase">
                     Pillar #{idx + 1}
                   </span>
                   <div>
@@ -1078,7 +1132,7 @@ export function HospitalInfoPage() {
         )}
 
         <div className="flex justify-end pt-4">
-          <Button type="submit" variant="primary" disabled={updateHospital.isPending} className="bg-navy-700 px-8 py-3 text-sm">
+          <Button type="submit" variant="primary" disabled={updateHospital.isPending} className="bg-emerald-700 px-8 py-3 text-sm">
             {updateHospital.isPending ? "Saving configuration..." : "Save Config Details"}
           </Button>
         </div>

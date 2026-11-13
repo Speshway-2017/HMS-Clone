@@ -6,6 +6,7 @@ interface KpiCardProps {
   label: string;
   value: ReactNode;
   icon?: ReactNode;
+  subtitle?: ReactNode;
   trend?: { direction: "up" | "down"; text: string };
   emphasis?: boolean;
   to?: string;
@@ -19,6 +20,7 @@ export function KpiCard({
   label,
   value,
   icon,
+  subtitle,
   trend,
   emphasis = false,
   to,
@@ -52,27 +54,31 @@ export function KpiCard({
           handleClick(e as any);
         }
       }}
-      className={`h-full min-w-0 overflow-hidden transition-all duration-300 cursor-pointer ${
-        isSm ? "p-4" : "p-5 sm:p-6"
+      className={`h-full min-w-0 overflow-hidden transition-all duration-150 cursor-pointer ${
+        isSm ? "p-3 sm:p-3.5" : "p-3.5 sm:p-4"
       } ${
         emphasis
-          ? "bg-navy-700 text-white hover:bg-navy-800"
-          : "hover:bg-slate-50 hover:border-slate-350 focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+          ? "bg-emerald-700 text-white hover:bg-emerald-800 border-emerald-800 shadow-xs"
+          : "bg-white hover:bg-emerald-50/20 hover:border-emerald-300 border-slate-200 shadow-xs"
       } ${className}`}
       title={valueString ? `${label}: ${valueString} (Click to show complete amount)` : undefined}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <span
-          className={`text-[10px] sm:text-xs font-semibold uppercase tracking-wide truncate ${
-            emphasis ? "text-navy-100" : "text-slate-500"
+          className={`text-[11px] font-bold uppercase tracking-wider truncate ${
+            emphasis ? "text-emerald-100" : "text-slate-500"
           }`}
         >
           {label}
         </span>
         {icon && (
           <span
-            className={`rounded-lg flex-shrink-0 ${isSm ? "p-1.5" : "p-2"} ${
-              emphasis ? "bg-white/15" : "bg-navy-50 text-navy-700"
+            className={`rounded-lg flex-shrink-0 flex items-center justify-center ${
+              isSm ? "h-7 w-7" : "h-8 w-8"
+            } ${
+              emphasis
+                ? "bg-white/15 text-white"
+                : "bg-emerald-50 text-emerald-700 border border-emerald-100"
             }`}
           >
             {icon}
@@ -81,30 +87,41 @@ export function KpiCard({
       </div>
 
       <div
-        className={`font-semibold tracking-tight transition-all ${
+        className={`font-bold tracking-tight transition-all text-slate-900 ${
+          emphasis ? "text-white" : "text-slate-900"
+        } ${
           isExpanded
-            ? "mt-3 text-lg sm:text-xl break-all whitespace-normal"
-            : `mt-3 ${isSm ? "text-xl sm:text-2xl" : "text-2xl xl:text-3xl"} ${isLong ? "text-xl sm:text-2xl" : ""} truncate`
+            ? "mt-2 text-base sm:text-lg break-all whitespace-normal"
+            : `mt-2 ${isSm ? "text-lg sm:text-xl" : "text-xl sm:text-2xl"} ${isLong ? "text-lg" : ""} truncate`
         }`}
       >
         {value}
       </div>
 
       {isLong && expandable && !onClick && (
-        <p className={`text-[10px] mt-1 font-medium ${emphasis ? "text-navy-200" : "text-slate-400"}`}>
-          {isExpanded ? "Click to collapse" : "Click to show complete amount"}
+        <p className={`text-[10px] mt-0.5 font-medium ${emphasis ? "text-emerald-200" : "text-slate-400"}`}>
+          {isExpanded ? "Click to collapse" : "Click to view full"}
         </p>
       )}
 
-      {trend && (
+      {subtitle ? (
+        <div className={`text-xs ${isSm ? "mt-1" : "mt-1.5"} ${emphasis ? "text-emerald-100" : "text-slate-500 font-normal"}`}>
+          {subtitle}
+        </div>
+      ) : trend ? (
         <div
-          className={`font-medium ${isSm ? "mt-1.5 text-xs" : "mt-2 text-sm"} ${
-            trend.direction === "up" ? "text-emerald-500" : "text-red-500"
+          className={`font-semibold flex items-center gap-1 ${
+            isSm ? "mt-1 text-[11px]" : "mt-1.5 text-xs"
+          } ${
+            trend.direction === "up"
+              ? emphasis ? "text-emerald-200" : "text-emerald-600"
+              : emphasis ? "text-rose-200" : "text-rose-600"
           }`}
         >
-          {trend.direction === "up" ? "↗" : "↘"} {trend.text}
+          <span>{trend.direction === "up" ? "↗" : "↘"}</span>
+          <span>{trend.text}</span>
         </div>
-      )}
+      ) : null}
     </Card>
   );
 

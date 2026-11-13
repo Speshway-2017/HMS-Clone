@@ -2,235 +2,139 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { User } from "../models/User";
 import { CustomRole } from "../models/Role";
-import { ROLES } from "../utils/roles";
-import { ROLE_PERMISSIONS } from "../utils/rolePermissions";
 import { catchAsync } from "../utils/catchAsync";
 import { AppError } from "../utils/AppError";
 
-const createRoleSchema = z.object({
-  role: z
-    .string({ invalid_type_error: "Role Key must be valid data. Please enter valid data" })
-    .trim()
-    .min(1, "Role Key (System Identifier) is required. Field is required. Please fill out this field")
-    .max(50, "Role Key (System Identifier) cannot exceed 50 characters. Too long text is not accepted. Please enter valid data")
-    .refine((val) => val.length >= 2 && /^[a-z_]+$/.test(val), {
-      message: "Role Key must contain only lowercase characters and underscores. Invalid data is not accepted. Please enter valid data",
-    }),
-  label: z
-    .string({ invalid_type_error: "Role Label must be valid data. Please enter valid data" })
-    .trim()
-    .min(1, "Role Label (Display Name) is required. Field is required. Please fill out this field")
-    .max(50, "Role Label (Display Name) cannot exceed 50 characters. Too long text is not accepted. Please enter valid data")
-    .refine((val) => val.length >= 2 && /^[a-zA-Z][a-zA-Z0-9\s\.\-/'&]*$/.test(val), {
-      message: "Role Label (Display Name) contains invalid data. Invalid data is not accepted. Please enter valid data",
-    }),
-  description: z
-    .string({ invalid_type_error: "Description must be valid data. Please enter valid data" })
-    .max(500, "Description cannot exceed 500 characters. Too long text is not accepted. Please enter valid data")
-    .refine((val) => !val || !/<script|javascript:|data:|<[^>]*>/i.test(val), {
-      message: "Description contains invalid data. Invalid data is not accepted. Please enter valid data",
-    })
-    .optional()
-    .default(""),
-  permissions: z.array(z.string()).default([]),
-});
+export const CANONICAL_ROLES = [
+  {
+    role: "super_admin",
+    label: "Super Admin",
+    description: "Full network oversight across every hospital, branch, CMS, public pages, and admin accounts.",
+    permissions: ["Full System Access", "Manage Institutions", "Website CMS Control", "Public Enquiries", "Security Override"],
+  },
+  {
+    role: "admin",
+    label: "Hospital Admin",
+    description: "Runs day-to-day operations, departments, clinical workforce, and facilities for an assigned hospital.",
+    permissions: ["Manage Staff", "View Hospital Analytics", "Manage Departments", "Inventory Control", "Bed & Ward Management"],
+  },
+  {
+    role: "receptionist",
+    label: "Receptionist",
+    description: "Manages patient onboarding, schedules appointments, and handles clinic front desk operations.",
+    permissions: ["Patient Registration", "Appointment Scheduling", "Visitor Log", "Billing Intake", "Patient Management", "Queue Management"],
+  },
+  {
+    role: "pharmacist",
+    label: "Pharmacist",
+    description: "Verifies prescriptions, dispenses medicines, manages inventory, and handles pharmacy billing.",
+    permissions: ["Verify Prescriptions", "Dispense Medicines", "Inventory Management", "Pharmacy Billing"],
+  },
+  {
+    role: "doctor",
+    label: "Doctor",
+    description: "Provides medical care, creates prescriptions, manages IP/OP records, and orders lab tests.",
+    permissions: ["Patient Consultation", "Electronic Prescriptions", "Clinical Notes", "IP/OP Management"],
+  },
+  {
+    role: "staff",
+    label: "Clinical Staff",
+    description: "Provides direct patient care, records vital signs, administers medications, handles shift handovers, and manages ward workflows.",
+    permissions: ["Record Vitals", "Administer Medications", "Ward Management", "Patient Care", "Shift Handover", "Nursing Notes"],
+  },
+  {
+    role: "patient",
+    label: "Patient",
+    description: "Accesses own medical records, prescriptions, billing summaries, and appointments scheduler.",
+    permissions: ["View Personal Records", "View Prescriptions", "Book Appointments", "View Billing"],
+  },
+] as const;
 
 export const listRoles = catchAsync(async (req: Request, res: Response) => {
-  const isHospitalScoped = req.user!.role !== "super_admin";
-  const hospitalId = req.user!.hospital;
+  // 1. Purge legacy duplicate roles from the database to eliminate duplicate cards
+  await CustomRole.deleteMany({
+    role: { $in: ["hospital_admin", "nurse", "accountant", "laboratory"] },
+  });
 
-  // Lazy-initialize default roles for this hospital if missing in DB
-  if (isHospitalScoped && hospitalId) {
-    const defaultRoles = [
-      {
-        role: "hospital_admin",
-        label: "Hospital Admin",
-        description: "Runs day-to-day operations for a single assigned hospital.",
-        permissions: ["Manage Staff", "View Hospital Analytics", "Manage Departments", "Inventory Control"],
-      },
-      {
-        role: "accountant",
-        label: "Accountant",
-        description: "Handles billing, payroll, claims, and financial reporting for an assigned hospital.",
-        permissions: ["Billing Operations", "Payroll Processing", "Insurance Claims", "Financial Reports"],
-      },
-      {
-        role: "doctor",
-        label: "Doctor",
-        description: "Provides medical care, creates prescriptions, manages IP/OP records, and orders lab tests.",
-        permissions: ["Patient Consultation", "Electronic Prescriptions", "Clinical Notes", "IP/OP Management"],
-      },
-      {
-        role: "nurse",
-        label: "Nurse",
-        description: "Provides direct patient care, records vital signs, administers medications, and manages ward workflows.",
-        permissions: ["Record Vitals", "Administer Medications", "Ward Management", "Patient Care"],
-      },
-      {
-        role: "receptionist",
-        label: "Receptionist",
-        description: "Manages patient onboarding, schedules appointments, and handles clinic front desk operations.",
-        permissions: ["Patient Registration", "Appointment Scheduling", "Visitor Log", "Billing Intake"],
-      },
-      {
-        role: "pharmacist",
-        label: "Pharmacist",
-        description: "Verifies prescriptions, dispenses medicines, manages inventory, and handles pharmacy billing.",
-        permissions: ["Verify Prescriptions", "Dispense Medicines", "Inventory Management", "Pharmacy Billing"],
-      },
-      {
-        role: "laboratory",
-        label: "Laboratory",
-        description: "The Laboratory role manages lab test requests, sample collections, test processing, quality control, laboratory inventory, and report delivery.",
-        permissions: ["Manage Test Requests", "Collect Samples", "Process Tests", "Quality Control", "Lab Inventory", "Report Delivery"],
-      },
-    ];
-
-    for (const dr of defaultRoles) {
-      const exists = await CustomRole.findOne({ hospital: hospitalId, role: dr.role });
-      if (!exists) {
-        await CustomRole.create({ ...dr, hospital: hospitalId });
-      }
+  // 2. Ensure each canonical role is safely initialized and persisted in the database
+  for (const cr of CANONICAL_ROLES) {
+    const existing = await CustomRole.findOne({ role: cr.role });
+    if (!existing) {
+      await CustomRole.create({
+        role: cr.role,
+        label: cr.label,
+        description: cr.description,
+        permissions: cr.permissions,
+        hospital: null,
+      });
     }
   }
 
-  const matchStage = isHospitalScoped ? { hospital: hospitalId } : {};
+  // 3. Count assigned users per role (aggregating legacy aliases to canonical roles)
+  const isHospitalScoped = req.user!.role !== "super_admin";
+  const hospitalId = req.user!.hospital;
+  const matchStage = isHospitalScoped && hospitalId ? { hospital: hospitalId } : {};
 
-  // Count assigned users per role
   const counts = await User.aggregate([{ $match: matchStage }, { $group: { _id: "$role", count: { $sum: 1 } } }]);
   const countByRole = new Map(counts.map((c) => [c._id, c.count]));
 
-  let roles: any[] = [];
+  const adminUsers = (countByRole.get("admin") || 0) + (countByRole.get("hospital_admin") || 0);
+  const staffUsers = (countByRole.get("staff") || 0) + (countByRole.get("nurse") || 0);
 
-  if (isHospitalScoped && hospitalId) {
-    // Fetch all roles from DB (default + custom)
-    const dbRoles = await CustomRole.find({ hospital: hospitalId });
-    roles = dbRoles.map((r) => ({
+  // 4. Retrieve roles strictly from the database
+  const dbRoles = await CustomRole.find({
+    role: { $in: CANONICAL_ROLES.map((r) => r.role) },
+  });
+
+  // Preserve canonical display order
+  const orderMap = new Map<string, number>(CANONICAL_ROLES.map((r, idx) => [r.role, idx]));
+  const sortedDbRoles = dbRoles.sort((a, b) => (orderMap.get(a.role) ?? 99) - (orderMap.get(b.role) ?? 99));
+
+  const roles = sortedDbRoles.map((r) => {
+    let assignedCount = countByRole.get(r.role) || 0;
+    if (r.role === "admin") assignedCount = adminUsers;
+    if (r.role === "staff") assignedCount = staffUsers;
+
+    return {
       _id: r._id,
       role: r.role,
       label: r.label,
       description: r.description,
       permissions: r.permissions,
-      assignedUsers: countByRole.get(r.role) ?? 0,
-      isCustom: true,
-    }));
-  } else {
-    // For super admins (system-wide standard roles view + custom system roles)
-    const visibleRoles = ROLES;
-    const staticRoles = visibleRoles.map((role) => ({
-      role,
-      ...ROLE_PERMISSIONS[role],
-      assignedUsers: countByRole.get(role) ?? 0,
+      assignedUsers: assignedCount,
       isCustom: false,
-    }));
-
-    const dbCustomRoles = await CustomRole.find({});
-    const customRoles = dbCustomRoles
-      .filter((r) => !visibleRoles.includes(r.role as any))
-      .map((r) => ({
-        _id: r._id,
-        role: r.role,
-        label: r.label,
-        description: r.description,
-        permissions: r.permissions,
-        assignedUsers: countByRole.get(r.role) ?? 0,
-        isCustom: true,
-      }));
-
-    roles = [...staticRoles, ...customRoles];
-  }
+    };
+  });
 
   res.json({ status: "success", data: { roles } });
 });
 
 const updateRoleSchema = z.object({
-  label: z
-    .string({ invalid_type_error: "Role Label must be valid data. Please enter valid data" })
-    .trim()
-    .max(50, "Role Label (Display Name) cannot exceed 50 characters. Too long text is not accepted. Please enter valid data")
-    .refine((val) => !val || (val.length >= 2 && /^[a-zA-Z][a-zA-Z0-9\s\.\-/'&]*$/.test(val)), {
-      message: "Role Label (Display Name) contains invalid data. Invalid data is not accepted. Please enter valid data",
-    })
-    .optional(),
-  description: z
-    .string({ invalid_type_error: "Description must be valid data. Please enter valid data" })
-    .max(500, "Description cannot exceed 500 characters. Too long text is not accepted. Please enter valid data")
-    .refine((val) => !val || !/<script|javascript:|data:|<[^>]*>/i.test(val), {
-      message: "Description contains invalid data. Invalid data is not accepted. Please enter valid data",
-    })
-    .optional(),
+  label: z.string().trim().max(50).optional(),
+  description: z.string().max(500).optional(),
   permissions: z.array(z.string()).optional(),
 });
 
 export const updateRole = catchAsync(async (req: Request, res: Response) => {
   const body = updateRoleSchema.parse(req.body);
-  const isSuperAdmin = req.user!.role === "super_admin";
-  const hospitalId = isSuperAdmin ? null : req.user!.hospital;
 
-  const filter = hospitalId ? { _id: req.params.id, hospital: hospitalId } : { _id: req.params.id };
-
-  const role = await CustomRole.findOneAndUpdate(
-    filter,
-    body,
+  const role = await CustomRole.findByIdAndUpdate(
+    req.params.id,
+    { $set: body },
     { new: true, runValidators: true }
   );
 
   if (!role) {
-    throw new AppError("Custom role not found.", 404);
+    throw new AppError("Role not found in the database.", 404);
   }
 
   res.json({ status: "success", data: { role } });
 });
 
-export const deleteRole = catchAsync(async (req: Request, res: Response) => {
-  const isSuperAdmin = req.user!.role === "super_admin";
-  const hospitalId = isSuperAdmin ? null : req.user!.hospital;
-
-  const filter = hospitalId ? { _id: req.params.id, hospital: hospitalId } : { _id: req.params.id };
-
-  const role = await CustomRole.findOne(filter);
-  if (!role) {
-    throw new AppError("Custom role not found.", 404);
-  }
-
-  // Prevent deleting custom role if users are assigned to it
-  const userFilter = hospitalId ? { role: role.role, hospital: hospitalId } : { role: role.role };
-  const assignedUsersCount = await User.countDocuments(userFilter);
-  if (assignedUsersCount > 0) {
-    throw new AppError("Cannot delete this role because users are currently assigned to it.", 400);
-  }
-
-  await CustomRole.deleteOne({ _id: role._id });
-
-  res.status(204).send();
+export const deleteRole = catchAsync(async (_req: Request, _res: Response) => {
+  throw new AppError("System operates strictly on the 7 canonical clinical roles. Roles cannot be deleted.", 400);
 });
 
-export const createRole = catchAsync(async (req: Request, res: Response) => {
-  const body = createRoleSchema.parse(req.body);
-  const isSuperAdmin = req.user!.role === "super_admin";
-  const hospitalId = isSuperAdmin ? null : req.user!.hospital;
-
-  if (!isSuperAdmin && !hospitalId) {
-    throw new AppError("Hospital context required to create a custom role.", 400);
-  }
-
-  // Ensure role does not collide with static roles
-  if (["super_admin", "hospital_admin"].includes(body.role)) {
-    throw new AppError("A system role with this name already exists.", 400);
-  }
-
-  // Check if role key already exists
-  const existing = await CustomRole.findOne(
-    hospitalId ? { hospital: hospitalId, role: body.role } : { role: body.role }
-  );
-  if (existing) {
-    throw new AppError("A role with this key already exists.", 400);
-  }
-
-  const role = await CustomRole.create({
-    ...body,
-    hospital: hospitalId,
-  });
-
-  res.status(201).json({ status: "success", data: { role } });
+export const createRole = catchAsync(async (_req: Request, _res: Response) => {
+  throw new AppError("The system operates strictly on the 7 canonical clinical roles. Adding custom roles is disabled.", 400);
 });

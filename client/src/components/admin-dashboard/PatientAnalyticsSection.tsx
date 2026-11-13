@@ -257,7 +257,7 @@ export function PatientAnalyticsSection({ patients, admissions = [], appointment
       {/* Section Header */}
       <div className="flex items-center justify-between border-b border-slate-200 pb-3">
         <div className="flex items-center gap-2">
-          <div className="rounded-lg bg-navy-50 p-2 text-navy-700">
+          <div className="rounded-lg bg-emerald-50 p-2 text-emerald-700">
             <Users className="h-5 w-5" />
           </div>
           <div>
@@ -470,19 +470,19 @@ export function PatientAnalyticsSection({ patients, admissions = [], appointment
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between h-full">
           <p className="text-[11.5px] sm:text-xs font-semibold text-slate-500 truncate tracking-tight" title="Total Patients">Total Patients</p>
-          <p className="mt-2 text-2xl font-extrabold text-navy-900">{metrics.total}</p>
+          <p className="mt-2 text-2xl font-extrabold text-slate-900">{metrics.total}</p>
           <span className="mt-1 inline-block text-[11px] text-slate-400 truncate">Live Database Records</span>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between h-full">
           <p className="text-[11.5px] sm:text-xs font-semibold text-slate-500 truncate tracking-tight" title="OP Patients">OP Patients</p>
-          <p className="mt-2 text-2xl font-extrabold text-blue-600">{metrics.opCount}</p>
+          <p className="mt-2 text-2xl font-extrabold text-emerald-700">{metrics.opCount}</p>
           <span className="mt-1 inline-block text-[11px] text-slate-400 truncate">Outpatient Visits</span>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between h-full">
           <p className="text-[11.5px] sm:text-xs font-semibold text-slate-500 truncate tracking-tight" title="IP Patients">IP Patients</p>
-          <p className="mt-2 text-2xl font-extrabold text-purple-600">{metrics.ipCount}</p>
+          <p className="mt-2 text-2xl font-extrabold text-rose-600">{metrics.ipCount}</p>
           <span className="mt-1 inline-block text-[11px] text-slate-400 truncate">Inpatient Admissions</span>
         </div>
 

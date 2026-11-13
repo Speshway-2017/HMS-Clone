@@ -55,7 +55,7 @@ export function OperationTheatrePage() {
   if (isLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-navy-700 border-t-transparent"></div>
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-700 border-t-transparent"></div>
       </div>
     );
   }
@@ -134,8 +134,8 @@ export function OperationTheatrePage() {
                       ...surgery.assistants.map((a) => ({ role: "Assistant", name: a })),
                     ].map((member, i) => (
                       <div key={i} className="flex items-center gap-2 rounded-lg border border-slate-100 px-3 py-2">
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy-100">
-                          <User className="h-3.5 w-3.5 text-navy-700" />
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                          <User className="h-3.5 w-3.5 text-emerald-700" />
                         </div>
                         <div className="min-w-0">
                           <p className="text-xs text-slate-400">{member.role}</p>

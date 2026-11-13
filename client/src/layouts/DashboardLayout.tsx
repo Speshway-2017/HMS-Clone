@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Sidebar } from "../components/ui/Sidebar";
-import { Topbar } from "../components/ui/Topbar";
+import { TopNavbar } from "../components/layout/TopNavbar";
 import { useAuth } from "../context/AuthContext";
 import { socket } from "../lib/socket";
 import { useDoctorProfileMe } from "../features/doctors";
@@ -11,20 +10,27 @@ import { useMyHospital } from "../features/hospitals";
 export function DashboardLayout() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const { data: doctorProfile } = useDoctorProfileMe();
-  const { data: hospital } = useMyHospital({ enabled: !!user?.hospital });
+  const { data: hospital } = useMyHospital();
 
   useEffect(() => {
-    if (hospital?.logoUrl) {
+    const effectiveName = hospital?.name || localStorage.getItem("hms_hospital_name");
+    if (effectiveName) {
+      document.title = `${effectiveName} — Hospital Information System`;
+    }
+  }, [hospital?.name]);
+
+  useEffect(() => {
+    const effectiveLogo = hospital?.logoUrl || localStorage.getItem("hms_hospital_logo");
+    if (effectiveLogo) {
       let favicon = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
       if (!favicon) {
         favicon = document.createElement("link");
         favicon.rel = "icon";
         document.getElementsByTagName("head")[0].appendChild(favicon);
       }
-      favicon.href = hospital.logoUrl;
+      favicon.href = effectiveLogo;
     }
   }, [hospital?.logoUrl]);
 
@@ -87,7 +93,6 @@ export function DashboardLayout() {
       "prescription:new",
       "prescription:updated",
       "prescription:dispensed",
-      "notification:new",
       "doctor:created",
       "doctor:updated",
       "doctor:deleted",
@@ -103,6 +108,7 @@ export function DashboardLayout() {
       "branch:updated",
       "branch:deleted",
       "hospital:updated",
+      "hospital:created",
       "hospital:deleted",
       "profile:updated"
     ];
@@ -121,18 +127,11 @@ export function DashboardLayout() {
   }, [queryClient]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 print:bg-white print:h-auto print:overflow-visible">
-      <div className="print:hidden">
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      </div>
-      <div className="flex flex-1 flex-col overflow-hidden print:overflow-visible">
-        <div className="print:hidden">
-          <Topbar onMenuClick={() => setSidebarOpen(true)} />
-        </div>
-        <main className="flex-1 min-w-0 overflow-y-auto p-3 sm:p-4 md:p-6 print:p-0 print:overflow-visible">
-          <Outlet />
-        </main>
-      </div>
+    <div className="min-h-screen flex flex-col bg-slate-50 print:bg-white print:h-auto print:overflow-visible text-slate-900">
+      <TopNavbar />
+      <main className="flex-1 w-full max-w-[1720px] mx-auto px-4 py-4 sm:px-6 sm:py-5 print:p-0 print:overflow-visible">
+        <Outlet />
+      </main>
     </div>
   );
 }

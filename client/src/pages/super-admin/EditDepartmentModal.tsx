@@ -371,7 +371,7 @@ export function EditDepartmentModal({ department, isOpen, onClose }: EditDepartm
             </div>
             <div>
               <h2 className="text-base font-semibold text-white">Edit Department</h2>
-              <p className="text-xs text-navy-200">{department.name}</p>
+              <p className="text-xs text-emerald-200">{department.name}</p>
             </div>
           </div>
           <button

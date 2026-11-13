@@ -279,7 +279,7 @@ export function PharmacyBilling() {
                 onClick={() => setActiveTab(tab)}
                 className={`rounded-md px-4 py-1.5 text-xs font-semibold transition-colors ${
                   activeTab === tab 
-                    ? "bg-white text-navy-700 shadow-sm" 
+                    ? "bg-white text-emerald-700 shadow-sm" 
                     : "text-slate-600 hover:text-slate-950"
                 }`}
               >
@@ -296,7 +296,7 @@ export function PharmacyBilling() {
             placeholder="Search by Patient, UHID, Invoice or Rx..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-slate-350 bg-slate-50 pl-9 pr-4 py-2 text-xs outline-none focus:border-navy-500 focus:bg-white"
+            className="w-full rounded-lg border border-slate-350 bg-slate-50 pl-9 pr-4 py-2 text-xs outline-none focus:border-emerald-500 focus:bg-white"
           />
         </div>
       </div>
@@ -310,7 +310,7 @@ export function PharmacyBilling() {
           columns={[
             {
               header: "Invoice ID",
-              render: (r) => <span className="font-bold text-navy-700 font-mono text-xs" title={r._id}>#{r._id.slice(-8).toUpperCase()}</span>
+              render: (r) => <span className="font-bold text-emerald-700 font-mono text-xs" title={r._id}>#{r._id.slice(-8).toUpperCase()}</span>
             },
             {
               header: "Patient",
@@ -359,7 +359,7 @@ export function PharmacyBilling() {
                       setSelectedInvoice(r);
                       setIsInvoiceDetailsOpen(true);
                     }} 
-                    className="p-1 hover:text-navy-700"
+                    className="p-1 hover:text-emerald-700"
                     title="View Receipt"
                   >
                     <Eye className="h-4 w-4" />
@@ -409,7 +409,7 @@ export function PharmacyBilling() {
                 <span className="text-slate-500">Total Paid:</span>
                 <span className="font-bold text-slate-800">₹{selectedInvoice.amountPaid.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-sm font-bold border-t border-dashed border-slate-200 pt-1.5 text-navy-800">
+              <div className="flex justify-between text-sm font-bold border-t border-dashed border-slate-200 pt-1.5 text-emerald-800">
                 <span>Remaining Balance Due:</span>
                 <span>₹{selectedInvoice.patientBalance.toFixed(2)}</span>
               </div>
@@ -456,7 +456,7 @@ export function PharmacyBilling() {
             </SelectField>
 
             {payMethod === "Mixed" && (
-              <div className="p-3 bg-navy-50/30 border border-navy-100 rounded-lg grid grid-cols-3 gap-2">
+              <div className="p-3 bg-emerald-50/30 border border-navy-100 rounded-lg grid grid-cols-3 gap-2">
                 <InputField
                   label="UPI Amount (₹)"
                   type="number"
@@ -585,7 +585,7 @@ export function PharmacyBilling() {
                 </div>
                 <div className="flex justify-between text-sm font-bold text-slate-900 border-t border-slate-150 pt-2">
                   <span>Remaining Balance Due:</span>
-                  <span className="font-mono text-navy-700">₹{selectedInvoice.patientBalance.toFixed(2)}</span>
+                  <span className="font-mono text-emerald-700">₹{selectedInvoice.patientBalance.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -613,7 +613,7 @@ export function PharmacyBilling() {
                   <IndianRupee className="h-4 w-4" /> Pay Balance
                 </Button>
               )}
-              <Button onClick={() => window.print()} className="flex items-center gap-1 bg-navy-700">
+              <Button onClick={() => window.print()} className="flex items-center gap-1 bg-emerald-700">
                 <Printer className="h-4 w-4" /> Print Receipt
               </Button>
             </div>

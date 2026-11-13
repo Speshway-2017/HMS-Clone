@@ -801,7 +801,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
   // Split events for Recent Activities Feed (Top 6 entries)
   const recentShiftActivities = databaseTimelineEvents.slice(0, 6).map((item: any) => {
     let icon = ClipboardList;
-    let color = "text-navy-500 bg-navy-50";
+    let color = "text-navy-500 bg-emerald-50";
 
     if (item.eventType === "vital_update" || item.description?.toLowerCase().includes("vital")) {
       icon = Thermometer;
@@ -922,7 +922,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
 
       {viewingPatientDetailsId && isDetailInpatientLoading ? (
         <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
-          <Loader2 className="h-10 w-10 text-navy-700 animate-spin" />
+          <Loader2 className="h-10 w-10 text-emerald-700 animate-spin" />
           <p className="text-sm font-semibold text-slate-500">Retrieving patient chart details...</p>
         </div>
       ) : viewingPatientDetailsId && !detailInpatient ? (
@@ -961,7 +961,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                     className="h-14 w-14 rounded-full object-cover ring-4 ring-navy-50"
                   />
                 ) : (
-                  <div className="h-14 w-14 rounded-full bg-navy-100 text-navy-700 flex items-center justify-center font-extrabold text-lg ring-4 ring-navy-50">
+                  <div className="h-14 w-14 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-extrabold text-lg ring-4 ring-navy-50">
                     {detailInpatient.patient?.name?.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -981,7 +981,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                 <p className="text-xs text-slate-400 mt-1 font-semibold">
                   UHID: <span className="font-mono text-slate-600 font-bold">{detailInpatient.patient?.uhid || "N/A"}</span>
                   <span className="mx-2">•</span>
-                  Status: <span className="capitalize font-bold text-navy-600">{detailInpatient.status}</span>
+                  Status: <span className="capitalize font-bold text-emerald-600">{detailInpatient.status}</span>
                 </p>
               </div>
             </div>
@@ -1200,7 +1200,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                       <div key={i} className="border-b border-slate-100 last:border-0 pb-3 last:pb-0">
                         <div className="flex justify-between text-[10px] text-slate-400 font-semibold mb-1">
                           <span>{new Date(hist.date).toLocaleDateString()} · {hist.visitType || "Visit"}</span>
-                          <span className="text-navy-700 uppercase font-bold">{hist.doctorName} ({hist.department})</span>
+                          <span className="text-emerald-700 uppercase font-bold">{hist.doctorName} ({hist.department})</span>
                         </div>
                         <h4 className="text-xs font-bold text-slate-800">Diagnosis: {hist.diagnosis || "No diagnosis logged"}</h4>
                         {hist.notes && <p className="text-xs text-slate-500 mt-1 font-medium">{hist.notes}</p>}
@@ -1321,7 +1321,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                 </h3>
                 {detailInpatient.admittingDoctor ? (
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-navy-50 text-navy-700 flex items-center justify-center font-extrabold text-sm shrink-0">
+                    <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-extrabold text-sm shrink-0">
                       Dr
                     </div>
                     <div>
@@ -1350,7 +1350,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                           <div className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-slate-400" />
                           <div className="flex justify-between items-center text-[9px] text-slate-400 font-semibold mb-0.5">
                             <span>{new Date(note.date).toLocaleDateString()} at {note.time}</span>
-                            <span className="uppercase font-extrabold text-navy-600">{note.userName}</span>
+                            <span className="uppercase font-extrabold text-emerald-600">{note.userName}</span>
                           </div>
                           <p className="text-[11px] text-slate-600 leading-normal font-medium">{note.description}</p>
                         </div>
@@ -1372,7 +1372,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
           {/* Header Card */}
           <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-navy-50 text-navy-600 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                 <BedDouble className="h-6 w-6" />
               </div>
               <div>
@@ -1385,7 +1385,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
             <div className="flex gap-4 self-start md:self-auto">
               <div className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Assigned</p>
-                <p className="text-xl font-extrabold text-navy-700">{assignedPatients.length}</p>
+                <p className="text-xl font-extrabold text-emerald-700">{assignedPatients.length}</p>
               </div>
               <div className="bg-rose-50 border border-rose-100 rounded-xl px-4 py-2.5">
                 <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider">Critical</p>
@@ -1411,7 +1411,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                     setSearchPatientQuery(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 text-sm outline-none transition focus:border-navy-500 focus:ring-2 focus:ring-navy-100"
+                  className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-navy-100"
                 />
                 {searchPatientQuery && (
                   <button
@@ -1445,7 +1445,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                     setFilterWard(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2 px-2.5 rounded-xl cursor-pointer outline-none transition focus:border-navy-500"
+                  className="w-full text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2 px-2.5 rounded-xl cursor-pointer outline-none transition focus:border-emerald-500"
                 >
                   <option value="">All Wards</option>
                   {uniqueWards.map((w, i) => (
@@ -1463,7 +1463,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                     setFilterDoctor(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2 px-2.5 rounded-xl cursor-pointer outline-none transition focus:border-navy-500"
+                  className="w-full text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2 px-2.5 rounded-xl cursor-pointer outline-none transition focus:border-emerald-500"
                 >
                   <option value="">All Doctors</option>
                   {uniqueDoctors.map((d, i) => (
@@ -1481,7 +1481,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                     setFilterRoom(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2 px-2.5 rounded-xl cursor-pointer outline-none transition focus:border-navy-500"
+                  className="w-full text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2 px-2.5 rounded-xl cursor-pointer outline-none transition focus:border-emerald-500"
                 >
                   <option value="">All Rooms</option>
                   {uniqueRooms.map((r, i) => (
@@ -1499,7 +1499,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                     setFilterBed(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2 px-2.5 rounded-xl cursor-pointer outline-none transition focus:border-navy-500"
+                  className="w-full text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2 px-2.5 rounded-xl cursor-pointer outline-none transition focus:border-emerald-500"
                 >
                   <option value="">All Beds</option>
                   {uniqueBeds.map((b, i) => (
@@ -1517,7 +1517,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                     setFilterStatus(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2 px-2.5 rounded-xl cursor-pointer outline-none transition focus:border-navy-500"
+                  className="w-full text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2 px-2.5 rounded-xl cursor-pointer outline-none transition focus:border-emerald-500"
                 >
                   <option value="">All Statuses</option>
                   {uniqueStatuses.map((s, i) => (
@@ -1660,7 +1660,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 setSearchPatientQuery("");
                                 setCurrentPage(1);
                               }}
-                              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 border border-navy-200 text-navy-700 font-bold text-xs bg-navy-50 rounded-xl hover:bg-navy-100 transition-all cursor-pointer"
+                              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 border border-emerald-200 text-emerald-700 font-bold text-xs bg-emerald-50 rounded-xl hover:bg-emerald-100 transition-all cursor-pointer"
                             >
                               Clear All Filters
                             </button>
@@ -1704,12 +1704,12 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                           {/* Name */}
                           <td className="py-4 px-5">
                             <div className="flex items-center gap-2.5">
-                              <div className="h-8 w-8 rounded-full bg-navy-50 flex items-center justify-center text-navy-700 font-extrabold text-xs shrink-0">
+                              <div className="h-8 w-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-700 font-extrabold text-xs shrink-0">
                                 {patient.name?.charAt(0).toUpperCase() || "?"}
                               </div>
                               <span
                                 onClick={() => setViewingPatientDetailsId(patient._id)}
-                                className="font-bold text-slate-800 text-sm hover:text-navy-600 transition-colors cursor-pointer whitespace-nowrap"
+                                className="font-bold text-slate-800 text-sm hover:text-emerald-600 transition-colors cursor-pointer whitespace-nowrap"
                               >
                                 {patient.name || "Unknown Patient"}
                               </span>
@@ -1867,7 +1867,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                         key={idx}
                         onClick={() => setCurrentPage(idx + 1)}
                         className={`h-7.5 w-7.5 flex items-center justify-center rounded-lg text-xs font-bold transition-all cursor-pointer ${currentPage === idx + 1
-                            ? "bg-navy-700 text-white shadow-sm"
+                            ? "bg-emerald-700 text-white shadow-sm"
                             : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
                           }`}
                       >
@@ -1898,8 +1898,8 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
              ========================================== */}
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-2xl bg-navy-50 text-navy-700 border border-navy-100/60 flex items-center justify-center shrink-0">
-                <HeartPulse className="h-6 w-6 text-navy-700" />
+              <div className="h-12 w-12 rounded-2xl bg-emerald-50 text-emerald-700 border border-navy-100/60 flex items-center justify-center shrink-0">
+                <HeartPulse className="h-6 w-6 text-emerald-700" />
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -1920,7 +1920,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                 <p className="text-xs font-bold text-slate-800 font-sans">
                   {currentTime.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
                 </p>
-                <p className="text-[11px] font-mono font-bold text-navy-700 mt-0.5">
+                <p className="text-[11px] font-mono font-bold text-emerald-700 mt-0.5">
                   {currentTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })}
                 </p>
               </div>
@@ -2089,7 +2089,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-sm font-extrabold text-slate-800 font-sans uppercase tracking-wider flex items-center gap-2">
-                  <Activity className="h-4.5 w-4.5 text-navy-700" /> Clinical Shift Tasks Progress
+                  <Activity className="h-4.5 w-4.5 text-emerald-700" /> Clinical Shift Tasks Progress
                 </h3>
                 <p className="text-xs text-slate-500 font-sans mt-0.5">Overall task completion status for assigned ward patients</p>
               </div>
@@ -2179,7 +2179,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
               {/* 1. Record Vitals */}
               <div
                 onClick={() => setActiveDrawer("vitals")}
-                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-navy-200 cursor-pointer flex flex-col justify-between h-32 hover:shadow-md transition-all group"
+                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-emerald-200 cursor-pointer flex flex-col justify-between h-32 hover:shadow-md transition-all group"
               >
                 <div className="h-10 w-10 rounded-xl bg-rose-50 text-rose-500 border border-rose-100 flex items-center justify-center group-hover:bg-rose-500 group-hover:text-white transition-colors">
                   <Thermometer className="h-5 w-5" />
@@ -2193,7 +2193,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
               {/* 2. Medication Admin */}
               <div
                 onClick={() => setActiveDrawer("meds")}
-                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-navy-200 cursor-pointer flex flex-col justify-between h-32 hover:shadow-md transition-all group"
+                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-emerald-200 cursor-pointer flex flex-col justify-between h-32 hover:shadow-md transition-all group"
               >
                 <div className="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-500 border border-indigo-100 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                   <Pill className="h-5 w-5" />
@@ -2207,7 +2207,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
               {/* 3. Nursing Notes */}
               <div
                 onClick={() => setActiveDrawer("notes")}
-                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-navy-200 cursor-pointer flex flex-col justify-between h-32 hover:shadow-md transition-all group"
+                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-emerald-200 cursor-pointer flex flex-col justify-between h-32 hover:shadow-md transition-all group"
               >
                 <div className="h-10 w-10 rounded-xl bg-purple-50 text-purple-500 border border-purple-100 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
                   <ClipboardList className="h-5 w-5" />
@@ -2224,7 +2224,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                   setSelectedPatientId("");
                   setActiveDrawer("handover");
                 }}
-                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-navy-200 cursor-pointer flex flex-col justify-between h-32 hover:shadow-md transition-all group"
+                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-emerald-200 cursor-pointer flex flex-col justify-between h-32 hover:shadow-md transition-all group"
               >
                 <div className="h-10 w-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-colors">
                   <UserCheck className="h-5 w-5" />
@@ -2238,7 +2238,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
               {/* 5. Ward Management */}
               <div
                 onClick={() => navigate("/nurse/inpatients")}
-                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-navy-200 cursor-pointer flex flex-col justify-between h-32 hover:shadow-md transition-all group"
+                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-emerald-200 cursor-pointer flex flex-col justify-between h-32 hover:shadow-md transition-all group"
               >
                 <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
                   <BedDouble className="h-5 w-5" />
@@ -2252,7 +2252,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
               {/* 6. Emergency Alerts */}
               <div
                 onClick={() => setActiveDrawer("alerts")}
-                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-navy-200 cursor-pointer flex flex-col justify-between h-32 hover:shadow-md transition-all group"
+                className="bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-emerald-200 cursor-pointer flex flex-col justify-between h-32 hover:shadow-md transition-all group"
               >
                 <div className="h-10 w-10 rounded-xl bg-rose-50 text-rose-500 border border-rose-100 flex items-center justify-center group-hover:bg-rose-500 group-hover:text-white transition-colors">
                   <ShieldAlert className="h-5 w-5" />
@@ -2292,13 +2292,13 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                       <div key={idx} className="relative">
 
                         {/* Activity Bullet Node */}
-                        <span className="absolute -left-[31px] top-0.5 rounded-full border-4 border-white p-1 shadow-sm shrink-0 bg-navy-500 text-white">
+                        <span className="absolute -left-[31px] top-0.5 rounded-full border-4 border-white p-1 shadow-sm shrink-0 bg-emerald-500 text-white">
                           <Clock className="h-3 w-3" />
                         </span>
 
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-mono font-bold text-navy-600 bg-navy-50 border border-navy-100 px-2 py-0.5 rounded">
+                            <span className="text-xs font-mono font-bold text-emerald-600 bg-emerald-50 border border-navy-100 px-2 py-0.5 rounded">
                               {item.time || new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                             <h4 className="text-xs font-bold text-slate-800">
@@ -2307,7 +2307,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                           </div>
 
                           {/* Event Type badge */}
-                          <span className="self-start text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-navy-50 text-navy-700 border border-navy-100">
+                          <span className="self-start text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-navy-100">
                             {item.eventType || "Care Entry"}
                           </span>
                         </div>
@@ -2385,7 +2385,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
             <div>
               <div className="flex justify-between items-center border-b border-slate-100 pb-4">
                 <div>
-                  <span className="text-[10px] font-bold text-navy-600 bg-navy-50 border border-navy-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-navy-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
                     Nurse bedside utility
                   </span>
                   <h3 className="text-base font-extrabold text-slate-800 capitalize mt-1.5 flex items-center gap-2">
@@ -2421,7 +2421,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                         placeholder="Search roster by patient name, UHID, room..."
                         value={searchPatientQuery}
                         onChange={(e) => setSearchPatientQuery(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 pl-9 pr-4 py-2 outline-none focus:border-navy-500 text-xs font-semibold"
+                        className="w-full rounded-xl border border-slate-200 pl-9 pr-4 py-2 outline-none focus:border-emerald-500 text-xs font-semibold"
                       />
                     </div>
 
@@ -2443,7 +2443,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 toast.success(`Active selection: ${patientData.name}`);
                               }}
                               className={`p-4 rounded-xl border transition-all cursor-pointer ${isSelected
-                                  ? "bg-navy-50/50 border-navy-300 ring-1 ring-navy-300"
+                                  ? "bg-emerald-50/50 border-navy-300 ring-1 ring-navy-300"
                                   : "bg-slate-50/50 border-slate-150 hover:bg-slate-55 hover:border-slate-350"
                                 }`}
                             >
@@ -2503,7 +2503,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 setSelectedPatientId(e.target.value);
                                 setEditingVitalId(null);
                               }}
-                              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors"
+                              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 focus:ring-1 focus:ring-navy-500 outline-none cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors"
                             >
                               <option value="">-- Choose Assigned Patient --</option>
                               {currentInpatients.map((p: any, idx) => (
@@ -2523,7 +2523,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. 98.6"
                                 value={vitalsTemp}
                                 onChange={(e) => setVitalsTemp(e.target.value)}
-                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-navy-500 ${isVitalAbnormal("temp", vitalsTemp) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
+                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-emerald-500 ${isVitalAbnormal("temp", vitalsTemp) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
                                   }`}
                               />
                             </div>
@@ -2535,7 +2535,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. 72"
                                 value={vitalsPulse}
                                 onChange={(e) => setVitalsPulse(e.target.value)}
-                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-navy-500 ${isVitalAbnormal("pulse", vitalsPulse) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
+                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-emerald-500 ${isVitalAbnormal("pulse", vitalsPulse) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
                                   }`}
                               />
                             </div>
@@ -2547,7 +2547,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. 120/80"
                                 value={vitalsBp}
                                 onChange={(e) => setVitalsBp(e.target.value)}
-                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-navy-500 ${isVitalAbnormal("bp", vitalsBp) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
+                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-emerald-500 ${isVitalAbnormal("bp", vitalsBp) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
                                   }`}
                               />
                             </div>
@@ -2559,7 +2559,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. 16"
                                 value={vitalsResp}
                                 onChange={(e) => setVitalsResp(e.target.value)}
-                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-navy-500 ${isVitalAbnormal("resp", vitalsResp) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
+                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-emerald-500 ${isVitalAbnormal("resp", vitalsResp) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
                                   }`}
                               />
                             </div>
@@ -2571,7 +2571,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. 98"
                                 value={vitalsO2}
                                 onChange={(e) => setVitalsO2(e.target.value)}
-                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-navy-500 ${isVitalAbnormal("spo2", vitalsO2) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
+                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-emerald-500 ${isVitalAbnormal("spo2", vitalsO2) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
                                   }`}
                               />
                             </div>
@@ -2583,7 +2583,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. 110"
                                 value={vitalsBloodSugar}
                                 onChange={(e) => setVitalsBloodSugar(e.target.value)}
-                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-navy-500 ${isVitalAbnormal("sugar", vitalsBloodSugar) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
+                                className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition focus:border-emerald-500 ${isVitalAbnormal("sugar", vitalsBloodSugar) ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200"
                                   }`}
                               />
                             </div>
@@ -2595,7 +2595,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. 175"
                                 value={vitalsHeight}
                                 onChange={(e) => setVitalsHeight(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none"
+                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none"
                               />
                             </div>
                             {/* Weight */}
@@ -2606,7 +2606,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. 70"
                                 value={vitalsWeight}
                                 onChange={(e) => setVitalsWeight(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none"
+                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none"
                               />
                             </div>
                           </div>
@@ -2632,7 +2632,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                               placeholder="Log physical signs, comments, or clinical remarks..."
                               value={vitalsObservationNotes}
                               onChange={(e) => setVitalsObservationNotes(e.target.value)}
-                              className="w-full rounded-xl border border-slate-200 p-3 text-xs font-medium focus:border-navy-500 outline-none resize-none"
+                              className="w-full rounded-xl border border-slate-200 p-3 text-xs font-medium focus:border-emerald-500 outline-none resize-none"
                             />
                           </div>
 
@@ -2675,7 +2675,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                               {previousVitals.map((v: any, vIdx: number) => (
                                 <div
                                   key={v._id || vIdx}
-                                  className="p-3.5 bg-slate-50 border border-slate-150 rounded-xl space-y-2.5 relative group hover:border-navy-200 transition-colors"
+                                  className="p-3.5 bg-slate-50 border border-slate-150 rounded-xl space-y-2.5 relative group hover:border-emerald-200 transition-colors"
                                 >
                                   <div className="flex justify-between items-start">
                                     <div>
@@ -2689,7 +2689,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                     <button
                                       type="button"
                                       onClick={() => handleEditVitalClick(v)}
-                                      className="text-[9px] font-bold text-navy-700 hover:text-navy-900 bg-white border border-slate-200 hover:border-navy-200 px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-sm transition-all cursor-pointer"
+                                      className="text-[9px] font-bold text-emerald-700 hover:text-slate-900 bg-white border border-slate-200 hover:border-emerald-200 px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-sm transition-all cursor-pointer"
                                     >
                                       <FileEdit className="h-3 w-3" /> Edit
                                     </button>
@@ -2757,7 +2757,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                               setSelectedMedOrderId(null);
                               setMedAction(null);
                             }}
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 focus:ring-1 focus:ring-navy-500 outline-none bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
                           >
                             <option value="">-- Choose Assigned Patient --</option>
                             {currentInpatients.map((p: any, idx) => (
@@ -2776,7 +2776,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                               <form onSubmit={handleMedicationActionSubmit} className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-4 animate-in fade-in slide-in-from-top duration-205">
                                 <div className="flex justify-between items-center border-b border-slate-200 pb-2">
                                   <h4 className="text-xs font-bold text-slate-700">
-                                    Log Action: <span className="text-navy-600">{targetMed?.drugName}</span>
+                                    Log Action: <span className="text-emerald-600">{targetMed?.drugName}</span>
                                   </h4>
                                   <span className="text-[10px] font-bold text-slate-500 bg-white border px-2 py-0.5 rounded-lg uppercase tracking-wide">
                                     {medAction}
@@ -2793,7 +2793,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                         placeholder="e.g. 09:30 AM"
                                         value={medAdminTime}
                                         onChange={(e) => setMedAdminTime(e.target.value)}
-                                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none bg-white"
+                                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none bg-white"
                                       />
                                     </div>
                                   )}
@@ -2808,7 +2808,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                         placeholder="e.g. 11:30 AM"
                                         value={medScheduledTime}
                                         onChange={(e) => setMedScheduledTime(e.target.value)}
-                                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none bg-white"
+                                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none bg-white"
                                       />
                                     </div>
                                   )}
@@ -2830,7 +2830,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                       }
                                       value={medRemarks}
                                       onChange={(e) => setMedRemarks(e.target.value)}
-                                      className="w-full rounded-xl border border-slate-200 p-3 text-xs font-medium focus:border-navy-500 outline-none resize-none bg-white"
+                                      className="w-full rounded-xl border border-slate-200 p-3 text-xs font-medium focus:border-emerald-500 outline-none resize-none bg-white"
                                     />
                                   </div>
                                 </div>
@@ -2839,7 +2839,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                   <button
                                     type="submit"
                                     disabled={medSubmitting}
-                                    className="flex-1 bg-navy-600 hover:bg-navy-700 text-white font-bold py-2 rounded-xl flex items-center justify-center gap-1 text-xs shadow-sm cursor-pointer transition-all active:scale-98"
+                                    className="flex-1 bg-navy-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-xl flex items-center justify-center gap-1 text-xs shadow-sm cursor-pointer transition-all active:scale-98"
                                   >
                                     {medSubmitting ? (
                                       <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Logging...</>
@@ -3060,7 +3060,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 setSelectedPatientId(e.target.value);
                                 resetNurseNoteForm();
                               }}
-                              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+                              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
                             >
                               <option value="">-- Choose Patient Chart --</option>
                               {currentInpatients.map((p: any, idx) => (
@@ -3078,7 +3078,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                               <select
                                 value={noteObservationType}
                                 onChange={(e) => setNoteObservationType(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none cursor-pointer"
+                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none cursor-pointer"
                               >
                                 <option value="Routine">Routine Round</option>
                                 <option value="Post-Op">Post-Operative</option>
@@ -3098,7 +3098,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. Ambulatory / Bed Rest"
                                 value={noteMobility}
                                 onChange={(e) => setNoteMobility(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none"
+                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none"
                               />
                             </div>
 
@@ -3110,7 +3110,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. Alert & Oriented x3"
                                 value={noteMentalStatus}
                                 onChange={(e) => setNoteMentalStatus(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none"
+                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none"
                               />
                             </div>
 
@@ -3122,7 +3122,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. Intact, dry, warm"
                                 value={noteSkinCondition}
                                 onChange={(e) => setNoteSkinCondition(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none"
+                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none"
                               />
                             </div>
 
@@ -3134,7 +3134,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. Liquid Diet / Regular"
                                 value={noteDiet}
                                 onChange={(e) => setNoteDiet(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none"
+                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none"
                               />
                             </div>
 
@@ -3146,7 +3146,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. 500 ml IV"
                                 value={noteFluidIntake}
                                 onChange={(e) => setNoteFluidIntake(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none"
+                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none"
                               />
                             </div>
 
@@ -3158,7 +3158,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="e.g. 350 ml void"
                                 value={noteOutput}
                                 onChange={(e) => setNoteOutput(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none"
+                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none"
                               />
                             </div>
                           </div>
@@ -3171,7 +3171,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                               placeholder="e.g. Clean dry dressing applied..."
                               value={noteWoundCare}
                               onChange={(e) => setNoteWoundCare(e.target.value)}
-                              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none"
+                              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none"
                             />
                           </div>
 
@@ -3183,7 +3183,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                               placeholder="e.g. Improving patient hemodynamics..."
                               value={noteTreatmentProgress}
                               onChange={(e) => setNoteTreatmentProgress(e.target.value)}
-                              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none"
+                              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none"
                             />
                           </div>
 
@@ -3195,7 +3195,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                               placeholder="Describe any other clinical findings..."
                               value={noteAdditionalNotes}
                               onChange={(e) => setNoteAdditionalNotes(e.target.value)}
-                              className="w-full rounded-xl border border-slate-200 p-3 text-xs font-medium focus:border-navy-500 outline-none resize-none"
+                              className="w-full rounded-xl border border-slate-200 p-3 text-xs font-medium focus:border-emerald-500 outline-none resize-none"
                             />
                           </div>
 
@@ -3240,13 +3240,13 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                 placeholder="Search notes content..."
                                 value={nurseNoteSearchQuery}
                                 onChange={(e) => setNurseNoteSearchQuery(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 pl-8 pr-3 py-1.5 outline-none focus:border-navy-500 text-xs font-medium"
+                                className="w-full rounded-xl border border-slate-200 pl-8 pr-3 py-1.5 outline-none focus:border-emerald-500 text-xs font-medium"
                               />
                             </div>
                             <select
                               value={nurseNoteFilterType}
                               onChange={(e) => setNurseNoteFilterType(e.target.value)}
-                              className="rounded-xl border border-slate-200 px-3 py-1.5 outline-none focus:border-navy-500 text-xs font-bold cursor-pointer"
+                              className="rounded-xl border border-slate-200 px-3 py-1.5 outline-none focus:border-emerald-500 text-xs font-bold cursor-pointer"
                             >
                               <option>All Notes</option>
                               <option>Nurse Notes</option>
@@ -3298,7 +3298,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                                           <button
                                             type="button"
                                             onClick={() => handleEditNurseNoteClick(note)}
-                                            className="text-[9px] font-bold text-navy-700 hover:text-navy-900 bg-white border border-slate-200 px-2 py-0.5 rounded shadow-sm cursor-pointer transition-colors"
+                                            className="text-[9px] font-bold text-emerald-700 hover:text-slate-900 bg-white border border-slate-200 px-2 py-0.5 rounded shadow-sm cursor-pointer transition-colors"
                                           >
                                             Edit
                                           </button>
@@ -3382,7 +3382,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                           <select
                             value={selectedPatientId}
                             onChange={(e) => setSelectedPatientId(e.target.value)}
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
                           >
                             {currentInpatients.map((p: any, idx) => (
                               <option key={idx} value={p.patient?._id || p._id}>
@@ -3454,7 +3454,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                             <select
                               value={bedsideCompletionStatus}
                               onChange={(e) => setBedsideCompletionStatus(e.target.value)}
-                              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none cursor-pointer"
+                              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none cursor-pointer"
                             >
                               <option value="Completed">Completed</option>
                               <option value="Partially Completed">Partially Completed</option>
@@ -3479,7 +3479,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                             placeholder="e.g. Tolerated oral feeds, IV line patent..."
                             value={bedsideRemarks}
                             onChange={(e) => setBedsideRemarks(e.target.value)}
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none"
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none"
                           />
                         </div>
 
@@ -3701,7 +3701,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                         required
                         value={selectedPatientId}
                         onChange={(e) => setSelectedPatientId(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none"
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none"
                       >
                         <option value="">-- Choose Assigned Patient --</option>
                         {currentInpatients.map((p: any, idx) => (
@@ -3737,7 +3737,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                         placeholder="Detail any telemetry updates, critical dosage administration, or physician verbal orders to carry over..."
                         value={handoverSummary}
                         onChange={(e) => setHandoverSummary(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium focus:border-navy-500 outline-none resize-none"
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium focus:border-emerald-500 outline-none resize-none"
                       />
                     </div>
 
@@ -3749,7 +3749,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                         placeholder="Type Full Name (e.g. Sarah Jenkins, RN)"
                         value={handoverNurseSign}
                         onChange={(e) => setHandoverNurseSign(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold focus:border-navy-500 outline-none"
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold focus:border-emerald-500 outline-none"
                       />
                     </div>
 
@@ -3783,7 +3783,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                         required
                         value={selectedPatientId}
                         onChange={(e) => setSelectedPatientId(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 outline-none"
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 outline-none"
                       >
                         <option value="">-- Choose Patient --</option>
                         {currentInpatients.map((p: any, idx) => (
@@ -3917,7 +3917,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                           <select
                             value={prepStatus}
                             onChange={(e) => setPrepStatus(e.target.value)}
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-navy-500 bg-white outline-none cursor-pointer"
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold focus:border-emerald-500 bg-white outline-none cursor-pointer"
                           >
                             <option value="Pending">Pending (Work In Progress)</option>
                             <option value="Ready for Doctor Review">Ready for Doctor Review</option>
@@ -3933,7 +3933,7 @@ export function NurseDashboard({ activeTab }: NurseDashboardProps) {
                             placeholder="Add notes regarding transit requests, pharmacy delays, or other comments..."
                             value={prepRemarks}
                             onChange={(e) => setPrepRemarks(e.target.value)}
-                            className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-medium focus:border-navy-500 outline-none resize-none"
+                            className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-medium focus:border-emerald-500 outline-none resize-none"
                           />
                         </div>
 

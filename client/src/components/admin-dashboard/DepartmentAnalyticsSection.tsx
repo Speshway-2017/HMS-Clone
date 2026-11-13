@@ -190,13 +190,13 @@ export function DepartmentAnalyticsSection({ departments, invoices, appointments
                     {dept.completionRate}% Done
                   </span>
                 </div>
-                <p className="text-lg font-black text-navy-900">{formatINR(dept.revenue)}</p>
+                <p className="text-lg font-black text-slate-900">{formatINR(dept.revenue)}</p>
                 <div className="flex justify-between text-[11px] text-slate-500">
                   <span>Patients: {dept.patientCount}</span>
                 </div>
                 {/* Progress bar */}
                 <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
-                  <div className="h-full bg-navy-700 rounded-full" style={{ width: `${dept.completionRate}%` }} />
+                  <div className="h-full bg-emerald-700 rounded-full" style={{ width: `${dept.completionRate}%` }} />
                 </div>
               </div>
             ))}

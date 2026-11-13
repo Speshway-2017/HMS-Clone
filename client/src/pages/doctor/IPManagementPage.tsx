@@ -98,14 +98,14 @@ function IPMedicineStrengthSelect({
             onChange={(e) => onChange(e.target.value)}
             placeholder="e.g. 500mg"
             className={`w-full rounded-xl border px-3 py-2 text-xs outline-none focus:ring-2 ${
-              error ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-rose-100" : "border-slate-200 bg-white focus:border-navy-600 focus:ring-navy-100"
+              error ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-rose-100" : "border-slate-200 bg-white focus:border-emerald-600 focus:ring-navy-100"
             }`}
           />
           {hasVariants && (
             <button
               type="button"
               onClick={() => { setIsCustom(false); onChange(""); }}
-              className="text-[9px] text-navy-700 hover:underline whitespace-nowrap font-bold"
+              className="text-[9px] text-emerald-700 hover:underline whitespace-nowrap font-bold"
               title="Switch back to dropdown"
             >
               ↩ List
@@ -133,7 +133,7 @@ function IPMedicineStrengthSelect({
           onChange={(e) => onChange(e.target.value)}
           placeholder="e.g. 500mg"
           className={`w-full rounded-xl border px-3 py-2 text-xs outline-none focus:ring-2 ${
-            error ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-rose-100" : "border-slate-200 bg-white focus:border-navy-600 focus:ring-navy-100"
+            error ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-rose-100" : "border-slate-200 bg-white focus:border-emerald-600 focus:ring-navy-100"
           }`}
         />
         {error && <p className="mt-1 text-xs font-medium text-rose-500">{error}</p>}
@@ -159,7 +159,7 @@ function IPMedicineStrengthSelect({
           }
         }}
         className={`w-full rounded-xl border px-3 py-2 text-xs outline-none focus:ring-2 cursor-pointer ${
-          error ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-rose-100" : "border-slate-200 bg-white focus:border-navy-600 focus:ring-navy-100"
+          error ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-rose-100" : "border-slate-200 bg-white focus:border-emerald-600 focus:ring-navy-100"
         }`}
       >
         <option value="">— Select Strength —</option>
@@ -944,7 +944,7 @@ export function IPManagementPage() {
   if (isLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-navy-700 border-t-transparent"></div>
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-700 border-t-transparent"></div>
       </div>
     );
   }
@@ -1036,7 +1036,7 @@ export function IPManagementPage() {
             onClick={() => setActiveTab(idx)}
             className={`border-b-2 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap ${
               activeTab === idx
-                ? "border-navy-700 text-navy-700"
+                ? "border-emerald-700 text-emerald-700"
                 : "border-transparent text-slate-500 hover:text-slate-700"
             }`}
           >
@@ -1069,10 +1069,10 @@ export function IPManagementPage() {
                       key={p._id}
                       onClick={() => handleSelect(p)}
                       className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-slate-50 ${
-                        isActive ? "border-navy-500 bg-navy-50/20" : "border-slate-100"
+                        isActive ? "border-emerald-500 bg-emerald-50/20" : "border-slate-100"
                       }`}
                     >
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-bold text-navy-700">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
                         {p.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1092,7 +1092,7 @@ export function IPManagementPage() {
               <div className="lg:col-span-2 space-y-4">
                 {/* Header */}
                 <Card className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-navy-700 text-lg font-bold text-white">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-700 text-lg font-bold text-white">
                     {selectedPatient.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -1105,7 +1105,7 @@ export function IPManagementPage() {
                     <p className="text-xs text-slate-400 mt-1">
                       {selectedPatient.age || "—"} yrs · {selectedPatient.gender || "—"} · Blood Group: {selectedPatient.bloodGroup || admissionDetails?.patient?.bloodGroup || "—"} · Phone: {selectedPatient.phone || admissionDetails?.patient?.phone || "—"}
                     </p>
-                    <p className="text-xs font-medium text-navy-700 mt-0.5 font-mono">
+                    <p className="text-xs font-medium text-emerald-700 mt-0.5 font-mono">
                       {getBedDisplay(selectedPatient, admissionDetails)} {selectedPatient.uhid ? `· UHID: ${selectedPatient.uhid}` : ""}
                     </p>
                   </div>
@@ -1140,7 +1140,7 @@ export function IPManagementPage() {
                     </div>
                     <button
                       onClick={openVitalsModal}
-                      className="absolute -top-3 right-0 bg-navy-50 text-navy-700 border border-navy-200 rounded px-2 py-0.5 text-[10px] font-bold hover:bg-navy-100 transition-colors"
+                      className="absolute -top-3 right-0 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded px-2 py-0.5 text-[10px] font-bold hover:bg-emerald-100 transition-colors"
                     >
                       Record Vitals
                     </button>
@@ -1151,7 +1151,7 @@ export function IPManagementPage() {
                 <Card>
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-navy-700" /> Daily Progress Note
+                      <FileText className="h-4 w-4 text-emerald-700" /> Daily Progress Note
                     </h3>
                     <span className="text-xs text-slate-400">Day {getDaysAdmitted(selectedPatient)} Note</span>
                   </div>
@@ -1175,7 +1175,7 @@ export function IPManagementPage() {
                         className={`w-full rounded-lg border px-3 py-2 text-xs transition-colors focus:outline-none ${
                           progressDiagError
                             ? "border-rose-400 bg-rose-50/20 focus:border-rose-500"
-                            : "border-slate-200 bg-white focus:border-navy-500"
+                            : "border-slate-200 bg-white focus:border-emerald-500"
                         }`}
                       />
                       {progressDiagError && (
@@ -1202,7 +1202,7 @@ export function IPManagementPage() {
                         className={`w-full rounded-lg border px-3 py-2 text-xs transition-colors focus:outline-none resize-none ${
                           progressNoteError
                             ? "border-rose-400 bg-rose-50/20 focus:border-rose-500"
-                            : "border-slate-200 bg-white focus:border-navy-500"
+                            : "border-slate-200 bg-white focus:border-emerald-500"
                         }`}
                       />
                       {progressNoteError && (
@@ -1226,11 +1226,11 @@ export function IPManagementPage() {
                 <Card>
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                      <Pill className="h-4 w-4 text-navy-700" /> Medication Orders
+                      <Pill className="h-4 w-4 text-emerald-700" /> Medication Orders
                     </h3>
                     <button
                       onClick={openAddMedModal}
-                      className="text-xs font-semibold text-navy-700 hover:underline"
+                      className="text-xs font-semibold text-emerald-700 hover:underline"
                     >
                       + Add Drug
                     </button>
@@ -1357,7 +1357,7 @@ export function IPManagementPage() {
                               type="checkbox"
                               checked={morning}
                               onChange={() => setMorning(!morning)}
-                              className="rounded text-navy-600 focus:ring-navy-500 h-3.5 w-3.5"
+                              className="rounded text-emerald-600 focus:ring-navy-500 h-3.5 w-3.5"
                             />
                             <span>Morning</span>
                           </label>
@@ -1366,7 +1366,7 @@ export function IPManagementPage() {
                               type="checkbox"
                               checked={afternoon}
                               onChange={() => setAfternoon(!afternoon)}
-                              className="rounded text-navy-600 focus:ring-navy-500 h-3.5 w-3.5"
+                              className="rounded text-emerald-600 focus:ring-navy-500 h-3.5 w-3.5"
                             />
                             <span>Afternoon</span>
                           </label>
@@ -1375,7 +1375,7 @@ export function IPManagementPage() {
                               type="checkbox"
                               checked={night}
                               onChange={() => setNight(!night)}
-                              className="rounded text-navy-600 focus:ring-navy-500 h-3.5 w-3.5"
+                              className="rounded text-emerald-600 focus:ring-navy-500 h-3.5 w-3.5"
                             />
                             <span>Night</span>
                           </label>
@@ -1490,7 +1490,7 @@ export function IPManagementPage() {
                     return (
                       <div key={adm._id} className="rounded-xl border border-slate-100 p-4">
                         <div className="flex items-center gap-3 mb-2">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-navy-100 text-xs font-bold text-navy-700">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
                             {p.name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
                           </div>
                           <div>
@@ -1576,7 +1576,7 @@ export function IPManagementPage() {
                           type="checkbox"
                           checked={selectedLabTests.includes(test)}
                           onChange={() => toggleLabTest(test)}
-                          className="rounded border-slate-350 text-navy-700 focus:ring-navy-500 h-4 w-4"
+                          className="rounded border-slate-350 text-emerald-700 focus:ring-navy-500 h-4 w-4"
                         />
                         {test}
                       </label>
@@ -1658,7 +1658,7 @@ export function IPManagementPage() {
                           type="checkbox"
                           checked={selectedRadiologyStudies.includes(study)}
                           onChange={() => toggleRadiologyStudy(study)}
-                          className="rounded border-slate-350 text-navy-700 focus:ring-navy-500 h-4 w-4"
+                          className="rounded border-slate-350 text-emerald-700 focus:ring-navy-500 h-4 w-4"
                         />
                         {study}
                       </label>
@@ -1829,7 +1829,7 @@ export function IPManagementPage() {
                                     }
                                   }}
                                   className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
-                                    dischargeErrors[p._id]?.diagnosis ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-rose-100" : "border-slate-200 focus:ring-navy-200"
+                                    dischargeErrors[p._id]?.diagnosis ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-rose-100" : "border-slate-200 focus:ring-emerald-200"
                                   }`}
                                   placeholder="e.g. Acute Viral Fever, Resolved"
                                 />
@@ -1847,7 +1847,7 @@ export function IPManagementPage() {
                                   maxLength={1000}
                                   onChange={e => setDischargeField(p._id, "medications", e.target.value)}
                                   rows={3}
-                                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-navy-200"
+                                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200"
                                   placeholder="List medications to continue after discharge..."
                                 />
                               </div>
@@ -1861,7 +1861,7 @@ export function IPManagementPage() {
                                   value={getDischargeField(p._id, "followUp")}
                                   maxLength={500}
                                   onChange={e => setDischargeField(p._id, "followUp", e.target.value)}
-                                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                                   placeholder="e.g. OPD after 2 weeks"
                                 />
                               </div>
@@ -1875,7 +1875,7 @@ export function IPManagementPage() {
                                   value={getDischargeField(p._id, "specialInstructions")}
                                   maxLength={500}
                                   onChange={e => setDischargeField(p._id, "specialInstructions", e.target.value)}
-                                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                                   placeholder="e.g. Rest, avoid heavy lifting"
                                 />
                               </div>
@@ -1884,7 +1884,7 @@ export function IPManagementPage() {
                               <button
                                 onClick={() => handleFinalizeDischarge(p)}
                                 disabled={isSubmitting}
-                                className="flex items-center gap-2 rounded-lg bg-navy-700 px-4 py-2 text-sm font-semibold text-white hover:bg-navy-800 disabled:opacity-60 transition-colors"
+                                className="flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60 transition-colors"
                               >
                                 {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                                 {isSubmitting ? "Sending Request..." : "Send Discharge Request"}

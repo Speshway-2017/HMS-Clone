@@ -152,7 +152,7 @@ function getAppointmentStatusDetails(appt: any) {
     label: rawStatus.toUpperCase(),
     tone: "info",
     isPastAutoCompleted: false,
-    badgeClass: "bg-blue-50 text-blue-700 border border-blue-200 font-bold",
+    badgeClass: "bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold",
   };
 }
 
@@ -2082,7 +2082,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
   if (isLoading) {
     return (
       <div className="flex h-[75vh] flex-col items-center justify-center gap-3">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-navy-700 border-t-transparent"></div>
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-700 border-t-transparent"></div>
         <p className="text-sm font-semibold text-slate-500">Loading Patient Portal Dashboard...</p>
       </div>
     );
@@ -2197,7 +2197,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       {activeTab === "overview" && (
         <div className="space-y-6">
           {/* Header Banner */}
-          <div className="flex flex-col gap-4 rounded-2xl bg-gradient-to-r from-navy-800 via-navy-700 to-indigo-900 p-6 text-white shadow-lg sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-2xl bg-gradient-to-r from-emerald-800 via-emerald-700 to-indigo-900 p-6 text-white shadow-lg sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-indigo-500/20 px-3 py-0.5 text-xs font-semibold text-indigo-200 border border-indigo-400/30">
@@ -2218,9 +2218,9 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
               <button
                 type="button"
                 onClick={() => openBookingInterface("Appointment")}
-                className="flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-navy-800 hover:bg-indigo-50 transition-all shadow-md active:scale-95 cursor-pointer"
+                className="flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-emerald-800 hover:bg-indigo-50 transition-all shadow-md active:scale-95 cursor-pointer"
               >
-                <Plus className="h-4 w-4 text-navy-700" /> Book Appointment
+                <Plus className="h-4 w-4 text-emerald-700" /> Book Appointment
               </button>
               <button
                 type="button"
@@ -2251,7 +2251,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
             <KpiCard
               label="Diagnostic & Scans"
               value={reports?.length || 0}
-              icon={<FileText className="h-5 w-5 text-blue-500" />}
+              icon={<FileText className="h-5 w-5 text-emerald-700" />}
               to="/patient/reports"
               onClick={() => changeTab("reports")}
             />
@@ -2273,7 +2273,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-slate-200 pb-2">
               <div className="flex items-center gap-2">
-                <div className="rounded-lg bg-navy-50 p-2 text-navy-700">
+                <div className="rounded-lg bg-emerald-50 p-2 text-emerald-700">
                   <TrendingUp className="h-5 w-5" />
                 </div>
                 <div>
@@ -2297,7 +2297,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     </h3>
                     <p className="text-[11px] text-slate-400">Appointment status distribution</p>
                   </div>
-                  <span className="text-xs font-extrabold text-navy-800 bg-navy-50 px-2 py-0.5 rounded-lg">
+                  <span className="text-xs font-extrabold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg">
                     {healthAnalytics.totalAppointments} Total
                   </span>
                 </div>
@@ -2360,8 +2360,8 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                       <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#64748b" }} />
                       <YAxis tick={{ fontSize: 10, fill: "#64748b" }} />
                       <Tooltip content={<CustomPatientTooltip />} />
-                      <Area type="monotone" dataKey="totalBilled" name="Total Billed (₹)" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#patientBillingGrad)" />
-                      <Area type="monotone" dataKey="amountPaid" name="Paid (₹)" stroke="#3b82f6" strokeWidth={2} fillOpacity={0.1} fill="#3b82f6" />
+                      <Area type="monotone" dataKey="totalBilled" name="Total Billed (₹)" stroke="#16a34a" strokeWidth={2.5} fillOpacity={1} fill="url(#patientBillingGrad)" />
+                      <Area type="monotone" dataKey="amountPaid" name="Paid (₹)" stroke="#e11d48" strokeWidth={2} fillOpacity={0.1} fill="#e11d48" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -2372,7 +2372,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     <span className="text-slate-600">Total Billed</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
                     <span className="text-slate-600">Amount Paid</span>
                   </div>
                 </div>
@@ -2383,11 +2383,11 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-2">
                   <div>
                     <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-blue-600" /> Medical File Records
+                      <FileText className="h-4 w-4 text-emerald-700" /> Medical File Records
                     </h3>
                     <p className="text-[11px] text-slate-400">Profile file artifact count</p>
                   </div>
-                  <span className="text-xs font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg">
+                  <span className="text-xs font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg">
                     HMS Database
                   </span>
                 </div>
@@ -2417,7 +2417,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
               <Card className="p-6">
                 <div className="flex flex-col gap-6 md:flex-row md:items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-navy-600 to-indigo-800 text-2xl font-extrabold text-white shadow-md">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-600 to-indigo-800 text-2xl font-extrabold text-white shadow-md">
                       {patient?.name?.charAt(0).toUpperCase() || "P"}
                     </div>
                     <div>
@@ -2436,7 +2436,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                       setIsEditingProfile(true);
                       changeTab("profile");
                     }}
-                    className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-bold text-navy-700 hover:bg-slate-50 transition-all cursor-pointer"
+                    className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-bold text-emerald-700 hover:bg-slate-50 transition-all cursor-pointer"
                     title="Edit Profile Information"
                   >
                     <Edit3 className="h-3.5 w-3.5" /> Edit Profile
@@ -2515,7 +2515,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   <button
                     type="button"
                     onClick={() => changeTab("appointments")}
-                    className="text-xs font-bold text-navy-700 flex items-center gap-1 hover:underline cursor-pointer"
+                    className="text-xs font-bold text-emerald-700 flex items-center gap-1 hover:underline cursor-pointer"
                   >
                     View All <ArrowRight className="h-3 w-3" />
                   </button>
@@ -2551,7 +2551,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                         </button>
                       )}
                       <div className="text-right">
-                        <p className="text-base font-extrabold text-navy-700">
+                        <p className="text-base font-extrabold text-emerald-700">
                           {new Date(nextAppointment.date).toLocaleDateString("en-IN", { month: "short", day: "numeric" })}
                         </p>
                         <p className="text-xs font-bold text-slate-500">{nextAppointment.time}</p>
@@ -2562,7 +2562,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 ) : (
                   <div className="flex h-24 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-slate-500">
                     <p className="text-xs font-semibold">No upcoming appointments right now</p>
-                    <button type="button" onClick={() => openBookingInterface("Appointment")} className="mt-2 text-xs font-bold text-navy-700 hover:underline cursor-pointer">
+                    <button type="button" onClick={() => openBookingInterface("Appointment")} className="mt-2 text-xs font-bold text-emerald-700 hover:underline cursor-pointer">
                       + Book a new appointment
                     </button>
                   </div>
@@ -2577,7 +2577,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
                     <Bell className="h-5 w-5 text-amber-500" /> Notifications
                   </h3>
-                  <button onClick={() => changeTab("notifications")} className="text-xs font-bold text-navy-700 hover:underline cursor-pointer">
+                  <button onClick={() => changeTab("notifications")} className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer">
                     See all ({unreadNotificationsCount})
                   </button>
                 </div>
@@ -2603,7 +2603,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   <button
                     type="button"
                     onClick={() => changeTab("appointments")}
-                    className="text-xs font-bold text-navy-700 flex items-center gap-1 hover:underline cursor-pointer"
+                    className="text-xs font-bold text-emerald-700 flex items-center gap-1 hover:underline cursor-pointer"
                   >
                     View All <ArrowRight className="h-3 w-3" />
                   </button>
@@ -2619,8 +2619,8 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                         tabIndex={0}
                         title="Click to view consultation details"
                       >
-                        <div className="absolute -left-[21px] top-3.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-navy-600" />
-                        <p className="text-[10px] font-bold text-navy-600">{new Date(entry.date).toLocaleDateString("en-IN")}</p>
+                        <div className="absolute -left-[21px] top-3.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-600" />
+                        <p className="text-[10px] font-bold text-emerald-600">{new Date(entry.date).toLocaleDateString("en-IN")}</p>
                         <h4 className="text-xs font-bold text-slate-800">{entry.visitType || "OPD Consultation"}</h4>
                         <p className="text-xs font-medium text-slate-600">Diagnosis: {entry.diagnosis || "Regular Consultation"}</p>
                         <p className="text-[10px] text-slate-400">Dr. {entry.doctorName}</p>
@@ -2636,8 +2636,8 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                       tabIndex={0}
                       title="Click to view consultation details"
                     >
-                      <div className="absolute -left-[21px] top-3.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-navy-600" />
-                      <p className="text-[10px] font-bold text-navy-600">25 July 2026</p>
+                      <div className="absolute -left-[21px] top-3.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-600" />
+                      <p className="text-[10px] font-bold text-emerald-600">25 July 2026</p>
                       <h4 className="text-xs font-bold text-slate-800">OPD Cardiology Follow-up</h4>
                       <p className="text-xs font-medium text-slate-600">Primary Essential Hypertension</p>
                       <p className="text-[10px] text-slate-400">Dr. Vikram Seth</p>
@@ -2671,13 +2671,13 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-4 mb-6">
             <div>
               <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <User className="h-5 w-5 text-navy-700" /> {isEditingProfile ? "Edit Profile Information" : "Personal & Contact Profile - Edit Profile Information"}
+                <User className="h-5 w-5 text-emerald-700" /> {isEditingProfile ? "Edit Profile Information" : "Personal & Contact Profile - Edit Profile Information"}
               </h3>
               <p className="text-xs text-slate-500">Edit Profile Information - View and update your personal details, emergency contact, and insurance info.</p>
             </div>
             <button
               onClick={() => setIsEditingProfile(!isEditingProfile)}
-              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition-all ${isEditingProfile ? "bg-slate-200 text-slate-700" : "bg-navy-700 text-white hover:bg-navy-800 shadow"
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition-all ${isEditingProfile ? "bg-slate-200 text-slate-700" : "bg-emerald-700 text-white hover:bg-emerald-800 shadow"
                 }`}
             >
               {isEditingProfile ? <X className="h-4 w-4" /> : <Edit3 className="h-4 w-4" />}
@@ -2731,7 +2731,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     profileErrors.name
                       ? "border-red-500 bg-red-50/50 text-red-900 focus:ring-2 focus:ring-red-200"
                       : isEditingProfile
-                      ? "border-navy-500 bg-white focus:ring-2 focus:ring-navy-200"
+                      ? "border-emerald-500 bg-white focus:ring-2 focus:ring-emerald-200"
                       : "bg-slate-50 text-slate-700"
                   }`}
                 />
@@ -2777,7 +2777,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     profileErrors.email
                       ? "border-red-500 bg-red-50/50 text-red-900 focus:ring-2 focus:ring-red-200"
                       : isEditingProfile
-                      ? "border-navy-500 bg-white focus:ring-2 focus:ring-navy-200"
+                      ? "border-emerald-500 bg-white focus:ring-2 focus:ring-emerald-200"
                       : "bg-slate-50 text-slate-700"
                   }`}
                 />
@@ -2796,7 +2796,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   type="text"
                   disabled
                   value={patient?.uhid || "HMS-PT-88201"}
-                  className="w-full rounded-lg border bg-slate-100 px-3.5 py-2 text-xs font-bold text-navy-800 cursor-not-allowed border-slate-200 shadow-inner"
+                  className="w-full rounded-lg border bg-slate-100 px-3.5 py-2 text-xs font-bold text-emerald-800 cursor-not-allowed border-slate-200 shadow-inner"
                 />
               </div>
 
@@ -2837,7 +2837,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     profileErrors.phone
                       ? "border-red-500 bg-red-50/50 text-red-900 focus:ring-2 focus:ring-red-200"
                       : isEditingProfile
-                      ? "border-navy-500 bg-white focus:ring-2 focus:ring-navy-200"
+                      ? "border-emerald-500 bg-white focus:ring-2 focus:ring-emerald-200"
                       : "bg-slate-50 text-slate-700"
                   }`}
                 />
@@ -2885,7 +2885,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     profileErrors.age
                       ? "border-red-500 bg-red-50/50 text-red-900 focus:ring-2 focus:ring-red-200"
                       : isEditingProfile
-                      ? "border-navy-500 bg-white focus:ring-2 focus:ring-navy-200"
+                      ? "border-emerald-500 bg-white focus:ring-2 focus:ring-emerald-200"
                       : "bg-slate-50 text-slate-700"
                   }`}
                 />
@@ -2903,7 +2903,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   value={profileForm.gender}
                   onChange={(e) => setProfileForm({ ...profileForm, gender: e.target.value })}
                   className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${
-                    isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
+                    isEditingProfile ? "border-emerald-500 bg-white" : "bg-slate-50 text-slate-700"
                   }`}
                 >
                   {["Male", "Female", "Other"].map((g) => (
@@ -2919,7 +2919,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   value={profileForm.bloodGroup}
                   onChange={(e) => setProfileForm({ ...profileForm, bloodGroup: e.target.value })}
                   className={`w-full rounded-lg border px-3.5 py-2 text-xs font-semibold ${
-                    isEditingProfile ? "border-navy-500 bg-white" : "bg-slate-50 text-slate-700"
+                    isEditingProfile ? "border-emerald-500 bg-white" : "bg-slate-50 text-slate-700"
                   }`}
                 >
                   {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bg) => (
@@ -2964,7 +2964,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     profileErrors.allergies
                       ? "border-red-500 bg-red-50/50 text-red-900 focus:ring-2 focus:ring-red-200"
                       : isEditingProfile
-                      ? "border-navy-500 bg-white"
+                      ? "border-emerald-500 bg-white"
                       : "bg-slate-50 text-slate-700"
                   }`}
                 />
@@ -3011,7 +3011,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     profileErrors.address
                       ? "border-red-500 bg-red-50/50 text-red-900 focus:ring-2 focus:ring-red-200"
                       : isEditingProfile
-                      ? "border-navy-500 bg-white"
+                      ? "border-emerald-500 bg-white"
                       : "bg-slate-50 text-slate-700"
                   }`}
                 />
@@ -3065,7 +3065,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                       profileErrors.emergencyContactName
                         ? "border-red-500 bg-red-50/50 text-red-900 focus:ring-2 focus:ring-red-200"
                         : isEditingProfile
-                        ? "border-navy-500 bg-white"
+                        ? "border-emerald-500 bg-white"
                         : "bg-slate-50 text-slate-700"
                     }`}
                   />
@@ -3113,7 +3113,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                       profileErrors.emergencyContactPhone
                         ? "border-red-500 bg-red-50/50 text-red-900 focus:ring-2 focus:ring-red-200"
                         : isEditingProfile
-                        ? "border-navy-500 bg-white"
+                        ? "border-emerald-500 bg-white"
                         : "bg-slate-50 text-slate-700"
                     }`}
                   />
@@ -3160,7 +3160,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                       profileErrors.emergencyContactRelation
                         ? "border-red-500 bg-red-50/50 text-red-900 focus:ring-2 focus:ring-red-200"
                         : isEditingProfile
-                        ? "border-navy-500 bg-white"
+                        ? "border-emerald-500 bg-white"
                         : "bg-slate-50 text-slate-700"
                     }`}
                   />
@@ -3215,7 +3215,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                       profileErrors.insuranceProvider
                         ? "border-red-500 bg-red-50/50 text-red-900 focus:ring-2 focus:ring-red-200"
                         : isEditingProfile
-                        ? "border-navy-500 bg-white"
+                        ? "border-emerald-500 bg-white"
                         : "bg-slate-50 text-slate-700"
                     }`}
                   />
@@ -3262,7 +3262,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                       profileErrors.insurancePolicyNumber
                         ? "border-red-500 bg-red-50/50 text-red-900 focus:ring-2 focus:ring-red-200"
                         : isEditingProfile
-                        ? "border-navy-500 bg-white"
+                        ? "border-emerald-500 bg-white"
                         : "bg-slate-50 text-slate-700"
                     }`}
                   />
@@ -3286,7 +3286,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-navy-700 px-5 py-2 text-xs font-bold text-white hover:bg-navy-800 shadow"
+                  className="rounded-lg bg-emerald-700 px-5 py-2 text-xs font-bold text-white hover:bg-emerald-800 shadow"
                 >
                   Save Profile Changes
                 </button>
@@ -3316,7 +3316,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 onClick={() => setApptSubTab("book")}
                 className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all ${apptSubTab === "book"
                     ? "bg-emerald-600 text-white shadow-md"
-                    : "bg-navy-700 text-white hover:bg-navy-800 shadow"
+                    : "bg-emerald-700 text-white hover:bg-emerald-800 shadow"
                   }`}
               >
                 <Plus className="h-4 w-4" /> Book New Appointment
@@ -3340,14 +3340,14 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     key={st.id}
                     onClick={() => setApptSubTab(st.id as any)}
                     className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${isActive
-                        ? "bg-navy-800 text-white shadow"
+                        ? "bg-emerald-800 text-white shadow"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800"
                       }`}
                   >
                     <Icon className={`h-4 w-4 ${isActive ? "text-indigo-200" : "text-slate-400"}`} />
                     <span>{st.label}</span>
                     {st.count !== undefined && st.count > 0 && (
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${isActive ? "bg-white text-navy-900" : "bg-indigo-100 text-indigo-700"}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${isActive ? "bg-white text-slate-900" : "bg-indigo-100 text-indigo-700"}`}>
                         {st.count}
                       </span>
                     )}
@@ -3365,7 +3365,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   placeholder="Search doctor, ref ID..."
                   value={apptSearchQuery}
                   onChange={(e) => setApptSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border bg-slate-50 pl-9 pr-3 py-1.5 text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-navy-400"
+                  className="w-full rounded-lg border bg-slate-50 pl-9 pr-3 py-1.5 text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
                 />
               </div>
             )}
@@ -3389,7 +3389,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   <p className="text-sm font-semibold">No upcoming appointments scheduled.</p>
                   <button
                     onClick={() => setApptSubTab("book")}
-                    className="mt-3 rounded-lg bg-navy-700 px-4 py-2 text-xs font-bold text-white shadow"
+                    className="mt-3 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-bold text-white shadow"
                   >
                     + Book Your Consultation Now
                   </button>
@@ -3406,7 +3406,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                       <div key={a._id} className="relative rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-all space-y-4">
                         <div className="flex justify-between items-start">
                           <div className="flex items-center gap-3">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-navy-700 to-indigo-800 text-white font-extrabold text-base shadow-sm">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-700 to-indigo-800 text-white font-extrabold text-base shadow-sm">
                               {docName.charAt(0).toUpperCase()}
                             </div>
                             <div>
@@ -3446,7 +3446,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                             </Badge>
                             <button
                               onClick={() => setViewApptSlip(a)}
-                              className="text-[11px] font-bold text-navy-700 hover:underline flex items-center gap-1"
+                              className="text-[11px] font-bold text-emerald-700 hover:underline flex items-center gap-1"
                             >
                               <FileText className="h-3.5 w-3.5" /> View Slip
                             </button>
@@ -3564,7 +3564,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                             onClick={() => handleDepartmentChange(dept.id)}
                             className={`rounded-full px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
                               isSelected
-                                ? "bg-navy-800 text-white shadow-md ring-2 ring-navy-800/20 scale-[1.02]"
+                                ? "bg-emerald-800 text-white shadow-md ring-2 ring-emerald-800/20 scale-[1.02]"
                                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                             }`}
                           >
@@ -3576,7 +3576,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     <div className="flex items-center justify-between pt-1 text-xs">
                       <span className="text-slate-500 font-medium">
                         Active Filter:{" "}
-                        <strong className="text-navy-800">
+                        <strong className="text-emerald-800">
                           {availableDepartments.find(
                             (d) =>
                               d.id === selectedDeptFilter ||
@@ -3590,7 +3590,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                           const step2El = document.getElementById("step-2-choose-doctor");
                           if (step2El) step2El.scrollIntoView({ behavior: "smooth" });
                         }}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-navy-800 px-3 py-1.5 font-bold text-white hover:bg-navy-900 transition-all shadow-sm cursor-pointer"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-800 px-3 py-1.5 font-bold text-white hover:bg-emerald-900 transition-all shadow-sm cursor-pointer"
                       >
                         Proceed to Step 2: Choose Doctor &rarr;
                       </button>
@@ -3611,7 +3611,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     {isDoctorsLoading ? (
                       <div className="flex items-center justify-center p-8 rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div className="flex flex-col items-center gap-2">
-                          <span className="h-6 w-6 rounded-full border-2 border-navy-700 border-t-transparent animate-spin" />
+                          <span className="h-6 w-6 rounded-full border-2 border-emerald-700 border-t-transparent animate-spin" />
                           <p className="text-xs font-bold text-slate-500">Loading available specialist doctors...</p>
                         </div>
                       </div>
@@ -3658,17 +3658,17 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                               key={docUniqueId}
                               onClick={() => setSelectedDoctorId(docUniqueId)}
                               className={`relative cursor-pointer rounded-2xl p-5 transition-all duration-200 ${isSelected
-                                  ? "bg-indigo-50/70 border-2 border-navy-800 ring-4 ring-navy-800/15 shadow-md scale-[1.01]"
+                                  ? "bg-indigo-50/70 border-2 border-emerald-800 ring-4 ring-emerald-800/15 shadow-md scale-[1.01]"
                                   : "bg-white border-2 border-slate-200 text-slate-700 hover:border-indigo-300 hover:shadow-sm"
                                 }`}
                             >
                               {/* Selection Indicator Badge */}
                               <div className="flex items-center justify-between mb-3 border-b pb-2.5 border-slate-200/60">
-                                <span className={`text-[11px] font-extrabold uppercase tracking-wider ${isSelected ? "text-navy-900" : "text-slate-400"}`}>
+                                <span className={`text-[11px] font-extrabold uppercase tracking-wider ${isSelected ? "text-slate-900" : "text-slate-400"}`}>
                                   {docSpec}
                                 </span>
                                 {isSelected ? (
-                                  <span className="inline-flex items-center gap-1.5 rounded-full bg-navy-800 text-white px-3 py-1 text-[11px] font-extrabold shadow-sm">
+                                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-800 text-white px-3 py-1 text-[11px] font-extrabold shadow-sm">
                                     <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Selected Doctor
                                   </span>
                                 ) : (
@@ -3680,13 +3680,13 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
 
                               <div className="flex items-start gap-4 my-2">
                                 <div className={`flex h-12 w-12 items-center justify-center rounded-xl font-black text-lg shadow-sm shrink-0 ${isSelected
-                                    ? "bg-navy-800 text-white ring-2 ring-indigo-200"
-                                    : "bg-slate-100 text-navy-800 border border-slate-200"
+                                    ? "bg-emerald-800 text-white ring-2 ring-indigo-200"
+                                    : "bg-slate-100 text-emerald-800 border border-slate-200"
                                   }`}>
                                   {avatarChar}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <h4 className={`text-base font-extrabold truncate ${isSelected ? "text-navy-950" : "text-slate-800"}`}>
+                                  <h4 className={`text-base font-extrabold truncate ${isSelected ? "text-emerald-950" : "text-slate-800"}`}>
                                     Dr. {docName}
                                   </h4>
                                   <p className={`text-xs mt-0.5 truncate ${isSelected ? "text-indigo-700 font-bold" : "text-slate-500 font-medium"}`}>
@@ -3696,7 +3696,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                               </div>
 
                               <div className={`mt-4 flex items-center justify-between border-t pt-3 text-xs font-bold ${isSelected ? "border-indigo-200/80" : "border-slate-100"}`}>
-                                <span className={isSelected ? "text-navy-900 font-black" : "text-slate-600"}>
+                                <span className={isSelected ? "text-slate-900 font-black" : "text-slate-600"}>
                                   Consultation Fee: ₹{fee}
                                 </span>
                                 <span
@@ -3963,7 +3963,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
 
                           <div className="pt-2 border-t flex justify-between items-baseline">
                             <span className="text-sm font-extrabold text-slate-800">Total Consultation Bill:</span>
-                            <span className="text-xl font-black text-navy-900">₹{finalFee}.00</span>
+                            <span className="text-xl font-black text-slate-900">₹{finalFee}.00</span>
                           </div>
 
                           {isRevisit && (
@@ -3980,7 +3980,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                           <button
                             type="submit"
                             disabled={createAppointmentMutation.isPending}
-                            className="w-full rounded-xl bg-navy-800 py-3 text-xs font-extrabold text-white hover:bg-navy-900 shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 mt-2"
+                            className="w-full rounded-xl bg-emerald-800 py-3 text-xs font-extrabold text-white hover:bg-emerald-900 shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 mt-2"
                           >
                             {createAppointmentMutation.isPending ? (
                               <>
@@ -4057,7 +4057,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 >
                   ← Prev Month
                 </button>
-                <span className="text-sm font-extrabold text-navy-800">
+                <span className="text-sm font-extrabold text-emerald-800">
                   {calendarViewDate.toLocaleString("en-IN", { month: "long", year: "numeric" })}
                 </span>
                 <button
@@ -4116,7 +4116,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                             setSelectedCalendarDayAppts({ day, appts: dayAppts });
                           }
                         }}
-                        className={`h-24 rounded-xl border p-2 flex flex-col justify-between transition-all ${dayAppts.length > 0 ? "cursor-pointer hover:border-navy-600 hover:shadow-md" : ""
+                        className={`h-24 rounded-xl border p-2 flex flex-col justify-between transition-all ${dayAppts.length > 0 ? "cursor-pointer hover:border-emerald-600 hover:shadow-md" : ""
                           } ${isToday ? "bg-indigo-50/50 border-indigo-300 ring-2 ring-indigo-200" : "bg-white border-slate-200"}`}
                       >
                         <div className="flex justify-between items-center">
@@ -4129,7 +4129,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                             {dayAppts.slice(0, 2).map((a) => {
                               const docName = typeof a.doctor === "object" ? (a.doctor as any).name : a.doctor;
                               return (
-                                <div key={a._id} className="rounded bg-navy-800 px-1.5 py-0.5 text-[10px] font-bold text-white truncate">
+                                <div key={a._id} className="rounded bg-emerald-800 px-1.5 py-0.5 text-[10px] font-bold text-white truncate">
                                   {a.time} · Dr. {docName}
                                 </div>
                               );
@@ -4194,13 +4194,13 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => changeTab("prescriptions")}
-                              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-navy-700 hover:bg-slate-50"
+                              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-slate-50"
                             >
                               View Prescription RX
                             </button>
                             <button
                               onClick={() => setViewApptSlip(a)}
-                              className="rounded-lg bg-navy-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-navy-800"
+                              className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-800"
                             >
                               Download Slip
                             </button>
@@ -4221,7 +4221,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       {activeTab === "history" && (
         <div className="space-y-6">
           {/* Medical History Header & Summary KPIs */}
-          <Card className="p-6 bg-gradient-to-r from-slate-900 via-navy-900 to-indigo-950 text-white rounded-2xl shadow-md">
+          <Card className="p-6 bg-gradient-to-r from-slate-900 via-emerald-900 to-indigo-950 text-white rounded-2xl shadow-md">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-indigo-500/20 pb-4">
               <div>
                 <div className="flex items-center gap-2">
@@ -4294,12 +4294,12 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                           onClick={() => setHistoryCategoryFilter(cat.id as any)}
                           className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition-all ${
                             isActive
-                              ? "bg-navy-800 text-white shadow-md"
+                              ? "bg-emerald-800 text-white shadow-md"
                               : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
                           }`}
                         >
                           <span>{cat.label}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${isActive ? "bg-white text-navy-900" : "bg-slate-200 text-slate-700"}`}>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${isActive ? "bg-white text-slate-900" : "bg-slate-200 text-slate-700"}`}>
                             {cat.count}
                           </span>
                         </button>
@@ -4317,7 +4317,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   placeholder="Search diagnosis, doctor, notes..."
                   value={historySearchQuery}
                   onChange={(e) => setHistorySearchQuery(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-navy-500 transition-all"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                 />
                 {historySearchQuery && (
                   <button
@@ -4391,7 +4391,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                       <div key={item.id || idx} className="relative group">
                         {/* Timeline Bullet Node */}
                         <div className={`absolute -left-[35px] top-4 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-white shadow-md ${
-                          isVideo ? "bg-indigo-600" : isWalkin ? "bg-navy-700" : isPrescription ? "bg-emerald-600" : "bg-blue-600"
+                          isVideo ? "bg-rose-600" : isWalkin ? "bg-emerald-700" : isPrescription ? "bg-emerald-600" : "bg-emerald-700"
                         }`}>
                           {isVideo ? <Video className="h-3.5 w-3.5" /> : isConsultation ? <Heart className="h-3.5 w-3.5" /> : isPrescription ? <Pill className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
                         </div>
@@ -4401,7 +4401,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                           {/* Header: Date, Visit Type & Doctor */}
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-xs font-black text-navy-800 bg-navy-50 px-3 py-1 rounded-lg border border-navy-100">
+                              <span className="text-xs font-black text-emerald-800 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-100">
                                 {item.dateFormatted}
                               </span>
                               {isVideo && (
@@ -4528,7 +4528,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                                     };
                                     setSelectedReport(fullReport);
                                   }}
-                                  className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-800 hover:bg-indigo-100 transition-all cursor-pointer"
+                                  className="flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition-all cursor-pointer"
                                 >
                                   <Eye className="h-3.5 w-3.5" /> View Report
                                 </button>
@@ -4537,7 +4537,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                                     href={item.fileUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-800 hover:bg-blue-100 transition-all"
+                                    className="flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition-all"
                                   >
                                     <Download className="h-3.5 w-3.5" /> Download Report
                                   </a>
@@ -4562,7 +4562,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       {activeTab === "prescriptions" && (
         <div className="space-y-6">
           {/* Header & Financial/Medical RX Summary KPIs */}
-          <Card className="p-6 bg-gradient-to-r from-emerald-950 via-teal-900 to-navy-950 text-white rounded-2xl shadow-md">
+          <Card className="p-6 bg-gradient-to-r from-emerald-950 via-teal-900 to-emerald-950 text-white rounded-2xl shadow-md">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-emerald-500/20 pb-4">
               <div>
                 <div className="flex items-center gap-2">
@@ -4830,7 +4830,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
         <Card className="p-6 space-y-6">
           <div className="border-b pb-4">
             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <FileText className="h-5 w-5 text-blue-600" /> Laboratory Test Reports
+              <FileText className="h-5 w-5 text-emerald-700" /> Laboratory Test Reports
             </h3>
             <p className="text-xs text-slate-500">View diagnostic lab results, reference values, and download digital reports.</p>
           </div>
@@ -4852,11 +4852,11 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   <div
                     key={rep._id || idx}
                     onClick={() => setSelectedReport(rep)}
-                    className="group rounded-2xl border border-slate-200 bg-white p-5 cursor-pointer hover:shadow-md hover:border-indigo-300 transition-all flex flex-col justify-between"
+                    className="group rounded-2xl border border-slate-200 bg-white p-5 cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all flex flex-col justify-between"
                   >
                     <div>
                       <div className="flex items-center justify-between mb-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 group-hover:bg-emerald-700 group-hover:text-white transition-all">
                           <FileText className="h-5 w-5" />
                         </div>
                         <Badge tone={rep.status === "Critical" ? "danger" : rep.status === "Borderline" ? "warning" : "success"}>
@@ -4868,7 +4868,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                       <p className="mt-2 text-xs font-semibold text-slate-600">Doctor: Dr. {docName}</p>
                     </div>
                     <div className="mt-4 border-t pt-3 flex items-center justify-between text-xs">
-                      <span className="font-bold text-navy-700 group-hover:underline flex items-center gap-1">
+                      <span className="font-bold text-emerald-700 group-hover:underline flex items-center gap-1">
                         <Eye className="h-3.5 w-3.5" /> View Report Details
                       </span>
                       {rep.files?.[0]?.secure_url && (
@@ -4879,7 +4879,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <Download className="h-4 w-4 text-slate-400 group-hover:text-navy-700" />
+                          <Download className="h-4 w-4 text-slate-400 group-hover:text-emerald-700" />
                         </a>
                       )}
                     </div>
@@ -4927,7 +4927,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                       <div className="relative h-44 bg-slate-900 overflow-hidden cursor-pointer" onClick={() => setSelectedRadiology(rad)}>
                         <img src={imgUrl} alt={testName} className="h-full w-full object-cover opacity-85 hover:opacity-100 hover:scale-105 transition-all duration-300" />
                         <div className="absolute top-3 left-3">
-                          <span className="rounded-md bg-navy-900/80 backdrop-blur-md px-2.5 py-1 text-[10px] font-bold text-white">
+                          <span className="rounded-md bg-emerald-900/80 backdrop-blur-md px-2.5 py-1 text-[10px] font-bold text-white">
                             Radiology
                           </span>
                         </div>
@@ -4949,7 +4949,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     <div className="p-5 pt-0">
                       <button
                         onClick={() => setSelectedRadiology(rad)}
-                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-navy-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-navy-800 transition-all shadow"
+                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-800 transition-all shadow"
                       >
                         Open Scan Image <ArrowRight className="h-3.5 w-3.5" />
                       </button>
@@ -5026,7 +5026,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
         return (
           <div className="space-y-6">
             {/* Billing Summary Header & Financial KPIs */}
-            <Card className="p-6 bg-gradient-to-r from-navy-950 via-slate-900 to-indigo-950 text-white rounded-2xl shadow-md">
+            <Card className="p-6 bg-gradient-to-r from-emerald-950 via-slate-900 to-indigo-950 text-white rounded-2xl shadow-md">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-indigo-500/20 pb-4">
                 <div>
                   <div className="flex items-center gap-2">
@@ -5112,7 +5112,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   <div className="rounded-2xl bg-slate-50/80 p-5 border border-slate-200/80 space-y-4">
                     <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
                       <span className="text-xs font-black uppercase text-slate-500 tracking-wider">Invoice Reference</span>
-                      <span className="text-xs font-mono font-black text-navy-900 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-xs">
+                      <span className="text-xs font-mono font-black text-slate-900 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-xs">
                         {checkoutInvRef}
                       </span>
                     </div>
@@ -5124,7 +5124,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-slate-500 font-semibold">Patient UHID:</span>
-                        <span className="font-mono font-extrabold text-navy-800">{patient?.uhid || (patient as any)?.patientId || "UHID-2868535278"}</span>
+                        <span className="font-mono font-extrabold text-emerald-800">{patient?.uhid || (patient as any)?.patientId || "UHID-2868535278"}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-slate-500 font-semibold">Service Category:</span>
@@ -5205,7 +5205,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                       <div className="mx-auto my-3 flex h-32 w-32 items-center justify-center rounded-xl bg-white p-3 border shadow-sm">
                         <QrCode className="h-28 w-28 text-slate-800" />
                       </div>
-                      <p className="text-xs text-slate-600 font-mono">UPI ID: <span className="font-bold text-navy-900">hms-speshway@hdfcbank</span></p>
+                      <p className="text-xs text-slate-600 font-mono">UPI ID: <span className="font-bold text-slate-900">hms-speshway@hdfcbank</span></p>
                     </div>
                   )}
 
@@ -5417,12 +5417,12 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                         onClick={() => setBillingStatusFilter(tab.id as any)}
                         className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
                           isActive
-                            ? "bg-navy-800 text-white shadow-md"
+                            ? "bg-emerald-800 text-white shadow-md"
                             : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
                         }`}
                       >
                         <span>{tab.label}</span>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${isActive ? "bg-white text-navy-900" : "bg-slate-200 text-slate-700"}`}>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${isActive ? "bg-white text-slate-900" : "bg-slate-200 text-slate-700"}`}>
                           {tab.count}
                         </span>
                       </button>
@@ -5438,7 +5438,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     placeholder="Search by invoice ID or service..."
                     value={billingSearchQuery}
                     onChange={(e) => setBillingSearchQuery(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-navy-500 transition-all"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                   />
                   {billingSearchQuery && (
                     <button
@@ -5498,7 +5498,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                           {/* Header Row: Invoice Ref, Category & Status */}
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
                             <div className="flex flex-wrap items-center gap-3">
-                              <span className="text-sm font-black text-navy-900 bg-navy-50 px-3 py-1 rounded-lg border border-navy-100">
+                              <span className="text-sm font-black text-slate-900 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-100">
                                 {invRefId}
                               </span>
                               <span className="rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-extrabold text-indigo-700 border border-indigo-100">
@@ -5544,7 +5544,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                             <div className="border-t pt-3">
                               <button
                                 onClick={() => setExpandedInvoiceId(isExpanded ? null : inv._id)}
-                                className="text-xs font-bold text-navy-700 hover:text-navy-900 flex items-center gap-1.5"
+                                className="text-xs font-bold text-emerald-700 hover:text-slate-900 flex items-center gap-1.5"
                               >
                                 <FileText className="h-3.5 w-3.5" />
                                 {isExpanded ? "Hide Billed Line Items" : `View ${inv.items.length} Itemized Services Breakdown`}
@@ -5630,7 +5630,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                                       patientName: patient?.name || user?.name
                                     });
                                   }}
-                                  className="flex items-center gap-2 rounded-xl bg-navy-800 hover:bg-navy-900 px-4 py-2.5 text-xs font-bold text-white transition-all shadow active:scale-95 cursor-pointer"
+                                  className="flex items-center gap-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 px-4 py-2.5 text-xs font-bold text-white transition-all shadow active:scale-95 cursor-pointer"
                                 >
                                   <Download className="h-4 w-4 text-emerald-400" /> Download Official Receipt (PDF)
                                 </button>
@@ -5667,7 +5667,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 setClaimTouched({});
                 setIsClaimModalOpen(true);
               }}
-              className="flex items-center gap-2 rounded-xl bg-navy-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-navy-800 shadow"
+              className="flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-800 shadow"
             >
               <Plus className="h-4 w-4" /> Submit Pre-Auth Claim
             </button>
@@ -5675,7 +5675,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
 
           {/* Insurance Card Overview */}
           {patient?.insuranceProvider ? (
-            <div className="rounded-2xl bg-gradient-to-r from-navy-900 via-navy-800 to-indigo-900 p-6 text-white shadow-md">
+            <div className="rounded-2xl bg-gradient-to-r from-emerald-900 via-emerald-800 to-indigo-900 p-6 text-white shadow-md">
               <div className="flex flex-col gap-6 md:flex-row md:items-center justify-between">
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">Policy Provider</span>
@@ -5735,7 +5735,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   ) : (
                     claimsList.map((clm) => (
                       <tr key={clm.id} className="hover:bg-slate-50/60">
-                        <td className="px-4 py-3.5 font-extrabold text-navy-700">{clm.id}</td>
+                        <td className="px-4 py-3.5 font-extrabold text-emerald-700">{clm.id}</td>
                         <td className="px-4 py-3.5">{clm.date}</td>
                         <td className="px-4 py-3.5 font-bold text-slate-800">{clm.category}</td>
                         <td className="px-4 py-3.5 font-bold">₹{clm.amount.toLocaleString("en-IN")}</td>
@@ -6085,7 +6085,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                         key={i}
                         className={`p-2.5 rounded-xl ${
                           msg.sender === "patient" || msg.sender === "You"
-                            ? "bg-navy-50 text-navy-900 ml-4 border border-navy-100"
+                            ? "bg-emerald-50 text-slate-900 ml-4 border border-emerald-100"
                             : msg.sender === "System"
                             ? "bg-slate-50 text-slate-500 italic text-center"
                             : "bg-indigo-50 text-indigo-900 mr-4 border border-indigo-100"
@@ -6127,11 +6127,11 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
                       placeholder="Type a message to doctor..."
-                      className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-navy-500"
+                      className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs outline-none focus:border-emerald-500"
                     />
                     <button
                       type="submit"
-                      className="rounded-lg bg-navy-800 text-white px-3 py-1.5 text-xs font-bold hover:bg-navy-900 transition-colors"
+                      className="rounded-lg bg-emerald-800 text-white px-3 py-1.5 text-xs font-bold hover:bg-emerald-900 transition-colors"
                     >
                       Send
                     </button>
@@ -6149,7 +6149,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
       {activeTab === "notifications" && (
         <div className="space-y-6">
           {/* Header & Notification Stats Banner */}
-          <Card className="p-6 bg-gradient-to-r from-amber-950 via-slate-900 to-navy-950 text-white rounded-2xl shadow-md">
+          <Card className="p-6 bg-gradient-to-r from-amber-950 via-slate-900 to-emerald-950 text-white rounded-2xl shadow-md">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-amber-500/20 pb-4">
               <div>
                 <div className="flex items-center gap-2">
@@ -6232,12 +6232,12 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     onClick={() => setNotifCategoryFilter(cat.id as any)}
                     className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
                       isActive
-                        ? "bg-navy-800 text-white shadow-md"
+                        ? "bg-emerald-800 text-white shadow-md"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
                     }`}
                   >
                     <span>{cat.label}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${isActive ? "bg-white text-navy-900" : "bg-slate-200 text-slate-700"}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${isActive ? "bg-white text-slate-900" : "bg-slate-200 text-slate-700"}`}>
                       {cat.count}
                     </span>
                   </button>
@@ -6285,7 +6285,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   >
                     <div className="flex items-start gap-4">
                       <div className={`mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-bold text-white shadow-sm ${
-                        isDoctor ? "bg-indigo-600" : isBooking ? "bg-navy-800" : isBilling ? "bg-emerald-600" : "bg-blue-600"
+                        isDoctor ? "bg-rose-600" : isBooking ? "bg-emerald-700" : isBilling ? "bg-emerald-600" : "bg-emerald-700"
                       }`}>
                         {isDoctor ? <Heart className="h-5 w-5" /> : isBooking ? <Calendar className="h-5 w-5" /> : isBilling ? <CreditCard className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
                       </div>
@@ -6294,12 +6294,12 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                         <div className="flex flex-wrap items-center gap-2">
                           <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border ${
                             isDoctor
-                              ? "bg-indigo-50 text-indigo-800 border-indigo-200"
+                              ? "bg-rose-50 text-rose-800 border-rose-200"
                               : isBooking
-                              ? "bg-navy-50 text-navy-800 border-navy-200"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
                               : isBilling
                               ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                              : "bg-blue-50 text-blue-800 border-blue-200"
+                              : "bg-emerald-50 text-emerald-800 border-emerald-200"
                           }`}>
                             {isDoctor ? "👨‍⚕️ Doctor Update" : isBooking ? "📅 Patient Booking" : isBilling ? "💳 Billing & Receipt" : "🧪 Lab Diagnostic"}
                           </span>
@@ -6318,7 +6318,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                           e.stopPropagation();
                           if (n.actionTab) changeTab(n.actionTab);
                         }}
-                        className="flex items-center gap-1 text-xs font-bold text-navy-700 hover:text-navy-900 hover:underline bg-slate-100 px-3 py-1.5 rounded-lg"
+                        className="flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-slate-900 hover:underline bg-slate-100 px-3 py-1.5 rounded-lg"
                       >
                         View Details <ArrowRight className="h-3.5 w-3.5" />
                       </button>
@@ -6365,7 +6365,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   <button
                     type="button"
                     onClick={() => setBookingType("Appointment")}
-                    className={`p-2.5 rounded-lg border text-center font-bold transition-all ${bookingType === "Appointment" ? "border-navy-700 bg-navy-50 text-navy-800" : "border-slate-200 text-slate-600"
+                    className={`p-2.5 rounded-lg border text-center font-bold transition-all ${bookingType === "Appointment" ? "border-emerald-700 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-600"
                       }`}
                   >
                     In-Person Hospital Visit
@@ -6386,7 +6386,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   required
                   value={selectedDoctorId}
                   onChange={(e) => setSelectedDoctorId(e.target.value)}
-                  className="w-full rounded-lg border px-3.5 py-2.5 outline-none focus:border-navy-500 font-medium text-xs"
+                  className="w-full rounded-lg border px-3.5 py-2.5 outline-none focus:border-emerald-500 font-medium text-xs"
                 >
                   <option value="">-- Select Specialist Doctor --</option>
                   {doctors.map((doc: any) => (
@@ -6407,7 +6407,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     setBookingDate(e.target.value);
                     setBookingTime("");
                   }}
-                  className="w-full rounded-lg border px-3.5 py-2 outline-none focus:border-navy-500 font-medium text-xs"
+                  className="w-full rounded-lg border px-3.5 py-2 outline-none focus:border-emerald-500 font-medium text-xs"
                 />
               </div>
 
@@ -6508,7 +6508,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   className={`w-full rounded-lg border px-3.5 py-2 outline-none font-medium text-xs ${
                     bookingNotesError
                       ? "border-red-500 bg-red-50/50 text-red-900 focus:border-red-500"
-                      : "border-slate-200 focus:border-navy-500"
+                      : "border-slate-200 focus:border-emerald-500"
                   }`}
                 />
                 {bookingNotesError && (
@@ -6527,7 +6527,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-navy-700 px-5 py-2 font-bold text-white hover:bg-navy-800 shadow"
+                  className="rounded-lg bg-emerald-700 px-5 py-2 font-bold text-white hover:bg-emerald-800 shadow"
                 >
                   Confirm Booking Request
                 </button>
@@ -6622,7 +6622,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 <span className="rounded bg-emerald-100 text-emerald-800 px-2.5 py-0.5 text-[10px] font-extrabold uppercase">
                   Verified E-Prescription Pass
                 </span>
-                <h3 className="text-lg font-black text-navy-900 mt-1">Metropolitan Hospital Digital RX</h3>
+                <h3 className="text-lg font-black text-slate-900 mt-1">Metropolitan Hospital Digital RX</h3>
                 <p className="text-xs text-slate-500 font-mono">
                   RX No: {selectedPrescriptionRx.prescriptionNumber || `RX-${(selectedPrescriptionRx._id || selectedPrescriptionRx.id || "").toString().slice(-6).toUpperCase()}`}
                 </p>
@@ -6957,7 +6957,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
             </div>
 
             <div className="flex justify-end gap-2 pt-4 border-t mt-4">
-              <button onClick={() => setPaidReceipt(null)} className="rounded-lg bg-navy-700 px-5 py-2 text-white font-bold text-xs">
+              <button onClick={() => setPaidReceipt(null)} className="rounded-lg bg-emerald-700 px-5 py-2 text-white font-bold text-xs">
                 Done
               </button>
             </div>
@@ -6991,7 +6991,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 <select
                   value={claimCategory}
                   onChange={(e) => setClaimCategory(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-navy-500"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                   <option value="OPD Consultation & Diagnostics">OPD Consultation & Diagnostics</option>
                   <option value="Lab Investigation Suite">Lab Investigation Suite</option>
@@ -7026,7 +7026,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 transition-all ${
                     claimErrors.claimAmount
                       ? "border-rose-400 bg-rose-50/40 focus:ring-2 focus:ring-rose-400"
-                      : "border-slate-300 bg-white focus:ring-2 focus:ring-navy-500"
+                      : "border-slate-300 bg-white focus:ring-2 focus:ring-emerald-500"
                   }`}
                 />
                 {claimErrors.claimAmount && (
@@ -7065,7 +7065,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 transition-all ${
                     claimErrors.claimNotes
                       ? "border-rose-400 bg-rose-50/40 focus:ring-2 focus:ring-rose-400"
-                      : "border-slate-300 bg-white focus:ring-2 focus:ring-navy-500"
+                      : "border-slate-300 bg-white focus:ring-2 focus:ring-emerald-500"
                   }`}
                 />
                 {claimErrors.claimNotes && (
@@ -7090,7 +7090,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-navy-700 px-5 py-2 text-white font-bold hover:bg-navy-800 transition-all shadow cursor-pointer"
+                  className="rounded-xl bg-emerald-700 px-5 py-2 text-white font-bold hover:bg-emerald-800 transition-all shadow cursor-pointer"
                 >
                   Submit Claim Request
                 </button>
@@ -7111,7 +7111,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
             <div className="flex justify-between items-center border-b pb-4 mb-4 print:hidden">
               <div>
                 <span className="rounded bg-indigo-100 text-indigo-700 px-2 py-0.5 text-[10px] font-extrabold uppercase">Official Consultation Pass</span>
-                <h3 className="text-lg font-extrabold text-navy-900 mt-1">Metropolitan Hospital Outpatient Slip</h3>
+                <h3 className="text-lg font-extrabold text-slate-900 mt-1">Metropolitan Hospital Outpatient Slip</h3>
               </div>
               <button onClick={() => setViewApptSlip(null)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
             </div>
@@ -7120,7 +7120,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
               <div className="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-4 border border-slate-200">
                 <div>
                   <span className="text-[10px] text-slate-400 block uppercase font-bold">Reference ID</span>
-                  <span className="text-sm font-extrabold text-navy-800">{viewApptSlip.referenceId || "REF-" + viewApptSlip._id.slice(-6).toUpperCase()}</span>
+                  <span className="text-sm font-extrabold text-emerald-800">{viewApptSlip.referenceId || "REF-" + viewApptSlip._id.slice(-6).toUpperCase()}</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 block uppercase font-bold">Token Number</span>
@@ -7186,7 +7186,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   toast.success("Printing Outpatient Appointment Slip...");
                   window.print();
                 }}
-                className="rounded-lg bg-navy-700 px-4 py-2 text-white font-bold text-xs hover:bg-navy-800 flex items-center gap-1.5 cursor-pointer shadow active:scale-95"
+                className="rounded-lg bg-emerald-700 px-4 py-2 text-white font-bold text-xs hover:bg-emerald-800 flex items-center gap-1.5 cursor-pointer shadow active:scale-95"
               >
                 <Printer className="h-4 w-4" /> Print Slip Pass
               </button>
@@ -7207,7 +7207,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 <span className="rounded bg-indigo-100 text-indigo-800 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider">
                   Outpatient Billing Desk & Checkout
                 </span>
-                <h3 className="text-xl font-black text-navy-900 mt-1 flex items-center gap-2">
+                <h3 className="text-xl font-black text-slate-900 mt-1 flex items-center gap-2">
                   <CreditCard className="h-5 w-5 text-indigo-600" /> Confirm Consultation Payment
                 </h3>
               </div>
@@ -7237,7 +7237,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                     <div className="flex justify-between items-start border-b border-slate-200 pb-3">
                       <div>
                         <span className="text-[10px] text-slate-400 block font-bold uppercase">Invoice Reference</span>
-                        <span className="font-extrabold text-navy-800 text-sm">{invId}</span>
+                        <span className="font-extrabold text-emerald-800 text-sm">{invId}</span>
                       </div>
                       <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase ${finalFee === 0 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
                         {finalFee === 0 ? "EXEMPTED" : "UNPAID"}
@@ -7295,7 +7295,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                       </div>
                       <div className="flex justify-between pt-2 border-t font-black text-sm text-slate-900">
                         <span>Total Payable Amount:</span>
-                        <span className="text-lg text-navy-900">₹{finalFee}.00</span>
+                        <span className="text-lg text-slate-900">₹{finalFee}.00</span>
                       </div>
                     </div>
 
@@ -7467,7 +7467,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                         type="button"
                         disabled={isProcessingCheckout}
                         onClick={handleFinalPaymentSubmit}
-                        className="rounded-xl bg-navy-800 px-6 py-2.5 text-xs font-extrabold text-white hover:bg-navy-900 shadow-lg cursor-pointer active:scale-95 transition-all flex items-center gap-2"
+                        className="rounded-xl bg-emerald-800 px-6 py-2.5 text-xs font-extrabold text-white hover:bg-emerald-900 shadow-lg cursor-pointer active:scale-95 transition-all flex items-center gap-2"
                       >
                         {isProcessingCheckout ? (
                           <>
@@ -7500,7 +7500,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b pb-4 mb-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-200">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <FileText className="h-5 w-5" />
                 </div>
                 <div>
@@ -7588,7 +7588,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                         <div key={index} className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex flex-col gap-3">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 overflow-hidden">
-                              <FileText className="h-4 w-4 text-blue-600 shrink-0" />
+                              <FileText className="h-4 w-4 text-emerald-700 shrink-0" />
                               <span className="text-xs font-bold text-slate-800 truncate">
                                 {fileName}
                               </span>
@@ -7654,7 +7654,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                 </button>
                 <button
                   onClick={() => setSelectedReport(null)}
-                  className="rounded-xl bg-navy-800 px-5 py-2 text-xs font-extrabold text-white hover:bg-navy-900 shadow transition-all cursor-pointer"
+                  className="rounded-xl bg-emerald-800 px-5 py-2 text-xs font-extrabold text-white hover:bg-emerald-900 shadow transition-all cursor-pointer"
                 >
                   Close Report
                 </button>
@@ -7673,7 +7673,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b pb-4 mb-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-200">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <ScanLine className="h-5 w-5" />
                 </div>
                 <div>
@@ -7754,7 +7754,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                       {/* Document Toolbar */}
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="flex items-center gap-2 overflow-hidden">
-                          <ImageIcon className="h-4 w-4 text-blue-600 shrink-0" />
+                          <ImageIcon className="h-4 w-4 text-emerald-700 shrink-0" />
                           <span className="text-xs font-bold text-slate-800 truncate">
                             {fileName}
                           </span>
@@ -7865,7 +7865,7 @@ export function PatientDashboard({ activeTab: propActiveTab }: PatientDashboardP
                   setDicomZoom(1);
                   setDicomRotation(0);
                 }}
-                className="rounded-xl bg-navy-800 px-5 py-2 text-xs font-extrabold text-white hover:bg-navy-900 shadow transition-all cursor-pointer"
+                className="rounded-xl bg-emerald-800 px-5 py-2 text-xs font-extrabold text-white hover:bg-emerald-900 shadow transition-all cursor-pointer"
               >
                 Close Report
               </button>

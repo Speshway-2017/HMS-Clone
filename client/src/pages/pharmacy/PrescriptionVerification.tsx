@@ -121,7 +121,7 @@ export function PharmacyPrescriptionVerification() {
                 onClick={() => setActiveTab(tab)}
                 className={`rounded-md px-4 py-1.5 text-xs font-semibold transition-colors ${
                   activeTab === tab 
-                    ? "bg-white text-navy-700 shadow-sm" 
+                    ? "bg-white text-emerald-700 shadow-sm" 
                     : "text-slate-600 hover:text-slate-950"
                 }`}
               >
@@ -138,7 +138,7 @@ export function PharmacyPrescriptionVerification() {
             placeholder="Search by Patient / UHID / Prescription..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-slate-350 bg-slate-50 pl-9 pr-4 py-2 text-xs outline-none focus:border-navy-500 focus:bg-white"
+            className="w-full rounded-lg border border-slate-350 bg-slate-50 pl-9 pr-4 py-2 text-xs outline-none focus:border-emerald-500 focus:bg-white"
           />
         </div>
       </div>
@@ -155,8 +155,8 @@ export function PharmacyPrescriptionVerification() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-1.5">
-                    <FileText className="h-4 w-4 text-navy-700" />
-                    <span className="text-xs font-bold text-navy-700">{p.prescriptionNumber}</span>
+                    <FileText className="h-4 w-4 text-emerald-700" />
+                    <span className="text-xs font-bold text-emerald-700">{p.prescriptionNumber}</span>
                   </div>
                   <Badge tone={getStatusBadgeTone(p.status)}>
                     {getDisplayStatus(p.status)}

@@ -48,7 +48,7 @@ export function WardManagementPage() {
   const columns: Column<any>[] = [
     {
       header: "Bed ID",
-      render: (row) => <span className="font-bold text-navy-900">{row.bedCode || row.bedNumber || "Bed ID"}</span>,
+      render: (row) => <span className="font-bold text-slate-900">{row.bedCode || row.bedNumber || "Bed ID"}</span>,
     },
     {
       header: "Ward Name",
@@ -139,7 +139,7 @@ export function WardManagementPage() {
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold text-slate-500">Total Ward Beds</p>
-          <p className="mt-2 text-2xl font-extrabold text-navy-900">{metrics.totalBeds}</p>
+          <p className="mt-2 text-2xl font-extrabold text-slate-900">{metrics.totalBeds}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold text-slate-500">Occupied Beds</p>

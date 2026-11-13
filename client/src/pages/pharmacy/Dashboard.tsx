@@ -283,7 +283,7 @@ export function PharmacyDashboard() {
               <h3 className="text-base font-semibold text-slate-800">Sales Growth & Volume</h3>
               <p className="text-xs text-slate-500">Weekly tracking of sales revenue (line) vs prescription clearance (bar).</p>
             </div>
-            <Link to="/pharmacy/analytics" className="text-xs font-semibold text-navy-700 hover:text-navy-800 flex items-center gap-1">
+            <Link to="/pharmacy/analytics" className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1">
               View Analytics <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
@@ -313,7 +313,7 @@ export function PharmacyDashboard() {
               onClick={() => navigate("/pharmacy/dispensing")}
               className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 text-left transition hover:bg-slate-50"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
                 <Pill className="h-5 w-5" />
               </div>
               <div>
@@ -458,7 +458,7 @@ export function PharmacyDashboard() {
         <Card>
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-base font-semibold text-slate-800">Critical Stock Warnings</h3>
-            <Link to="/pharmacy/inventory" className="text-xs font-semibold text-navy-700 hover:text-navy-800">
+            <Link to="/pharmacy/inventory" className="text-xs font-semibold text-emerald-700 hover:text-emerald-800">
               View All
             </Link>
           </div>
@@ -486,7 +486,7 @@ export function PharmacyDashboard() {
         <Card>
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-base font-semibold text-slate-800">Recent Pending Prescriptions</h3>
-            <Link to="/pharmacy/prescriptions" className="text-xs font-semibold text-navy-700 hover:text-navy-800">
+            <Link to="/pharmacy/prescriptions" className="text-xs font-semibold text-emerald-700 hover:text-emerald-800">
               Go to Verification
             </Link>
           </div>
@@ -501,7 +501,7 @@ export function PharmacyDashboard() {
                     <div className="text-xs text-slate-500">Prescribed by {p.doctorName}</div>
                   </div>
                   <div className="text-right">
-                    <span className="inline-flex rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                    <span className="inline-flex rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                       {p.medicines.length} Item(s)
                     </span>
                     <div className="text-xs text-slate-400 mt-1">{p.date}</div>

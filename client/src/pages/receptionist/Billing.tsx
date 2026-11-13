@@ -864,7 +864,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
           <button
             onClick={() => setTab("consultation")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "consultation" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
+              tab === "consultation" ? "bg-emerald-50 text-emerald-700 font-bold" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             <CreditCard className="h-3.5 w-3.5" /> Consultation Payment
@@ -872,7 +872,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
           <button
             onClick={() => setTab("pending")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "pending" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
+              tab === "pending" ? "bg-emerald-50 text-emerald-700 font-bold" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             <AlertCircle className="h-3.5 w-3.5" /> Pending Bills
@@ -883,7 +883,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
           <button
             onClick={() => setTab("ip")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "ip" ? "bg-navy-50 text-navy-700 font-bold animate-pulse" : "text-slate-500 hover:text-slate-700"
+              tab === "ip" ? "bg-emerald-50 text-emerald-700 font-bold animate-pulse" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             <Layers className="h-3.5 w-3.5" /> IP Billing
@@ -891,7 +891,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
           <button
             onClick={() => setTab("completed")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "completed" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
+              tab === "completed" ? "bg-emerald-50 text-emerald-700 font-bold" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             <CheckCircle className="h-3.5 w-3.5" /> Completed
@@ -899,7 +899,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
           <button
             onClick={() => setTab("collections")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "collections" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
+              tab === "collections" ? "bg-emerald-50 text-emerald-700 font-bold" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             <Clock className="h-3.5 w-3.5" /> Today's Collections
@@ -1121,7 +1121,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                           </div>
                         ))}
                         {pendingInvoices.length > 5 && (
-                          <button onClick={() => setTab("pending")} className="w-full text-center text-xs font-bold text-navy-700 hover:underline mt-2">
+                          <button onClick={() => setTab("pending")} className="w-full text-center text-xs font-bold text-emerald-700 hover:underline mt-2">
                             View All {pendingInvoices.length} Pending Invoices
                           </button>
                         )}
@@ -1260,7 +1260,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                     {hospitalData?.logoUrl ? (
                       <img src={hospitalData.logoUrl} alt={hospitalData.name} className="h-9 w-9 object-contain rounded-lg bg-white p-1 border border-slate-200" />
                     ) : (
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy-700 text-white font-bold text-sm">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-700 text-white font-bold text-sm">
                         {hospitalData?.name ? hospitalData.name.charAt(0).toUpperCase() : "H"}
                       </div>
                     )}
@@ -1302,7 +1302,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                     variant="secondary"
                     className="flex-1 flex items-center justify-center gap-2 text-xs py-2.5 font-bold bg-white border-slate-200 hover:bg-slate-50 text-slate-800 shadow-sm"
                   >
-                    <Printer className="h-4 w-4 text-navy-700" /> Print Payment Receipt
+                    <Printer className="h-4 w-4 text-emerald-700" /> Print Payment Receipt
                   </Button>
                   <Button
                     onClick={() => setReceiptData(null)}
@@ -1346,7 +1346,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
         <Card className="print:hidden space-y-4">
           <div className="flex justify-between items-center border-b pb-2">
             <h2 className="text-base font-bold text-slate-800">Collections Summary Today</h2>
-            <span className="text-sm font-bold text-navy-700 bg-navy-50 border px-3 py-1 rounded">Total Received: {formatINR(todayTotal)}</span>
+            <span className="text-sm font-bold text-emerald-700 bg-emerald-50 border px-3 py-1 rounded">Total Received: {formatINR(todayTotal)}</span>
           </div>
           {collectionsLoading ? (
             <div className="py-8 text-center text-slate-400">Loading collections queue...</div>
@@ -1392,7 +1392,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                   className={`w-full rounded-lg border py-2 pl-9 pr-4 text-sm text-slate-700 outline-none focus:ring-1 ${
                     admissionSearchError
                       ? "border-rose-400 focus:border-rose-500 focus:ring-rose-400"
-                      : "border-slate-300 focus:border-navy-500 focus:ring-navy-500"
+                      : "border-slate-300 focus:border-emerald-500 focus:ring-navy-500"
                   }`}
                 />
               </div>
@@ -1445,7 +1445,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                           <td className="px-4 py-3 text-right">
                             <button
                               onClick={() => setSelectedAdmissionId(adm._id)}
-                              className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-navy-700 hover:bg-navy-800 rounded-md px-3 py-1.5 transition shadow-sm"
+                              className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-md px-3 py-1.5 transition shadow-sm"
                             >
                               Open Bill <ArrowRight className="h-3.5 w-3.5" />
                             </button>
@@ -1461,12 +1461,12 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
             // Inpatient active bill workspace
             <div className="space-y-6">
               {/* Active patient banner header */}
-              <div className="flex items-center justify-between bg-navy-50 border border-navy-150 rounded-xl p-4">
+              <div className="flex items-center justify-between bg-emerald-50 border border-navy-150 rounded-xl p-4">
                 <div className="flex items-center gap-3">
-                  <Layers className="h-6 w-6 text-navy-700 animate-pulse" />
+                  <Layers className="h-6 w-6 text-emerald-700 animate-pulse" />
                   <div>
-                    <h3 className="text-sm font-bold text-navy-800">Inpatient Billing Workspace</h3>
-                    <p className="text-xs text-navy-600">
+                    <h3 className="text-sm font-bold text-emerald-800">Inpatient Billing Workspace</h3>
+                    <p className="text-xs text-emerald-600">
                       Active Stay: <span className="font-semibold">{ipBillData?.bill?.patient?.name || "Loading..."}</span> ({ipBillData?.bill?.patient?.uhid})
                     </p>
                   </div>
@@ -1481,7 +1481,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
 
               {billLoading ? (
                 <div className="py-20 text-center flex flex-col items-center justify-center gap-2">
-                  <RefreshCw className="h-8 w-8 text-navy-600 animate-spin" />
+                  <RefreshCw className="h-8 w-8 text-emerald-600 animate-spin" />
                   <span className="text-sm font-semibold text-slate-500">Loading bill workspace details...</span>
                 </div>
               ) : !ipBillData?.bill ? (
@@ -1492,7 +1492,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                   </div>
                   <Button
                     onClick={handleCreateIPBill}
-                    className="inline-flex items-center gap-2 bg-navy-700 hover:bg-navy-800 text-white font-bold"
+                    className="inline-flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold"
                   >
                     <Plus className="h-4.5 w-4.5" /> Create IP Bill
                   </Button>
@@ -1505,7 +1505,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                     {/* Patient detail card stay information */}
                     <Card className="space-y-4">
                       <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                        <User className="h-4.5 w-4.5 text-navy-600" /> Stay Details Card
+                        <User className="h-4.5 w-4.5 text-emerald-600" /> Stay Details Card
                       </h3>
                       {ipBillData?.bill && (
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-y-3 gap-x-4 text-xs">
@@ -1576,7 +1576,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                     {/* 16 Sections of Billing Workspace */}
                     <div className="space-y-4">
                       <h3 className="text-base font-bold text-slate-800 flex items-center gap-1.5">
-                        <FileText className="h-5 w-5 text-navy-700" /> Billing Category Sections
+                        <FileText className="h-5 w-5 text-emerald-700" /> Billing Category Sections
                       </h3>
 
                       {groupIPItems(ipBillData?.items || []).map((group) => {
@@ -1593,7 +1593,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                               <div className="flex items-center gap-2">
                                 {isExpanded ? <ChevronDown className="h-4 w-4 text-slate-500" /> : <ChevronRight className="h-4 w-4 text-slate-500" />}
                                 <h4 className="text-sm font-bold text-slate-700">{group.name}</h4>
-                                <span className="bg-navy-50 text-navy-700 text-[10px] font-bold px-2 py-0.5 rounded border border-navy-150 ml-2">
+                                <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded border border-navy-150 ml-2">
                                   {group.itemCount} {group.itemCount === 1 ? "Item" : "Items"}
                                 </span>
                               </div>
@@ -1612,7 +1612,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                                         setManualCategory(group.categories[0]);
                                       }
                                     }}
-                                    className="p-1 rounded bg-navy-600 hover:bg-navy-700 text-white transition flex items-center justify-center"
+                                    className="p-1 rounded bg-navy-600 hover:bg-emerald-700 text-white transition flex items-center justify-center"
                                     title="Add manual item"
                                   >
                                     <Plus className="h-3.5 w-3.5" />
@@ -1667,7 +1667,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                                               setItemDescError(validateItemDesc(val));
                                             }}
                                             className={`w-full rounded border p-1.5 text-xs outline-none bg-white ${
-                                              itemDescError ? "border-rose-400" : "border-slate-200 focus:border-navy-500"
+                                              itemDescError ? "border-rose-400" : "border-slate-200 focus:border-emerald-500"
                                             }`}
                                           />
                                           {itemDescError && (
@@ -1751,7 +1751,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                                                 handleAddBillItem(manualCategory);
                                                 setAddManualGroup(null);
                                               }}
-                                              className="w-full h-8 bg-navy-700 hover:bg-navy-800 text-white rounded text-xs font-bold"
+                                              className="w-full h-8 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-xs font-bold"
                                               title="Submit item"
                                             >
                                               ✓
@@ -1873,7 +1873,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                                                     <>
                                                       <button
                                                         onClick={() => handleUpdateBillItem(item._id)}
-                                                        className="p-1 rounded bg-navy-50 hover:bg-navy-100 text-navy-700"
+                                                        className="p-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700"
                                                         title="Save changes"
                                                       >
                                                         <Save className="h-3.5 w-3.5" />
@@ -1928,7 +1928,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                     {/* Billing Summary Step 7 */}
                     <Card className="space-y-4 border-t-4 border-t-navy-700 bg-white shadow-md">
                       <h3 className="border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                        <CreditCard className="h-4.5 w-4.5 text-navy-600" /> Billing Summary
+                        <CreditCard className="h-4.5 w-4.5 text-emerald-600" /> Billing Summary
                       </h3>
                       <div className="space-y-2.5 text-xs border-b border-slate-100 pb-3">
                         <div className="flex justify-between items-center gap-3 text-slate-600">
@@ -2004,7 +2004,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                         {ipBillData.bill.status === "Generated" && (
                           <Button
                             onClick={() => setShowIPPaymentModal(true)}
-                            className="bg-navy-600 hover:bg-navy-700 text-white text-xs px-3.5 py-2 font-bold shrink-0 shadow-sm"
+                            className="bg-navy-600 hover:bg-emerald-700 text-white text-xs px-3.5 py-2 font-bold shrink-0 shadow-sm"
                           >
                             Receive Payment
                           </Button>
@@ -2091,7 +2091,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                     {ipBillData.bill.status === "Draft" ? (
                       <Button
                         onClick={handleGenerateInvoiceClick}
-                        className="w-full py-2.5 font-black text-xs uppercase bg-navy-700 hover:bg-navy-800 text-white rounded-lg transition-all"
+                        className="w-full py-2.5 font-black text-xs uppercase bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg transition-all"
                         disabled={generateInvoiceMutation.isPending}
                       >
                         {generateInvoiceMutation.isPending ? "Generating Invoice..." : "Generate Final Bill"}
@@ -2209,12 +2209,12 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                   {hospitalData?.logoUrl ? (
                     <img src={hospitalData.logoUrl} alt={hospitalData.name} className="h-10 w-10 object-contain rounded bg-slate-50 p-0.5 border" />
                   ) : (
-                    <div className="flex h-10 w-10 items-center justify-center rounded bg-navy-100 text-navy-700 font-bold text-lg">
+                    <div className="flex h-10 w-10 items-center justify-center rounded bg-emerald-100 text-emerald-700 font-bold text-lg">
                       {hospitalData?.name ? hospitalData.name.charAt(0).toUpperCase() : "H"}
                     </div>
                   )}
                   <div>
-                    <h3 className="text-sm font-bold text-navy-700">{hospitalData?.name || "HMS Hospital Network"}</h3>
+                    <h3 className="text-sm font-bold text-emerald-700">{hospitalData?.name || "HMS Hospital Network"}</h3>
                     <p className="text-[10px] text-slate-400">Inpatient Payments Desk</p>
                   </div>
                 </div>
@@ -2344,7 +2344,7 @@ export function BillingPage({ activeTab = "consultation" }: Props) {
                 type="button"
                 onClick={confirmGenerateInvoice}
                 disabled={generateInvoiceMutation.isPending}
-                className="bg-navy-700 hover:bg-navy-800 text-white text-xs font-bold px-4 py-2 shadow-sm flex items-center gap-1.5"
+                className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-4 py-2 shadow-sm flex items-center gap-1.5"
               >
                 {generateInvoiceMutation.isPending ? (
                   <>

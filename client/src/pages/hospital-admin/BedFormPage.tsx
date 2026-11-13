@@ -388,7 +388,7 @@ export function BedFormPage() {
   if (isLoading) {
     return (
       <div className="p-12 text-center flex flex-col items-center justify-center gap-3 text-slate-600 font-semibold">
-        <Loader2 className="h-8 w-8 animate-spin text-navy-700" />
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-700" />
         <span>Loading existing bed details...</span>
       </div>
     );
@@ -413,9 +413,9 @@ export function BedFormPage() {
       {/* Breadcrumb Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-          <Link to="/admin" className="hover:text-navy-700 transition">Dashboard</Link>
+          <Link to="/admin" className="hover:text-emerald-700 transition">Dashboard</Link>
           <ChevronRight className="h-3.5 w-3.5" />
-          <Link to="/admin/beds" className="hover:text-navy-700 transition">Beds & Wards</Link>
+          <Link to="/admin/beds" className="hover:text-emerald-700 transition">Beds & Wards</Link>
           {selectedWardObj && (
             <>
               <ChevronRight className="h-3.5 w-3.5" />
@@ -435,7 +435,7 @@ export function BedFormPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2.5">
-              <BedDouble className="h-7 w-7 text-navy-700" />
+              <BedDouble className="h-7 w-7 text-emerald-700" />
               {isEditing ? `Edit Bed — ${form.bedPrefix}` : "Step 3 — Configure Beds inside Room"}
             </h1>
             <p className="text-sm text-slate-500">
@@ -594,7 +594,7 @@ export function BedFormPage() {
                 <span className="text-xs font-bold text-slate-800 flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-amber-500" /> Bed Allocation Preview ({previewGeneratedBedIds.length} Beds):
                 </span>
-                <span className="text-xs font-mono font-semibold text-navy-700 bg-white px-2.5 py-1 rounded border">
+                <span className="text-xs font-mono font-semibold text-emerald-700 bg-white px-2.5 py-1 rounded border">
                   Room: {selectedRoomObj ? `Room ${selectedRoomObj.roomNumber}` : "—"}
                 </span>
               </div>

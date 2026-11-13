@@ -32,7 +32,7 @@ export function PerformancePage() {
   if (isLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-navy-700 border-t-transparent"></div>
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-700 border-t-transparent"></div>
       </div>
     );
   }
@@ -74,11 +74,11 @@ export function PerformancePage() {
         <Card className="lg:col-span-2">
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-navy-700" /> Monthly Consultations
+              <BarChart3 className="h-4 w-4 text-emerald-700" /> Monthly Consultations
             </h3>
             <div className="flex items-center gap-3 text-xs text-slate-500">
               <span className="flex items-center gap-1">
-                <span className="h-2.5 w-2.5 rounded-sm bg-navy-700 inline-block" /> Completed Consultations
+                <span className="h-2.5 w-2.5 rounded-sm bg-emerald-700 inline-block" /> Completed Consultations
               </span>
             </div>
           </div>
@@ -88,7 +88,7 @@ export function PerformancePage() {
                 <div key={d.month} className="flex-1 flex flex-col items-center gap-1">
                   <span className="text-xs text-slate-500">{d.consultations}</span>
                   <div
-                    className="w-full rounded-t-md bg-navy-700 transition-all hover:bg-navy-600"
+                    className="w-full rounded-t-md bg-emerald-700 transition-all hover:bg-navy-600"
                     style={{
                       height: `${(d.consultations / maxBar) * 100}%`,
                       minHeight: d.consultations > 0 ? "10px" : "4px",
@@ -145,7 +145,7 @@ export function PerformancePage() {
       <Card>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-navy-700" /> Consultation Metrics Summary
+            <Calendar className="h-4 w-4 text-emerald-700" /> Consultation Metrics Summary
           </h3>
         </div>
         <div className="overflow-x-auto">
@@ -165,7 +165,7 @@ export function PerformancePage() {
               ].map((row, i) => (
                 <tr key={i} className="border-b border-slate-50 hover:bg-slate-50">
                   <td className="py-3 font-semibold text-slate-800">{row.name}</td>
-                  <td className="py-3 text-center font-bold text-navy-700">{row.count}</td>
+                  <td className="py-3 text-center font-bold text-emerald-700">{row.count}</td>
                   <td className="py-3">
                     <Badge tone={row.status === "Finalized" ? "success" : "warning"}>{row.status}</Badge>
                   </td>
@@ -179,14 +179,14 @@ export function PerformancePage() {
       {/* Patient Feedback */}
       <Card>
         <h3 className="mb-4 text-base font-semibold text-slate-800 flex items-center gap-2">
-          <ThumbsUp className="h-4 w-4 text-navy-700" /> Recent Patient Feedback
+          <ThumbsUp className="h-4 w-4 text-emerald-700" /> Recent Patient Feedback
         </h3>
 
         {feedbackList.length > 0 ? (
           <div className="space-y-3">
             {feedbackList.map((fb) => (
               <div key={fb._id} className="flex items-start gap-4 rounded-lg border border-slate-100 p-3 hover:bg-slate-50">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-bold text-navy-700">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
                   {fb.patientName
                     .split(" ")
                     .map((n: string) => n[0])

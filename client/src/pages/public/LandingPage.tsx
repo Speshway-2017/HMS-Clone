@@ -90,14 +90,14 @@ export function LandingPage() {
   }
 
   const { data: hospital } = usePublicHospital();
-  const hospitalName = hospital?.name || "Sunrise General Hospital";
-  const logoUrl = hospital?.logoUrl;
+  const hospitalName = hospital?.name || (typeof window !== "undefined" ? localStorage.getItem("hms_hospital_name") : null) || "Preethi Fertility Centre & Women's Clinic";
+  const logoUrl = hospital?.logoUrl || (typeof window !== "undefined" ? localStorage.getItem("hms_hospital_logo") : null) || "/preethi_logo.jpg";
   const address = hospital?.address || "80 Feet Road, Koramangala, Bengaluru, KA 560034";
   const phone = hospital?.contactPhone || "+91 (80) 4567 8901";
   const email = hospital?.contactEmail || "contact@sunrisehospital.com";
   const workingHours = hospital?.workingHours || "Monday - Saturday: 08:00 AM - 08:00 PM (Emergency 24/7)";
   const heroBannerUrl = hospital?.heroBannerUrl;
-  const aboutText = hospital?.aboutText || "Sunrise General Hospital is committed to providing compassionate, high-quality, patient-centric healthcare services. With our state-of-the-art facilities, modern diagnostic laboratories, and an experienced team of medical practitioners, we ensure that you and your loved ones receive the best possible clinical care. From emergency trauma services to outpatient consultations, we are here for you 24/7.";
+  const aboutText = hospital?.aboutText || "Preethi Fertility Centre & Women's Clinic is committed to providing compassionate, high-quality, patient-centric healthcare services. With our state-of-the-art facilities, modern diagnostic laboratories, and an experienced team of medical practitioners, we ensure that you and your loved ones receive the best possible clinical care. From emergency trauma services to outpatient consultations, we are here for you 24/7.";
   const googleMapsLink = hospital?.googleMapsLink || "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3888.750247477546!2d77.6223405757754!3d12.923766787386766!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bae148ebffffff%3A0x6bde35501869e5d4!2sKoramangala%2080%20Feet%20Rd%2C%20Bengaluru%2C%20Karnataka!5e0!3m2!1sen!2sin!4v1700000000000!5m2!1sen!2sin";
   const footerText = hospital?.footerText || "Serving our community with integrity, compassion, and clinical excellence. Your health is our first priority.";
   const faqs = hospital?.faqs || [];
@@ -685,30 +685,30 @@ export function LandingPage() {
       </svg>
 
       {/* --- GLASSMORPHIC NAV BAR --- */}
-      <header className="sticky top-0 z-50 w-full border-b border-slate-200/50 bg-white/80 backdrop-blur-xl transition-all duration-300">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-6 py-6 lg:px-8">
+      <header className="sticky top-0 z-50 w-full border-b border-slate-200/80 bg-white/95 backdrop-blur-md transition-all duration-200 shadow-xs">
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
 
           {/* Logo / Hospital Name */}
           <div
             onClick={() => changeTab("home")}
-            className="flex cursor-pointer items-center gap-3 text-lg lg:text-xl font-extrabold tracking-tight text-navy-900 shrink-0"
+            className="flex cursor-pointer items-center gap-2.5 text-base sm:text-lg font-extrabold tracking-tight text-slate-900 shrink-0"
           >
             <img
-              src={logoUrl || "/hospital-logo.svg"}
+              src={logoUrl || "/preethi_logo.jpg"}
               alt=""
-              className="h-9 w-9 rounded-lg object-cover shadow-sm"
+              className="h-9 w-9 rounded-full object-contain border border-emerald-200 bg-white p-0.5 shadow-xs"
               onError={(e) => {
                 e.currentTarget.onerror = null;
-                e.currentTarget.src = "/hospital-logo.svg";
+                e.currentTarget.src = "/preethi_logo.jpg";
               }}
             />
-            <span className="bg-gradient-to-r from-navy-900 to-navy-700 bg-clip-text text-transparent">
+            <span className="text-slate-900 font-extrabold text-sm sm:text-base">
               {hospitalName}
             </span>
           </div>
 
           {/* Desktop Nav Items */}
-          <nav className="hidden items-center gap-5 xl:gap-8 text-sm font-semibold text-slate-600 lg:flex shrink-0">
+          <nav className="hidden items-center gap-4 xl:gap-6 text-xs font-semibold text-slate-600 lg:flex shrink-0">
             {[
               { id: "home", label: "Home" },
               { id: "about", label: "About Us" },
@@ -721,8 +721,9 @@ export function LandingPage() {
               <button
                 key={nav.id}
                 onClick={() => changeTab(nav.id)}
-                className={`nav-hover-underline transition-colors hover:text-[#0505a9] py-1 ${activeTab === nav.id ? "text-[#0505a9] font-bold active" : "text-slate-600"
-                  }`}
+                className={`transition-colors hover:text-emerald-700 py-1 cursor-pointer ${
+                  activeTab === nav.id ? "text-emerald-700 font-bold border-b-2 border-emerald-600" : "text-slate-600"
+                }`}
               >
                 {nav.label}
               </button>
@@ -730,27 +731,17 @@ export function LandingPage() {
           </nav>
 
           {/* Nav Actions */}
-          <div className="hidden items-center gap-4 shrink-0 lg:flex">
+          <div className="hidden items-center gap-3 shrink-0 lg:flex">
             <Link to="/login">
-              <button className="nav-hover-underline text-sm font-bold text-slate-700 hover:text-[#0505a9] py-1">
-                Login
+              <button className="text-xs font-bold text-slate-700 hover:text-emerald-700 py-1.5 px-3 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">
+                Sign In
               </button>
             </Link>
             <button
               onClick={() => changeTab("doctors")}
-              className="blob-btn blob-btn--sm blob-btn--reverse"
+              className="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold text-xs shadow-xs transition-colors cursor-pointer"
             >
-              <span className="relative z-10 inline-flex items-center gap-1.5 whitespace-nowrap">
-                Book Appointment
-              </span>
-              <span className="blob-btn__inner">
-                <span className="blob-btn__blobs">
-                  <span className="blob-btn__blob"></span>
-                  <span className="blob-btn__blob"></span>
-                  <span className="blob-btn__blob"></span>
-                  <span className="blob-btn__blob"></span>
-                </span>
-              </span>
+              Book Appointment
             </button>
           </div>
 
@@ -816,37 +807,29 @@ export function LandingPage() {
 
               <div className="mx-auto grid max-w-[1600px] grid-cols-1 items-center gap-12 lg:grid-cols-12">
                 <div className="text-center lg:col-span-6 lg:text-left space-y-6">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-navy-50/80 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-navy-800 border border-navy-100">
-                    <Heart className="h-3.5 w-3.5 text-navy-600 fill-navy-600" />
+                  <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-emerald-800 border border-emerald-200 shadow-xs">
+                    <Heart className="h-3.5 w-3.5 text-rose-600 fill-rose-600" />
                     Dedicated Clinical Excellence
                   </div>
-                  <h1 className="text-4xl font-extrabold leading-[1.1] tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-                    <DepthParallaxWords delay={100} stagger={65}>
-                      {heroTitle}
-                    </DepthParallaxWords>
+                  <h1 className="text-3xl font-extrabold leading-[1.15] tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">
+                    {heroTitle}
                   </h1>
-                  <p className="mx-auto mt-4 max-w-xl text-base lg:text-lg leading-relaxed text-slate-600 lg:mx-0">
-                    <DepthParallaxWords delay={350} stagger={25}>
-                      {heroSub}
-                    </DepthParallaxWords>
+                  <p className="mx-auto mt-3 max-w-xl text-sm lg:text-base leading-relaxed text-slate-600 lg:mx-0">
+                    {heroSub}
                   </p>
-                  <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row lg:justify-start">
+                  <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
                     <button
                       onClick={() => changeTab("doctors")}
-                      className="blob-btn blob-btn--reverse w-full sm:w-auto"
+                      className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold text-sm shadow-xs transition-colors cursor-pointer w-full sm:w-auto"
                     >
-                      <span className="relative z-10 inline-flex items-center gap-2">
-                        Book Appointment Online
-                        <ArrowRight className="h-5 w-5" />
-                      </span>
-                      <span className="blob-btn__inner">
-                        <span className="blob-btn__blobs">
-                          <span className="blob-btn__blob"></span>
-                          <span className="blob-btn__blob"></span>
-                          <span className="blob-btn__blob"></span>
-                          <span className="blob-btn__blob"></span>
-                        </span>
-                      </span>
+                      <span>Book Appointment Online</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => changeTab("departments")}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold text-sm shadow-xs transition-colors cursor-pointer w-full sm:w-auto"
+                    >
+                      <span>Explore Specialties</span>
                     </button>
                   </div>
 
@@ -860,43 +843,79 @@ export function LandingPage() {
                   </div>
                 </div>
 
-                {/* Hero Banner / 3D Clinical Illustration */}
+                {/* Hero Banner / 3D Animated Clinical Illustration */}
                 <div className="lg:col-span-6">
-                  {heroBannerUrl ? (
-                    <div className="relative overflow-hidden rounded-3xl border border-slate-200 shadow-2xl">
-                      <img src={heroBannerUrl} alt={hospitalName} className="w-full aspect-[4/3] object-cover" />
-                    </div>
-                  ) : (
-                    <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-gradient-to-b from-slate-50 to-white p-3 shadow-2xl group">
-                      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-navy-900 via-slate-900 to-navy-950 aspect-[4/3] flex items-center justify-center">
+                  <div className="relative group perspective-1000">
+                    {/* Ambient Glow Halo matching emerald & rose clinical color palette */}
+                    <div className="absolute -inset-2 rounded-3xl bg-gradient-to-r from-emerald-500/20 via-teal-500/10 to-rose-400/20 blur-xl opacity-75 group-hover:opacity-100 transition-opacity animate-pulse-glow pointer-events-none" />
+
+                    {/* Main 3D Card Shell */}
+                    <div className="relative rounded-3xl border border-slate-200/90 bg-white p-2.5 sm:p-3 shadow-2xl transition-all duration-500 group-hover:shadow-emerald-900/10 group-hover:-translate-y-1">
+                      <div className="relative rounded-2xl overflow-hidden aspect-[4/3] bg-gradient-to-br from-[#062417] via-[#093522] to-[#041a10]">
+                        {/* 3D Medical Illustration Image with Floating Animation */}
                         <img
-                          src="/3d_doctors.png"
-                          alt="3D Doctors Illustration"
-                          className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                          src={heroBannerUrl || "/hero_3d_medical.jpg"}
+                          alt={`${hospitalName} 3D Clinical Environment`}
+                          className="w-full h-full object-cover object-center animate-float-slow scale-102 group-hover:scale-105 transition-transform duration-700"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = "/hero_3d_medical.jpg";
+                          }}
                         />
-                        <div className="absolute top-4 right-4 rounded-full bg-emerald-500/20 backdrop-blur-md px-3.5 py-1 text-[11px] font-bold text-emerald-300 border border-emerald-400/30 flex items-center gap-1.5 shadow-sm">
-                          <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                          24/7 OPEN
-                        </div>
-                        <div className="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur-md rounded-xl p-3 border border-white/40 shadow-lg flex justify-between items-center text-navy-900">
-                          <div>
-                            <h4 className="text-xs font-extrabold">{hospitalName}</h4>
-                            <p className="text-[10px] text-slate-500 font-semibold">Specialized OPD & Trauma Center</p>
+
+                        {/* Top Floating Glass Badge */}
+                        <div className="absolute top-3.5 left-3.5 right-3.5 z-20 flex items-center justify-between pointer-events-none">
+                          <div className="flex items-center gap-2.5 rounded-2xl bg-slate-900/75 backdrop-blur-md border border-white/20 px-3 py-1.5 shadow-lg animate-float-reverse">
+                            <img
+                              src={logoUrl}
+                              alt="Logo"
+                              className="h-7 w-7 rounded-full border border-emerald-400/50 bg-white p-0.5 object-contain"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = "/preethi_logo.jpg";
+                              }}
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-white leading-tight">
+                                {hospitalName}
+                              </span>
+                              <span className="text-[10px] text-emerald-300 font-medium leading-none mt-0.5">
+                                Reproductive Medicine & Clinical Care
+                              </span>
+                            </div>
                           </div>
+
+                          <div className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-emerald-950/80 backdrop-blur-md px-3 py-1 text-[11px] font-bold text-emerald-300 border border-emerald-400/40 shadow-sm">
+                            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                            <span>CARE ACTIVE</span>
+                          </div>
+                        </div>
+
+                        {/* Bottom Floating Stats Strip */}
+                        <div className="absolute bottom-3.5 left-3.5 right-3.5 z-20 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pointer-events-auto">
+                          {/* Left Badge: Trust KPI */}
+                          <div className="rounded-xl bg-slate-900/80 backdrop-blur-md px-3.5 py-2 border border-white/15 shadow-lg flex items-center gap-3">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-bold text-xs">
+                              98%
+                            </div>
+                            <div>
+                              <div className="text-xs font-bold text-white leading-tight">Patient Care Trust</div>
+                              <div className="text-[10px] text-emerald-300 font-medium">Verified Clinical Outcomes</div>
+                            </div>
+                          </div>
+
+                          {/* Right Badge: Specialists Link */}
                           <button
                             onClick={() => changeTab("doctors")}
-                            className="group/btn relative inline-flex items-center gap-1.5 overflow-hidden rounded-lg bg-gradient-to-r from-navy-700 via-navy-800 to-navy-900 px-3.5 py-1.5 text-[11px] font-bold text-white shadow-md transition-all duration-300 ease-out hover:-translate-y-0.5 hover:scale-105 hover:from-navy-800 hover:to-navy-950 hover:shadow-lg hover:shadow-navy-900/35 hover:ring-2 hover:ring-navy-400/30 active:scale-95"
+                            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700/90 hover:bg-emerald-600 backdrop-blur-md px-4 py-2 text-xs font-bold text-white border border-emerald-400/40 shadow-lg transition-all active:scale-95 cursor-pointer"
                           >
-                            <span className="relative z-10 flex items-center gap-1.5">
-                              View Doctors
-                              <ArrowRight className="w-3 h-3 transition-transform duration-300 ease-out group-hover/btn:translate-x-0.5" />
-                            </span>
-                            <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/15 to-transparent transition-transform duration-700 ease-out group-hover/btn:translate-x-full" />
+                            <span>Consult Specialists</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             </section>
@@ -939,14 +958,14 @@ export function LandingPage() {
                   <AnimatedList
                     items={whyChooseUs.slice(0, 4).map((item, idx) => {
                       const icons = [<Heart className="h-5 w-5" />, <Shield className="h-5 w-5" />, <Clock3 className="h-5 w-5" />, <Award className="h-5 w-5" />];
-                      const colors = ["#0505a9", "#0505a9", "#0505a9", "#0505a9"];
+                      const colors = ["#16a34a", "#16a34a", "#16a34a", "#16a34a"];
                       const badges = ["Compassion", "Certified", "24/7 OPD", "Top Rated"];
                       return {
                         id: `trust-card-${idx}`,
                         title: item.title,
                         description: item.desc,
                         icon: icons[idx] || <Heart className="h-5 w-5" />,
-                        color: colors[idx] || "#0505a9",
+                        color: colors[idx] || "#16a34a",
                         badge: badges[idx] || "Verified",
                       };
                     })}
@@ -999,7 +1018,7 @@ export function LandingPage() {
                             </p>
                             <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500 font-medium">
                               <span>Floor: <strong className="text-slate-700">{dept.floor || "Ground"}</strong></span>
-                              <span className="font-extrabold text-[#0505a9]">OPD Fee: ₹{dept.consultationFee || 300}</span>
+                              <span className="font-extrabold text-[#16a34a]">OPD Fee: ₹{dept.consultationFee || 300}</span>
                             </div>
                           </div>
                         </div>
@@ -2192,22 +2211,22 @@ export function LandingPage() {
           side="top"
           sideOffset={16}
           bgClassName="bg-white border border-slate-200 shadow-2xl text-slate-800"
-          triggerBgClassName="bg-[#0505a9]"
+          triggerBgClassName="bg-[#16a34a]"
           contentClassName="p-5"
           trigger={
             <div className="flex items-center justify-center w-full h-full text-white relative">
               <MessageSquare className="h-6 w-6" />
               <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-[#0505a9]"></span>
+                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-[#16a34a]"></span>
               </span>
             </div>
           }
         >
           <div className="space-y-4 text-left">
             <div className="border-b border-slate-150 pb-3">
-              <h4 className="text-base font-extrabold text-[#0505a9] flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-[#0505a9]" />
+              <h4 className="text-base font-extrabold text-[#16a34a] flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-[#16a34a]" />
                 <span>Send Contact Message</span>
               </h4>
               <p className="text-[11px] text-slate-500 font-medium mt-0.5">
@@ -2235,7 +2254,7 @@ export function LandingPage() {
                   className={`w-full rounded-xl border px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all shadow-sm ${
                     contactTouched.name && contactErrors.name
                       ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
-                      : "bg-slate-50 border-slate-200 focus:border-[#0505a9] focus:bg-white focus:ring-2 focus:ring-[#0505a9]/20"
+                      : "bg-slate-50 border-slate-200 focus:border-[#16a34a] focus:bg-white focus:ring-2 focus:ring-[#16a34a]/20"
                   }`}
                 />
                 {contactTouched.name && contactErrors.name && (
@@ -2265,7 +2284,7 @@ export function LandingPage() {
                   className={`w-full rounded-xl border px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all shadow-sm ${
                     contactTouched.email && contactErrors.email
                       ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
-                      : "bg-slate-50 border-slate-200 focus:border-[#0505a9] focus:bg-white focus:ring-2 focus:ring-[#0505a9]/20"
+                      : "bg-slate-50 border-slate-200 focus:border-[#16a34a] focus:bg-white focus:ring-2 focus:ring-[#16a34a]/20"
                   }`}
                 />
                 {contactTouched.email && contactErrors.email && (
@@ -2295,7 +2314,7 @@ export function LandingPage() {
                   className={`w-full rounded-xl border px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all resize-none shadow-sm ${
                     contactTouched.message && contactErrors.message
                       ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
-                      : "bg-slate-50 border-slate-200 focus:border-[#0505a9] focus:bg-white focus:ring-2 focus:ring-[#0505a9]/20"
+                      : "bg-slate-50 border-slate-200 focus:border-[#16a34a] focus:bg-white focus:ring-2 focus:ring-[#16a34a]/20"
                   }`}
                 />
                 {contactTouched.message && contactErrors.message && (
@@ -2310,7 +2329,7 @@ export function LandingPage() {
                 <button
                   type="submit"
                   disabled={isSubmittingContact || isSubmittedContact}
-                  className="w-full py-2.5 px-4 rounded-xl bg-[#0505a9] hover:bg-[#040488] active:scale-[0.98] text-white font-extrabold text-xs shadow-md transition-all duration-200 flex items-center justify-center gap-2"
+                  className="w-full py-2.5 px-4 rounded-xl bg-[#16a34a] hover:bg-[#15803d] active:scale-[0.98] text-white font-extrabold text-xs shadow-md transition-all duration-200 flex items-center justify-center gap-2"
                 >
                   {isSubmittingContact ? (
                     <div className="flex items-center gap-2">

@@ -32,11 +32,12 @@ export function useAdmins(params: AdminListParams) {
 interface CreateAdminPayload {
   name: string;
   email: string;
-  role: "hospital_admin" | "accountant";
-  hospital: string;
+  role?: string;
+  hospital?: string | null;
   title?: string;
   phone?: string;
   employeeId?: string;
+  avatarUrl?: string;
 }
 
 export function useCreateAdmin() {

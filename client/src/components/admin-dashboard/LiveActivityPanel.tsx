@@ -18,9 +18,9 @@ interface LiveActivityPanelProps {
 export function LiveActivityPanel({ notifications }: LiveActivityPanelProps) {
   const [events, setEvents] = useState<LiveEvent[]>([
     { id: "1", type: "payment", title: "Payment ₹1,250 received for Invoice #INV-8492", timestamp: "Just now", icon: CreditCard, color: "text-emerald-600 bg-emerald-50" },
-    { id: "2", type: "patient", title: "New OP Patient registered: Rahul Sharma (UHID: HMS-9041)", timestamp: "2 mins ago", icon: UserPlus, color: "text-blue-600 bg-blue-50" },
-    { id: "3", type: "lab", title: "Lab Report Uploaded: CBC Test for Patient #402", timestamp: "5 mins ago", icon: FileText, color: "text-purple-600 bg-purple-50" },
-    { id: "4", type: "admission", title: "IP Admission: Patient admitted to ICU Bed #04", timestamp: "12 mins ago", icon: Activity, color: "text-rose-600 bg-rose-50" },
+    { id: "2", type: "patient", title: "New OP Patient registered: Rahul Sharma (UHID: HMS-9041)", timestamp: "2 mins ago", icon: UserPlus, color: "text-emerald-700 bg-emerald-50" },
+    { id: "3", type: "lab", title: "Lab Report Uploaded: CBC Test for Patient #402", timestamp: "5 mins ago", icon: FileText, color: "text-rose-600 bg-rose-50" },
+    { id: "4", type: "admission", title: "IP Admission: Patient admitted to ICU Bed #04", timestamp: "12 mins ago", icon: Activity, color: "text-rose-700 bg-rose-50" },
     { id: "5", type: "pharmacy", title: "Prescription Dispensed: Paracetamol 650mg & Amoxicillin", timestamp: "18 mins ago", icon: Pill, color: "text-emerald-600 bg-emerald-50" },
   ]);
 
@@ -33,7 +33,7 @@ export function LiveActivityPanel({ notifications }: LiveActivityPanelProps) {
         title: data?.title || data?.message || "Real-time system update received",
         timestamp: "Just now",
         icon: Zap,
-        color: "text-navy-700 bg-navy-50",
+        color: "text-emerald-700 bg-emerald-50",
       };
 
       setEvents((prev) => [newEv, ...prev.slice(0, 9)]);
@@ -43,7 +43,6 @@ export function LiveActivityPanel({ notifications }: LiveActivityPanelProps) {
     socket.on("admission:request:created", handleNewEvent);
     socket.on("prescription:new", handleNewEvent);
     socket.on("prescription:dispensed", handleNewEvent);
-    socket.on("notification:new", handleNewEvent);
     socket.on("payment_update", handleNewEvent);
 
     return () => {
@@ -120,8 +119,8 @@ export function LiveActivityPanel({ notifications }: LiveActivityPanelProps) {
             </div>
           </div>
 
-          <div className="rounded-lg bg-white p-3 border border-blue-200 flex items-start gap-2.5">
-            <FileText className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+          <div className="rounded-lg bg-white p-3 border border-emerald-200 flex items-start gap-2.5">
+            <FileText className="h-4 w-4 text-emerald-700 shrink-0 mt-0.5" />
             <div>
               <p className="text-xs font-bold text-slate-800">Pending Lab Verifications</p>
               <p className="text-[11px] text-slate-500">5 Diagnostic reports waiting for doctor verification.</p>

@@ -435,7 +435,7 @@ export function DoctorFormPage() {
                     navigator.clipboard.writeText(created.tempPassword);
                     toast.success("Password copied to clipboard!");
                   }}
-                  className="text-slate-400 hover:text-navy-700"
+                  className="text-slate-400 hover:text-emerald-700"
                   title="Copy password"
                 >
                   <Copy className="h-4 w-4" />
@@ -463,7 +463,7 @@ export function DoctorFormPage() {
     <div className="w-full space-y-6">
       <div>
         <div className="text-sm text-slate-400">
-          <Link to="/admin/doctors" className="hover:text-navy-700">
+          <Link to="/admin/doctors" className="hover:text-emerald-700">
             Doctors
           </Link>{" "}
           &gt; {isEdit ? "Edit Doctor" : "Add New Doctor"}

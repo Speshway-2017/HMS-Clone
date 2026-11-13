@@ -49,7 +49,7 @@ export const PendingHandoverAcceptModal: React.FC<PendingHandoverAcceptModalProp
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Shift Cycle</span>
-            <span className="font-bold text-navy-700">{handover.currentShift} → {handover.nextShift}</span>
+            <span className="font-bold text-emerald-700">{handover.currentShift} → {handover.nextShift}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Patients Count</span>

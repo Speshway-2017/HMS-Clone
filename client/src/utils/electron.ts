@@ -29,10 +29,10 @@ export const isElectron = (): boolean => {
 export const DESKTOP_ALLOWED_ROLES: Role[] = [
   "super_admin",
   "hospital_admin",
-  "accountant",
+  "admin",
   "receptionist",
   "doctor",
   "pharmacist",
-  "laboratory",
+  "staff",
   "nurse",
 ];

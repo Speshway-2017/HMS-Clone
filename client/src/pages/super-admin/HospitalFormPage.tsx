@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { Building2, Phone, UserCog, FileBadge, AlertCircle } from "lucide-react";
+import { Building2, Phone, FileBadge, AlertCircle, Sparkles, UserCheck, Plus } from "lucide-react";
 import toast from "react-hot-toast";
 import { useHospital, useCreateHospital, useUpdateHospital, useUnassignedHospitalAdmins } from "../../features/hospitals";
 import { FormSection } from "../../components/ui/FormSection";
@@ -8,37 +8,35 @@ import { InputField, SelectField } from "../../components/ui/Field";
 import { FileUpload } from "../../components/ui/FileUpload";
 import { Button } from "../../components/ui/Button";
 import { api } from "../../lib/api";
-import { MAX_LENGTHS, isValidPhone, isValidEmail } from "../../lib/validation";
+import { MAX_LENGTHS, isValidEmail } from "../../lib/validation";
 
 export function HospitalFormPage() {
   const { id } = useParams();
   const isEdit = !!id;
   const navigate = useNavigate();
   const { data } = useHospital(id);
-  const { data: unassignedAdmins, isLoading: isLoadingAdmins } = useUnassignedHospitalAdmins();
+  const { data: adminsList, isLoading: isLoadingAdmins } = useUnassignedHospitalAdmins(id);
   const createHospital = useCreateHospital();
   const updateHospital = useUpdateHospital(id ?? "");
 
   const [form, setForm] = useState<{
     name: string;
     code: string;
-    bedCapacity: number | string;
     address: string;
     contactEmail: string;
     contactPhone: string;
+    primaryAdminId: string;
     logoUrl: string;
     licenseUrl: string;
-    primaryAdminId: string;
   }>({
     name: "",
     code: "",
-    bedCapacity: 0,
     address: "",
     contactEmail: "",
     contactPhone: "",
+    primaryAdminId: "",
     logoUrl: "",
     licenseUrl: "",
-    primaryAdminId: "",
   });
 
   const [error, setError] = useState<string | null>(null);
@@ -47,40 +45,52 @@ export function HospitalFormPage() {
     code?: string;
     contactPhone?: string;
     contactEmail?: string;
-    primaryAdminId?: string;
     logoUrl?: string;
     licenseUrl?: string;
-    bedCapacity?: string;
     address?: string;
+    primaryAdminId?: string;
   }>({});
   const [touched, setTouched] = useState<{
     name?: boolean;
     code?: boolean;
-    bedCapacity?: boolean;
     address?: boolean;
     contactPhone?: boolean;
     contactEmail?: boolean;
-    primaryAdminId?: boolean;
   }>({});
+
+  // Auto-generate next sequential Hospital ID on create
+  useEffect(() => {
+    if (!isEdit) {
+      api
+        .get<{ status: string; data: { nextId: string } }>("/hospitals/next-id")
+        .then((res) => {
+          if (res.data?.data?.nextId) {
+            setForm((f) => ({ ...f, code: res.data.data.nextId }));
+          }
+        })
+        .catch(() => {
+          setForm((f) => ({ ...f, code: "HOSP-001" }));
+        });
+    }
+  }, [isEdit]);
 
   useEffect(() => {
     if (data?.hospital) {
-      setForm((f) => ({
-        ...f,
+      setForm({
         name: data.hospital.name,
         code: data.hospital.code,
-        bedCapacity: data.hospital.bedCapacity,
-        address: data.hospital.address,
-        contactEmail: data.hospital.contactEmail,
-        contactPhone: data.hospital.contactPhone,
+        address: data.hospital.address ?? "",
+        contactEmail: data.hospital.contactEmail ?? "",
+        contactPhone: data.hospital.contactPhone ?? "",
+        primaryAdminId: data.stats?.primaryAdmin?._id ?? "",
         logoUrl: data.hospital.logoUrl ?? "",
         licenseUrl: data.hospital.licenseUrl ?? "",
-      }));
+      });
     }
   }, [data]);
 
   const validateField = (
-    field: "name" | "code" | "bedCapacity" | "address" | "contactPhone" | "contactEmail" | "primaryAdminId" | "logoUrl" | "licenseUrl",
+    field: "name" | "code" | "address" | "contactPhone" | "contactEmail" | "logoUrl" | "licenseUrl",
     value: any
   ): string | undefined => {
     const rawVal = typeof value === "string" ? value : value !== undefined && value !== null ? String(value) : "";
@@ -88,69 +98,43 @@ export function HospitalFormPage() {
 
     if (field === "name") {
       if (!trimmed) {
-        return "Please fill out this field";
+        return "Hospital Name is required";
       }
       if (rawVal.length > MAX_LENGTHS.NAME) {
-        return `Hospital Name cannot exceed ${MAX_LENGTHS.NAME} characters. Please enter valid data`;
+        return `Hospital Name cannot exceed ${MAX_LENGTHS.NAME} characters`;
       }
       if (trimmed.length < 2) {
-        return "Hospital Name must be at least 2 characters. Please enter valid data";
+        return "Hospital Name must be at least 2 characters";
       }
       if (!/^[a-zA-Z0-9][a-zA-Z0-9\s.,\-_/'&()]*$/.test(trimmed)) {
-        return "Hospital Name contains invalid data. Please enter valid data";
+        return "Hospital Name contains invalid characters";
       }
       return undefined;
     }
 
     if (field === "code") {
       if (!trimmed) {
-        return "Please fill out this field";
+        return "Hospital Unique ID is required";
       }
       if (rawVal.length > MAX_LENGTHS.CODE) {
-        return `Hospital Code cannot exceed ${MAX_LENGTHS.CODE} characters. Please enter valid data`;
+        return `Hospital ID cannot exceed ${MAX_LENGTHS.CODE} characters`;
       }
       if (trimmed.length < 2) {
-        return "Hospital Code must be at least 2 characters. Please enter valid data";
+        return "Hospital ID must be at least 2 characters";
       }
       if (!/^[A-Za-z0-9\-_]+$/.test(trimmed)) {
-        return "Hospital Code must contain only letters, numbers, hyphens, and underscores. Please enter valid data";
-      }
-      return undefined;
-    }
-
-    if (field === "bedCapacity") {
-      if (value === "" || value === null || value === undefined || (typeof value === "string" && !value.trim())) {
-        return undefined; // Optional: data should be saved without this field
-      }
-      const strVal = String(value).trim();
-      if (!/^-?\d+(\.\d+)?$/.test(strVal)) {
-        return "Please enter valid data";
-      }
-      if (strVal.includes(".")) {
-        return "Total Bed Capacity must be a whole number. Please enter valid data";
-      }
-      const num = Number(strVal);
-      if (isNaN(num)) {
-        return "Please enter valid data";
-      }
-      if (num < 0) {
-        return "Total Bed Capacity cannot be negative. Please enter valid data";
-      }
-      if (num > 100000 || strVal.length > 6) {
-        return "Total Bed Capacity cannot exceed 100,000. Please enter valid data";
+        return "Hospital ID must contain only letters, numbers, hyphens, and underscores";
       }
       return undefined;
     }
 
     if (field === "address") {
-      if (!trimmed) {
-        return undefined; // Optional: data should be saved without this field
-      }
+      if (!trimmed) return undefined;
       if (rawVal.length > MAX_LENGTHS.ADDRESS) {
-        return `Address cannot exceed ${MAX_LENGTHS.ADDRESS} characters. Please enter valid data`;
+        return `Address cannot exceed ${MAX_LENGTHS.ADDRESS} characters`;
       }
       if (/<script|javascript:|data:/i.test(trimmed) || !/^[a-zA-Z0-9\s,.\-#/'()]+$/.test(trimmed)) {
-        return "Address contains invalid data. Please enter valid data";
+        return "Address contains invalid characters";
       }
       return undefined;
     }
@@ -159,16 +143,13 @@ export function HospitalFormPage() {
       if (!trimmed) return undefined;
       const digitsOnly = trimmed.replace(/\D/g, "");
       if (/[^\d]/.test(trimmed)) {
-        return "Invalid phone number. Primary Phone should accept 10 digits only. Please enter valid data";
+        return "Contact phone should accept 10 digits only";
       }
-      if (digitsOnly.length > 10) {
-        return "Primary Phone cannot exceed 10 digits. Please enter valid data";
-      }
-      if (digitsOnly.length < 10) {
-        return "Invalid phone number. Please enter a valid 10-digit phone number. Please enter valid data";
+      if (digitsOnly.length !== 10) {
+        return "Please enter a valid 10-digit phone number";
       }
       if (/^(\d)\1{9}$/.test(digitsOnly)) {
-        return "Please enter a valid 10-digit phone number. Please enter valid data";
+        return "Please enter a valid 10-digit phone number";
       }
       return undefined;
     }
@@ -176,23 +157,10 @@ export function HospitalFormPage() {
     if (field === "contactEmail") {
       if (!trimmed) return undefined;
       if (value.length > MAX_LENGTHS.EMAIL) {
-        return `Email cannot exceed ${MAX_LENGTHS.EMAIL} characters. Please enter valid data`;
+        return `Email cannot exceed ${MAX_LENGTHS.EMAIL} characters`;
       }
       if (!isValidEmail(trimmed)) {
-        return "Please enter a valid email address. Please enter valid data";
-      }
-      return undefined;
-    }
-
-    if (field === "primaryAdminId") {
-      if (!trimmed) return undefined;
-      const isEligible = Boolean(
-        unassignedAdmins &&
-        unassignedAdmins.length > 0 &&
-        unassignedAdmins.some((a) => a._id === trimmed)
-      );
-      if (!isEligible) {
-        return "Selected administrator is invalid or ineligible. Please enter valid data";
+        return "Please enter a valid email address";
       }
       return undefined;
     }
@@ -201,7 +169,7 @@ export function HospitalFormPage() {
       if (!trimmed) return undefined;
       const lower = trimmed.toLowerCase();
       if (!lower.endsWith(".pdf") && !lower.includes(".pdf?")) {
-        return "Only PDF files should be accepted. Remaining files are not accepted.";
+        return "Only PDF files are accepted for licenses";
       }
       return undefined;
     }
@@ -214,7 +182,7 @@ export function HospitalFormPage() {
         lower.startsWith("data:image/") ||
         validImageExts.some((ext) => lower.endsWith(ext) || lower.includes(ext + "?") || lower.includes("/image/upload/"));
       if (!isImg) {
-        return "Unsupported file format. Hospital Logo accepts only PNG, JPEG, WEBP, or SVG images";
+        return "Hospital Logo accepts only PNG, JPEG, WEBP, or SVG images";
       }
       return undefined;
     }
@@ -222,343 +190,7 @@ export function HospitalFormPage() {
     return undefined;
   };
 
-  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const allowedNavKeys = [
-      "Backspace",
-      "Delete",
-      "Tab",
-      "Escape",
-      "Enter",
-      "ArrowLeft",
-      "ArrowRight",
-      "ArrowUp",
-      "ArrowDown",
-      "Home",
-      "End",
-    ];
-    const input = e.currentTarget;
-    const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
-    if (
-      !hasSelection &&
-      form.name.length >= MAX_LENGTHS.NAME &&
-      !allowedNavKeys.includes(e.key) &&
-      !e.ctrlKey &&
-      !e.metaKey &&
-      !e.altKey
-    ) {
-      e.preventDefault();
-      const limitMsg = `Hospital Name cannot exceed ${MAX_LENGTHS.NAME} characters. Please enter valid data`;
-      setFieldErrors((prev) => ({ ...prev, name: limitMsg }));
-      setError(limitMsg);
-      toast.error(limitMsg, { id: "hospital-name-limit" });
-    }
-  };
-
-  const handleNameChange = async (newName: string) => {
-    let cleanName = newName;
-    let limitErr: string | undefined;
-    if (newName.length > MAX_LENGTHS.NAME) {
-      cleanName = newName.slice(0, MAX_LENGTHS.NAME);
-      limitErr = `Hospital Name cannot exceed ${MAX_LENGTHS.NAME} characters. Please enter valid data`;
-    }
-
-    const err = limitErr || validateField("name", cleanName);
-    setFieldErrors((prev) => ({ ...prev, name: err }));
-    if (err) {
-      setError(err);
-      if (limitErr) {
-        toast.error(limitErr, { id: "hospital-name-limit" });
-      }
-    } else if (
-      error?.includes("Hospital Name") ||
-      error === "Please fill out this field" ||
-      error === "Please enter valid data"
-    ) {
-      setError(null);
-    }
-
-    setForm((prev) => {
-      const updated = { ...prev, name: cleanName };
-      if (!isEdit && cleanName.trim()) {
-        const clean = cleanName.trim().replace(/[^a-zA-Z0-9\s]/g, "");
-        const firstWord = clean.split(/\s+/)[0]?.toUpperCase()?.slice(0, 6) || "HOSP";
-        const baseCode = firstWord.length >= 3 ? firstWord : "HOSP";
-        updated.code = `${baseCode}-01`;
-      }
-      return updated;
-    });
-
-    if (!isEdit && cleanName.trim().length >= 2 && cleanName.trim().length <= MAX_LENGTHS.NAME) {
-      try {
-        const res = await api.get("/hospitals/generate-code", { params: { name: cleanName } });
-        if (res.data?.data?.code) {
-          setForm((prev) => ({ ...prev, code: res.data.data.code }));
-        }
-      } catch (e) {
-        // Fallback to local code
-      }
-    }
-  };
-
-  const handleCodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const allowedNavKeys = [
-      "Backspace",
-      "Delete",
-      "Tab",
-      "Escape",
-      "Enter",
-      "ArrowLeft",
-      "ArrowRight",
-      "ArrowUp",
-      "ArrowDown",
-      "Home",
-      "End",
-    ];
-    const input = e.currentTarget;
-    const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
-    if (
-      !hasSelection &&
-      form.code.length >= MAX_LENGTHS.CODE &&
-      !allowedNavKeys.includes(e.key) &&
-      !e.ctrlKey &&
-      !e.metaKey &&
-      !e.altKey
-    ) {
-      e.preventDefault();
-      const limitMsg = `Hospital Code cannot exceed ${MAX_LENGTHS.CODE} characters. Please enter valid data`;
-      setFieldErrors((prev) => ({ ...prev, code: limitMsg }));
-      setError(limitMsg);
-      toast.error(limitMsg, { id: "hospital-code-limit" });
-    }
-  };
-
-  const handleCodeChange = (newCode: string) => {
-    let cleanCode = newCode;
-    let limitErr: string | undefined;
-    if (newCode.length > MAX_LENGTHS.CODE) {
-      cleanCode = newCode.slice(0, MAX_LENGTHS.CODE);
-      limitErr = `Hospital Code cannot exceed ${MAX_LENGTHS.CODE} characters. Please enter valid data`;
-    }
-
-    setForm((prev) => ({ ...prev, code: cleanCode }));
-    const err = limitErr || validateField("code", cleanCode);
-    setFieldErrors((prev) => ({ ...prev, code: err }));
-    if (err) {
-      setError(err);
-      if (limitErr) {
-        toast.error(limitErr, { id: "hospital-code-limit" });
-      }
-    } else if (
-      error?.includes("Hospital Code") ||
-      error === "Please fill out this field" ||
-      error === "Please enter valid data"
-    ) {
-      setError(null);
-    }
-  };
-
-  const handleBedCapacityKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const allowedNavKeys = [
-      "Backspace",
-      "Delete",
-      "Tab",
-      "Escape",
-      "Enter",
-      "ArrowLeft",
-      "ArrowRight",
-      "ArrowUp",
-      "ArrowDown",
-      "Home",
-      "End",
-    ];
-    if (["-", "e", "E", "+"].includes(e.key)) {
-      e.preventDefault();
-      const msg = "Total Bed Capacity cannot be negative. Please enter valid data";
-      setFieldErrors((prev) => ({ ...prev, bedCapacity: msg }));
-      setError(msg);
-      toast.error(msg, { id: "bed-capacity-invalid" });
-      return;
-    }
-    const input = e.currentTarget;
-    const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
-    if (
-      !hasSelection &&
-      String(form.bedCapacity).length >= 6 &&
-      /^[0-9]$/.test(e.key) &&
-      !allowedNavKeys.includes(e.key) &&
-      !e.ctrlKey &&
-      !e.metaKey
-    ) {
-      e.preventDefault();
-      const limitMsg = "Total Bed Capacity cannot exceed 100,000. Please enter valid data";
-      setFieldErrors((prev) => ({ ...prev, bedCapacity: limitMsg }));
-      setError(limitMsg);
-      toast.error(limitMsg, { id: "bed-capacity-limit" });
-    }
-  };
-
-  const handleBedCapacityChange = (newVal: string) => {
-    setForm((prev) => ({ ...prev, bedCapacity: newVal }));
-    const err = validateField("bedCapacity", newVal);
-    setFieldErrors((prev) => ({ ...prev, bedCapacity: err }));
-    if (err) {
-      setError(err);
-    } else if (error?.includes("Bed Capacity") || error?.includes("bed capacity") || error === "Please enter valid data") {
-      setError(null);
-    }
-  };
-
-  const handleAddressKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const allowedNavKeys = [
-      "Backspace",
-      "Delete",
-      "Tab",
-      "Escape",
-      "Enter",
-      "ArrowLeft",
-      "ArrowRight",
-      "ArrowUp",
-      "ArrowDown",
-      "Home",
-      "End",
-    ];
-    const input = e.currentTarget;
-    const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
-    if (
-      !hasSelection &&
-      form.address.length >= MAX_LENGTHS.ADDRESS &&
-      !allowedNavKeys.includes(e.key) &&
-      !e.ctrlKey &&
-      !e.metaKey &&
-      !e.altKey
-    ) {
-      e.preventDefault();
-      const limitMsg = `Address cannot exceed ${MAX_LENGTHS.ADDRESS} characters. Please enter valid data`;
-      setFieldErrors((prev) => ({ ...prev, address: limitMsg }));
-      setError(limitMsg);
-      toast.error(limitMsg, { id: "hospital-address-limit" });
-    }
-  };
-
-  const handleAddressChange = (newAddress: string) => {
-    let cleanAddress = newAddress;
-    let limitErr: string | undefined;
-    if (newAddress.length > MAX_LENGTHS.ADDRESS) {
-      cleanAddress = newAddress.slice(0, MAX_LENGTHS.ADDRESS);
-      limitErr = `Address cannot exceed ${MAX_LENGTHS.ADDRESS} characters. Please enter valid data`;
-    }
-
-    setForm((prev) => ({ ...prev, address: cleanAddress }));
-    const err = limitErr || validateField("address", cleanAddress);
-    setFieldErrors((prev) => ({ ...prev, address: err }));
-    if (err) {
-      setError(err);
-      if (limitErr) {
-        toast.error(limitErr, { id: "hospital-address-limit" });
-      }
-    } else if (error?.includes("Address") || error?.includes("address") || error === "Please enter valid data") {
-      setError(null);
-    }
-  };
-
-  const handlePhoneKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const allowedNavKeys = [
-      "Backspace",
-      "Delete",
-      "Tab",
-      "Escape",
-      "Enter",
-      "ArrowLeft",
-      "ArrowRight",
-      "ArrowUp",
-      "ArrowDown",
-      "Home",
-      "End",
-    ];
-
-    // Block non-digits
-    if (!allowedNavKeys.includes(e.key) && !e.ctrlKey && !e.metaKey && !/^[0-9]$/.test(e.key)) {
-      e.preventDefault();
-      const msg = "Invalid phone number. Primary Phone should accept 10 digits only";
-      setFieldErrors((prev) => ({ ...prev, contactPhone: msg }));
-      setError(msg);
-      toast.error(msg, { id: "primary-phone-digits-only" });
-      return;
-    }
-
-    // Block typing exceeding 10 digits
-    const input = e.currentTarget;
-    const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
-    if (
-      /^[0-9]$/.test(e.key) &&
-      !hasSelection &&
-      form.contactPhone.length >= 10
-    ) {
-      e.preventDefault();
-      const msg = "Primary Phone cannot exceed 10 digits";
-      setFieldErrors((prev) => ({ ...prev, contactPhone: msg }));
-      setError(msg);
-      toast.error(msg, { id: "primary-phone-limit" });
-    }
-  };
-
-  const handlePhoneChange = (newPhone: string) => {
-    const digitsOnly = newPhone.replace(/\D/g, "");
-    let phoneToSet = digitsOnly;
-    let limitErr: string | undefined;
-
-    if (digitsOnly.length > 10) {
-      phoneToSet = digitsOnly.slice(0, 10);
-      limitErr = "Primary Phone cannot exceed 10 digits";
-    }
-
-    setForm((prev) => ({ ...prev, contactPhone: phoneToSet }));
-
-    const err = limitErr || validateField("contactPhone", phoneToSet);
-    setFieldErrors((prev) => ({ ...prev, contactPhone: err }));
-    if (err) {
-      setError(err);
-      if (limitErr) {
-        toast.error(limitErr, { id: "primary-phone-limit" });
-      }
-    } else if (
-      error?.includes("Primary Phone") ||
-      error?.includes("phone number") ||
-      error?.includes("Phone number")
-    ) {
-      setError(null);
-    }
-  };
-
-  const handleEmailChange = (newEmail: string) => {
-    setForm((prev) => ({ ...prev, contactEmail: newEmail }));
-    const err = validateField("contactEmail", newEmail);
-    setFieldErrors((prev) => ({ ...prev, contactEmail: err }));
-    if (err) {
-      setError(err);
-    } else if (
-      error === "Please enter a valid email address" ||
-      error?.includes("Email cannot exceed")
-    ) {
-      setError(null);
-    }
-  };
-
-  const handleAdminChange = (adminId: string) => {
-    setForm((prev) => ({ ...prev, primaryAdminId: adminId }));
-    const err = validateField("primaryAdminId", adminId);
-    setFieldErrors((prev) => ({ ...prev, primaryAdminId: err }));
-    if (err) {
-      setError(err);
-      toast.error(err, { id: "hospital-admin-error" });
-    } else if (error?.includes("administrator") || error?.includes("admin")) {
-      setError(null);
-    }
-  };
-
-  const handleBlur = (
-    field: "name" | "code" | "bedCapacity" | "address" | "contactPhone" | "contactEmail" | "primaryAdminId"
-  ) => {
+  const handleBlur = (field: "name" | "code" | "address" | "contactPhone" | "contactEmail") => {
     setTouched((prev) => ({ ...prev, [field]: true }));
     const err = validateField(field, form[field]);
     setFieldErrors((prev) => ({ ...prev, [field]: err }));
@@ -575,69 +207,48 @@ export function HospitalFormPage() {
     setTouched({
       name: true,
       code: true,
-      bedCapacity: true,
       address: true,
       contactPhone: true,
       contactEmail: true,
-      primaryAdminId: true,
     });
 
     const nameErr = validateField("name", form.name);
     const codeErr = validateField("code", form.code);
-    const bedErr = validateField("bedCapacity", form.bedCapacity);
     const addressErr = validateField("address", form.address);
     const phoneErr = validateField("contactPhone", form.contactPhone);
     const emailErr = validateField("contactEmail", form.contactEmail);
-    const adminErr = validateField("primaryAdminId", form.primaryAdminId);
     const logoErr = fieldErrors.logoUrl || (form.logoUrl ? validateField("logoUrl", form.logoUrl) : undefined);
     const licenseErr = fieldErrors.licenseUrl || (form.licenseUrl ? validateField("licenseUrl", form.licenseUrl) : undefined);
 
     const newFieldErrors = {
       name: nameErr,
       code: codeErr,
-      bedCapacity: bedErr,
       address: addressErr,
       contactPhone: phoneErr,
       contactEmail: emailErr,
-      primaryAdminId: adminErr,
       logoUrl: logoErr,
       licenseUrl: licenseErr,
     };
     setFieldErrors(newFieldErrors);
 
-    const firstError =
-      nameErr ||
-      codeErr ||
-      bedErr ||
-      addressErr ||
-      phoneErr ||
-      emailErr ||
-      adminErr ||
-      logoErr ||
-      licenseErr;
+    const firstError = nameErr || codeErr || addressErr || phoneErr || emailErr || logoErr || licenseErr;
 
     if (firstError) {
       setError(firstError);
-      toast.error(firstError, {
-        id: "hospital-submit-error",
-      });
+      toast.error(firstError, { id: "hospital-submit-error" });
       return;
     }
 
     try {
-      const parsedBed =
-        form.bedCapacity === "" || form.bedCapacity === null || form.bedCapacity === undefined
-          ? 0
-          : Number(form.bedCapacity);
-
       const payload = {
-        ...form,
         name: form.name.trim(),
         code: form.code.trim().toUpperCase(),
-        bedCapacity: isNaN(parsedBed) ? 0 : parsedBed,
         address: form.address.trim(),
         contactEmail: form.contactEmail.trim().toLowerCase(),
         contactPhone: form.contactPhone.trim(),
+        primaryAdminId: form.primaryAdminId || undefined,
+        logoUrl: form.logoUrl,
+        licenseUrl: form.licenseUrl,
       };
 
       if (isEdit) {
@@ -645,15 +256,15 @@ export function HospitalFormPage() {
         toast.success("Hospital updated successfully!");
       } else {
         await createHospital.mutateAsync(payload);
-        toast.success("Hospital created successfully!");
+        toast.success("Hospital created and administrator assigned successfully!");
       }
       navigate("/super-admin/hospitals");
     } catch (err: any) {
       const serverMsg =
         err?.response?.data?.message ||
         err?.message ||
-        "Could not save hospital. Please enter valid data";
-      setError("Please enter valid data");
+        "Could not save hospital. Please verify the information entered.";
+      setError(serverMsg);
       toast.error(serverMsg, { id: "hospital-submit-error" });
     }
   }
@@ -661,20 +272,34 @@ export function HospitalFormPage() {
   const isSaving = createHospital.isPending || updateHospital.isPending;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div>
-        <div className="text-sm text-slate-400">
-          <Link to="/super-admin/hospitals" className="hover:text-navy-700">
-            Hospitals
-          </Link>{" "}
-          &gt; {isEdit ? "Edit Hospital" : "Add New Hospital"}
+    <div className="w-full space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+        <div>
+          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            <Link to="/super-admin/hospitals" className="hover:text-emerald-700 transition-colors">
+              Hospitals Registry
+            </Link>{" "}
+            / {isEdit ? "Edit Facility" : "Add Facility"}
+          </div>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
+            {isEdit ? "Edit Hospital Facility" : "Add Independent Hospital"}
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Add and manage hospitals directly under Super Admin supervision with automated Unique IDs and administrator assignment.
+          </p>
         </div>
-        <h1 className="text-2xl font-bold text-slate-900">{isEdit ? "Edit Hospital" : "Onboard New Hospital"}</h1>
-        <p className="text-sm text-slate-500">Register a new facility into the HMS unified network.</p>
+        {form.code && (
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-mono font-bold self-start sm:self-auto">
+            <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+            <span>ID: {form.code}</span>
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} noValidate className="space-y-6">
-        <FormSection icon={Building2} title="Basic Information">
+        {/* Basic Facility Info & Administrator Assignment */}
+        <FormSection icon={Building2} title="Facility Identity & Administration">
           <InputField
             label="Hospital Name"
             required
@@ -682,123 +307,172 @@ export function HospitalFormPage() {
             showCharCount
             value={form.name}
             error={fieldErrors.name}
-            onChange={(e) => handleNameChange(e.target.value)}
-            onKeyDown={handleNameKeyDown}
+            onChange={(e) => {
+              const val = e.target.value;
+              setForm((p) => ({ ...p, name: val }));
+              const err = validateField("name", val);
+              setFieldErrors((p) => ({ ...p, name: err }));
+              if (!err && error?.includes("Hospital Name")) setError(null);
+            }}
             onBlur={() => handleBlur("name")}
-            placeholder="e.g. Speshway Hospitals"
+            placeholder="e.g. Preethi Multi-Specialty Hospital"
           />
+
           <InputField
-            label="Hospital Code (Auto-Generated)"
+            label="Hospital Unique ID (Auto-Generated)"
             required
             maxLength={MAX_LENGTHS.CODE}
             showCharCount
             value={form.code}
             error={fieldErrors.code}
-            onChange={(e) => handleCodeChange(e.target.value)}
-            onKeyDown={handleCodeKeyDown}
+            onChange={(e) => {
+              const val = e.target.value.toUpperCase();
+              setForm((p) => ({ ...p, code: val }));
+              const err = validateField("code", val);
+              setFieldErrors((p) => ({ ...p, code: err }));
+              if (!err && error?.includes("Hospital ID")) setError(null);
+            }}
             onBlur={() => handleBlur("code")}
-            placeholder={form.name ? "Auto-generating code..." : "e.g. SPESH-01"}
-            hint={!isEdit ? "Automatically derived from Hospital Name" : undefined}
+            placeholder="e.g. HOSP-001"
+            hint="System-wide institutional code used for generating all staff and doctor credentials."
           />
+
+          {/* Administrator Assignment */}
+          <div className="sm:col-span-2 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <UserCheck className="h-4 w-4 text-emerald-700" />
+                Assign Hospital Administrator
+              </label>
+              <Link
+                to="/super-admin/admins/new"
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 transition-colors"
+              >
+                <Plus className="h-3 w-3" /> Create New Admin
+              </Link>
+            </div>
+            <SelectField
+              label=""
+              value={form.primaryAdminId}
+              error={fieldErrors.primaryAdminId}
+              onChange={(e) => {
+                setForm((p) => ({ ...p, primaryAdminId: e.target.value }));
+                setFieldErrors((p) => ({ ...p, primaryAdminId: undefined }));
+              }}
+              hint="Designate an administrator to manage this hospital's day-to-day operations, clinical departments, and staff."
+            >
+              <option value="">Select an Administrator (Optional / Assign Later)</option>
+              {isLoadingAdmins ? (
+                <option value="" disabled>Loading available administrators...</option>
+              ) : adminsList && adminsList.length > 0 ? (
+                adminsList.map((a) => (
+                  <option key={a._id} value={a._id}>
+                    {a.name} ({a.employeeId ? `${a.employeeId} • ` : ""}{a.email})
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>No administrators available. Click "Create New Admin" above to register one.</option>
+              )}
+            </SelectField>
+          </div>
+
           <InputField
-            label="Total Bed Capacity"
-            type="number"
-            min={0}
-            max={100000}
-            value={form.bedCapacity}
-            error={fieldErrors.bedCapacity}
-            onChange={(e) => handleBedCapacityChange(e.target.value)}
-            onKeyDown={handleBedCapacityKeyDown}
-            onBlur={() => handleBlur("bedCapacity")}
-            placeholder="0"
-          />
-          <InputField
-            label="Address"
+            label="Full Address / Location"
             maxLength={MAX_LENGTHS.ADDRESS}
             showCharCount
             value={form.address}
             error={fieldErrors.address}
-            onChange={(e) => handleAddressChange(e.target.value)}
-            onKeyDown={handleAddressKeyDown}
+            onChange={(e) => {
+              const val = e.target.value;
+              setForm((p) => ({ ...p, address: val }));
+              const err = validateField("address", val);
+              setFieldErrors((p) => ({ ...p, address: err }));
+              if (!err && error?.includes("Address")) setError(null);
+            }}
             onBlur={() => handleBlur("address")}
-            placeholder="Street, city, state"
+            placeholder="Street address, City, State, PIN"
           />
         </FormSection>
 
-        <FormSection icon={Phone} title="Contact">
+        {/* Contact Info */}
+        <FormSection icon={Phone} title="Institutional Contact Channels">
           <InputField
-            label="Contact Email"
+            label="Official Contact Email"
             type="email"
             maxLength={MAX_LENGTHS.EMAIL}
             showCharCount
             value={form.contactEmail}
             error={fieldErrors.contactEmail}
-            onChange={(e) => handleEmailChange(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setForm((p) => ({ ...p, contactEmail: val }));
+              const err = validateField("contactEmail", val);
+              setFieldErrors((p) => ({ ...p, contactEmail: err }));
+              if (!err && error?.includes("email")) setError(null);
+            }}
             onBlur={() => handleBlur("contactEmail")}
             placeholder="contact@hospital.com"
           />
+
           <InputField
-            label="Primary Phone"
+            label="Official Contact Phone"
             type="tel"
             maxLength={MAX_LENGTHS.PHONE}
             showCharCount
             value={form.contactPhone}
             error={fieldErrors.contactPhone}
-            onChange={(e) => handlePhoneChange(e.target.value)}
-            onKeyDown={handlePhoneKeyDown}
+            onChange={(e) => {
+              const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
+              setForm((p) => ({ ...p, contactPhone: digitsOnly }));
+              const err = validateField("contactPhone", digitsOnly);
+              setFieldErrors((p) => ({ ...p, contactPhone: err }));
+              if (!err && error?.includes("phone")) setError(null);
+            }}
             onBlur={() => handleBlur("contactPhone")}
-            placeholder="e.g. 9876543210"
+            placeholder="10-digit mobile or landline"
           />
         </FormSection>
 
-        <FormSection icon={UserCog} title="Assignment">
-          <SelectField
-            label="Primary Admin"
-            value={form.primaryAdminId}
-            error={fieldErrors.primaryAdminId}
-            onChange={(e) => handleAdminChange(e.target.value)}
-            onBlur={() => handleBlur("primaryAdminId")}
-            hint="Must be an active hospital_admin user with no hospital assigned yet."
-          >
-            <option value="">Select an administrator (Optional)</option>
-            {isLoadingAdmins ? (
-              <option value="" disabled>Loading eligible administrators...</option>
-            ) : unassignedAdmins && unassignedAdmins.length > 0 ? (
-              unassignedAdmins.map((a) => (
-                <option key={a._id} value={a._id}>
-                  {a.name} ({a.email})
-                </option>
-              ))
-            ) : (
-              <option value="" disabled>
-                No eligible unassigned administrators available
-              </option>
+        {/* Logo and Documentation */}
+        <FormSection icon={FileBadge} title="Brand & Institutional Credentials">
+          <div className="space-y-4">
+            <FileUpload
+              label="Hospital Brand Logo"
+              folder="hospital-logos"
+              accept="image/png,image/jpeg,image/webp,image/svg+xml"
+              maxSizeMB={2}
+              value={form.logoUrl}
+              error={fieldErrors.logoUrl}
+              onChange={(url) => {
+                setForm((prev) => ({ ...prev, logoUrl: url }));
+                setFieldErrors((prev) => ({ ...prev, logoUrl: undefined }));
+                if (error?.includes("Logo")) setError(null);
+              }}
+              onError={(err) => {
+                setFieldErrors((prev) => ({ ...prev, logoUrl: err || undefined }));
+                if (err) setError(err);
+                else if (error?.includes("Logo")) setError(null);
+              }}
+              hint="PNG, JPEG, WEBP, or SVG up to 2MB. Displayed across patient portals and public websites."
+            />
+
+            {form.logoUrl && (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-50/50 border border-emerald-100">
+                <img
+                  src={form.logoUrl}
+                  alt="Logo preview"
+                  className="h-12 w-12 rounded-full object-cover border border-emerald-300 shadow-xs"
+                />
+                <div>
+                  <div className="text-xs font-semibold text-emerald-950">Active Logo Configured</div>
+                  <div className="text-[11px] text-emerald-700 font-mono truncate max-w-sm">{form.logoUrl}</div>
+                </div>
+              </div>
             )}
-          </SelectField>
-        </FormSection>
+          </div>
 
-        <FormSection icon={FileBadge} title="Documents">
           <FileUpload
-            label="Hospital Logo"
-            folder="hospital-logos"
-            accept="image/png,image/jpeg,image/webp,image/svg+xml"
-            maxSizeMB={2}
-            value={form.logoUrl}
-            error={fieldErrors.logoUrl}
-            onChange={(url) => {
-              setForm((prev) => ({ ...prev, logoUrl: url }));
-              setFieldErrors((prev) => ({ ...prev, logoUrl: undefined }));
-              if (error?.includes("Logo")) setError(null);
-            }}
-            onError={(err) => {
-              setFieldErrors((prev) => ({ ...prev, logoUrl: err || undefined }));
-              if (err) setError(err);
-              else if (error?.includes("Logo")) setError(null);
-            }}
-            hint="PNG, JPEG, WEBP, SVG up to 2MB"
-          />
-          <FileUpload
-            label="License Credentials"
+            label="Facility License & Accreditation Documents (PDF)"
             folder="hospital-licenses"
             accept=".pdf,application/pdf"
             maxSizeMB={5}
@@ -814,23 +488,23 @@ export function HospitalFormPage() {
               if (err) setError(err);
               else if (error?.includes("License") || error?.includes("PDF")) setError(null);
             }}
-            hint="PDF files only (max 5MB)"
+            hint="PDF documents only (max 5MB). Clinical registration or regulatory certification."
           />
         </FormSection>
 
         {error && (
-          <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-700 flex items-center gap-2 animate-in fade-in duration-150">
+          <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-700 flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
             <span>{error}</span>
           </div>
         )}
 
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="secondary" onClick={() => navigate("/super-admin/hospitals")}>
             Cancel
           </Button>
           <Button type="submit" variant="primary" disabled={isSaving}>
-            {isSaving ? "Saving..." : isEdit ? "Save Hospital" : "Create Hospital"}
+            {isSaving ? "Saving..." : isEdit ? "Update Hospital" : "Add Hospital"}
           </Button>
         </div>
       </form>

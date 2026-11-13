@@ -55,7 +55,7 @@ export function AppointmentsPage() {
     {
       header: "Actions",
       render: (a) => (
-        <Link to={`/admin/appointments/${a._id}`} className="text-sm font-medium text-navy-700 hover:underline">
+        <Link to={`/admin/appointments/${a._id}`} className="text-sm font-medium text-emerald-700 hover:underline">
           View
         </Link>
       ),
@@ -87,7 +87,7 @@ export function AppointmentsPage() {
                 setStatus(s);
                 setPage(1);
               }}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium ${status === s ? "bg-navy-50 text-navy-700" : "text-slate-500 hover:bg-slate-50"}`}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium ${status === s ? "bg-emerald-50 text-emerald-700" : "text-slate-500 hover:bg-slate-50"}`}
             >
               {s === "" ? "All" : s.replace("_", " ")}
             </button>

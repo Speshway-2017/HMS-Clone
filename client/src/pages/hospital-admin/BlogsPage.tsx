@@ -47,8 +47,8 @@ export function BlogsPage() {
             Publish health news, clinical updates, and medical advice articles for public visitors.
           </p>
         </div>
-        <Link to="/admin/blogs/new">
-          <Button variant="primary" className="bg-navy-700 hover:bg-navy-800">
+        <Link to="/super-admin/blogs/new">
+          <Button variant="primary">
             <Plus className="h-4 w-4 mr-2" /> Write New Post
           </Button>
         </Link>
@@ -61,7 +61,7 @@ export function BlogsPage() {
             onClick={() => setSelectedTag("all")}
             className={`rounded-lg px-3 py-1 text-xs font-bold transition-all ${
               selectedTag === "all"
-                ? "bg-navy-700 text-white shadow-sm"
+                ? "bg-emerald-700 text-white shadow-sm"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
@@ -73,7 +73,7 @@ export function BlogsPage() {
               onClick={() => setSelectedTag(tag)}
               className={`rounded-lg px-3 py-1 text-xs font-bold transition-all ${
                 selectedTag === tag
-                  ? "bg-navy-700 text-white shadow-sm"
+                  ? "bg-emerald-700 text-white shadow-sm"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -93,8 +93,8 @@ export function BlogsPage() {
             Get started by writing your hospital's first clinical update or patient health advisory post.
           </p>
           <div className="mt-6">
-            <Link to="/admin/blogs/new">
-              <Button variant="primary" className="bg-navy-700">
+            <Link to="/super-admin/blogs/new">
+              <Button variant="primary" className="bg-emerald-700">
                 <Plus className="h-4 w-4 mr-2" /> Create First Post
               </Button>
             </Link>
@@ -167,8 +167,8 @@ export function BlogsPage() {
                 <span className="text-slate-500 font-medium">Author: {post.author}</span>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => navigate(`/admin/blogs/edit/${post._id}`)}
-                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-navy-700 hover:border-navy-200 shadow-2xs"
+                    onClick={() => navigate(`/super-admin/blogs/edit/${post._id}`)}
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-emerald-700 hover:border-emerald-200 shadow-2xs"
                     title="Edit post"
                   >
                     <Edit className="h-3.5 w-3.5" />

@@ -27,16 +27,16 @@ export function ReportsPage() {
           return (
             <Card key={category.type}>
               <div className="flex items-start justify-between">
-                <span className="rounded-lg bg-navy-50 p-2 text-navy-700">
+                <span className="rounded-lg bg-emerald-50 p-2 text-emerald-700">
                   <Icon className="h-5 w-5" />
                 </span>
-                <span className="rounded-full bg-navy-50 px-2 py-0.5 text-xs font-semibold text-navy-700">{category.count}</span>
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">{category.count}</span>
               </div>
               <h3 className="mt-3 text-base font-semibold text-slate-800">{category.label}</h3>
               <button
                 onClick={() => exportReport.mutate(category.type)}
                 disabled={exportReport.isPending}
-                className="mt-3 flex items-center gap-1 text-sm font-medium text-navy-700 hover:underline disabled:opacity-50"
+                className="mt-3 flex items-center gap-1 text-sm font-medium text-emerald-700 hover:underline disabled:opacity-50"
               >
                 Export CSV <ArrowRight className="h-4 w-4" />
               </button>

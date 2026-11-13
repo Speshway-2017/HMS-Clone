@@ -1,4 +1,13 @@
-export type Role = "super_admin" | "hospital_admin" | "accountant" | "receptionist" | "doctor" | "pharmacist" | "laboratory" | "nurse" | "patient";
+export type Role =
+  | "super_admin"
+  | "hospital_admin"
+  | "admin"
+  | "receptionist"
+  | "doctor"
+  | "pharmacist"
+  | "staff"
+  | "nurse"
+  | "patient";
 
 export interface AuthUser {
   id: string;
@@ -14,24 +23,23 @@ export interface AuthUser {
 export const ROLE_HOME_PATH: Record<Role, string> = {
   super_admin: "/super-admin",
   hospital_admin: "/admin",
-  accountant: "/accountant",
+  admin: "/admin",
   receptionist: "/receptionist",
   doctor: "/doctor",
   pharmacist: "/pharmacy",
-  laboratory: "/laboratory",
-  nurse: "/nurse",
+  staff: "/staff",
+  nurse: "/staff",
   patient: "/patient",
 };
 
 export const ROLE_LABEL: Record<Role, string> = {
   super_admin: "Super Admin",
   hospital_admin: "Hospital Admin",
-  accountant: "Accountant",
+  admin: "Hospital Admin",
   receptionist: "Receptionist",
   doctor: "Doctor",
   pharmacist: "Pharmacist",
-  laboratory: "Laboratory",
-  nurse: "Nurse",
+  staff: "Clinical Staff",
+  nurse: "Clinical Staff",
   patient: "Patient",
 };
-

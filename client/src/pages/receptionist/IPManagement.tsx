@@ -830,7 +830,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
           <button
             onClick={() => setTab("admissions")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "admissions" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
+              tab === "admissions" ? "bg-emerald-50 text-emerald-700 font-bold" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             <List className="h-3.5 w-3.5" /> Current Admissions
@@ -838,7 +838,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
           <button
             onClick={() => setTab("new")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "new" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
+              tab === "new" ? "bg-emerald-50 text-emerald-700 font-bold" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             <Plus className="h-3.5 w-3.5" /> Admission Requests
@@ -846,7 +846,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
           <button
             onClick={() => setTab("rooms")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "rooms" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
+              tab === "rooms" ? "bg-emerald-50 text-emerald-700 font-bold" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             <BedDouble className="h-3.5 w-3.5" /> Bed Grid Map
@@ -854,7 +854,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
           <button
             onClick={() => setTab("transfer")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "transfer" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
+              tab === "transfer" ? "bg-emerald-50 text-emerald-700 font-bold" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             <ArrowRightLeft className="h-3.5 w-3.5" /> Room Transfer
@@ -914,7 +914,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                 
                 {/* 1. Admission Slip Card */}
                 <Card id="admission-slip-print" className="space-y-4 border border-slate-200 shadow-md p-6 bg-white relative print:border-none print:shadow-none print:p-0">
-                  <div className="absolute top-4 right-4 bg-navy-50 text-navy-700 font-bold font-mono text-xs px-2 py-0.5 rounded border border-navy-100">
+                  <div className="absolute top-4 right-4 bg-emerald-50 text-emerald-700 font-bold font-mono text-xs px-2 py-0.5 rounded border border-navy-100">
                     ADMISSION SLIP
                   </div>
                   
@@ -1238,8 +1238,8 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                 ) : (
                   <form onSubmit={handleAdmit} className="space-y-6">
                   {subTab === "requests" && (
-                    <Card className="space-y-4 bg-navy-50/20 border-navy-100">
-                      <h3 className="text-sm font-bold text-navy-800 border-b pb-2 flex items-center justify-between">
+                    <Card className="space-y-4 bg-emerald-50/20 border-navy-100">
+                      <h3 className="text-sm font-bold text-emerald-800 border-b pb-2 flex items-center justify-between">
                         <span>Review Doctor Admission Request Details</span>
                         <Badge tone={selectedReq.priority === "Emergency" ? "danger" : selectedReq.priority === "Urgent" ? "warning" : "info"}>
                           {selectedReq.priority || "Routine"}
@@ -1643,7 +1643,7 @@ export function IPManagementPage({ activeTab = "admissions" }: Props) {
                     <div className="font-bold text-slate-800 text-sm">Room {room.roomNumber}</div>
                     <div className="text-[10px] text-slate-400 uppercase font-semibold">{room.wardName}</div>
                   </div>
-                  <span className="text-[10px] font-bold bg-navy-50 text-navy-700 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
                     {room.roomType}
                   </span>
                 </div>

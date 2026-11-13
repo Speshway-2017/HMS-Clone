@@ -222,13 +222,13 @@ function MedicineStrengthSelect({
             maxLength={CONSULTATION_LIMITS.MEDICINE_STRENGTH}
             onChange={(e) => onChange(e.target.value)}
             placeholder="e.g. 500mg"
-            className={`w-full rounded-xl border ${error ? "border-red-500 bg-red-50/20" : "border-slate-200 bg-white"} px-3 py-2 text-xs outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100`}
+            className={`w-full rounded-xl border ${error ? "border-red-500 bg-red-50/20" : "border-slate-200 bg-white"} px-3 py-2 text-xs outline-none focus:border-emerald-600 focus:ring-2 focus:ring-navy-100`}
           />
           {hasVariants && (
             <button
               type="button"
               onClick={() => { setIsCustom(false); onChange(""); }}
-              className="text-[9px] text-navy-700 hover:underline whitespace-nowrap font-bold"
+              className="text-[9px] text-emerald-700 hover:underline whitespace-nowrap font-bold"
               title="Switch back to dropdown"
             >
               ↩ List
@@ -251,7 +251,7 @@ function MedicineStrengthSelect({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="e.g. 500mg"
-          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100"
+          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-600 focus:ring-2 focus:ring-navy-100"
         />
       </div>
     );
@@ -272,7 +272,7 @@ function MedicineStrengthSelect({
             onChange(e.target.value);
           }
         }}
-        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-100 cursor-pointer"
+        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-600 focus:ring-2 focus:ring-navy-100 cursor-pointer"
       >
         <option value="">— Select Strength —</option>
         {variants.map((v) => (
@@ -650,7 +650,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
   if (isLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-navy-700 border-t-transparent"></div>
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-700 border-t-transparent"></div>
       </div>
     );
   }
@@ -1183,7 +1183,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
         <div className="xl:col-span-1 space-y-6">
           <Card className="p-4 space-y-4">
             <h3 className="text-sm font-bold text-slate-800 border-b pb-2 flex items-center gap-1.5">
-              <User className="h-4 w-4 text-navy-700" /> Patient Details
+              <User className="h-4 w-4 text-emerald-700" /> Patient Details
             </h3>
             <div className="space-y-3 text-sm">
               <div>
@@ -1252,7 +1252,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
               <button
                 key={t.key}
                 onClick={() => setActiveTab(t.key)}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors ${activeTab === t.key ? "bg-navy-700 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors ${activeTab === t.key ? "bg-emerald-700 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
                   }`}
               >
                 {t.icon}
@@ -1417,7 +1417,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                           {/* Consultation Clinical Summary */}
                           {group.consultation && (
                             <div className="bg-white rounded-lg border border-slate-200/60 p-3 space-y-1.5 text-xs shadow-xs">
-                              <div className="flex items-center gap-1.5 text-navy-700 font-bold border-b border-slate-100 pb-1 mb-1">
+                              <div className="flex items-center gap-1.5 text-emerald-700 font-bold border-b border-slate-100 pb-1 mb-1">
                                 <FileText className="h-3.5 w-3.5" /> Clinical Examination Details
                               </div>
                               {group.consultation.diagnosis && (
@@ -1626,7 +1626,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                     <div className="flex items-center justify-between border-b pb-2">
                       <h3 className="text-sm font-bold text-slate-800">Issue Medication</h3>
                       {!isCompleted && (
-                        <button type="button" onClick={handleAddMed} className="text-xs font-semibold text-navy-700 hover:text-navy-800 flex items-center gap-0.5">
+                        <button type="button" onClick={handleAddMed} className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-0.5">
                           <Plus className="h-3 w-3" /> Add Med
                         </button>
                       )}
@@ -1788,7 +1788,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                                 type="checkbox"
                                 checked={!!med.morning}
                                 onChange={() => handleCheckboxToggle(index, "morning")}
-                                className="rounded text-navy-600 focus:ring-navy-500 h-4 w-4"
+                                className="rounded text-emerald-600 focus:ring-navy-500 h-4 w-4"
                               />
                               <span>Morning</span>
                             </label>
@@ -1797,7 +1797,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                                 type="checkbox"
                                 checked={!!med.afternoon}
                                 onChange={() => handleCheckboxToggle(index, "afternoon")}
-                                className="rounded text-navy-600 focus:ring-navy-500 h-4 w-4"
+                                className="rounded text-emerald-600 focus:ring-navy-500 h-4 w-4"
                               />
                               <span>Afternoon</span>
                             </label>
@@ -1806,7 +1806,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                                 type="checkbox"
                                 checked={!!med.night}
                                 onChange={() => handleCheckboxToggle(index, "night")}
-                                className="rounded text-navy-600 focus:ring-navy-500 h-4 w-4"
+                                className="rounded text-emerald-600 focus:ring-navy-500 h-4 w-4"
                               />
                               <span>Night</span>
                             </label>
@@ -1991,7 +1991,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                             type="checkbox"
                             checked={selectedLabTests.includes(test)}
                             onChange={() => toggleLabTest(test)}
-                            className="rounded border-slate-350 text-navy-700 focus:ring-navy-500"
+                            className="rounded border-slate-350 text-emerald-700 focus:ring-navy-500"
                           />
                           {test}
                         </label>
@@ -2097,7 +2097,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                               type="checkbox"
                               checked={selectedRadiologyStudies.includes(study)}
                               onChange={() => toggleRadiologyStudy(study)}
-                              className="rounded border-slate-350 text-navy-700 focus:ring-navy-500"
+                              className="rounded border-slate-350 text-emerald-700 focus:ring-navy-500"
                             />
                             {study}
                           </label>
@@ -2185,7 +2185,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                     {/* Title & Accent */}
                     <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                       <div className="flex items-center gap-2.5">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy-50 text-navy-700">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
                           <FileText className="h-5 w-5" />
                         </div>
                         <div>
@@ -2198,7 +2198,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                     {/* Modern Patient Info Card */}
                     <div className="bg-gradient-to-r from-navy-50/50 to-blue-50/20 rounded-xl p-4 border border-navy-100/50 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-navy-700 font-bold text-white text-sm shadow-sm">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-700 font-bold text-white text-sm shadow-sm">
                           {((appointment.patient as any)?.name || "P").split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
                         </div>
                         <div>
@@ -2478,7 +2478,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
                       {admissions.map((adm) => (
                         <div key={adm._id} className="border border-indigo-100 rounded-xl p-3.5 space-y-3 text-xs bg-indigo-50/10 shadow-sm">
                           <div className="flex justify-between items-center">
-                            <span className="font-bold text-navy-700 tracking-wider font-mono">IP No: {adm.admissionNumber}</span>
+                            <span className="font-bold text-emerald-700 tracking-wider font-mono">IP No: {adm.admissionNumber}</span>
                             <Badge tone={adm.status === "admitted" ? "warning" : "success"}>
                               {adm.status.toUpperCase()}
                             </Badge>
@@ -2645,12 +2645,12 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
         {/* Hospital Letterhead */}
         <div className="flex items-center justify-between border-b-2 border-navy-800 pb-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-navy-900 tracking-tight">SPESHWAY HOSPITALS</h1>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">SPESHWAY HOSPITALS</h1>
             <p className="text-xs text-slate-600 font-medium mt-0.5">Multispecialty Healthcare & Research Institute</p>
             <p className="text-[11px] text-slate-500">123 Health City Avenue, Medical District · Phone: +91 800-123-4567 · www.speshwayhospitals.com</p>
           </div>
           <div className="text-right">
-            <div className="inline-block bg-navy-50 border border-navy-200 px-3 py-1 rounded text-xs font-bold text-navy-800 uppercase tracking-wider mb-1">
+            <div className="inline-block bg-emerald-50 border border-emerald-200 px-3 py-1 rounded text-xs font-bold text-emerald-800 uppercase tracking-wider mb-1">
               OPD Consultation Record
             </div>
             <p className="text-xs text-slate-600 font-mono">Date: {new Date((workspaceData?.draftSession as any)?.completedAt || (appointment as any)?.updatedAt || Date.now()).toLocaleDateString("en-IN")}</p>
@@ -2680,7 +2680,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
         {/* Clinical Assessment & Diagnosis */}
         <div className="space-y-4 mb-6">
           <div className="border border-slate-200 rounded-lg p-3">
-            <p className="text-xs font-bold text-navy-800 uppercase tracking-wider mb-1">Diagnosis Confirmation</p>
+            <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider mb-1">Diagnosis Confirmation</p>
             <p className="text-sm font-semibold text-slate-800">{diagnosis || admitDiagnosis || "Routine Outpatient Consultation"}</p>
             {chiefComplaint && <p className="text-xs text-slate-600 mt-1"><span className="font-semibold">Chief Complaint:</span> {chiefComplaint}</p>}
           </div>
@@ -2714,7 +2714,7 @@ export function ConsultationWorkspacePage({ appointmentIdOverride, isEmbedded = 
           {/* Prescribed Medications Table */}
           {prescriptionMeds.length > 0 && prescriptionMeds.some(p => p.name) && (
             <div className="border border-slate-200 rounded-lg p-3">
-              <p className="text-xs font-bold text-navy-800 uppercase tracking-wider mb-2">Rx — Prescribed Medications</p>
+              <p className="text-xs font-bold text-emerald-800 uppercase tracking-wider mb-2">Rx — Prescribed Medications</p>
               <table className="w-full text-xs text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-[10px] uppercase font-bold text-slate-500">

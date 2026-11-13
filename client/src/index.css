@@ -7,6 +7,59 @@ body {
   @apply bg-slate-50 text-slate-900 antialiased;
 }
 
+/* Pristine browser autofill styling across Chrome, Safari, Edge */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #0f172a !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* 3D Floating & Ambient Glow Animations */
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(0.4deg);
+  }
+}
+
+@keyframes floatReverse {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(6px);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(1.04);
+  }
+}
+
+.animate-float-slow {
+  animation: floatSlow 6s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: floatReverse 5s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 4s ease-in-out infinite;
+}
+
 /* Hide scrollbars everywhere while keeping content scrollable. */
 * {
   scrollbar-width: none; /* Firefox */
@@ -138,7 +191,7 @@ body {
   padding: 16px 36px;
   text-align: center;
   text-transform: uppercase;
-  color: #0505A9;
+  color: #16a34a;
   font-size: 16px;
   font-weight: bold;
   background-color: transparent;
@@ -161,7 +214,7 @@ body {
   top: 0;
   width: 100%;
   height: 100%;
-  border: 2px solid #0505A9;
+  border: 2px solid #16a34a;
   border-radius: 30px;
 }
 
@@ -227,7 +280,7 @@ body {
   top: 2px;
   width: 25%;
   height: 100%;
-  background: #0505A9;
+  background: #16a34a;
   border-radius: 100%;
   transform: translate3d(0, 150%, 0) scale(1.7);
   transition: transform 0.45s;
@@ -272,16 +325,16 @@ body {
 /* --- Reverse Blob Button Variant (Blue initial, White on hover) --- */
 .blob-btn--reverse {
   color: #ffffff;
-  box-shadow: 0 10px 25px -5px rgba(5, 5, 169, 0.4);
+  box-shadow: 0 10px 25px -5px rgba(22, 163, 74, 0.4);
   transition: color 0.5s, box-shadow 0.3s;
 }
 
 .blob-btn--reverse:before {
-  border-color: #0505A9;
+  border-color: #16a34a;
 }
 
 .blob-btn--reverse .blob-btn__inner {
-  background: #0505A9;
+  background: #16a34a;
 }
 
 .blob-btn--reverse .blob-btn__blob {
@@ -289,8 +342,8 @@ body {
 }
 
 .blob-btn--reverse:hover {
-  color: #0505A9;
-  box-shadow: 0 12px 30px -5px rgba(5, 5, 169, 0.25);
+  color: #16a34a;
+  box-shadow: 0 12px 30px -5px rgba(22, 163, 74, 0.25);
 }
 
 
@@ -425,8 +478,8 @@ body {
 .holographic-card:hover,
 .doctor-card-smooth:hover {
   transform: translateY(-4px);
-  box-shadow: 0 12px 28px -6px rgba(5, 5, 169, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
-  border-color: rgba(5, 5, 169, 0.28);
+  box-shadow: 0 12px 28px -6px rgba(22, 163, 74, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+  border-color: rgba(22, 163, 74, 0.28);
 }
 
 
@@ -456,15 +509,15 @@ body {
   justify-content: center;
   z-index: 2;
   transform: translateY(95px);
-  background: linear-gradient(135deg, #1e3a8a 0%, #0505a9 100%);
+  background: linear-gradient(135deg, #15803d 0%, #16a34a 100%);
   color: #ffffff;
-  box-shadow: 0 10px 30px rgba(5, 5, 169, 0.35);
+  box-shadow: 0 10px 30px rgba(22, 163, 74, 0.35);
   padding: 20px;
 }
 
 .dept-slide-card:hover .slide.slide1 {
   transform: translateY(0px);
-  box-shadow: 0 15px 35px rgba(5, 5, 169, 0.45);
+  box-shadow: 0 15px 35px rgba(22, 163, 74, 0.45);
 }
 
 .dept-slide-card .slide.slide1 .content {
@@ -505,7 +558,7 @@ body {
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
-  background: #0505a9;
+  background: #16a34a;
   border-radius: 4px;
 }
 
@@ -529,7 +582,7 @@ body {
   position: absolute;
   width: 100%;
   height: 2px;
-  background: linear-gradient(to right, #0505a9, #2563eb);
+  background: linear-gradient(to right, #16a34a, #22c55e);
   left: 0;
   transform: scaleX(0);
   transition: transform 0.4s ease-out;
@@ -575,17 +628,17 @@ body {
 
 /* --- Animated Tile Grid & Line Card Hover Effect (Blue Theme) --- */
 .tile-grid-card {
-  --card-border-color: rgba(5, 5, 169, 0.12);
-  --card-box-shadow-1: rgba(5, 5, 169, 0.04);
-  --card-box-shadow-2: rgba(5, 5, 169, 0.08);
+  --card-border-color: rgba(22, 163, 74, 0.12);
+  --card-box-shadow-1: rgba(22, 163, 74, 0.04);
+  --card-box-shadow-2: rgba(22, 163, 74, 0.08);
   --card-shine-opacity: 0.25;
-  --card-shine-gradient: conic-gradient(from 225deg at 50% 50%, rgba(5, 5, 169, 0) 0deg, #0505a9 25deg, #2563eb 285deg, #60a5fa 345deg, rgba(5, 5, 169, 0) 360deg);
-  --card-line-color: rgba(5, 5, 169, 0.25);
-  --card-tile-color: rgba(5, 5, 169, 0.08);
+  --card-shine-gradient: conic-gradient(from 225deg at 50% 50%, rgba(22, 163, 74, 0) 0deg, #16a34a 25deg, #22c55e 285deg, #86efac 345deg, rgba(22, 163, 74, 0) 360deg);
+  --card-line-color: rgba(22, 163, 74, 0.25);
+  --card-tile-color: rgba(22, 163, 74, 0.08);
 
-  --card-hover-border-color: rgba(5, 5, 169, 0.4);
-  --card-hover-box-shadow-1: rgba(5, 5, 169, 0.08);
-  --card-hover-box-shadow-2: rgba(5, 5, 169, 0.18);
+  --card-hover-border-color: rgba(22, 163, 74, 0.4);
+  --card-hover-box-shadow-1: rgba(22, 163, 74, 0.08);
+  --card-hover-box-shadow-2: rgba(22, 163, 74, 0.18);
 
   background-color: #ffffff;
   box-shadow: 0px 3px 6px var(--card-box-shadow-1), 0px 8px 15px var(--card-box-shadow-2), 0 0 0 1px var(--card-border-color);
@@ -831,8 +884,8 @@ body {
   position: relative;
   width: 100%;
   height: 52px;
-  background-color: #0505a9;
-  border: 3px solid #0505a9;
+  background-color: #16a34a;
+  border: 3px solid #16a34a;
   border-radius: 14px;
   cursor: pointer;
   display: flex;
@@ -847,9 +900,9 @@ body {
 }
 
 .morph-submit-btn:hover {
-  background-color: #1e3a8a;
-  border-color: #1e3a8a;
-  box-shadow: 0 6px 20px rgba(5, 5, 169, 0.25);
+  background-color: #15803d;
+  border-color: #15803d;
+  box-shadow: 0 6px 20px rgba(22, 163, 74, 0.25);
 }
 
 .morph-submit-btn .btn-text,
@@ -870,9 +923,9 @@ body {
   width: 52px;
   border-radius: 50px;
   background: transparent;
-  border: 4px solid rgba(5, 5, 169, 0.15);
-  border-left: 4px solid #0505a9;
-  border-bottom: 4px solid #0505a9;
+  border: 4px solid rgba(22, 163, 74, 0.15);
+  border-left: 4px solid #16a34a;
+  border-bottom: 4px solid #16a34a;
   animation: morphSpin 1.8s 200ms forwards;
 }
 
@@ -908,9 +961,9 @@ body {
     transform: rotate(0deg);
   }
   80% {
-    border: 4px solid rgba(5, 5, 169, 0.15);
-    border-left: 4px solid #0505a9;
-    border-bottom: 4px solid #0505a9;
+    border: 4px solid rgba(22, 163, 74, 0.15);
+    border-left: 4px solid #16a34a;
+    border-bottom: 4px solid #16a34a;
   }
   100% {
     transform: rotate(1080deg);
@@ -1051,7 +1104,7 @@ ul.social-hover-list li.instagram-item a:before {
 }
 
 .smooth-about-card:hover {
-  box-shadow: 0px 25px 40px -10px rgba(5, 5, 169, 0.15);
+  box-shadow: 0px 25px 40px -10px rgba(22, 163, 74, 0.15);
   transform: translateY(-6px) scale(1.03);
   border-color: rgba(37, 99, 235, 0.4);
 }
@@ -1122,7 +1175,7 @@ ul.social-hover-list li.instagram-item a:before {
   font-size: 10px;
   letter-spacing: 1.5px;
   font-weight: 700;
-  color: #0505a9;
+  color: #16a34a;
 }
 
 .smooth-about-card .card__title {
@@ -1142,7 +1195,7 @@ ul.social-hover-list li.instagram-item a:before {
   width: 100%;
   padding: 12px 20px;
   background: #ffffff; /* Starting white background */
-  color: #0505a9; /* Blue text */
+  color: #16a34a; /* Blue text */
   font-size: 12px;
   font-weight: 800;
   text-decoration: none;
@@ -1156,9 +1209,9 @@ ul.social-hover-list li.instagram-item a:before {
 }
 
 .neon-blue-border-btn:hover {
-  background: #0505a9; /* Blue background on hover */
+  background: #16a34a; /* Blue background on hover */
   color: #ffffff; /* White text on hover */
-  border-color: #2563eb;
+  border-color: #22c55e;
   box-shadow: 0 0 12px rgba(37, 99, 235, 0.5), 0 0 28px rgba(37, 99, 235, 0.3);
 }
 
@@ -1173,7 +1226,7 @@ ul.social-hover-list li.instagram-item a:before {
   left: 0;
   width: 100%;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #60a5fa);
+  background: linear-gradient(90deg, transparent, #86efac);
   animation: neon-animate1 1s linear infinite;
 }
 
@@ -1191,7 +1244,7 @@ ul.social-hover-list li.instagram-item a:before {
   right: 0;
   width: 2px;
   height: 100%;
-  background: linear-gradient(180deg, transparent, #60a5fa);
+  background: linear-gradient(180deg, transparent, #86efac);
   animation: neon-animate2 1s linear infinite;
   animation-delay: 0.25s;
 }
@@ -1210,7 +1263,7 @@ ul.social-hover-list li.instagram-item a:before {
   right: 0;
   width: 100%;
   height: 2px;
-  background: linear-gradient(270deg, transparent, #60a5fa);
+  background: linear-gradient(270deg, transparent, #86efac);
   animation: neon-animate3 1s linear infinite;
   animation-delay: 0.5s;
 }
@@ -1229,7 +1282,7 @@ ul.social-hover-list li.instagram-item a:before {
   left: 0;
   width: 2px;
   height: 100%;
-  background: linear-gradient(360deg, transparent, #60a5fa);
+  background: linear-gradient(360deg, transparent, #86efac);
   animation: neon-animate4 1s linear infinite;
   animation-delay: 0.75s;
 }
@@ -1246,11 +1299,11 @@ ul.social-hover-list li.instagram-item a:before {
   font-size: 11px;
   font-weight: 800;
   color: #ffffff;
-  background: #0505a9;
+  background: #16a34a;
   transition: all 0.35s ease;
-  box-shadow: 0 4px 14px -2px rgba(5, 5, 169, 0.3);
+  box-shadow: 0 4px 14px -2px rgba(22, 163, 74, 0.3);
   border-radius: 9999px;
-  border: 1.5px solid #0505a9;
+  border: 1.5px solid #16a34a;
   cursor: pointer;
   overflow: hidden;
 }
@@ -1261,7 +1314,7 @@ ul.social-hover-list li.instagram-item a:before {
 
 .skew-cta-btn:hover {
   transition: 0.35s ease;
-  background: #1d4ed8;
+  background: #166534;
   box-shadow: 0 6px 20px -2px rgba(29, 78, 216, 0.5);
   border-color: #38bdf8;
   transform: translateY(-2px);

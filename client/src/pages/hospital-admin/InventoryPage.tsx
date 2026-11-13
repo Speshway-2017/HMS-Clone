@@ -98,7 +98,7 @@ export function InventoryPage() {
                 setCategory(c);
                 setPage(1);
               }}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize ${category === c ? "bg-navy-50 text-navy-700" : "text-slate-500 hover:bg-slate-50"}`}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize ${category === c ? "bg-emerald-50 text-emerald-700" : "text-slate-500 hover:bg-slate-50"}`}
             >
               {c === "" ? "All" : c}
             </button>

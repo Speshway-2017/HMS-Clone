@@ -34,7 +34,7 @@ export function AppointmentDetailsPage() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-slate-400">
-        <Link to="/admin/appointments" className="hover:text-navy-700">
+        <Link to="/admin/appointments" className="hover:text-emerald-700">
           Appointments
         </Link>{" "}
         &gt; {appointment.referenceId}
@@ -50,7 +50,7 @@ export function AppointmentDetailsPage() {
               <p className="text-sm text-red-600">{(patient as unknown as { allergies?: string }).allergies}</p>
             </div>
           )}
-          <Link to={`/admin/patients/${patient?._id}`} className="mt-4 inline-block text-sm font-medium text-navy-700 hover:underline">
+          <Link to={`/admin/patients/${patient?._id}`} className="mt-4 inline-block text-sm font-medium text-emerald-700 hover:underline">
             View Full Patient Record
           </Link>
         </Card>
@@ -89,14 +89,14 @@ export function AppointmentDetailsPage() {
               <div className="flex flex-col items-center gap-2">
                 <div
                   className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold ${
-                    i <= currentIndex ? "bg-navy-700 text-white" : "border-2 border-slate-200 text-slate-300"
+                    i <= currentIndex ? "bg-emerald-700 text-white" : "border-2 border-slate-200 text-slate-300"
                   }`}
                 >
                   {i + 1}
                 </div>
-                <span className={`text-xs font-medium ${i <= currentIndex ? "text-navy-700" : "text-slate-400"}`}>{step.replace("_", " ")}</span>
+                <span className={`text-xs font-medium ${i <= currentIndex ? "text-emerald-700" : "text-slate-400"}`}>{step.replace("_", " ")}</span>
               </div>
-              {i < STATUS_FLOW.length - 1 && <div className={`mx-2 h-0.5 flex-1 ${i < currentIndex ? "bg-navy-700" : "bg-slate-200"}`} />}
+              {i < STATUS_FLOW.length - 1 && <div className={`mx-2 h-0.5 flex-1 ${i < currentIndex ? "bg-emerald-700" : "bg-slate-200"}`} />}
             </div>
           ))}
         </div>

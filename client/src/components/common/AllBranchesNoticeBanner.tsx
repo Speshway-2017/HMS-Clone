@@ -1,6 +1,7 @@
 import React from "react";
 import { Eye, ShieldAlert } from "lucide-react";
 import { useBranchContext } from "../../context/BranchContext";
+import { useAuth } from "../../context/AuthContext";
 
 interface AllBranchesNoticeBannerProps {
   customMessage?: string;
@@ -9,8 +10,11 @@ interface AllBranchesNoticeBannerProps {
 
 export const AllBranchesNoticeBanner: React.FC<AllBranchesNoticeBannerProps> = ({ customMessage, className = "" }) => {
   const { isAllBranches } = useBranchContext();
+  const { user } = useAuth();
 
-  if (!isAllBranches) return null;
+  // Super Admin has global enterprise authority, and Hospital Admins have full authority over their facility.
+  // Neither should ever see this banner or be restricted by branch read-only mode.
+  if (!isAllBranches || user?.role === "super_admin" || user?.role === "hospital_admin" || user?.role === "admin") return null;
 
   return (
     <div className={`mb-4 flex items-center justify-between rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 via-amber-50/90 to-amber-100/80 px-4 py-3 text-xs font-medium text-amber-900 shadow-sm animate-in fade-in duration-200 ${className}`}>

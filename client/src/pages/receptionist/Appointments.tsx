@@ -926,31 +926,31 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 max-w-max">
         <button
           onClick={() => setTab("today")}
-          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "today" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "today" ? "bg-emerald-50 text-emerald-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
         >
           <List className="h-3.5 w-3.5" /> Today's Queue
         </button>
         <button
           onClick={() => setTab("scheduled")}
-          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "scheduled" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "scheduled" ? "bg-emerald-50 text-emerald-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
         >
           <Clock className="h-3.5 w-3.5" /> Scheduled Bookings
         </button>
         <button
           onClick={() => setTab("completed")}
-          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "completed" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "completed" ? "bg-emerald-50 text-emerald-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
         >
           <CheckCircle className="h-3.5 w-3.5" /> Completed
         </button>
         <button
           onClick={() => setTab("new")}
-          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "new" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "new" ? "bg-emerald-50 text-emerald-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
         >
           <Plus className="h-3.5 w-3.5" /> Book Appointment
         </button>
         <button
           onClick={() => setTab("calendar")}
-          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "calendar" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${tab === "calendar" ? "bg-emerald-50 text-emerald-700 font-bold" : "text-slate-500 hover:text-slate-700"}`}
         >
           <Calendar className="h-3.5 w-3.5" /> Calendar View
         </button>
@@ -1025,7 +1025,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
 
               {patientLoading && (
                 <div className="py-4 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
-                  <RefreshCw className="h-4 w-4 animate-spin text-navy-600" />
+                  <RefreshCw className="h-4 w-4 animate-spin text-emerald-600" />
                   <span>Loading patient details...</span>
                 </div>
               )}
@@ -1073,7 +1073,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                         setValue("patientId", "");
                         setPatientQuery("");
                       }}
-                      className="text-xs font-bold text-navy-700 hover:text-navy-800 border border-slate-200 bg-white rounded-md px-3 py-1.5 transition-colors shadow-sm"
+                      className="text-xs font-bold text-emerald-700 hover:text-emerald-800 border border-slate-200 bg-white rounded-md px-3 py-1.5 transition-colors shadow-sm"
                     >
                       Change Patient
                     </button>
@@ -1117,7 +1117,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                         placeholder="Search patient by UHID, phone, or name..."
                         value={patientQuery}
                         onChange={(e) => setPatientQuery(e.target.value)}
-                        className="w-full rounded-lg border border-slate-300 pl-10 pr-4 py-2 text-sm outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+                        className="w-full rounded-lg border border-slate-300 pl-10 pr-4 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-navy-500"
                       />
                     </div>
                     {searchPatients && searchPatients.length > 0 && (
@@ -1127,7 +1127,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                             key={p._id}
                             type="button"
                             onClick={() => { setValue("patientId", p._id); setPatientQuery(`${p.name} (${p.uhid})`); }}
-                            className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-slate-50 ${selectedPatientId === p._id ? "bg-navy-50 font-semibold" : ""}`}
+                            className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-slate-50 ${selectedPatientId === p._id ? "bg-emerald-50 font-semibold" : ""}`}
                           >
                             <div>
                               <div className="font-semibold text-slate-800">{p.name}</div>
@@ -1149,7 +1149,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card className="space-y-3">
                   <h4 className="font-bold text-xs uppercase tracking-wider text-slate-500 border-b pb-1.5 flex items-center gap-1.5">
-                    <FolderHeart className="h-4 w-4 text-navy-600" /> Previous Visits & Appointments
+                    <FolderHeart className="h-4 w-4 text-emerald-600" /> Previous Visits & Appointments
                   </h4>
                   {((patientDetail as any)?.recentAppointments?.length > 0 || (patientDetail.patient.medicalHistory && patientDetail.patient.medicalHistory.length > 0)) ? (
                     <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
@@ -1349,7 +1349,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                               isBooked
                                 ? "border-rose-100 bg-rose-50 text-rose-450 line-through cursor-not-allowed opacity-60"
                                 : isSelected
-                                ? "border-navy-600 bg-navy-600 text-white ring-2 ring-navy-100"
+                                ? "border-emerald-600 bg-navy-600 text-white ring-2 ring-navy-100"
                                 : "border-emerald-200 bg-emerald-50/50 text-emerald-700 hover:border-emerald-400 hover:bg-emerald-100 active:scale-95"
                             }`}
                           >
@@ -1477,7 +1477,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
-              <div className="text-sm font-bold text-navy-700 w-32 text-center">
+              <div className="text-sm font-bold text-emerald-700 w-32 text-center">
                 {calendarDate.toLocaleString("default", { month: "long", year: "numeric" })}
               </div>
               <button
@@ -1525,7 +1525,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                     }}
                     className={`rounded-lg border p-2 text-left transition-all ${
                       dayAppts.length > 0 
-                        ? "border-navy-200 hover:border-navy-400 hover:bg-navy-50/20 cursor-pointer" 
+                        ? "border-emerald-200 hover:border-navy-400 hover:bg-emerald-50/20 cursor-pointer" 
                         : "border-slate-100 text-slate-400 hover:bg-slate-50"
                     } ${isToday ? "bg-amber-50/60 border-amber-300 ring-1 ring-amber-200" : ""}`}
                   >
@@ -1562,7 +1562,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                       <span className="font-bold text-slate-800 text-sm">{appt.patient?.name}</span>
                       <span className="text-[10px] text-slate-400 font-mono block">UHID: {appt.patient?.uhid}</span>
                     </div>
-                    <span className="rounded-full bg-navy-100 px-2 py-0.5 text-[9px] font-semibold text-navy-800 font-mono">
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-semibold text-emerald-800 font-mono">
                       {appt.time}
                     </span>
                   </div>
@@ -1660,7 +1660,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
               </div>
               <div>
                 <span className="text-slate-400 block mb-0.5">Status</span>
-                <span className="font-semibold text-navy-700 uppercase">{selectedAppt.status || "—"}</span>
+                <span className="font-semibold text-emerald-700 uppercase">{selectedAppt.status || "—"}</span>
               </div>
             </div>
 
@@ -1764,7 +1764,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                       min={new Date().toISOString().split("T")[0]}
                       value={rescheduleDate}
                       onChange={(e) => { setRescheduleDate(e.target.value); setRescheduleTime(""); }}
-                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1 ${rescheduleErrors.date ? "border-red-400 focus:ring-red-400" : "border-slate-300 focus:border-navy-500 focus:ring-navy-500"}`}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1 ${rescheduleErrors.date ? "border-red-400 focus:ring-red-400" : "border-slate-300 focus:border-emerald-500 focus:ring-navy-500"}`}
                     />
                     {rescheduleErrors.date && <p className="mt-0.5 text-xs text-red-500">{rescheduleErrors.date}</p>}
                   </div>
@@ -1773,7 +1773,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                     <select
                       value={rescheduleTime}
                       onChange={(e) => setRescheduleTime(e.target.value)}
-                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1 ${rescheduleErrors.time ? "border-red-400 focus:ring-red-400" : "border-slate-300 focus:border-navy-500 focus:ring-navy-500"}`}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1 ${rescheduleErrors.time ? "border-red-400 focus:ring-red-400" : "border-slate-300 focus:border-emerald-500 focus:ring-navy-500"}`}
                     >
                       <option value="">Select Slot</option>
                       {getAvailableSlots(rescheduleDate, rescheduleDoctor).map((s) => <option key={s} value={s}>{s}</option>)}
@@ -1788,7 +1788,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                     <select
                       value={rescheduleDoctor}
                       onChange={(e) => setRescheduleDoctor(e.target.value)}
-                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1 ${rescheduleErrors.doctor ? "border-red-400 focus:ring-red-400" : "border-slate-300 focus:border-navy-500 focus:ring-navy-500"}`}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1 ${rescheduleErrors.doctor ? "border-red-400 focus:ring-red-400" : "border-slate-300 focus:border-emerald-500 focus:ring-navy-500"}`}
                     >
                       <option value="">Select Doctor</option>
                       {doctors?.map((doc: any) => <option key={doc._id} value={doc._id}>{doc.name} ({doc.specialization})</option>)}
@@ -1800,7 +1800,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                     <select
                       value={rescheduleDept}
                       onChange={(e) => setRescheduleDept(e.target.value)}
-                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1 ${rescheduleErrors.department ? "border-red-400 focus:ring-red-400" : "border-slate-300 focus:border-navy-500 focus:ring-navy-500"}`}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1 ${rescheduleErrors.department ? "border-red-400 focus:ring-red-400" : "border-slate-300 focus:border-emerald-500 focus:ring-navy-500"}`}
                     >
                       <option value="">Select Department</option>
                       {departments.map((dept: any) => <option key={dept._id} value={dept._id}>{dept.name}</option>)}
@@ -1814,7 +1814,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                   <select
                     value={rescheduleReason}
                     onChange={(e) => setRescheduleReason(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-navy-500"
                   >
                     <option value="Patient Requested">Patient Requested</option>
                     <option value="Doctor Requested">Doctor Requested</option>
@@ -1845,7 +1845,7 @@ export function AppointmentsPage({ activeTab = "today" }: Props) {
                   {cancelMutation.isPending ? "Cancelling..." : "Confirm Cancellation"}
                 </Button>
               ) : (
-                <Button type="submit" disabled={isMutating || !isCancellationAllowed(selectedAppt?.date, selectedAppt?.time)} className="bg-navy-600 hover:bg-navy-700 text-white">
+                <Button type="submit" disabled={isMutating || !isCancellationAllowed(selectedAppt?.date, selectedAppt?.time)} className="bg-navy-600 hover:bg-emerald-700 text-white">
                   {rescheduleMutation.isPending ? "Rescheduling..." : "Confirm Reschedule"}
                 </Button>
               )}

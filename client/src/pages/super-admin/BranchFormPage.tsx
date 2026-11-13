@@ -303,10 +303,10 @@ export function BranchFormPage() {
   const isSaving = createBranch.isPending || updateBranch.isPending;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="w-full space-y-6">
       <div>
         <div className="text-sm text-slate-400">
-          <Link to="/super-admin/branches" className="hover:text-navy-700">
+          <Link to="/super-admin/branches" className="hover:text-emerald-700">
             Branches
           </Link>{" "}
           &gt; {isEdit ? "Edit Branch" : "Add New Branch"}

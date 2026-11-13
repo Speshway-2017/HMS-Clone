@@ -287,7 +287,7 @@ export function AttendanceCorrectionDialog({ isOpen, onClose, record }: Props) {
                   value={checkInTime}
                   onChange={(e) => { setCheckInTime(e.target.value); setErrors((p) => ({ ...p, checkInTime: "" })); }}
                   placeholder="09:00 AM"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-navy-500 outline-none"
                 />
                 {errors.checkInTime && <p className="mt-1 text-xs text-red-600">{errors.checkInTime}</p>}
               </div>
@@ -301,7 +301,7 @@ export function AttendanceCorrectionDialog({ isOpen, onClose, record }: Props) {
                   value={checkOutTime}
                   onChange={(e) => setCheckOutTime(e.target.value)}
                   placeholder="05:00 PM"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-navy-500 outline-none"
                 />
               </div>
 
@@ -316,7 +316,7 @@ export function AttendanceCorrectionDialog({ isOpen, onClose, record }: Props) {
                   step={0.5}
                   value={workingHours}
                   onChange={(e) => { setWorkingHours(parseFloat(e.target.value) || 0); setErrors((p) => ({ ...p, workingHours: "" })); }}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-navy-500 outline-none"
                 />
                 {errors.workingHours && <p className="mt-1 text-xs text-red-600">{errors.workingHours}</p>}
               </div>
@@ -332,7 +332,7 @@ export function AttendanceCorrectionDialog({ isOpen, onClose, record }: Props) {
                   step={0.5}
                   value={overtimeHours}
                   onChange={(e) => { setOvertimeHours(parseFloat(e.target.value) || 0); setErrors((p) => ({ ...p, overtimeHours: "" })); }}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-navy-500 outline-none"
                 />
                 {errors.overtimeHours && <p className="mt-1 text-xs text-red-600">{errors.overtimeHours}</p>}
               </div>

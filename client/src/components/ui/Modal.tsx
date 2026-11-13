@@ -28,18 +28,18 @@ export function Modal({ title, isOpen, onClose, children, size = "md", className
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 print:p-0 print:static print:inset-auto print:block">
       {/* Backdrop overlay */}
       <div
-        className="fixed inset-0 bg-transparent transition-opacity print:hidden"
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity print:hidden"
         onClick={onClose}
       />
 
-      <div className={`relative z-10 w-full ${widthClass} rounded-xl bg-white p-4 sm:p-6 shadow-2xl border border-slate-100 max-h-[90vh] sm:max-h-[85vh] flex flex-col print:max-h-none print:shadow-none print:border-none print:p-0 print:w-full print:max-w-none ${className}`}>
-        <div className="mb-4 flex items-center justify-between shrink-0 print:hidden">
-          <h2 className="text-base sm:text-lg font-semibold text-slate-800 truncate pr-2">{title}</h2>
-          <button onClick={onClose} aria-label="Close" className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors shrink-0">
-            <X className="h-5 w-5" />
+      <div className={`relative z-10 w-full ${widthClass} rounded-xl bg-white p-3.5 sm:p-5 shadow-xl border border-slate-200 max-h-[90vh] sm:max-h-[85vh] flex flex-col print:max-h-none print:shadow-none print:border-none print:p-0 print:w-full print:max-w-none ${className}`}>
+        <div className="mb-3 flex items-center justify-between shrink-0 border-b border-slate-100 pb-2.5 print:hidden">
+          <h2 className="text-sm sm:text-base font-bold text-slate-900 truncate pr-2">{title}</h2>
+          <button onClick={onClose} aria-label="Close" className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors shrink-0 cursor-pointer">
+            <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="overflow-y-auto flex-1 pr-1 print:overflow-visible print:p-0">
+        <div className="overflow-y-auto flex-1 pr-1 print:overflow-visible print:p-0 text-xs">
           {children}
         </div>
       </div>

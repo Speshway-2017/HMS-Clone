@@ -98,7 +98,10 @@ app.use(
       "X-Requested-With",
       "X-Branch-ID",
       "x-branch-id",
+      "X-Hospital-ID",
+      "x-hospital-id",
       "Accept",
+      "Origin",
     ],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   })
@@ -155,7 +158,6 @@ app.use("/api/v1/suppliers", supplierRoutes);
 app.use("/api/v1/invoices", invoiceRoutes);
 app.use("/api/v1/ip-billing", ipBillingRoutes);
 app.use("/api/v1/ip-bills", ipBillRoutes);
-app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/reception", receptionRoutes);
 app.use("/api/v1/wards", wardRoutes);
 app.use("/api/v1/rooms", roomRoutes);
@@ -166,10 +168,11 @@ app.use("/api/v1/admission-requests", admissionRequestRoutes);
 // Register Prescription Delivery endpoints
 app.use("/api/v1/prescriptions", prescriptionRoutes);
 app.use("/api/patient/prescriptions", protect, getPatientPrescriptions);
-app.use("/api/v1/accountant", accountantRoutes);
 
-// Register Diagnostic Report & Laboratory endpoints
-app.use("/api/v1/laboratory", laboratoryRoutes);
+// Notifications, accountant, and standalone lab modules disabled per architecture redesign
+// app.use("/api/v1/notifications", notificationRoutes);
+// app.use("/api/v1/accountant", accountantRoutes);
+// app.use("/api/v1/laboratory", laboratoryRoutes);
 app.use("/api/v1/consultations", consultationRoutes);
 app.use("/api/v1/diagnostic-reports", diagnosticReportRoutes);
 app.use("/api/v1/blogs", blogRoutes);

@@ -129,14 +129,14 @@ export function NewLabOrderPage() {
                 <label
                   key={test}
                   className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all duration-200 select-none ${
-                    isChecked ? "border-navy-700 bg-navy-50 text-navy-900 font-medium" : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                    isChecked ? "border-emerald-700 bg-emerald-50 text-slate-900 font-medium" : "border-slate-200 text-slate-700 hover:bg-slate-50"
                   }`}
                 >
                   <input
                     type="checkbox"
                     checked={isChecked}
                     onChange={() => toggleTest(test)}
-                    className="h-4 w-4 rounded border-slate-300 text-navy-700 focus:ring-navy-500"
+                    className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-navy-500"
                   />
                   <span className="text-sm">{test}</span>
                 </label>

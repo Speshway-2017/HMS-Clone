@@ -333,7 +333,7 @@ export function LeaveManagementPage() {
               ) : (
                 leaves.map((leave) => (
                   <tr key={leave._id} className="hover:bg-slate-50">
-                    <td className="py-3 px-4 font-mono font-semibold text-navy-700">
+                    <td className="py-3 px-4 font-mono font-semibold text-emerald-700">
                       {leave.leaveId}
                     </td>
                     <td className="py-3 px-4">

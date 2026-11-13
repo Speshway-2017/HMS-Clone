@@ -457,7 +457,7 @@ export function ShiftManagementPage() {
         <KpiCard
           label="Active Shifts"
           value={shifts.length}
-          icon={<Clock className="h-5 w-5 text-navy-600" />}
+          icon={<Clock className="h-5 w-5 text-emerald-600" />}
         />
         <KpiCard
           label="Assigned Staff"
@@ -491,7 +491,7 @@ export function ShiftManagementPage() {
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => handleOpenEdit(shift)}
-                    className="p-1 text-slate-400 hover:text-navy-700 rounded hover:bg-slate-100"
+                    className="p-1 text-slate-400 hover:text-emerald-700 rounded hover:bg-slate-100"
                     title="Edit Shift"
                   >
                     <Pencil className="h-4 w-4" />
@@ -509,7 +509,7 @@ export function ShiftManagementPage() {
               <div className="space-y-2 text-xs text-slate-600">
                 <div className="flex justify-between font-mono text-slate-900 bg-slate-50 p-2 rounded border">
                   <span>Timing:</span>
-                  <span className="font-bold text-navy-800">
+                  <span className="font-bold text-emerald-800">
                     {shift.startTime} – {shift.endTime}
                   </span>
                 </div>
@@ -557,7 +557,7 @@ export function ShiftManagementPage() {
             <tbody className="divide-y divide-slate-200">
               {allEmployees.map((emp) => (
                 <tr key={emp._id} className="hover:bg-slate-50">
-                  <td className="py-3 px-4 font-mono font-semibold text-navy-700">{emp.employeeId}</td>
+                  <td className="py-3 px-4 font-mono font-semibold text-emerald-700">{emp.employeeId}</td>
                   <td className="py-3 px-4 font-medium text-slate-900">{emp.name}</td>
                   <td className="py-3 px-4 text-slate-600">{emp.role}</td>
                   <td className="py-3 px-4">
@@ -701,7 +701,7 @@ export function ShiftManagementPage() {
                     title="Up Arrow"
                     data-testid="grace-period-up"
                     onClick={handleGracePeriodUp}
-                    className="px-1 py-0.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 flex items-center justify-center transition-colors border-b border-slate-200 cursor-pointer"
+                    className="px-1 py-0.5 text-slate-500 hover:text-emerald-700 hover:bg-slate-100 flex items-center justify-center transition-colors border-b border-slate-200 cursor-pointer"
                   >
                     <ChevronUp className="h-3 w-3" />
                   </button>
@@ -711,7 +711,7 @@ export function ShiftManagementPage() {
                     title="Down Arrow"
                     data-testid="grace-period-down"
                     onClick={handleGracePeriodDown}
-                    className="px-1 py-0.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+                    className="px-1 py-0.5 text-slate-500 hover:text-emerald-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
                   >
                     <ChevronDown className="h-3 w-3" />
                   </button>
@@ -757,7 +757,7 @@ export function ShiftManagementPage() {
                     title="Up Arrow"
                     data-testid="full-day-up"
                     onClick={handleFullDayUp}
-                    className="px-1 py-0.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 flex items-center justify-center transition-colors border-b border-slate-200 cursor-pointer"
+                    className="px-1 py-0.5 text-slate-500 hover:text-emerald-700 hover:bg-slate-100 flex items-center justify-center transition-colors border-b border-slate-200 cursor-pointer"
                   >
                     <ChevronUp className="h-3 w-3" />
                   </button>
@@ -767,7 +767,7 @@ export function ShiftManagementPage() {
                     title="Down Arrow"
                     data-testid="full-day-down"
                     onClick={handleFullDayDown}
-                    className="px-1 py-0.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+                    className="px-1 py-0.5 text-slate-500 hover:text-emerald-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
                   >
                     <ChevronDown className="h-3 w-3" />
                   </button>
@@ -813,7 +813,7 @@ export function ShiftManagementPage() {
                     title="Up Arrow"
                     data-testid="half-day-up"
                     onClick={handleHalfDayUp}
-                    className="px-1 py-0.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 flex items-center justify-center transition-colors border-b border-slate-200 cursor-pointer"
+                    className="px-1 py-0.5 text-slate-500 hover:text-emerald-700 hover:bg-slate-100 flex items-center justify-center transition-colors border-b border-slate-200 cursor-pointer"
                   >
                     <ChevronUp className="h-3 w-3" />
                   </button>
@@ -823,7 +823,7 @@ export function ShiftManagementPage() {
                     title="Down Arrow"
                     data-testid="half-day-down"
                     onClick={handleHalfDayDown}
-                    className="px-1 py-0.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+                    className="px-1 py-0.5 text-slate-500 hover:text-emerald-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
                   >
                     <ChevronDown className="h-3 w-3" />
                   </button>
@@ -838,7 +838,7 @@ export function ShiftManagementPage() {
               id="crossesMidnight"
               checked={crossesMidnight}
               onChange={(e) => setCrossesMidnight(e.target.checked)}
-              className="h-4 w-4 text-navy-600 rounded border-slate-300 focus:ring-navy-500"
+              className="h-4 w-4 text-emerald-600 rounded border-slate-300 focus:ring-navy-500"
             />
             <label htmlFor="crossesMidnight" className="text-xs font-semibold text-slate-700 cursor-pointer">
               Shift crosses midnight (Night shift)

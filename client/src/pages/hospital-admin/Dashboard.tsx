@@ -33,7 +33,7 @@ import { useDepartments } from "../../features/departments";
 import { useBeds } from "../../features/beds";
 import { useInventory } from "../../features/inventory";
 import { useLaboratoryRequests } from "../../features/laboratory";
-import { useNotifications } from "../../features/notifications";
+// Notifications decommissioned per system architecture specification
 import { useIPAdmissions } from "../../features/ipBilling";
 import { useAdmissions } from "../../features/receptionist";
 
@@ -79,7 +79,6 @@ export function HospitalAdminDashboard() {
   const { data: bedsData } = useBeds();
   const { data: inventoryData } = useInventory();
   const { data: labRequestsData } = useLaboratoryRequests();
-  const { data: notificationsData } = useNotifications();
   const { data: ipAdmissionsData } = useIPAdmissions();
   const { data: recAdmissionsData } = useAdmissions();
 
@@ -112,7 +111,6 @@ export function HospitalAdminDashboard() {
       "prescription:dispensed",
       "prescription:new",
       "admission:request:created",
-      "notification:new",
     ];
 
     socketEvents.forEach((evt) => socket.on(evt, handleSocketSync));
@@ -372,15 +370,15 @@ export function HospitalAdminDashboard() {
           {hospital?.logoUrl ? (
             <img src={hospital.logoUrl} alt={hospital.name} className="h-12 w-12 rounded-xl object-contain ring-2 ring-slate-100 bg-white p-1" />
           ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-navy-100 text-navy-700 font-bold text-xl ring-2 ring-slate-100 shadow-sm">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 font-bold text-xl ring-2 ring-slate-100 shadow-sm">
               {hospital?.name ? hospital.name.charAt(0).toUpperCase() : "H"}
             </div>
           )}
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-black tracking-tight text-slate-900">{hospital?.name || "Hospital Dashboard"}</h1>
-              <span className="rounded-full bg-navy-50 px-2.5 py-0.5 text-xs font-bold text-navy-700 border border-navy-100 flex items-center gap-1">
-                <Sparkles className="h-3 w-3 text-navy-700" /> Executive Analytics ERP
+              <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-navy-100 flex items-center gap-1">
+                <Sparkles className="h-3 w-3 text-emerald-700" /> Executive Analytics ERP
               </span>
             </div>
             <p className="text-sm text-slate-500">Real-time enterprise analytics center for hospital operations & finance.</p>
@@ -392,7 +390,7 @@ export function HospitalAdminDashboard() {
           <div className="flex items-center gap-2">
             <Link
               to="/admin/doctors/new"
-              className="flex items-center gap-1.5 rounded-lg bg-navy-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-navy-800"
+              className="flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-800"
             >
               <Plus className="h-3.5 w-3.5" /> Add Doctor
             </Link>
@@ -456,7 +454,7 @@ export function HospitalAdminDashboard() {
             <p className="text-xs font-semibold text-slate-700 mt-1">Management Shortcuts</p>
           </div>
           {!isAllBranches ? (
-            <Link to="/admin/doctors/new" className="flex items-center gap-1.5 rounded-lg bg-navy-50 px-2.5 py-1.5 text-xs font-bold text-navy-700 hover:bg-navy-100">
+            <Link to="/admin/doctors/new" className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
               <Plus className="h-3.5 w-3.5" /> Doctor
             </Link>
           ) : (
@@ -471,7 +469,7 @@ export function HospitalAdminDashboard() {
           onClick={() => setActiveTab("overview")}
           className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold transition-all whitespace-nowrap ${
             activeTab === "overview"
-              ? "border-navy-700 text-navy-700 font-extrabold"
+              ? "border-emerald-700 text-emerald-700 font-extrabold"
               : "border-transparent text-slate-500 hover:text-slate-700"
           }`}
         >
@@ -482,7 +480,7 @@ export function HospitalAdminDashboard() {
           onClick={() => setActiveTab("patient_flow")}
           className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold transition-all whitespace-nowrap ${
             activeTab === "patient_flow"
-              ? "border-navy-700 text-navy-700 font-extrabold"
+              ? "border-emerald-700 text-emerald-700 font-extrabold"
               : "border-transparent text-slate-500 hover:text-slate-700"
           }`}
         >
@@ -493,7 +491,7 @@ export function HospitalAdminDashboard() {
           onClick={() => setActiveTab("dept_doctors")}
           className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold transition-all whitespace-nowrap ${
             activeTab === "dept_doctors"
-              ? "border-navy-700 text-navy-700 font-extrabold"
+              ? "border-emerald-700 text-emerald-700 font-extrabold"
               : "border-transparent text-slate-500 hover:text-slate-700"
           }`}
         >
@@ -504,7 +502,7 @@ export function HospitalAdminDashboard() {
           onClick={() => setActiveTab("revenue")}
           className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold transition-all whitespace-nowrap ${
             activeTab === "revenue"
-              ? "border-navy-700 text-navy-700 font-extrabold"
+              ? "border-emerald-700 text-emerald-700 font-extrabold"
               : "border-transparent text-slate-500 hover:text-slate-700"
           }`}
         >
@@ -515,7 +513,7 @@ export function HospitalAdminDashboard() {
           onClick={() => setActiveTab("diagnostics")}
           className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold transition-all whitespace-nowrap ${
             activeTab === "diagnostics"
-              ? "border-navy-700 text-navy-700 font-extrabold"
+              ? "border-emerald-700 text-emerald-700 font-extrabold"
               : "border-transparent text-slate-500 hover:text-slate-700"
           }`}
         >
@@ -555,9 +553,9 @@ export function HospitalAdminDashboard() {
         )}
       </div>
 
-      {/* 6. Live Activity Stream & Real-time Notification Panel */}
+      {/* 6. Live Activity Stream */}
       <div className="pt-4">
-        <LiveActivityPanel notifications={notificationsData?.data?.notifications || []} />
+        <LiveActivityPanel />
       </div>
     </div>
   );

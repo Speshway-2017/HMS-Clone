@@ -52,13 +52,13 @@ export function DoctorsPage() {
           {d.photoUrl ? (
             <img src={d.photoUrl} alt={d.name} className="h-9 w-9 rounded-full object-cover" />
           ) : (
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-700">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700">
               {d.name.slice(0, 2).toUpperCase()}
             </div>
           )}
           <div>
             <div className="font-semibold text-slate-800">{d.name}</div>
-            <div className="text-xs text-navy-600">{d.email}</div>
+            <div className="text-xs text-emerald-600">{d.email}</div>
           </div>
         </div>
       ),
@@ -71,12 +71,12 @@ export function DoctorsPage() {
       header: "Actions",
       render: (d) => (
         <div className="flex items-center gap-2 text-slate-400">
-          <Link to={`/admin/doctors/${d._id}`} className="hover:text-navy-700" title="View Doctor Profile">
+          <Link to={`/admin/doctors/${d._id}`} className="hover:text-emerald-700" title="View Doctor Profile">
             <Eye className="h-4 w-4" />
           </Link>
           {!isAllBranches ? (
             <>
-              <Link to={`/admin/doctors/${d._id}/edit`} className="hover:text-navy-700" title="Edit Doctor">
+              <Link to={`/admin/doctors/${d._id}/edit`} className="hover:text-emerald-700" title="Edit Doctor">
                 <Pencil className="h-4 w-4" />
               </Link>
               <button

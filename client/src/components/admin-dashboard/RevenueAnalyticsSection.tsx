@@ -129,13 +129,13 @@ export function RevenueAnalyticsSection({ invoices, hospitalCounts }: RevenueAna
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between h-full">
           <p className="text-[11.5px] sm:text-xs font-semibold text-slate-500 truncate tracking-tight" title="Monthly Revenue">Monthly Revenue</p>
-          <p className="mt-2 text-2xl font-extrabold text-blue-600">{formatINR(metrics.monthlyRev)}</p>
+          <p className="mt-2 text-2xl font-extrabold text-emerald-700">{formatINR(metrics.monthlyRev)}</p>
           <span className="mt-1 inline-block text-[11px] text-slate-400 truncate">Current Month Total</span>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between h-full">
           <p className="text-[11.5px] sm:text-xs font-semibold text-slate-500 truncate tracking-tight" title="Yearly Revenue">Yearly Revenue</p>
-          <p className="mt-2 text-2xl font-extrabold text-navy-900">{formatINR(metrics.yearlyRev)}</p>
+          <p className="mt-2 text-2xl font-extrabold text-slate-900">{formatINR(metrics.yearlyRev)}</p>
           <span className="mt-1 inline-block text-[11px] text-slate-400 truncate">YTD Paid Collections</span>
         </div>
 

@@ -37,7 +37,7 @@ function NotificationRowItem({
   return (
     <div
       className={`p-4 transition-colors border-b border-slate-100 ${
-        item.isRead ? "bg-white" : "bg-navy-50/15"
+        item.isRead ? "bg-white" : "bg-emerald-50/15"
       }`}
     >
       {showConfirmDelete ? (

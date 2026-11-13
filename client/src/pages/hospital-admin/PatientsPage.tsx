@@ -30,7 +30,7 @@ export function PatientsPage() {
       header: "Patient Name",
       render: (p) => (
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-700">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700">
             {p.name.slice(0, 2).toUpperCase()}
           </div>
           <div>
@@ -61,7 +61,7 @@ export function PatientsPage() {
     {
       header: "Actions",
       render: (p) => (
-        <Link to={`/admin/patients/${p._id}`} className="text-sm font-medium text-navy-700 hover:underline">
+        <Link to={`/admin/patients/${p._id}`} className="text-sm font-medium text-emerald-700 hover:underline">
           View
         </Link>
       ),

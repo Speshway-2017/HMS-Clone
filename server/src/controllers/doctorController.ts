@@ -149,6 +149,7 @@ export const createDoctor = catchAsync(async (req: Request, res: Response) => {
   const doctor = await Doctor.create({
     ...body,
     licenseNo,
+    employeeId: (body as any).employeeId || licenseNo,
     hospital: hospitalId,
     branch: branchId
   });

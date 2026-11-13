@@ -98,7 +98,7 @@ export function AppointmentAnalyticsSection({ appointments }: AppointmentAnalyti
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-7">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between h-full">
           <p className="text-[11.5px] sm:text-xs font-semibold text-slate-500 truncate tracking-tight" title="Today's Total">Today's Total</p>
-          <p className="mt-2 text-2xl font-extrabold text-navy-900">{metrics.todaysCount}</p>
+          <p className="mt-2 text-2xl font-extrabold text-slate-900">{metrics.todaysCount}</p>
           <span className="mt-1 inline-block text-[11px] text-slate-400 truncate">Scheduled Today</span>
         </div>
 
@@ -128,13 +128,13 @@ export function AppointmentAnalyticsSection({ appointments }: AppointmentAnalyti
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between h-full">
           <p className="text-[11.5px] sm:text-xs font-semibold text-slate-500 truncate tracking-tight" title="Walk-ins">Walk-ins</p>
-          <p className="mt-2 text-2xl font-extrabold text-blue-600">{metrics.walkIns}</p>
+          <p className="mt-2 text-2xl font-extrabold text-emerald-700">{metrics.walkIns}</p>
           <span className="mt-1 inline-block text-[11px] text-slate-400 truncate">OP Desk Booking</span>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between h-full">
           <p className="text-[11.5px] sm:text-xs font-semibold text-slate-500 truncate tracking-tight" title="Online Bookings">Online Bookings</p>
-          <p className="mt-2 text-2xl font-extrabold text-indigo-600">{metrics.onlineBookings}</p>
+          <p className="mt-2 text-2xl font-extrabold text-rose-600">{metrics.onlineBookings}</p>
           <span className="mt-1 inline-block text-[11px] text-slate-400 truncate">Web & App Portal</span>
         </div>
       </div>

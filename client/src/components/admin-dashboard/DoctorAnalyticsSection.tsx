@@ -94,7 +94,7 @@ export function DoctorAnalyticsSection({ doctors, appointments }: DoctorAnalytic
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <span className="text-xs font-semibold text-slate-500">Total Doctors</span>
-          <p className="mt-2 text-2xl font-extrabold text-navy-900">{metrics.total}</p>
+          <p className="mt-2 text-2xl font-extrabold text-slate-900">{metrics.total}</p>
           <span className="text-[11px] text-slate-400">Registered Specialists</span>
         </div>
 
@@ -106,7 +106,7 @@ export function DoctorAnalyticsSection({ doctors, appointments }: DoctorAnalytic
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <span className="text-xs font-semibold text-slate-500">Doctors Available</span>
-          <p className="mt-2 text-2xl font-extrabold text-blue-600">{metrics.available}</p>
+          <p className="mt-2 text-2xl font-extrabold text-emerald-700">{metrics.available}</p>
           <span className="text-[11px] text-slate-400">Ready for OP</span>
         </div>
 
@@ -166,7 +166,7 @@ export function DoctorAnalyticsSection({ doctors, appointments }: DoctorAnalytic
                       <p className="text-[10px] text-slate-400">{doc.dept}</p>
                     </div>
                   </div>
-                  <span className="rounded-full bg-navy-50 px-2.5 py-1 text-xs font-extrabold text-navy-700">
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-extrabold text-emerald-700">
                     {doc.count} consults
                   </span>
                 </div>

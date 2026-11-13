@@ -140,7 +140,7 @@ export function InpatientsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by name, UHID, IP #..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:border-navy-500 font-sans"
+            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 font-sans"
           />
         </div>
       </div>
@@ -209,7 +209,7 @@ export function InpatientsPage() {
                     </Link>
                     <button
                       onClick={() => handleOpenNotes(patient._id, patientName)}
-                      className="flex-1 min-w-[90px] inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-navy-700 hover:bg-navy-800 text-white rounded-lg text-xs font-medium transition-colors font-sans"
+                      className="flex-1 min-w-[90px] inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-medium transition-colors font-sans"
                     >
                       <FileText className="h-3.5 w-3.5" /> Daily Notes
                     </button>
@@ -292,7 +292,7 @@ export function InpatientsPage() {
                           </Link>
                           <button
                             onClick={() => handleOpenNotes(patient._id, patientName)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-navy-700 hover:bg-navy-800 text-white rounded-lg text-xs font-medium transition-colors font-sans"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-medium transition-colors font-sans"
                           >
                             <FileText className="h-3.5 w-3.5" /> Daily Notes
                           </button>
@@ -356,7 +356,7 @@ export function InpatientsPage() {
                 className={`w-full rounded-lg border px-3 py-2 text-xs transition-colors focus:outline-none font-sans ${
                   diagError
                     ? "border-rose-400 bg-rose-50/20 focus:border-rose-500"
-                    : "border-slate-200 bg-white focus:border-navy-500"
+                    : "border-slate-200 bg-white focus:border-emerald-500"
                 }`}
               />
               {diagError && (
@@ -383,7 +383,7 @@ export function InpatientsPage() {
                 className={`w-full rounded-lg border px-3 py-2 text-xs transition-colors focus:outline-none resize-none font-sans ${
                   notesError
                     ? "border-rose-400 bg-rose-50/20 focus:border-rose-500"
-                    : "border-slate-200 bg-white focus:border-navy-500"
+                    : "border-slate-200 bg-white focus:border-emerald-500"
                 }`}
               />
               {notesError && (
@@ -403,7 +403,7 @@ export function InpatientsPage() {
                 type="button"
                 onClick={handleNotesSubmit}
                 disabled={isSubmitting || addNotesMutation.isPending}
-                className="px-4 py-2 bg-navy-700 hover:bg-navy-800 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
               >
                 {isSubmitting || addNotesMutation.isPending ? "Saving..." : "Save Notes"}
               </button>

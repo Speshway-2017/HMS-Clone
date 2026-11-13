@@ -91,7 +91,7 @@ export function RadiologyPage() {
   if (isLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-navy-700 border-t-transparent"></div>
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-700 border-t-transparent"></div>
       </div>
     );
   }
@@ -127,7 +127,7 @@ export function RadiologyPage() {
                 key={m}
                 onClick={() => setActiveModality(m)}
                 className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap ${
-                  activeModality === m ? "bg-navy-700 text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+                  activeModality === m ? "bg-emerald-700 text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
               >
                 {m}
@@ -187,7 +187,7 @@ export function RadiologyPage() {
 
           {/* Detail Modal Panel */}
           {selectedReport && (
-            <Card className="border-navy-200">
+            <Card className="border-emerald-200">
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h3 className="text-base font-semibold text-slate-800">
@@ -250,7 +250,7 @@ export function RadiologyPage() {
 
               {!selectedReport.approved && (
                 <div className="mt-4 flex gap-2">
-                  <button className="flex items-center gap-1 rounded-lg bg-navy-700 px-4 py-2 text-sm font-medium text-white hover:bg-navy-800">
+                  <button className="flex items-center gap-1 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800">
                     <CheckCircle2 className="h-4 w-4" /> Acknowledge &amp; Approve
                   </button>
                   <button className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">

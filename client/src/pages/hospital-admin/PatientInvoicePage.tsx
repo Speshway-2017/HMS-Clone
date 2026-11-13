@@ -24,7 +24,7 @@ export function PatientInvoicePage() {
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm text-slate-400">
-            <Link to="/admin/finance" className="hover:text-navy-700">
+            <Link to="/admin/finance" className="hover:text-emerald-700">
               Revenue Analytics
             </Link>{" "}
             / Invoices / {id}
@@ -54,18 +54,18 @@ export function PatientInvoicePage() {
         <div className="space-y-6">
           <Card>
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Patient Details</p>
-            <Link to={`/admin/patients/${patientId}`} className="mt-1 block text-lg font-semibold text-navy-700 hover:underline">
+            <Link to={`/admin/patients/${patientId}`} className="mt-1 block text-lg font-semibold text-emerald-700 hover:underline">
               {patientName}
             </Link>
           </Card>
 
-          <Card className="bg-navy-700 text-white">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-navy-100">Current Status</h3>
+          <Card className="bg-emerald-700 text-white">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-100">Current Status</h3>
             <div className="mt-3">
               <Badge tone={STATUS_TONE[invoice.status]}>{invoice.status.replace("_", " ")}</Badge>
             </div>
             <div className="mt-4">
-              <div className="flex justify-between text-sm text-navy-100">
+              <div className="flex justify-between text-sm text-emerald-100">
                 <span>Insurance Coverage</span>
                 <span>{invoice.insuranceCoveragePercent}%</span>
               </div>

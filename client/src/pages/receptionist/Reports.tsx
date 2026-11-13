@@ -67,7 +67,7 @@ export function ReportsPage() {
         {/* Run Report card */}
         <Card className="space-y-4 md:col-span-2">
           <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-            <FileBarChart2 className="h-5 w-5 text-navy-700" /> Compile Daily Overview Report
+            <FileBarChart2 className="h-5 w-5 text-emerald-700" /> Compile Daily Overview Report
           </h2>
           <p className="text-xs text-slate-500">Generates a live database summary of today's registrations, queues, and collections.</p>
           <div className="pt-2">

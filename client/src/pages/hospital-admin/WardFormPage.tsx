@@ -416,7 +416,7 @@ export function WardFormPage() {
   if (isLoading) {
     return (
       <div className="p-12 text-center flex flex-col items-center justify-center gap-3 text-slate-600 font-semibold">
-        <Loader2 className="h-8 w-8 animate-spin text-navy-700" />
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-700" />
         <span>Loading existing ward details...</span>
       </div>
     );
@@ -441,9 +441,9 @@ export function WardFormPage() {
       {/* Breadcrumb Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-          <Link to="/admin" className="hover:text-navy-700 transition">Dashboard</Link>
+          <Link to="/admin" className="hover:text-emerald-700 transition">Dashboard</Link>
           <ChevronRight className="h-3.5 w-3.5" />
-          <Link to="/admin/beds" className="hover:text-navy-700 transition">Beds & Wards</Link>
+          <Link to="/admin/beds" className="hover:text-emerald-700 transition">Beds & Wards</Link>
           <ChevronRight className="h-3.5 w-3.5" />
           <span className="text-slate-900 font-bold">{isEditing ? `Edit Ward: ${form.name}` : "Create Ward"}</span>
         </div>
@@ -451,7 +451,7 @@ export function WardFormPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2.5">
-              <Building2 className="h-7 w-7 text-navy-700" />
+              <Building2 className="h-7 w-7 text-emerald-700" />
               {isEditing ? `Edit Ward — ${form.name}` : "Step 1 — Create Ward Master"}
             </h1>
             <p className="text-sm text-slate-500">
@@ -516,7 +516,7 @@ export function WardFormPage() {
                     <button
                       type="button"
                       onClick={handleAutoGenerateCode}
-                      className="text-[11px] font-bold text-navy-700 hover:underline flex items-center gap-1 cursor-pointer"
+                      className="text-[11px] font-bold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
                     >
                       <Wand2 className="h-3 w-3" /> Auto Generate
                     </button>

@@ -176,7 +176,7 @@ export function LabRadiologyPharmacySection({ labRequests, inventory }: LabRadio
               {metrics.topTests.slice(0, 3).map((t) => (
                 <div key={t.name} className="flex justify-between text-xs text-slate-600 border-b border-slate-50 pb-1">
                   <span>{t.name}</span>
-                  <span className="font-bold text-navy-800">{t.count} orders</span>
+                  <span className="font-bold text-emerald-800">{t.count} orders</span>
                 </div>
               ))}
             </div>

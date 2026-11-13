@@ -28,121 +28,23 @@ export function generateTempPassword(): string {
 export function getRolePrefix(role: string): string {
   const clean = (role || "").toLowerCase().trim();
   if (clean.includes("doc")) return "DOC";
-  if (clean.includes("nur")) return "NUR";
+  if (clean.includes("nur") || clean.includes("staff")) return "STF";
   if (clean.includes("recep")) return "REC";
+  if (clean.includes("pharm")) return "PHM";
   if (clean.includes("lab")) return "LAB";
   if (clean.includes("radio")) return "RAD";
-  if (clean.includes("account")) return "ACC";
-  if (clean.includes("pharm")) return "PHA";
   if (clean.includes("admin")) return "ADM";
   return clean.substring(0, 3).toUpperCase() || "EMP";
 }
 
-export async function generateUniqueEmployeeId(
-  role: string,
-  hospitalId: any,
-  branchId?: any
-): Promise<string> {
-  const rolePrefix = getRolePrefix(role);
-  const year = new Date().getFullYear();
-
-  // 1. Get Hospital Code / Prefix
-  let hospCode = "HOSP";
-  if (hospitalId) {
-    try {
-      const hosp = await Hospital.findById(hospitalId).select("code name");
-      if (hosp) {
-        if (hosp.code && hosp.code.trim()) {
-          hospCode = hosp.code.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-        } else if (hosp.name && hosp.name.trim()) {
-          hospCode = hosp.name.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
-        }
-      }
-    } catch (e) {
-      // Ignore query or ObjectId errors
-    }
-  }
-  if (!hospCode) hospCode = "HOSP";
-
-  // 2. Get Branch Code / Prefix
-  let branchPrefix = "MAIN";
-  if (branchId && String(branchId) !== "null" && String(branchId) !== "undefined") {
-    try {
-      const br = await Branch.findById(branchId).select("branchId name");
-      if (br) {
-        if (br.branchId && br.branchId.trim()) {
-          branchPrefix = br.branchId.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-        } else if (br.name && br.name.trim()) {
-          branchPrefix = br.name.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
-        }
-      } else if (typeof branchId === "string" && branchId.length < 12) {
-        branchPrefix = branchId.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-      }
-    } catch (e) {
-      // Ignore invalid ObjectId errors
-    }
-  }
-  if (!branchPrefix) branchPrefix = "MAIN";
-
-  // 3. Construct ID Prefix: e.g. SPESH-MAIN-ACC or SPESH-BR01-ACC
-  const prefix = `${hospCode}-${branchPrefix}-${rolePrefix}`;
-  const regex = new RegExp(`^${prefix}-${year}-(\\d+)`, "i");
-
-  // Find existing staff & users with matching prefix
-  const existingStaff = await Staff.find({ employeeId: regex }).select("employeeId");
-  const existingUsers = await User.find({ employeeId: regex }).select("employeeId");
-
+/**
+ * Generates the next sequential Unique Hospital ID (e.g. HOSP-001, HOSP-002).
+ */
+export async function generateNextHospitalId(): Promise<string> {
+  const hospitals = await Hospital.find().select("code");
   let maxNum = 0;
-  for (const s of [...existingStaff, ...existingUsers]) {
-    const match = s.employeeId?.match(regex);
-    if (match && match[1]) {
-      const num = parseInt(match[1], 10);
-      if (!isNaN(num) && num > maxNum) maxNum = num;
-    }
-  }
 
-  let nextNum = maxNum + 1;
-  let candidate = `${prefix}-${year}-${String(nextNum).padStart(4, "0")}`;
-
-  // 4. Global Uniqueness Loop across Staff, User, and Doctor collections
-  while (
-    (await Staff.exists({ employeeId: candidate })) ||
-    (await User.exists({ employeeId: candidate })) ||
-    (await Doctor.exists({ $or: [{ licenseNo: candidate }, { employeeId: candidate }] }))
-  ) {
-    nextNum++;
-    candidate = `${prefix}-${year}-${String(nextNum).padStart(4, "0")}`;
-  }
-
-  return candidate;
-}
-
-export async function generateUniqueHospitalCode(name: string): Promise<string> {
-  const cleanName = (name || "").trim().replace(/[^a-zA-Z0-9\s]/g, "");
-  const words = cleanName.split(/\s+/).filter(Boolean);
-  
-  let baseCode = "";
-  if (words.length > 0) {
-    baseCode = words[0].toUpperCase();
-    if (baseCode.length > 6) {
-      baseCode = baseCode.slice(0, 6);
-    }
-  }
-  if (!baseCode || baseCode.length < 3) {
-    baseCode = "HOSP";
-  }
-
-  const regex = new RegExp(`^${baseCode}-(\\d+)`, "i");
-
-  const existingHospitals = await Hospital.find({
-    $or: [
-      { code: new RegExp(`^${baseCode}`, "i") },
-      { code: regex }
-    ]
-  }).select("code");
-
-  let maxNum = 0;
-  for (const h of existingHospitals) {
+  for (const h of hospitals) {
     if (h.code) {
       const match = h.code.match(/(\d+)$/);
       if (match && match[1]) {
@@ -155,14 +57,125 @@ export async function generateUniqueHospitalCode(name: string): Promise<string> 
   }
 
   let nextNum = maxNum + 1;
-  let candidate = `${baseCode}-${String(nextNum).padStart(2, "0")}`;
+  let candidate = `HOSP-${String(nextNum).padStart(3, "0")}`;
 
   while (await Hospital.exists({ code: candidate })) {
     nextNum++;
-    candidate = `${baseCode}-${String(nextNum).padStart(2, "0")}`;
+    candidate = `HOSP-${String(nextNum).padStart(3, "0")}`;
   }
 
   return candidate;
 }
 
+/**
+ * Generates the next sequential Unique Administrator ID (e.g. ADM-001, ADM-002).
+ */
+export async function generateNextAdminId(): Promise<string> {
+  const users = await User.find({
+    $or: [{ role: { $in: ["admin", "hospital_admin"] } }, { employeeId: /^ADM-/i }],
+  }).select("employeeId");
 
+  let maxNum = 0;
+  for (const u of users) {
+    if (u.employeeId) {
+      const match = u.employeeId.match(/(\d+)$/);
+      if (match && match[1]) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+  }
+
+  let nextNum = maxNum + 1;
+  let candidate = `ADM-${String(nextNum).padStart(3, "0")}`;
+
+  while (await User.exists({ employeeId: candidate })) {
+    nextNum++;
+    candidate = `ADM-${String(nextNum).padStart(3, "0")}`;
+  }
+
+  return candidate;
+}
+
+/**
+ * Generates derived staff IDs based on Hospital ID:
+ * e.g. <HOSP_CODE>-DOC-001, <HOSP_CODE>-STF-001, <HOSP_CODE>-REC-001, <HOSP_CODE>-PHM-001.
+ * For independent admins, returns ADM-001.
+ */
+export async function generateUniqueEmployeeId(
+  role: string,
+  hospitalId?: any,
+  branchId?: any
+): Promise<string> {
+  const rolePrefix = getRolePrefix(role);
+
+  // If role is Admin, use dedicated Admin ID sequence
+  if (rolePrefix === "ADM") {
+    return generateNextAdminId();
+  }
+
+  // 1. Resolve Hospital Unique Code / ID
+  let hospCode = "HOSP-001";
+  if (hospitalId) {
+    try {
+      const hosp = await Hospital.findById(hospitalId).select("code name");
+      if (hosp) {
+        if (hosp.code && hosp.code.trim()) {
+          hospCode = hosp.code.trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+        } else if (hosp.name && hosp.name.trim()) {
+          hospCode = hosp.name.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+        }
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  // 2. Base prefix: e.g. HOSP-001-DOC or HOSP-001-STF
+  const prefix = `${hospCode}-${rolePrefix}`;
+  const regex = new RegExp(`^${prefix}-(\\d+)`, "i");
+
+  const [existingStaff, existingUsers, existingDoctors] = await Promise.all([
+    Staff.find({ employeeId: regex }).select("employeeId"),
+    User.find({ employeeId: regex }).select("employeeId"),
+    Doctor.find({
+      $or: [{ licenseNo: regex }, { employeeId: regex }],
+    }).select("licenseNo employeeId"),
+  ]);
+
+  let maxNum = 0;
+  for (const s of [...existingStaff, ...existingUsers]) {
+    const match = s.employeeId?.match(regex);
+    if (match && match[1]) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    }
+  }
+  for (const d of existingDoctors) {
+    const match = (d.licenseNo || (d as any).employeeId)?.match(regex);
+    if (match && match[1]) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    }
+  }
+
+  let nextNum = maxNum + 1;
+  let candidate = `${prefix}-${String(nextNum).padStart(3, "0")}`;
+
+  while (
+    (await Staff.exists({ employeeId: candidate })) ||
+    (await User.exists({ employeeId: candidate })) ||
+    (await Doctor.exists({ $or: [{ licenseNo: candidate }, { employeeId: candidate }] }))
+  ) {
+    nextNum++;
+    candidate = `${prefix}-${String(nextNum).padStart(3, "0")}`;
+  }
+
+  return candidate;
+}
+
+export async function generateUniqueHospitalCode(name?: string): Promise<string> {
+  return generateNextHospitalId();
+}

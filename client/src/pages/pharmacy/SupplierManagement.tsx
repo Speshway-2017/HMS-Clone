@@ -437,7 +437,7 @@ export function PharmacySupplierManagement() {
             onClick={() => setActiveTab("suppliers")}
             className={`rounded-md px-4 py-1.5 text-xs font-semibold transition-colors ${
               activeTab === "suppliers"
-                ? "bg-white text-navy-700 shadow-sm"
+                ? "bg-white text-emerald-700 shadow-sm"
                 : "text-slate-600 hover:text-slate-950"
             }`}
           >
@@ -447,7 +447,7 @@ export function PharmacySupplierManagement() {
             onClick={() => setActiveTab("orders")}
             className={`rounded-md px-4 py-1.5 text-xs font-semibold transition-colors ${
               activeTab === "orders"
-                ? "bg-white text-navy-700 shadow-sm"
+                ? "bg-white text-emerald-700 shadow-sm"
                 : "text-slate-600 hover:text-slate-950"
             }`}
           >
@@ -462,7 +462,7 @@ export function PharmacySupplierManagement() {
             placeholder={activeTab === "suppliers" ? "Search suppliers..." : "Search POs..."}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-slate-350 bg-slate-50 pl-9 pr-4 py-2 text-xs outline-none focus:border-navy-500 focus:bg-white"
+            className="w-full rounded-lg border border-slate-350 bg-slate-50 pl-9 pr-4 py-2 text-xs outline-none focus:border-emerald-500 focus:bg-white"
           />
         </div>
       </div>
@@ -477,7 +477,7 @@ export function PharmacySupplierManagement() {
             columns={[
               {
                 header: "ID",
-                render: (r) => <span className="font-bold text-navy-700">{r.supplierId || r._id.slice(-6)}</span>,
+                render: (r) => <span className="font-bold text-emerald-700">{r.supplierId || r._id.slice(-6)}</span>,
               },
               {
                 header: "Supplier Name",
@@ -524,7 +524,7 @@ export function PharmacySupplierManagement() {
                     <Button
                       variant="ghost"
                       onClick={() => setSelectedSupplier(r)}
-                      className="p-1 hover:text-navy-700"
+                      className="p-1 hover:text-emerald-700"
                       title="View Details"
                     >
                       <Eye className="h-4 w-4" />
@@ -561,7 +561,7 @@ export function PharmacySupplierManagement() {
             columns={[
               {
                 header: "PO Code",
-                render: (r) => <span className="font-bold text-navy-700">{r._id}</span>,
+                render: (r) => <span className="font-bold text-emerald-700">{r._id}</span>,
               },
               {
                 header: "Supplier",
@@ -606,7 +606,7 @@ export function PharmacySupplierManagement() {
                     <Button
                       variant="ghost"
                       onClick={() => setSelectedOrder(r)}
-                      className="p-1 hover:text-navy-700"
+                      className="p-1 hover:text-emerald-700"
                       title="View Details"
                     >
                       <Eye className="h-4 w-4" />

@@ -493,7 +493,7 @@ export function InventoryFormPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <div className="text-sm text-slate-400">
-          <Link to="/admin/inventory" className="hover:text-navy-700">
+          <Link to="/admin/inventory" className="hover:text-emerald-700">
             Inventory
           </Link>{" "}
           &gt; {isEdit ? "Edit Item" : "Add New Item"}

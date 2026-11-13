@@ -103,7 +103,7 @@ export function DoctorsPage({ activeTab = "availability" }: Props) {
           <button
             onClick={() => setTab("availability")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "availability" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
+              tab === "availability" ? "bg-emerald-50 text-emerald-700 font-bold" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             <List className="h-3.5 w-3.5" /> Doctor Statuses
@@ -111,7 +111,7 @@ export function DoctorsPage({ activeTab = "availability" }: Props) {
           <button
             onClick={() => setTab("timings")}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              tab === "timings" ? "bg-navy-50 text-navy-700 font-bold" : "text-slate-500 hover:text-slate-700"
+              tab === "timings" ? "bg-emerald-50 text-emerald-700 font-bold" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             <HeartPulse className="h-3.5 w-3.5" /> Timings Log
@@ -147,7 +147,7 @@ export function DoctorsPage({ activeTab = "availability" }: Props) {
       {tab === "timings" && (
         <Card>
           <h2 className="mb-4 text-base font-semibold text-slate-800 flex items-center gap-1.5">
-            <Stethoscope className="h-5 w-5 text-navy-700" /> Standard Outpatient Timings
+            <Stethoscope className="h-5 w-5 text-emerald-700" /> Standard Outpatient Timings
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="rounded-lg border border-slate-100 p-4 bg-slate-50">

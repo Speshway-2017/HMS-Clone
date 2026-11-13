@@ -27,7 +27,7 @@ export function DepartmentMetricsPage() {
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm text-slate-400">
-            <Link to={`${basePath}/departments`} className="hover:text-navy-700">
+            <Link to={`${basePath}/departments`} className="hover:text-emerald-700">
               Departments
             </Link>{" "}
             / {department.name} / Metrics
@@ -57,7 +57,7 @@ export function DepartmentMetricsPage() {
           <h3 className="text-base font-semibold text-slate-800">Bed Occupancy</h3>
           <p className="text-sm text-slate-500">Current availability</p>
           <div className="mt-6 flex flex-col items-center justify-center gap-2">
-            <div className="flex h-32 w-32 items-center justify-center rounded-full border-8 border-navy-600 text-2xl font-bold text-navy-700">
+            <div className="flex h-32 w-32 items-center justify-center rounded-full border-8 border-emerald-600 text-2xl font-bold text-emerald-700">
               {bedOccupancy.percent}%
             </div>
             <p className="text-xs text-slate-400">

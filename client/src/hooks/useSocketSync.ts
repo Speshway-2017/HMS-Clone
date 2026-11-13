@@ -111,7 +111,26 @@ export function useSocketSync() {
       queryClient.invalidateQueries({ queryKey: ["doctorDashboard"] });
     };
 
-    // 6. Generic Dashboard & Notification Sync
+    // 6. Instant Hospital Identity & Facility Cache Mutation
+    const handleHospitalUpdate = (payload: any) => {
+      const hosp = payload?.hospital || payload?.data || payload;
+      if (hosp) {
+        if (hosp.name) {
+          localStorage.setItem("hms_hospital_name", hosp.name);
+        }
+        if (hosp.logoUrl) {
+          localStorage.setItem("hms_hospital_logo", hosp.logoUrl);
+        }
+        queryClient.setQueriesData({ queryKey: ["hospitals", "me"] }, hosp);
+        queryClient.setQueriesData({ queryKey: ["hospitals", "public"] }, hosp);
+        if (hosp._id) {
+          queryClient.setQueriesData({ queryKey: ["hospitals", hosp._id] }, hosp);
+        }
+      }
+      queryClient.invalidateQueries({ queryKey: ["hospitals"] });
+    };
+
+    // 7. Generic Dashboard & Notification Sync
     const handleGenericDashboardUpdate = () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
@@ -122,6 +141,10 @@ export function useSocketSync() {
 
     // ── Subscribe to Socket Events ──────────────────────────────────────────
     socket.on("dashboard_update", handleGenericDashboardUpdate);
+    socket.on("hospital:updated", handleHospitalUpdate);
+    socket.on("hospital_updated", handleHospitalUpdate);
+    socket.on("hospital:created", handleHospitalUpdate);
+    socket.on("hospital:deleted", handleHospitalUpdate);
 
     socket.on("appointment_created", handleAppointmentChange);
     socket.on("appointment_updated", handleAppointmentChange);
@@ -221,6 +244,11 @@ export function useSocketSync() {
       socket.off("staff_updated", handleGenericDashboardUpdate);
       socket.off("doctor_updated", handleGenericDashboardUpdate);
       socket.off("patient_updated", handleGenericDashboardUpdate);
+
+      socket.off("hospital:updated", handleHospitalUpdate);
+      socket.off("hospital_updated", handleHospitalUpdate);
+      socket.off("hospital:created", handleHospitalUpdate);
+      socket.off("hospital:deleted", handleHospitalUpdate);
     };
   }, [queryClient]);
 }

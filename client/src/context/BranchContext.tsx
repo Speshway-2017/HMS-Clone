@@ -19,8 +19,17 @@ const BranchContext = createContext<BranchContextType | undefined>(undefined);
 export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  const isHospitalAdmin = user?.role === "hospital_admin" || user?.role === "admin";
+  const isSuperAdmin = user?.role === "super_admin";
+
   const [activeBranchId, setActiveBranchIdState] = useState<string>(() => {
-    return localStorage.getItem("hms_active_branch_id") || "all";
+    const stored = localStorage.getItem("hms_active_branch_id");
+    // Admins must not default to "all" to prevent accidental read-only lockouts
+    if (stored === "all") {
+      return "main";
+    }
+    return stored || "main";
   });
 
   const hospitalId = user?.hospital ? (typeof user.hospital === "object" ? (user.hospital as any)._id : user.hospital) : undefined;
@@ -30,10 +39,23 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   );
 
   const branches = branchesData?.data || [];
+
+  // Automatically lock hospital admin to their facility's valid branch without restriction
+  useEffect(() => {
+    if (isHospitalAdmin && branches.length > 0) {
+      if (activeBranchId === "all" || !branches.some((b) => b._id === activeBranchId)) {
+        const defaultBranchId = branches[0]._id;
+        setActiveBranchIdState(defaultBranchId);
+        localStorage.setItem("hms_active_branch_id", defaultBranchId);
+      }
+    }
+  }, [isHospitalAdmin, branches, activeBranchId]);
+
   const activeBranch = branches.find((b) => b._id === activeBranchId) || null;
 
-  const isAllBranches = activeBranchId === "all";
-  const isReadOnlyView = isAllBranches;
+  // Hospital Admins and Super Admins are NEVER locked into read-only mode
+  const isAllBranches = (isHospitalAdmin || isSuperAdmin) ? false : activeBranchId === "all";
+  const isReadOnlyView = (isHospitalAdmin || isSuperAdmin) ? false : isAllBranches;
 
   const setActiveBranchId = (id: string) => {
     setActiveBranchIdState(id);
@@ -43,13 +65,13 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   useEffect(() => {
-    if (activeBranchId !== "all" && activeBranchId !== "main" && branches.length > 0) {
+    if (!isHospitalAdmin && activeBranchId !== "all" && activeBranchId !== "main" && branches.length > 0) {
       const exists = branches.some((b) => b._id === activeBranchId);
       if (!exists) {
         setActiveBranchId("all");
       }
     }
-  }, [branches, activeBranchId]);
+  }, [branches, activeBranchId, isHospitalAdmin]);
 
   return (
     <BranchContext.Provider
@@ -72,13 +94,13 @@ export const useBranchContext = (): BranchContextType => {
   const context = useContext(BranchContext);
   if (!context) {
     return {
-      activeBranchId: "all",
+      activeBranchId: "main",
       setActiveBranchId: () => {},
       branches: [],
       activeBranch: null,
       isLoading: false,
-      isAllBranches: true,
-      isReadOnlyView: true,
+      isAllBranches: false,
+      isReadOnlyView: false,
     };
   }
   return context;

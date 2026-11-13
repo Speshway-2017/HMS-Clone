@@ -33,7 +33,7 @@ export function DashboardHeaderFilterBar({
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
       {/* Title & Live Status */}
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy-700 text-white shadow-sm">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-700 text-white shadow-sm">
           <Filter className="h-5 w-5" />
         </div>
         <div>
@@ -107,7 +107,7 @@ export function DashboardHeaderFilterBar({
         <button
           onClick={onRefresh}
           disabled={isRefreshing}
-          className="flex items-center gap-1.5 rounded-lg bg-navy-50 px-3 py-1.5 text-xs font-semibold text-navy-700 transition-all hover:bg-navy-100 disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-100 disabled:opacity-50"
           title="Refresh live metrics"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />

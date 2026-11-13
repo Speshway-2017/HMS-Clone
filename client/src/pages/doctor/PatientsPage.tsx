@@ -180,7 +180,7 @@ export function PatientsPage() {
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Search your patients..."
-                className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-navy-500 focus:border-navy-500"
+                className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-navy-500 focus:border-emerald-500"
               />
             </div>
           </Card>
@@ -201,7 +201,7 @@ export function PatientsPage() {
                   key={p._id}
                   onClick={() => setSelectedPatient(p)}
                   className={`p-3 border rounded-xl cursor-pointer transition-all duration-200 ${
-                    selectedPatient?._id === p._id ? "border-navy-700 bg-navy-50/50" : "border-slate-200 bg-white hover:bg-slate-50"
+                    selectedPatient?._id === p._id ? "border-emerald-700 bg-emerald-50/50" : "border-slate-200 bg-white hover:bg-slate-50"
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -253,7 +253,7 @@ export function PatientsPage() {
                       return (
                         <div key={group.key} className="border-l-2 border-navy-100 pl-4 py-1.5 space-y-1">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-navy-700 bg-navy-50 px-2 py-0.5 rounded">
+                            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
                               {group.visitType} {isMultiple ? `(${group.items.length} Orders)` : ""}
                             </span>
                             <span className="text-[10px] text-slate-400">{group.dateFormatted}</span>
@@ -268,7 +268,7 @@ export function PatientsPage() {
                               {group.items.map((item, idx) => (
                                 <div key={idx} className="text-xs text-slate-700 border-b border-slate-200/60 pb-1.5 last:border-0 last:pb-0">
                                   <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-                                    <span className="text-navy-600 font-bold">•</span>
+                                    <span className="text-emerald-600 font-bold">•</span>
                                     <span>{item.diagnosis || group.visitType}</span>
                                   </div>
                                   {item.notes && (

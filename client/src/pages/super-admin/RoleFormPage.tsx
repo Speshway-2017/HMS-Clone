@@ -247,7 +247,7 @@ export function RoleFormPage() {
     <div className="w-full space-y-6">
       <div>
         <div className="text-sm text-slate-400">
-          <Link to={`${basePath}/roles`} className="hover:text-navy-700">
+          <Link to={`${basePath}/roles`} className="hover:text-emerald-700">
             Roles &amp; Permissions
           </Link>{" "}
           &gt; {isEdit ? "Edit Role" : "Add New Role"}
@@ -345,7 +345,7 @@ export function RoleFormPage() {
                   <label
                     key={perm}
                     className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-slate-50 ${
-                      checked ? "border-navy-500 bg-navy-50/20" : "border-slate-200"
+                      checked ? "border-emerald-500 bg-emerald-50/20" : "border-slate-200"
                     }`}
                   >
                     <input

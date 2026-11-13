@@ -10,7 +10,7 @@ import toast from "react-hot-toast";
 import { MAX_LENGTHS, isValidEmail, isValidPhone } from "../../lib/validation";
 
 const fieldClasses =
-  "w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors disabled:bg-slate-100 disabled:text-slate-400";
+  "w-full rounded-md border px-3 py-1.5 text-xs outline-none transition-colors disabled:bg-slate-100 disabled:text-slate-400";
 
 interface WrapperProps {
   label: string;
@@ -314,7 +314,7 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
 
     const borderStyle = activeError
       ? "border-red-500 text-red-900 focus:border-red-500 focus:ring-1 focus:ring-red-500"
-      : "border-slate-300 text-slate-700 focus:border-navy-500 focus:ring-1 focus:ring-navy-500";
+      : "border-slate-300 text-slate-700 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500";
 
     return (
       <FieldWrapper
@@ -370,7 +370,7 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
   ({ label, hint, error, required, rightElement, className = "", children, ...props }, ref) => {
     const borderStyle = error
       ? "border-red-500 text-red-900 focus:border-red-500 focus:ring-1 focus:ring-red-500"
-      : "border-slate-300 text-slate-700 focus:border-navy-500 focus:ring-1 focus:ring-navy-500";
+      : "border-slate-300 text-slate-700 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500";
 
     return (
       <FieldWrapper label={label} required={required} hint={hint} error={error} rightElement={rightElement}>
@@ -501,7 +501,7 @@ export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>
 
     const borderStyle = activeError
       ? "border-red-500 text-red-900 focus:border-red-500 focus:ring-1 focus:ring-red-500"
-      : "border-slate-300 text-slate-700 focus:border-navy-500 focus:ring-1 focus:ring-navy-500";
+      : "border-slate-300 text-slate-700 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500";
 
     return (
       <FieldWrapper

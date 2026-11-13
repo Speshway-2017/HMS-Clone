@@ -4,14 +4,14 @@ import { z } from "zod";
 import { User } from "../models/User";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
-import { generateTempPassword, generateUniqueEmployeeId } from "../utils/idGenerator";
+import { generateTempPassword, generateNextAdminId } from "../utils/idGenerator";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 import {
   emailValidator,
   tenDigitPhoneValidator,
 } from "../utils/validators";
 
-const ADMIN_ROLES = ["hospital_admin", "accountant"] as const;
+const ADMIN_ROLES = ["admin", "hospital_admin", "accountant"] as const;
 
 const createAdminSchema = z.object({
   name: z
@@ -21,21 +21,24 @@ const createAdminSchema = z.object({
     .max(100, "Full Name cannot exceed 100 characters")
     .regex(/^[a-zA-Z\s\.\-']+$/, "Full Name should contain only letters, dots, hyphens, and spaces"),
   email: emailValidator("Email Address", true, 100),
-  role: z.literal("hospital_admin"),   // Super Admin can only create Hospital Admins
-  hospital: z.string().min(1, "Assigned Hospital is required"),
+  role: z.enum(["admin", "hospital_admin"]).default("admin"),
+  hospital: z.string().optional().nullable().default(null),
   title: z
     .string({ invalid_type_error: "Display Title must be a string" })
     .trim()
     .min(2, "Display Title is required and must be at least 2 characters")
     .max(100, "Display Title cannot exceed 100 characters")
-    .regex(/^[a-zA-Z0-9\s\.\-/'&]+$/, "Display Title contains invalid characters"),
+    .regex(/^[a-zA-Z0-9\s\.\-/'&]+$/, "Display Title contains invalid characters")
+    .optional()
+    .default("System Administrator"),
   phone: tenDigitPhoneValidator("Contact Number", true),
   employeeId: z
     .string({ invalid_type_error: "Employee ID must be a string" })
     .trim()
     .min(2, "Employee ID is required and must be at least 2 characters")
     .max(50, "Employee ID cannot exceed 50 characters")
-    .regex(/^[A-Za-z0-9\-_]+$/, "Employee ID must contain only letters, numbers, hyphens, and underscores"),
+    .regex(/^[A-Za-z0-9\-_]+$/, "Employee ID must contain only letters, numbers, hyphens, and underscores")
+    .optional(),
   avatarUrl: z.string().optional().default(""),
 });
 
@@ -49,7 +52,7 @@ const updateAdminSchema = z.object({
     .optional(),
   email: emailValidator("Email Address", false, 100).optional(),
   role: z.enum(ADMIN_ROLES).optional(),
-  hospital: z.string().min(1, "Assigned Hospital is required").optional(),
+  hospital: z.string().optional().nullable(),
   title: z
     .string({ invalid_type_error: "Display Title must be a string" })
     .trim()
@@ -69,21 +72,22 @@ const updateAdminSchema = z.object({
   status: z.enum(["active", "inactive"]).optional(),
 });
 
+export const getNextAdminId = catchAsync(async (_req: Request, res: Response) => {
+  const nextId = await generateNextAdminId();
+  res.json({ status: "success", data: { nextId } });
+});
+
 export const listAdmins = catchAsync(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req);
-  const hospitalId = req.query.hospitalId as string | undefined;
   const role = req.query.role as string | undefined;
 
   const filter: Record<string, unknown> = { role: { $in: ADMIN_ROLES } };
-  if (hospitalId) {
-    filter.hospital = hospitalId;
-  }
-  if (role && ADMIN_ROLES.includes(role as (typeof ADMIN_ROLES)[number])) {
+  if (role && (ADMIN_ROLES as readonly string[]).includes(role)) {
     filter.role = role;
   }
 
   const [admins, total] = await Promise.all([
-    User.find(filter).populate("hospital", "name").sort({ createdAt: -1 }).skip(skip).limit(limit),
+    User.find(filter).populate("hospital", "name code").sort({ createdAt: -1 }).skip(skip).limit(limit),
     User.countDocuments(filter),
   ]);
 
@@ -91,7 +95,7 @@ export const listAdmins = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const getAdmin = catchAsync(async (req: Request, res: Response) => {
-  const admin = await User.findOne({ _id: req.params.id, role: { $in: ADMIN_ROLES } }).populate("hospital", "name");
+  const admin = await User.findOne({ _id: req.params.id, role: { $in: ADMIN_ROLES } }).populate("hospital", "name code");
   if (!admin) {
     throw new AppError("Admin not found.", 404);
   }
@@ -107,19 +111,24 @@ export const createAdmin = catchAsync(async (req: Request, res: Response) => {
   }
 
   let employeeId = body.employeeId?.trim();
-  if (!employeeId && body.hospital) {
-    employeeId = await generateUniqueEmployeeId("hospital_admin", body.hospital);
-  } else if (employeeId && body.hospital) {
-    const existingEmp = await User.findOne({ employeeId, hospital: body.hospital });
+  if (!employeeId) {
+    employeeId = await generateNextAdminId();
+  } else {
+    const existingEmp = await User.findOne({ employeeId });
     if (existingEmp) {
-      throw new AppError("An administrator with this Employee ID already exists in the selected hospital.", 400);
+      throw new AppError("An administrator with this Employee ID already exists.", 400);
     }
   }
 
   const tempPassword = generateTempPassword();
   const passwordHash = await bcrypt.hash(tempPassword, 10);
 
-  const admin = await User.create({ ...body, employeeId, passwordHash });
+  const admin = await User.create({
+    ...body,
+    hospital: body.hospital || null,
+    employeeId,
+    passwordHash,
+  });
 
   res.status(201).json({
     status: "success",
@@ -149,16 +158,12 @@ export const updateAdmin = catchAsync(async (req: Request, res: Response) => {
   }
 
   if (body.employeeId && body.employeeId !== admin.employeeId) {
-    const hospId = body.hospital || admin.hospital;
-    if (hospId) {
-      const existingEmp = await User.findOne({
-        employeeId: body.employeeId,
-        hospital: hospId,
-        _id: { $ne: admin._id },
-      });
-      if (existingEmp) {
-        throw new AppError("An administrator with this Employee ID already exists in the selected hospital.", 400);
-      }
+    const existingEmp = await User.findOne({
+      employeeId: body.employeeId,
+      _id: { $ne: admin._id },
+    });
+    if (existingEmp) {
+      throw new AppError("An administrator with this Employee ID already exists.", 400);
     }
   }
 

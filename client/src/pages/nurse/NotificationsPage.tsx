@@ -282,7 +282,7 @@ export default function NotificationsPage() {
                   onClick={() => setActiveFilter(item.filter)}
                   className={`w-full text-left px-3 py-2 rounded-lg font-bold flex justify-between items-center transition-colors cursor-pointer ${
                     activeFilter === item.filter
-                      ? "bg-navy-700 text-white shadow-sm"
+                      ? "bg-emerald-700 text-white shadow-sm"
                       : "text-slate-600 hover:bg-slate-50"
                   }`}
                 >
@@ -503,7 +503,7 @@ export default function NotificationsPage() {
                 </div>
                 <div className="bg-slate-50 p-3 rounded-lg border">
                   <p className="text-[9px] uppercase font-bold text-slate-400">Incoming Nurse</p>
-                  <p className="font-bold text-navy-700">{selectedHandover.incomingNurseName}</p>
+                  <p className="font-bold text-emerald-700">{selectedHandover.incomingNurseName}</p>
                   <p className="text-[9px] text-slate-500 mt-1">Shift: {selectedHandover.nextShift || "Evening"}</p>
                 </div>
               </div>
@@ -516,7 +516,7 @@ export default function NotificationsPage() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                   <div>
-                    <h4 className="font-bold text-navy-800 text-[10px] uppercase border-b pb-1">Pending Medication</h4>
+                    <h4 className="font-bold text-emerald-800 text-[10px] uppercase border-b pb-1">Pending Medication</h4>
                     <p className="whitespace-pre-line text-slate-550 mt-1.5 font-medium">{selectedHandover.pendingMedication || "None recorded."}</p>
                   </div>
                   <div>
@@ -531,7 +531,7 @@ export default function NotificationsPage() {
                     <p className="whitespace-pre-line text-amber-900 mt-1.5 font-medium">{selectedHandover.criticalPatients || "None flagged."}</p>
                   </div>
                   <div>
-                    <h4 className="font-bold text-navy-700 text-[10px] uppercase border-b pb-1">Special Instructions</h4>
+                    <h4 className="font-bold text-emerald-700 text-[10px] uppercase border-b pb-1">Special Instructions</h4>
                     <p className="whitespace-pre-line text-slate-550 mt-1.5 font-medium">{selectedHandover.specialInstructions || "None recorded."}</p>
                   </div>
                 </div>

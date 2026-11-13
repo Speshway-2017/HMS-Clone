@@ -222,7 +222,7 @@ export function FinancePage() {
     {
       header: "Actions",
       render: (inv) => (
-        <Link to={`/admin/finance/invoices/${inv._id}`} className="text-sm font-medium text-navy-700 hover:underline">
+        <Link to={`/admin/finance/invoices/${inv._id}`} className="text-sm font-medium text-emerald-700 hover:underline">
           View
         </Link>
       ),
@@ -271,7 +271,7 @@ export function FinancePage() {
     {
       header: "View",
       render: (inv) => (
-        <Link to={`/admin/finance/invoices/${inv._id}`} className="inline-flex items-center gap-1 text-xs font-bold text-navy-700 hover:underline">
+        <Link to={`/admin/finance/invoices/${inv._id}`} className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline">
           View Invoice
         </Link>
       ),
@@ -314,7 +314,7 @@ export function FinancePage() {
           aria-label="All Invoices Overview"
           className={`border-b-2 px-4 py-2.5 text-sm font-semibold capitalize transition-all whitespace-nowrap ${
             activeTab === "overview"
-              ? "border-navy-700 text-navy-700 font-bold"
+              ? "border-emerald-700 text-emerald-700 font-bold"
               : "border-transparent text-slate-500 hover:text-slate-700"
           }`}
         >
@@ -341,7 +341,7 @@ export function FinancePage() {
           aria-label="Patient Consolidated Statement"
           className={`border-b-2 px-4 py-2.5 text-sm font-semibold capitalize transition-all whitespace-nowrap ${
             activeTab === "statement"
-              ? "border-navy-700 text-navy-700 font-bold"
+              ? "border-emerald-700 text-emerald-700 font-bold"
               : "border-transparent text-slate-500 hover:text-slate-700"
           }`}
         >
@@ -422,7 +422,7 @@ export function FinancePage() {
                     status === key
                       ? key === "pending"
                         ? "bg-amber-50 text-amber-700 font-bold border border-amber-300"
-                        : "bg-navy-50 text-navy-700 font-bold"
+                        : "bg-emerald-50 text-emerald-700 font-bold"
                       : "text-slate-500 hover:bg-slate-50"
                   }`}
                 >
@@ -478,7 +478,7 @@ export function FinancePage() {
                   <Button 
                     variant="primary" 
                     onClick={() => setIsStatementPrintModalOpen(true)}
-                    className="text-xs py-1.5 flex items-center gap-1 bg-navy-700 hover:bg-navy-800 text-white font-bold"
+                    className="text-xs py-1.5 flex items-center gap-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold"
                   >
                     <Printer className="h-4 w-4" /> {selectedVisitKey === "all" ? "Print Consolidated Statement" : `Print ${activeVisitGroup?.displayDate} Visit Bill`}
                   </Button>
@@ -495,7 +495,7 @@ export function FinancePage() {
                 placeholder="Search patient by name, UHID, or mobile number..."
                 value={patientSearchQuery}
                 onChange={(e) => setPatientSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-4 text-sm text-slate-700 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+                className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-4 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-navy-500"
               />
             </div>
 
@@ -519,7 +519,7 @@ export function FinancePage() {
                         }}
                         className={`text-left p-2.5 rounded-lg border transition-all ${
                           selectedPatient?._id === p._id
-                            ? "bg-navy-50 border-navy-300 text-navy-800 font-bold"
+                            ? "bg-emerald-50 border-navy-300 text-emerald-800 font-bold"
                             : "bg-white border-slate-200 hover:border-navy-400 text-slate-700"
                         }`}
                       >
@@ -545,9 +545,9 @@ export function FinancePage() {
                         setSelectedPatient(p);
                         setSelectedVisitKey("all");
                       }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-navy-50 hover:border-navy-300 text-xs font-medium text-slate-700 transition shadow-sm"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-navy-300 text-xs font-medium text-slate-700 transition shadow-sm"
                     >
-                      <User className="h-3.5 w-3.5 text-navy-600" />
+                      <User className="h-3.5 w-3.5 text-emerald-600" />
                       <span>{p.name}</span>
                       <span className="text-[10px] font-mono text-slate-400">({p.uhid})</span>
                     </button>
@@ -561,7 +561,7 @@ export function FinancePage() {
           {selectedPatient ? (
             <div className="space-y-6">
               {/* Patient Banner */}
-              <div className="bg-navy-700 text-white rounded-xl p-4 shadow flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="bg-emerald-700 text-white rounded-xl p-4 shadow flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="flex items-center gap-3">
                   <div className="h-12 w-12 rounded-full bg-white/10 flex items-center justify-center font-bold text-lg text-white">
                     {selectedPatient.name?.charAt(0).toUpperCase()}
@@ -573,7 +573,7 @@ export function FinancePage() {
                         {selectedPatient.uhid}
                       </span>
                     </h3>
-                    <p className="text-xs text-navy-200">
+                    <p className="text-xs text-emerald-200">
                       Mobile: {selectedPatient.phone || "N/A"} • Age/Gender: {selectedPatient.age} Yrs / <span className="capitalize">{selectedPatient.gender}</span> • Status: <span className="capitalize">{selectedPatient.status || "OPD"}</span>
                     </p>
                   </div>
@@ -582,7 +582,7 @@ export function FinancePage() {
                   <Button 
                     variant="primary"
                     onClick={() => setIsStatementPrintModalOpen(true)}
-                    className="bg-white text-navy-800 hover:bg-navy-50 font-bold text-xs py-2 px-4 shadow"
+                    className="bg-white text-emerald-800 hover:bg-emerald-50 font-bold text-xs py-2 px-4 shadow"
                   >
                     <Printer className="h-4 w-4" /> {selectedVisitKey === "all" ? "Print Consolidated Statement" : `Print ${activeVisitGroup?.displayDate} Visit Bill`}
                   </Button>
@@ -595,14 +595,14 @@ export function FinancePage() {
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-2">
                     <div>
                       <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                        <Calendar className="h-4 w-4 text-navy-700" /> Patient Visit & Consultation Sessions ({visitGroups.length} Visits)
+                        <Calendar className="h-4 w-4 text-emerald-700" /> Patient Visit & Consultation Sessions ({visitGroups.length} Visits)
                       </h4>
                       <p className="text-[11px] text-slate-400">Click a specific visit date session below to view or print that particular visit's grouped bills (OP, Pharmacy, Lab, IP).</p>
                     </div>
                     {selectedVisitKey !== "all" && (
                       <button
                         onClick={() => setSelectedVisitKey("all")}
-                        className="text-xs font-bold text-navy-700 hover:text-navy-900 bg-navy-50 hover:bg-navy-100 px-3 py-1 rounded-md border border-navy-200 transition"
+                        className="text-xs font-bold text-emerald-700 hover:text-slate-900 bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded-md border border-emerald-200 transition"
                       >
                         View All Visits (Full History)
                       </button>
@@ -615,18 +615,18 @@ export function FinancePage() {
                       onClick={() => setSelectedVisitKey("all")}
                       className={`text-left p-3 rounded-lg border transition-all ${
                         selectedVisitKey === "all"
-                          ? "bg-navy-50 border-navy-400 shadow-sm ring-1 ring-navy-400"
+                          ? "bg-emerald-50 border-navy-400 shadow-sm ring-1 ring-navy-400"
                           : "bg-slate-50 border-slate-200 hover:border-slate-300"
                       }`}
                     >
                       <div className="flex justify-between items-center mb-1">
                         <span className="font-bold text-xs text-slate-800">All Visits History</span>
-                        <span className="bg-navy-100 text-navy-700 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                        <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-0.5 rounded">
                           {patientInvoices.length} Bills
                         </span>
                       </div>
                       <div className="text-[10px] text-slate-500 font-medium">Consolidated Multi-Visit Summary</div>
-                      <div className="text-xs font-bold text-navy-700 mt-2 font-mono">{formatINR(patientInvoices.reduce((sum: number, i: any) => sum + (i.totals?.total || 0), 0))}</div>
+                      <div className="text-xs font-bold text-emerald-700 mt-2 font-mono">{formatINR(patientInvoices.reduce((sum: number, i: any) => sum + (i.totals?.total || 0), 0))}</div>
                     </button>
 
                     {/* Individual Visit Cards */}
@@ -651,7 +651,7 @@ export function FinancePage() {
                             </div>
                             <div className="flex flex-wrap gap-1 my-1.5">
                               {v.billingTypes.map((t) => (
-                                <span key={t} className="bg-navy-50 text-navy-700 border border-navy-150 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase">
+                                <span key={t} className="bg-emerald-50 text-emerald-700 border border-navy-150 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase">
                                   {t}
                                 </span>
                               ))}
@@ -665,7 +665,7 @@ export function FinancePage() {
                                 setSelectedVisitKey(v.dateKey);
                                 setIsStatementPrintModalOpen(true);
                               }}
-                              className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-navy-700 hover:bg-navy-800 px-2 py-1 rounded shadow-sm"
+                              className="inline-flex items-center gap-1 text-[10px] font-bold text-white bg-emerald-700 hover:bg-emerald-800 px-2 py-1 rounded shadow-sm"
                             >
                               <Printer className="h-3 w-3" /> Print Visit Bill
                             </button>
@@ -711,7 +711,7 @@ export function FinancePage() {
               <Card className="space-y-4">
                 <h3 className="text-sm font-bold text-slate-800 flex items-center justify-between border-b pb-2">
                   <span className="flex items-center gap-1.5">
-                    <FileText className="h-4.5 w-4.5 text-navy-700" /> 
+                    <FileText className="h-4.5 w-4.5 text-emerald-700" /> 
                     {selectedVisitKey === "all" 
                       ? `Complete Patient Billing Ledger (${patientInvoices.length} Bills)` 
                       : `Visit Ledger: ${activeVisitGroup?.displayDate} (${displayedPatientInvoices.length} Bills)`}
@@ -733,7 +733,7 @@ export function FinancePage() {
                             <span className="font-mono font-bold text-slate-700 uppercase">
                               INV: {inv._id.slice(-8).toUpperCase()}
                             </span>
-                            <span className="rounded bg-navy-100 text-navy-700 font-bold px-2 py-0.5 text-[10px] uppercase border border-navy-200">
+                            <span className="rounded bg-emerald-100 text-emerald-700 font-bold px-2 py-0.5 text-[10px] uppercase border border-emerald-200">
                               {inv.billingType || "OP"}
                             </span>
                             <span className="text-slate-400">• {new Date(inv.issuedAt).toLocaleDateString()}</span>
@@ -822,12 +822,12 @@ export function FinancePage() {
                   {hospitalData?.logoUrl ? (
                     <img src={hospitalData.logoUrl} alt={hospitalData.name} className="h-12 w-12 object-contain rounded bg-slate-50 p-0.5 border" />
                   ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded bg-navy-100 text-navy-700 font-bold text-lg">
+                    <div className="flex h-12 w-12 items-center justify-center rounded bg-emerald-100 text-emerald-700 font-bold text-lg">
                       {hospitalData?.name ? hospitalData.name.charAt(0).toUpperCase() : "H"}
                     </div>
                   )}
                   <div>
-                    <h3 className="text-lg font-bold text-navy-700">{hospitalData?.name || "HMS Enterprise"}</h3>
+                    <h3 className="text-lg font-bold text-emerald-700">{hospitalData?.name || "HMS Enterprise"}</h3>
                     <p className="text-xs text-slate-500">
                       {selectedVisitKey === "all" ? "Consolidated Patient Billing Statement & Tax Receipt" : `Visit Billing Statement & Tax Receipt (${activeVisitGroup?.displayDate})`}
                     </p>
@@ -956,7 +956,7 @@ export function FinancePage() {
                 <Button variant="secondary" onClick={() => setIsStatementPrintModalOpen(false)}>
                   Close
                 </Button>
-                <Button variant="primary" onClick={handlePrint} className="bg-navy-700 hover:bg-navy-800 text-white font-bold">
+                <Button variant="primary" onClick={handlePrint} className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold">
                   <Printer className="h-4 w-4" /> Print {selectedVisitKey === "all" ? "Consolidated Statement" : "Visit Bill"}
                 </Button>
               </div>

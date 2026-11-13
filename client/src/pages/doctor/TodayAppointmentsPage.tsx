@@ -134,7 +134,7 @@ export function TodayAppointmentsPage() {
                     {statusLower !== "completed" && statusLower !== "cancelled" ? (
                       <button
                         onClick={() => handleStartConsultation(appt._id)}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-navy-700 hover:bg-navy-800 text-white rounded-lg text-xs font-medium transition-colors"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-medium transition-colors"
                       >
                         <Stethoscope className="h-3.5 w-3.5" /> Start Consult
                       </button>
@@ -202,7 +202,7 @@ export function TodayAppointmentsPage() {
                           {statusLower !== "completed" && statusLower !== "cancelled" ? (
                             <button
                               onClick={() => handleStartConsultation(appt._id)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-navy-700 hover:bg-navy-800 text-white rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
                             >
                               <Stethoscope className="h-3.5 w-3.5" /> Start Consult
                             </button>

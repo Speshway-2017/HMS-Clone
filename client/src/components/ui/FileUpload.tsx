@@ -254,7 +254,7 @@ export function FileUpload({
               type="button"
               onClick={capturePhoto}
               disabled={isUploading}
-              className="flex-1 bg-navy-700 hover:bg-navy-800 text-white font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-55"
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-55"
             >
               <Camera className="h-4 w-4" />
               Capture & Save
@@ -271,11 +271,11 @@ export function FileUpload({
       ) : value ? (
         <div className="flex items-center gap-3 rounded-lg border border-slate-300 p-3">
           {isPdf ? (
-            <FileText className="h-8 w-8 text-navy-700" />
+            <FileText className="h-8 w-8 text-emerald-600" />
           ) : (
             <img src={value} alt={label} className="h-12 w-12 rounded-md object-cover" />
           )}
-          <a href={value} target="_blank" rel="noreferrer" className="flex-1 truncate text-sm text-navy-700 hover:underline">
+          <a href={value} target="_blank" rel="noreferrer" className="flex-1 truncate text-xs text-emerald-700 hover:underline">
             {value}
           </a>
           <button
@@ -302,7 +302,7 @@ export function FileUpload({
             }}
             onDrop={handleDrop}
             disabled={isUploading}
-            className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 py-6 text-sm text-slate-500 hover:border-navy-400 hover:text-navy-700 disabled:opacity-60 cursor-pointer"
+            className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 py-4 text-xs text-slate-500 hover:border-emerald-500 hover:text-emerald-700 disabled:opacity-60 cursor-pointer"
           >
             <UploadCloud className="h-4 w-4" />
             {isUploading ? "Uploading..." : "Click to upload"}
@@ -313,7 +313,7 @@ export function FileUpload({
               type="button"
               onClick={startCamera}
               disabled={isUploading}
-              className="flex items-center justify-center rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-600 px-4 hover:text-navy-700 disabled:opacity-60 transition-all cursor-pointer"
+              className="flex items-center justify-center rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-600 px-3.5 hover:text-emerald-700 disabled:opacity-60 transition-all cursor-pointer"
               title="Camera"
               aria-label="Camera"
               data-testid="camera-button"

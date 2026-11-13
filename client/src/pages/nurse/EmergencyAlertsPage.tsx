@@ -335,7 +335,7 @@ export function EmergencyAlertsPage() {
                       <td className="px-4 py-2.5">
                         <div>
                           <p className="font-semibold text-slate-700">{row.ward}</p>
-                          <span className="rounded bg-navy-50 px-2 py-0.5 text-[10px] font-extrabold text-navy-800 inline-block mt-0.5">
+                          <span className="rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800 inline-block mt-0.5">
                             {row.bedNumber}
                           </span>
                         </div>
@@ -394,7 +394,7 @@ export function EmergencyAlertsPage() {
                           {row.status === "new" && (
                             <button
                               onClick={(e) => handleAcknowledge(e, row._id)}
-                              className="inline-flex items-center gap-1 rounded-lg bg-navy-700 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-navy-800 transition-all shadow-xs cursor-pointer"
+                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-800 transition-all shadow-xs cursor-pointer"
                               title="Acknowledge Alert"
                             >
                               <Check className="h-3 w-3" /> Ack

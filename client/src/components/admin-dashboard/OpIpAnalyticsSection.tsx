@@ -9,7 +9,7 @@ interface OpIpAnalyticsSectionProps {
   admissions?: any[];
 }
 
-const COLORS = ["#2563eb", "#9333ea"]; // OP: Blue, IP: Purple
+const COLORS = ["#16a34a", "#e11d48"]; // OP: Emerald, IP: Rose
 
 export function OpIpAnalyticsSection({ patients, appointments, admissions = [] }: OpIpAnalyticsSectionProps) {
   const metrics = useMemo(() => {
@@ -72,53 +72,53 @@ export function OpIpAnalyticsSection({ patients, appointments, admissions = [] }
   }, [patients, appointments, admissions]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+      <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
         <div className="flex items-center gap-2">
-          <div className="rounded-lg bg-blue-50 p-2 text-blue-700">
-            <Activity className="h-5 w-5" />
+          <div className="rounded-lg bg-emerald-50 p-1.5 text-emerald-700">
+            <Activity className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-slate-900">OP vs IP Analytics</h3>
+            <h3 className="text-base font-bold text-slate-900">OP vs IP Analytics</h3>
             <p className="text-xs text-slate-500">Live Outpatient volume, Inpatient admissions & admission conversion rates</p>
           </div>
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Outpatient Visits (OP)</span>
-            <div className="rounded-lg bg-blue-50 p-2 text-blue-600">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Outpatient Visits (OP)</span>
+            <div className="rounded-lg bg-emerald-50 p-1.5 text-emerald-700">
               <Activity className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-3 text-3xl font-extrabold text-blue-600">{metrics.opVisits}</p>
-          <p className="mt-1 text-xs text-slate-400">Total consultations & OPD appointments</p>
+          <p className="mt-2 text-2xl font-bold text-emerald-700">{metrics.opVisits}</p>
+          <p className="mt-1 text-[11px] text-slate-400">Total consultations & OPD appointments</p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Inpatient Admissions (IP)</span>
-            <div className="rounded-lg bg-purple-50 p-2 text-purple-600">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Inpatient Admissions (IP)</span>
+            <div className="rounded-lg bg-rose-50 p-1.5 text-rose-600">
               <BedDouble className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-3 text-3xl font-extrabold text-purple-600">{metrics.ipAdmissions}</p>
-          <p className="mt-1 text-xs text-slate-400">Total ward & ICU bed admissions</p>
+          <p className="mt-2 text-2xl font-bold text-rose-600">{metrics.ipAdmissions}</p>
+          <p className="mt-1 text-[11px] text-slate-400">Total ward & ICU bed admissions</p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-navy-900 text-white p-5 shadow-sm">
+        <div className="rounded-xl border border-emerald-800 bg-emerald-700 text-white p-3.5 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-navy-200">OP → IP Admission Rate</span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-300">
-              <ArrowUpRight className="h-3.5 w-3.5" /> Ratio
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-100">OP → IP Admission Rate</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold text-white">
+              <ArrowUpRight className="h-3 w-3" /> Ratio
             </span>
           </div>
-          <p className="mt-3 text-3xl font-extrabold text-white">{metrics.admissionRate}%</p>
-          <p className="mt-1 text-xs text-navy-300">OP Patients converted to IP bed admissions</p>
+          <p className="mt-2 text-2xl font-bold text-white">{metrics.admissionRate}%</p>
+          <p className="mt-1 text-[11px] text-emerald-100">OP Patients converted to IP bed admissions</p>
         </div>
       </div>
 
@@ -148,11 +148,11 @@ export function OpIpAnalyticsSection({ patients, appointments, admissions = [] }
           </div>
           <div className="mt-2 flex justify-center gap-6 text-xs font-semibold">
             <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-blue-600" />
+              <span className="h-3 w-3 rounded-full bg-emerald-600" />
               <span className="text-slate-700">Outpatient (OP): {metrics.opVisits}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-purple-600" />
+              <span className="h-3 w-3 rounded-full bg-rose-600" />
               <span className="text-slate-700">Inpatient (IP): {metrics.ipAdmissions}</span>
             </div>
           </div>

@@ -128,7 +128,7 @@ export function QueuePage() {
                 }`}
               >
                 <div className="flex gap-4 items-center">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-navy-100 text-sm font-bold text-navy-700">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
                     {item.tokenNumber}
                   </div>
                   <div>

@@ -30,17 +30,19 @@ export function useHospital(id: string | undefined) {
     enabled: !!id,
     queryFn: async () => {
       const res = await api.get(`/hospitals/${id}`);
-      return res.data.data as { hospital: Hospital; stats: { branchCount: number; primaryAdmin: { name: string; email: string } | null }; branches: unknown[] };
+      return res.data.data as { hospital: Hospital; stats: { branchCount: number; primaryAdmin: { _id: string; name: string; email: string; employeeId?: string } | null }; branches: unknown[] };
     },
   });
 }
 
-export function useUnassignedHospitalAdmins() {
+export function useUnassignedHospitalAdmins(hospitalId?: string) {
   return useQuery({
-    queryKey: ["hospitals", "unassigned-admins"],
+    queryKey: ["hospitals", "unassigned-admins", hospitalId],
     queryFn: async () => {
-      const res = await api.get("/hospitals/unassigned-admins");
-      return res.data.data.admins as { _id: string; name: string; email: string }[];
+      const res = await api.get("/hospitals/unassigned-admins", {
+        params: hospitalId ? { hospitalId } : undefined,
+      });
+      return res.data.data.admins as { _id: string; name: string; email: string; employeeId?: string }[];
     },
   });
 }
@@ -52,7 +54,16 @@ export function useCreateHospital() {
       const res = await api.post("/hospitals", payload);
       return res.data.data.hospital as Hospital;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["hospitals"] }),
+    onSuccess: (data) => {
+      if (data?.name) localStorage.setItem("hms_hospital_name", data.name);
+      if (data?.logoUrl) localStorage.setItem("hms_hospital_logo", data.logoUrl);
+      if (data?._id) {
+        queryClient.setQueryData(["hospitals", data._id], data);
+      }
+      queryClient.setQueryData(["hospitals", "me"], data);
+      queryClient.setQueryData(["hospitals", "public"], data);
+      queryClient.invalidateQueries({ queryKey: ["hospitals"] });
+    },
   });
 }
 
@@ -63,7 +74,17 @@ export function useUpdateHospital(id: string) {
       const res = await api.patch(`/hospitals/${id}`, payload);
       return res.data.data.hospital as Hospital;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["hospitals"] }),
+    onSuccess: (data) => {
+      if (data?.name) localStorage.setItem("hms_hospital_name", data.name);
+      if (data?.logoUrl) localStorage.setItem("hms_hospital_logo", data.logoUrl);
+      queryClient.setQueryData(["hospitals", id], data);
+      queryClient.setQueryData(["hospitals", "me"], data);
+      queryClient.setQueryData(["hospitals", "public"], data);
+      queryClient.invalidateQueries({ queryKey: ["hospitals"] });
+      queryClient.invalidateQueries({ queryKey: ["hospitals", id] });
+      queryClient.invalidateQueries({ queryKey: ["hospitals", "me"] });
+      queryClient.invalidateQueries({ queryKey: ["hospitals", "public"] });
+    },
   });
 }
 
@@ -73,7 +94,11 @@ export function useDeleteHospital() {
     mutationFn: async (id: string) => {
       await api.delete(`/hospitals/${id}`);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["hospitals"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["hospitals"] });
+      queryClient.invalidateQueries({ queryKey: ["hospitals", "me"] });
+      queryClient.invalidateQueries({ queryKey: ["hospitals", "public"] });
+    },
   });
 }
 
@@ -105,9 +130,17 @@ export function useUpdateMyHospital() {
       const res = await api.patch("/hospitals/me", payload);
       return res.data.data.hospital as Hospital;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (data?.name) localStorage.setItem("hms_hospital_name", data.name);
+      if (data?.logoUrl) localStorage.setItem("hms_hospital_logo", data.logoUrl);
+      queryClient.setQueryData(["hospitals", "me"], data);
+      queryClient.setQueryData(["hospitals", "public"], data);
+      if (data?._id) {
+        queryClient.setQueryData(["hospitals", data._id], data);
+      }
       queryClient.invalidateQueries({ queryKey: ["hospitals", "me"] });
       queryClient.invalidateQueries({ queryKey: ["hospitals", "public"] });
+      queryClient.invalidateQueries({ queryKey: ["hospitals"] });
     },
   });
 }

@@ -192,7 +192,7 @@ export function TelemedicinePage() {
   if (isLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-navy-700 border-t-transparent"></div>
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-700 border-t-transparent"></div>
       </div>
     );
   }
@@ -224,7 +224,7 @@ export function TelemedicinePage() {
               onClick={() => setQueueTab("active")}
               className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all whitespace-nowrap ${
                 queueTab === "active"
-                  ? "bg-navy-700 text-white shadow"
+                  ? "bg-emerald-700 text-white shadow"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -234,7 +234,7 @@ export function TelemedicinePage() {
               onClick={() => setQueueTab("completed")}
               className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all ${
                 queueTab === "completed"
-                  ? "bg-navy-700 text-white shadow"
+                  ? "bg-emerald-700 text-white shadow"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -271,7 +271,7 @@ export function TelemedicinePage() {
                   onClick={() => handleSelect(patient)}
                   className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
                     isSelected
-                      ? "border-navy-600 bg-navy-50/80 shadow-md ring-2 ring-navy-500/30"
+                      ? "border-emerald-600 bg-emerald-50/80 shadow-md ring-2 ring-navy-500/30"
                       : "border-slate-200 bg-white hover:bg-slate-50/80 hover:border-slate-300"
                   }`}
                 >
@@ -352,7 +352,7 @@ export function TelemedicinePage() {
               <Button
                 type="submit"
                 variant="primary"
-                className="px-6 text-xs font-bold whitespace-nowrap rounded-xl bg-navy-700 hover:bg-navy-800 text-white shadow-sm"
+                className="px-6 text-xs font-bold whitespace-nowrap rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white shadow-sm"
               >
                 Submit
               </Button>

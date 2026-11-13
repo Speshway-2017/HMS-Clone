@@ -9,13 +9,13 @@ import { Doctor } from "../models/Doctor";
 import { Patient } from "../models/Patient";
 import { Appointment } from "../models/Appointment";
 import { Enquiry } from "../models/Enquiry";
-import { emitToHospital } from "../config/socket";
+import { emitToHospital, broadcastGlobal } from "../config/socket";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { getPagination, paginatedResponse } from "../utils/pagination";
 import { AppointmentSlotService } from "../services/appointmentSlotService";
 
-import { generateUniqueHospitalCode } from "../utils/idGenerator";
+import { generateUniqueHospitalCode, generateNextHospitalId } from "../utils/idGenerator";
 import {
   requiredTrimmedString,
   optionalTrimmedString,
@@ -252,6 +252,11 @@ const hospitalSchema = z.object({
     .default(""),
 });
 
+export const getNextHospitalId = catchAsync(async (_req: Request, res: Response) => {
+  const nextId = await generateNextHospitalId();
+  res.json({ status: "success", data: { nextId } });
+});
+
 export const listHospitals = catchAsync(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req);
   const search = (req.query.search as string) ?? "";
@@ -272,7 +277,10 @@ export const listHospitals = catchAsync(async (req: Request, res: Response) => {
   ]);
 
   const hospitalIds = hospitals.map((h) => h._id);
-  const admins = await User.find({ hospital: { $in: hospitalIds }, role: "hospital_admin" }).select("name hospital");
+  const admins = await User.find({
+    hospital: { $in: hospitalIds },
+    role: { $in: ["hospital_admin", "admin"] },
+  }).select("name hospital");
   const adminByHospital = new Map(admins.map((a) => [String(a.hospital), a.name]));
 
   const data = hospitals.map((h) => ({
@@ -301,27 +309,11 @@ export const createHospital = catchAsync(async (req: Request, res: Response) => 
   const body = hospitalSchema.parse(req.body);
   let { code, primaryAdminId, ...hospitalFields } = body;
 
-  // Validate Primary Admin eligibility if specified
-  if (primaryAdminId) {
-    if (!Types.ObjectId.isValid(primaryAdminId)) {
-      throw new AppError("Invalid or ineligible administrator should not be accepted.", 400);
-    }
-    const eligibleAdmin = await User.findOne({
-      _id: primaryAdminId,
-      role: "hospital_admin",
-      hospital: null,
-      status: "active",
-    });
-    if (!eligibleAdmin) {
-      throw new AppError("Invalid or ineligible administrator should not be accepted.", 400);
-    }
-  }
-
   let generatedCode = code?.trim();
   if (!generatedCode) {
-    generatedCode = await generateUniqueHospitalCode(body.name);
+    generatedCode = await generateNextHospitalId();
   } else if (await Hospital.exists({ code: generatedCode.toUpperCase() })) {
-    generatedCode = await generateUniqueHospitalCode(body.name);
+    generatedCode = await generateNextHospitalId();
   }
 
   const hospital = await Hospital.create({
@@ -330,9 +322,14 @@ export const createHospital = catchAsync(async (req: Request, res: Response) => 
     createdBy: req.user!._id,
   });
 
-  if (primaryAdminId) {
-    await User.findByIdAndUpdate(primaryAdminId, { hospital: hospital._id });
+  if (primaryAdminId && Types.ObjectId.isValid(primaryAdminId)) {
+    await User.findByIdAndUpdate(primaryAdminId, {
+      hospital: hospital._id,
+      role: "hospital_admin",
+    });
   }
+
+  broadcastGlobal("hospital:created", hospital);
 
   res.status(201).json({ status: "success", data: { hospital } });
 });
@@ -345,7 +342,7 @@ export const getHospital = catchAsync(async (req: Request, res: Response) => {
 
   const [branchCount, admin] = await Promise.all([
     Branch.countDocuments({ hospital: hospital._id }),
-    User.findOne({ hospital: hospital._id, role: "hospital_admin" }).select("name email"),
+    User.findOne({ hospital: hospital._id, role: { $in: ["hospital_admin", "admin"] } }).select("_id name email employeeId"),
   ]);
 
   const branches = await Branch.find({ hospital: hospital._id }).limit(6);
@@ -378,17 +375,21 @@ export const updateHospital = catchAsync(async (req: Request, res: Response) => 
     }
     const eligibleAdmin = await User.findOne({
       _id: primaryAdminId,
-      role: "hospital_admin",
+      role: { $in: ["hospital_admin", "admin"] },
       status: "active",
       $or: [{ hospital: null }, { hospital: hospital._id }],
     });
     if (!eligibleAdmin) {
       throw new AppError("Invalid or ineligible administrator should not be accepted.", 400);
     }
-    await User.findByIdAndUpdate(primaryAdminId, { hospital: hospital._id });
+    await User.findByIdAndUpdate(primaryAdminId, {
+      hospital: hospital._id,
+      role: "hospital_admin",
+    });
   }
 
   emitToHospital(hospital._id, "hospital:updated", hospital);
+  broadcastGlobal("hospital:updated", hospital);
 
   res.json({ status: "success", data: { hospital } });
 });
@@ -399,18 +400,70 @@ export const deleteHospital = catchAsync(async (req: Request, res: Response) => 
     throw new AppError("Hospital not found.", 404);
   }
   emitToHospital(req.params.id, "hospital:deleted", { id: req.params.id });
+  broadcastGlobal("hospital:deleted", { id: req.params.id });
   res.status(204).send();
 });
 
-export const listUnassignedHospitalAdmins = catchAsync(async (_req: Request, res: Response) => {
-  const admins = await User.find({ role: "hospital_admin", hospital: null, status: "active" })
-    .select("name email status")
+export const listUnassignedHospitalAdmins = catchAsync(async (req: Request, res: Response) => {
+  const hospitalId = req.query.hospitalId as string | undefined;
+  const filter: Record<string, unknown> = {
+    role: { $in: ["hospital_admin", "admin"] },
+    status: "active",
+  };
+
+  if (hospitalId) {
+    filter.$or = [{ hospital: null }, { hospital: hospitalId }];
+  } else {
+    filter.hospital = null;
+  }
+
+  let admins = await User.find(filter)
+    .select("name email employeeId status hospital")
     .sort({ name: 1 });
+
+  // If no unassigned admins found and no specific hospital requested, return active admins so super admin can still assign
+  if (admins.length === 0 && !hospitalId) {
+    admins = await User.find({
+      role: { $in: ["hospital_admin", "admin"] },
+      status: "active",
+    })
+      .select("name email employeeId status hospital")
+      .sort({ name: 1 });
+  }
+
   res.json({ status: "success", data: { admins } });
 });
 
 export const getMyHospital = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.user!.hospital;
+  let hospitalId = req.user?.hospital;
+
+  // Super Admin has global oversight; resolve the primary active hospital
+  if (!hospitalId && req.user?.role === "super_admin") {
+    const requestedId = req.query.hospitalId as string | undefined;
+    if (requestedId) {
+      hospitalId = requestedId as any;
+    } else {
+      let primary = await Hospital.findOne({ status: "active" }).sort({ createdAt: 1 });
+      if (!primary) {
+        primary = await Hospital.findOne().sort({ createdAt: 1 });
+      }
+      if (!primary) {
+        primary = await Hospital.create({
+          name: "Preethi Fertility Centre & Women's Clinic",
+          code: "PFC-MAIN",
+          address: "120 Melur Main Road, K.K. Nagar, Madurai, Tamil Nadu 625020",
+          contactEmail: "contact@preethifertility.com",
+          contactPhone: "9876543210",
+          status: "active",
+          logoUrl: "/preethi_logo.jpg",
+          heroTitle: "Dedicated Clinical Excellence in Fertility & Women's Care",
+          heroSub: "At Preethi Fertility Centre & Women's Clinic, we offer compassionate, state-of-the-art reproductive care.",
+        });
+      }
+      hospitalId = primary._id;
+    }
+  }
+
   if (!hospitalId) {
     throw new AppError("No hospital assigned to this user.", 404);
   }
@@ -422,7 +475,33 @@ export const getMyHospital = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const updateMyHospital = catchAsync(async (req: Request, res: Response) => {
-  const hospitalId = req.user!.hospital;
+  let hospitalId = req.user?.hospital;
+
+  // Super Admin can update the website CMS of the primary active hospital
+  if (!hospitalId && req.user?.role === "super_admin") {
+    const requestedId = req.query.hospitalId as string | undefined;
+    if (requestedId) {
+      hospitalId = requestedId as any;
+    } else {
+      let primary = await Hospital.findOne({ status: "active" }).sort({ createdAt: 1 });
+      if (!primary) {
+        primary = await Hospital.findOne().sort({ createdAt: 1 });
+      }
+      if (!primary) {
+        primary = await Hospital.create({
+          name: "Preethi Fertility Centre & Women's Clinic",
+          code: "PFC-MAIN",
+          address: "120 Melur Main Road, K.K. Nagar, Madurai, Tamil Nadu 625020",
+          contactEmail: "contact@preethifertility.com",
+          contactPhone: "9876543210",
+          status: "active",
+          logoUrl: "/preethi_logo.jpg",
+        });
+      }
+      hospitalId = primary._id;
+    }
+  }
+
   if (!hospitalId) {
     throw new AppError("No hospital assigned to this user.", 404);
   }
@@ -433,6 +512,7 @@ export const updateMyHospital = catchAsync(async (req: Request, res: Response) =
   });
   if (hospital) {
     emitToHospital(hospital._id, "hospital:updated", hospital);
+  broadcastGlobal("hospital:updated", hospital);
   }
   res.json({ status: "success", data: { hospital } });
 });

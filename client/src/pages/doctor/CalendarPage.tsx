@@ -77,7 +77,7 @@ export function CalendarPage() {
               key={view}
               onClick={() => setViewType(view)}
               className={`rounded-lg px-4 py-1.5 text-xs font-medium capitalize transition-colors ${
-                viewType === view ? "bg-navy-700 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
+                viewType === view ? "bg-emerald-700 text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
               }`}
             >
               {view}
@@ -117,7 +117,7 @@ export function CalendarPage() {
                 return (
                   <div key={appt._id} className="flex items-center justify-between border-b border-slate-100 pb-3 last:border-b-0 last:pb-0">
                     <div className="flex items-start gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy-50 text-xs font-bold text-navy-700">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xs font-bold text-emerald-700">
                         {patientName.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
                       </div>
                       <div>
@@ -128,7 +128,7 @@ export function CalendarPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs font-bold text-navy-700">{appt.time}</p>
+                      <p className="text-xs font-bold text-emerald-700">{appt.time}</p>
                       <p className="text-[10px] text-slate-400 mt-0.5">{apptDate}</p>
                     </div>
                   </div>

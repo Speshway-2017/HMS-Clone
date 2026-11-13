@@ -105,7 +105,7 @@ export function QueuePage() {
             aria-label="Refresh Queue"
             title="Refresh Queue"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${isFetching || isRefreshing ? "animate-spin text-navy-600" : ""}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${isFetching || isRefreshing ? "animate-spin text-emerald-600" : ""}`} />
             Refresh Queue
           </Button>
         </div>

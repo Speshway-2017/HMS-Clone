@@ -171,7 +171,7 @@ export function OPManagementPage() {
   if (isLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-navy-700 border-t-transparent"></div>
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-700 border-t-transparent"></div>
       </div>
     );
   }
@@ -208,7 +208,7 @@ export function OPManagementPage() {
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Search patient or token..."
-                        className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                        className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                       />
                     </div>
                     <div className="flex gap-1 bg-slate-100 p-1 rounded-lg overflow-x-auto max-w-full scrollbar-none flex-nowrap shrink-0">
@@ -217,7 +217,7 @@ export function OPManagementPage() {
                           key={s}
                           onClick={() => setStatusFilter(s)}
                           className={`rounded-md px-2.5 sm:px-3 py-1.5 text-xs font-semibold capitalize transition-all whitespace-nowrap ${
-                            statusFilter === s ? "bg-white text-navy-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                            statusFilter === s ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
                           }`}
                         >
                           {s === "today" ? "Today" : s.replace("_", " ")}
@@ -247,13 +247,13 @@ export function OPManagementPage() {
                           onClick={() => handleSelect(appt)}
                           className={`flex items-center gap-4 rounded-xl border px-4 py-3.5 cursor-pointer transition-all hover:shadow-sm ${
                             isSelected
-                              ? "border-navy-300 bg-navy-50 shadow-sm"
+                              ? "border-navy-300 bg-emerald-50 shadow-sm"
                               : appt.status === "in_consultation"
                               ? "border-amber-200 bg-amber-50"
                               : "border-slate-100 bg-white hover:bg-slate-50"
                           }`}
                         >
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-navy-100 text-sm font-bold text-navy-700">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700">
                             {token.slice(-3)}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -318,7 +318,7 @@ export function OPManagementPage() {
                         </div>
                         <button
                           onClick={() => handleRedirectToWorkspace("overview")}
-                          className="flex items-center justify-center gap-2 w-full rounded-lg bg-navy-700 px-3 py-2 text-sm font-medium text-white hover:bg-navy-800 transition-colors"
+                          className="flex items-center justify-center gap-2 w-full rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800 transition-colors"
                         >
                           <FileText className="h-4 w-4" /> View Consultation Record
                         </button>
@@ -327,7 +327,7 @@ export function OPManagementPage() {
                       <div className="flex flex-col gap-2">
                         <button
                           onClick={() => handleRedirectToWorkspace("overview", true)}
-                          className="flex items-center justify-center gap-2 w-full rounded-lg bg-navy-700 px-3 py-2 text-sm font-medium text-white hover:bg-navy-800 transition-colors"
+                          className="flex items-center justify-center gap-2 w-full rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800 transition-colors"
                         >
                           <Stethoscope className="h-4 w-4" /> {selectedAppt.status === "in_consultation" ? "Resume Consultation" : "Start Consultation"}
                         </button>
@@ -342,7 +342,7 @@ export function OPManagementPage() {
                         )}
                         <button
                           onClick={() => handleRedirectToWorkspace("prescription")}
-                          className="flex items-center justify-center gap-2 w-full rounded-lg border border-navy-200 px-3 py-2 text-sm font-medium text-navy-700 hover:bg-navy-50 transition-colors"
+                          className="flex items-center justify-center gap-2 w-full rounded-lg border border-emerald-200 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 transition-colors"
                         >
                           <Pill className="h-4 w-4" /> Write Prescription
                         </button>
@@ -366,7 +366,7 @@ export function OPManagementPage() {
               <div className="lg:col-span-2 space-y-4">
                 {/* Patient Info Bar */}
                 <Card className="p-4 flex items-center gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-navy-700 text-lg font-bold text-white">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-lg font-bold text-white">
                     {(selectedPatient?.name || "Unknown Patient").split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
                   </div>
                   <div className="flex-1">
@@ -388,7 +388,7 @@ export function OPManagementPage() {
                   <input
                     value={diagnosis}
                     onChange={(e) => setDiagnosis(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-200"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                     placeholder="Enter ICD-10 diagnosis..."
                   />
                   <div className="mt-2 flex flex-wrap gap-1">
@@ -396,7 +396,7 @@ export function OPManagementPage() {
                       <button
                         key={d}
                         onClick={() => setDiagnosis(d)}
-                        className="rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-navy-300 hover:bg-navy-50"
+                        className="rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-navy-300 hover:bg-emerald-50"
                       >
                         {d}
                       </button>
@@ -408,14 +408,14 @@ export function OPManagementPage() {
                 <Card>
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-navy-700" /> Medical Notes
+                      <FileText className="h-4 w-4 text-emerald-700" /> Medical Notes
                     </h3>
                   </div>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     rows={6}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-navy-200"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200"
                     placeholder="Write clinical observations, history, examination findings..."
                   />
                   <div className="mt-3 flex gap-2">
@@ -450,7 +450,7 @@ export function OPManagementPage() {
               <Card className="p-5">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h2 className="text-lg font-bold text-navy-700">Electronic Prescription</h2>
+                    <h2 className="text-lg font-bold text-emerald-700">Electronic Prescription</h2>
                     <p className="text-xs text-slate-400 mt-0.5">Date: {new Date().toLocaleDateString()}</p>
                   </div>
                   <div className="text-right">
@@ -464,7 +464,7 @@ export function OPManagementPage() {
               <Card>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-semibold text-slate-700">Prescribed Medications</h3>
-                  <button className="flex items-center gap-1 text-xs font-medium text-navy-700 hover:underline">
+                  <button className="flex items-center gap-1 text-xs font-medium text-emerald-700 hover:underline">
                     <Plus className="h-3.5 w-3.5" /> Add Drug
                   </button>
                 </div>
@@ -506,7 +506,7 @@ export function OPManagementPage() {
                 <textarea
                   rows={3}
                   defaultValue="Take medications after meals. Rest well. Follow-up if symptoms persist."
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-navy-200"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200"
                 />
                 <div className="mt-3 flex gap-2">
                   <Button variant="primary" onClick={handleMarkComplete}>

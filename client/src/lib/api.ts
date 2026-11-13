@@ -57,12 +57,23 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  const activeBranchId = localStorage.getItem("hms_active_branch_id");
-  // Only forward X-Branch-ID when it is a real MongoDB ObjectId (not "all" or "main")
-  if (activeBranchId && activeBranchId !== "all" && activeBranchId !== "main") {
-    config.headers["X-Branch-ID"] = activeBranchId;
-  } else if (activeBranchId === "main") {
-    config.headers["X-Branch-ID"] = "main";
+
+  // Only attach tenant routing headers when user is authenticated and not querying public auth routes
+  const isAuthOrPublic = config.url?.includes("/auth/") || config.url?.includes("/hospitals/public");
+  if (token && !isAuthOrPublic) {
+    const activeBranchId = localStorage.getItem("hms_active_branch_id");
+    // Only forward X-Branch-ID when it is a real MongoDB ObjectId (not "all" or "main")
+    if (activeBranchId && activeBranchId !== "all" && activeBranchId !== "main") {
+      config.headers["X-Branch-ID"] = activeBranchId;
+    } else if (activeBranchId === "main") {
+      config.headers["X-Branch-ID"] = "main";
+    }
+
+    // Forward X-Hospital-ID when Super Admin selects a specific hospital context
+    const superAdminHospitalId = localStorage.getItem("hms_super_admin_active_hospital_id");
+    if (superAdminHospitalId && superAdminHospitalId !== "all") {
+      config.headers["X-Hospital-ID"] = superAdminHospitalId;
+    }
   }
   return config;
 });

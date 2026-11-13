@@ -622,7 +622,7 @@ export function RoomFormPage() {
   if (isLoadingRoomData) {
     return (
       <div className="p-12 text-center flex flex-col items-center justify-center gap-3 text-slate-600 font-semibold">
-        <Loader2 className="h-8 w-8 animate-spin text-navy-700" />
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-700" />
         <span>Loading existing room details...</span>
       </div>
     );
@@ -647,9 +647,9 @@ export function RoomFormPage() {
       {/* Breadcrumb Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-          <Link to="/admin" className="hover:text-navy-700 transition">Dashboard</Link>
+          <Link to="/admin" className="hover:text-emerald-700 transition">Dashboard</Link>
           <ChevronRight className="h-3.5 w-3.5" />
-          <Link to="/admin/beds" className="hover:text-navy-700 transition">Beds & Wards</Link>
+          <Link to="/admin/beds" className="hover:text-emerald-700 transition">Beds & Wards</Link>
           {selectedWardObj && (
             <>
               <ChevronRight className="h-3.5 w-3.5" />
@@ -663,7 +663,7 @@ export function RoomFormPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2.5">
-              <DoorOpen className="h-7 w-7 text-navy-700" />
+              <DoorOpen className="h-7 w-7 text-emerald-700" />
               {isEditing ? `Edit Room — Room ${form.roomNumber}` : "Step 2 — Create Room Master"}
             </h1>
             <p className="text-sm text-slate-500">
@@ -694,7 +694,7 @@ export function RoomFormPage() {
                 }}
                 className={`flex items-center gap-3 p-3 rounded-xl transition border cursor-pointer ${
                   isActive
-                    ? "bg-navy-700/5 border-navy-700 text-navy-700 shadow-2xs"
+                    ? "bg-emerald-700/5 border-emerald-700 text-emerald-700 shadow-2xs"
                     : isCompleted
                     ? "bg-emerald-50/60 border-emerald-200 text-emerald-800"
                     : "bg-slate-50/50 border-slate-200 text-slate-400"
@@ -703,7 +703,7 @@ export function RoomFormPage() {
                 <div
                   className={`h-9 w-9 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 transition ${
                     isActive
-                      ? "bg-navy-700 text-white"
+                      ? "bg-emerald-700 text-white"
                       : isCompleted
                       ? "bg-emerald-600 text-white"
                       : "bg-slate-200 text-slate-600"
@@ -737,7 +737,7 @@ export function RoomFormPage() {
         <Card className="p-6 space-y-6">
           <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Layers className="h-5 w-5 text-navy-700" /> Step 1 — Room Identification & Climate
+              <Layers className="h-5 w-5 text-emerald-700" /> Step 1 — Room Identification & Climate
             </h2>
             <span className="text-xs font-medium text-slate-500">* Required Fields</span>
           </div>
@@ -848,7 +848,7 @@ export function RoomFormPage() {
 
           {/* Climate Setup */}
           <div className="p-4 bg-slate-50/70 border border-slate-200 rounded-xl space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-navy-700">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-700">
               Climate Configuration
             </h3>
 
@@ -860,7 +860,7 @@ export function RoomFormPage() {
                   value="AC"
                   checked={form.acType === "AC"}
                   onChange={() => setForm((prev) => ({ ...prev, acType: "AC" }))}
-                  className="h-4 w-4 text-navy-700 focus:ring-navy-500"
+                  className="h-4 w-4 text-emerald-700 focus:ring-navy-500"
                 />
                 ○ AC Room
               </label>
@@ -872,7 +872,7 @@ export function RoomFormPage() {
                   value="Non AC"
                   checked={form.acType === "Non AC"}
                   onChange={() => setForm((prev) => ({ ...prev, acType: "Non AC" }))}
-                  className="h-4 w-4 text-navy-700 focus:ring-navy-500"
+                  className="h-4 w-4 text-emerald-700 focus:ring-navy-500"
                 />
                 ○ Non AC Room
               </label>
@@ -920,7 +920,7 @@ export function RoomFormPage() {
         <Card className="p-6 space-y-6">
           <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <BedDouble className="h-5 w-5 text-navy-700" /> Step 2 — Bed Capacity & Auto Generator
+              <BedDouble className="h-5 w-5 text-emerald-700" /> Step 2 — Bed Capacity & Auto Generator
             </h2>
           </div>
 
@@ -969,7 +969,7 @@ export function RoomFormPage() {
                   type="checkbox"
                   checked={form.autoGenerateBeds}
                   onChange={(e) => setForm((prev) => ({ ...prev, autoGenerateBeds: e.target.checked }))}
-                  className="h-4 w-4 rounded text-navy-700 focus:ring-navy-500"
+                  className="h-4 w-4 rounded text-emerald-700 focus:ring-navy-500"
                 />
                 Auto Generate {previewBedsList.length} Beds
               </label>
@@ -1004,7 +1004,7 @@ export function RoomFormPage() {
         <Card className="p-6 space-y-6">
           <div className="border-b border-slate-100 pb-3">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <IndianRupee className="h-5 w-5 text-navy-700" /> Step 3 — Room Tariff Configuration
+              <IndianRupee className="h-5 w-5 text-emerald-700" /> Step 3 — Room Tariff Configuration
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               Room Tariff belongs to Room (NOT Bed) and automatically applies upon patient admission.

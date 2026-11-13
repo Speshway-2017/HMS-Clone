@@ -34,7 +34,7 @@ export function DepartmentFormPage() {
   const isSuperAdmin = user?.role === "super_admin";
   const basePath = ROLE_HOME_PATH[user!.role];
   const { data: department } = useDepartment(id);
-  const { data: hospitalsData } = useHospitals({ page: 1 }, { enabled: isSuperAdmin });
+  const { data: hospitalsData } = useHospitals({ page: 1, limit: 100 }, { enabled: isSuperAdmin });
   const createDepartment = useCreateDepartment();
   const updateDepartment = useUpdateDepartment(id ?? "");
 
@@ -78,6 +78,12 @@ export function DepartmentFormPage() {
       });
     }
   }, [department]);
+
+  useEffect(() => {
+    if (!isEdit && isSuperAdmin && hospitalsData?.data && hospitalsData.data.length === 1 && !form.hospital) {
+      setForm((f) => ({ ...f, hospital: hospitalsData.data[0]._id }));
+    }
+  }, [isEdit, isSuperAdmin, hospitalsData, form.hospital]);
 
   const validateField = (field: string, value: any): string | undefined => {
     if (field === "name") {
@@ -249,10 +255,10 @@ export function DepartmentFormPage() {
   const allServices = Array.from(new Set([...PRESET_SERVICES, ...form.services]));
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="w-full space-y-6">
       <div>
         <div className="text-sm text-slate-400">
-          <Link to={`${basePath}/departments`} className="hover:text-navy-700">
+          <Link to={`${basePath}/departments`} className="hover:text-emerald-700">
             Departments
           </Link>{" "}
           &gt; {isEdit ? "Edit Department" : "Add New Department"}
@@ -389,7 +395,7 @@ export function DepartmentFormPage() {
                   aria-label="Up Arrow"
                   title="Up Arrow"
                   onClick={() => updateNumericField("totalBeds", form.totalBeds + 1)}
-                  className="px-1 py-0.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 flex items-center justify-center transition-colors border-b border-slate-200 cursor-pointer"
+                  className="px-1 py-0.5 text-slate-500 hover:text-emerald-700 hover:bg-slate-100 flex items-center justify-center transition-colors border-b border-slate-200 cursor-pointer"
                 >
                   <ChevronUp className="h-3 w-3" />
                 </button>
@@ -398,7 +404,7 @@ export function DepartmentFormPage() {
                   aria-label="Down Arrow"
                   title="Down Arrow"
                   onClick={() => updateNumericField("totalBeds", form.totalBeds - 1)}
-                  className="px-1 py-0.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+                  className="px-1 py-0.5 text-slate-500 hover:text-emerald-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
                 >
                   <ChevronDown className="h-3 w-3" />
                 </button>
@@ -426,7 +432,7 @@ export function DepartmentFormPage() {
                   aria-label="Up Arrow"
                   title="Up Arrow"
                   onClick={() => updateNumericField("occupiedBeds", form.occupiedBeds + 1)}
-                  className="px-1 py-0.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 flex items-center justify-center transition-colors border-b border-slate-200 cursor-pointer"
+                  className="px-1 py-0.5 text-slate-500 hover:text-emerald-700 hover:bg-slate-100 flex items-center justify-center transition-colors border-b border-slate-200 cursor-pointer"
                 >
                   <ChevronUp className="h-3 w-3" />
                 </button>
@@ -435,7 +441,7 @@ export function DepartmentFormPage() {
                   aria-label="Down Arrow"
                   title="Down Arrow"
                   onClick={() => updateNumericField("occupiedBeds", form.occupiedBeds - 1)}
-                  className="px-1 py-0.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+                  className="px-1 py-0.5 text-slate-500 hover:text-emerald-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
                 >
                   <ChevronDown className="h-3 w-3" />
                 </button>
@@ -463,7 +469,7 @@ export function DepartmentFormPage() {
                   aria-label="Up Arrow"
                   title="Up Arrow"
                   onClick={() => updateNumericField("doctors", form.doctors + 1)}
-                  className="px-1 py-0.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 flex items-center justify-center transition-colors border-b border-slate-200 cursor-pointer"
+                  className="px-1 py-0.5 text-slate-500 hover:text-emerald-700 hover:bg-slate-100 flex items-center justify-center transition-colors border-b border-slate-200 cursor-pointer"
                 >
                   <ChevronUp className="h-3 w-3" />
                 </button>
@@ -472,7 +478,7 @@ export function DepartmentFormPage() {
                   aria-label="Down Arrow"
                   title="Down Arrow"
                   onClick={() => updateNumericField("doctors", form.doctors - 1)}
-                  className="px-1 py-0.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+                  className="px-1 py-0.5 text-slate-500 hover:text-emerald-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
                 >
                   <ChevronDown className="h-3 w-3" />
                 </button>
@@ -500,7 +506,7 @@ export function DepartmentFormPage() {
                   aria-label="Up Arrow"
                   title="Up Arrow"
                   onClick={() => updateNumericField("nurses", form.nurses + 1)}
-                  className="px-1 py-0.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 flex items-center justify-center transition-colors border-b border-slate-200 cursor-pointer"
+                  className="px-1 py-0.5 text-slate-500 hover:text-emerald-700 hover:bg-slate-100 flex items-center justify-center transition-colors border-b border-slate-200 cursor-pointer"
                 >
                   <ChevronUp className="h-3 w-3" />
                 </button>
@@ -509,7 +515,7 @@ export function DepartmentFormPage() {
                   aria-label="Down Arrow"
                   title="Down Arrow"
                   onClick={() => updateNumericField("nurses", form.nurses - 1)}
-                  className="px-1 py-0.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+                  className="px-1 py-0.5 text-slate-500 hover:text-emerald-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
                 >
                   <ChevronDown className="h-3 w-3" />
                 </button>
@@ -537,7 +543,7 @@ export function DepartmentFormPage() {
                   aria-label="Up Arrow"
                   title="Up Arrow"
                   onClick={() => updateNumericField("support", form.support + 1)}
-                  className="px-1 py-0.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 flex items-center justify-center transition-colors border-b border-slate-200 cursor-pointer"
+                  className="px-1 py-0.5 text-slate-500 hover:text-emerald-700 hover:bg-slate-100 flex items-center justify-center transition-colors border-b border-slate-200 cursor-pointer"
                 >
                   <ChevronUp className="h-3 w-3" />
                 </button>
@@ -546,7 +552,7 @@ export function DepartmentFormPage() {
                   aria-label="Down Arrow"
                   title="Down Arrow"
                   onClick={() => updateNumericField("support", form.support - 1)}
-                  className="px-1 py-0.5 text-slate-500 hover:text-navy-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+                  className="px-1 py-0.5 text-slate-500 hover:text-emerald-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
                 >
                   <ChevronDown className="h-3 w-3" />
                 </button>
@@ -564,7 +570,7 @@ export function DepartmentFormPage() {
                 key={service}
                 onClick={() => toggleService(service)}
                 className={`rounded-full border px-4 py-2 text-sm font-medium ${
-                  form.services.includes(service) ? "border-navy-700 bg-navy-700 text-white" : "border-slate-300 bg-white text-slate-600"
+                  form.services.includes(service) ? "border-emerald-700 bg-emerald-700 text-white" : "border-slate-300 bg-white text-slate-600"
                 }`}
               >
                 {service}
@@ -577,7 +583,7 @@ export function DepartmentFormPage() {
                 placeholder="Custom service"
                 className="w-28 bg-transparent text-sm outline-none"
               />
-              <button type="button" onClick={addCustomService} className="text-navy-700 cursor-pointer">
+              <button type="button" onClick={addCustomService} className="text-emerald-700 cursor-pointer">
                 <PlusCircle className="h-4 w-4" />
               </button>
             </div>

@@ -32,9 +32,9 @@ export function PatientFlowSection({ appointments, labRequests, admissions = [],
 
     // 8-step pipeline counts computed strictly from live DB models
     const steps = [
-      { name: "1. Registration", count: patients.length, color: "bg-blue-50 text-blue-700 border-blue-200" },
+      { name: "1. Registration", count: patients.length, color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
       { name: "2. Waiting Queue", count: waiting, color: "bg-amber-50 text-amber-700 border-amber-200" },
-      { name: "3. Doctor Consult", count: completedConsultations + pendingConsultations, color: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+      { name: "3. Doctor Consult", count: completedConsultations + pendingConsultations, color: "bg-rose-50 text-rose-700 border-rose-200" },
       { name: "4. Laboratory", count: labCount, color: "bg-purple-50 text-purple-700 border-purple-200" },
       { name: "5. Radiology", count: radCount, color: "bg-cyan-50 text-cyan-700 border-cyan-200" },
       { name: "6. Pharmacy", count: completedConsultations, color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
@@ -80,9 +80,9 @@ export function PatientFlowSection({ appointments, labRequests, admissions = [],
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500">Average Wait Time</span>
-            <Clock className="h-4 w-4 text-blue-500" />
+            <Clock className="h-4 w-4 text-emerald-600" />
           </div>
-          <p className="mt-2 text-2xl font-extrabold text-blue-600">{metrics.avgWaitTime} mins</p>
+          <p className="mt-2 text-2xl font-extrabold text-emerald-700">{metrics.avgWaitTime} mins</p>
           <p className="text-[11px] text-slate-400">Average queue wait</p>
         </div>
 

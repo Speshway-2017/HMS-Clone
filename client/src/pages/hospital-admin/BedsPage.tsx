@@ -266,7 +266,7 @@ export function BedsPage() {
         <div className="flex items-center gap-3">
           {!isAllBranches ? (
             <>
-              <button onClick={() => navigate(`/admin/beds/edit-ward/${w._id}`)} className="text-slate-400 hover:text-navy-700 transition-colors" title="Edit Ward Master">
+              <button onClick={() => navigate(`/admin/beds/edit-ward/${w._id}`)} className="text-slate-400 hover:text-emerald-700 transition-colors" title="Edit Ward Master">
                 <Pencil className="h-4 w-4" />
               </button>
               <button onClick={() => handleDeleteWard(w._id)} className="text-slate-400 hover:text-red-650 transition-colors" title="Delete Ward">
@@ -337,12 +337,12 @@ export function BedsPage() {
       header: "Actions",
       render: (r) => (
         <div className="flex items-center gap-3">
-          <button onClick={() => setViewRoomDetails(r)} className="text-slate-400 hover:text-navy-700 transition-colors" title="View Details">
+          <button onClick={() => setViewRoomDetails(r)} className="text-slate-400 hover:text-emerald-700 transition-colors" title="View Details">
             <Eye className="h-4 w-4" />
           </button>
           {!isAllBranches ? (
             <>
-              <button onClick={() => navigate(`/admin/beds/edit-room/${r._id}`)} className="text-slate-400 hover:text-navy-700 transition-colors" title="Edit Room Master Data">
+              <button onClick={() => navigate(`/admin/beds/edit-room/${r._id}`)} className="text-slate-400 hover:text-emerald-700 transition-colors" title="Edit Room Master Data">
                 <Pencil className="h-4 w-4" />
               </button>
               <button onClick={() => handleDeleteRoom(r)} className="text-slate-400 hover:text-red-650 transition-colors" title="Delete Room">
@@ -397,7 +397,7 @@ export function BedsPage() {
             <>
               <button
                 onClick={() => navigate(`/admin/beds/edit-bed/${b._id}`)}
-                className="p-1.5 rounded text-slate-400 hover:text-navy-700 transition"
+                className="p-1.5 rounded text-slate-400 hover:text-emerald-700 transition"
                 title="Edit Bed Master"
               >
                 <Pencil className="h-4 w-4" />
@@ -443,7 +443,7 @@ export function BedsPage() {
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Building2 className="h-7 w-7 text-navy-700" /> Enterprise Beds & Wards Management
+            <Building2 className="h-7 w-7 text-emerald-700" /> Enterprise Beds & Wards Management
           </h1>
           <p className="text-sm text-slate-500">
             Hierarchy: Hospital → Ward (Section) → Room (Accommodation) → Bed (Patient Allocation)
@@ -488,7 +488,7 @@ export function BedsPage() {
 
       {/* Real-World HMS Summary Cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
-        <KpiCard label="Total Wards" value={totalWardsCount} icon={<Building2 className="h-4 w-4 text-navy-700" />} />
+        <KpiCard label="Total Wards" value={totalWardsCount} icon={<Building2 className="h-4 w-4 text-emerald-700" />} />
         <KpiCard label="Total Rooms" value={totalRoomsCount} icon={<DoorOpen className="h-4 w-4 text-indigo-600" />} />
         <KpiCard label="Total Beds" value={statsTotalBeds} icon={<BedDouble className="h-4 w-4 text-slate-600" />} />
         <KpiCard label="Occupied Beds" value={statsOccupiedBeds} icon={<BedDouble className="h-4 w-4 text-red-500" />} />
@@ -503,7 +503,7 @@ export function BedsPage() {
           <button
             onClick={() => setActiveTab("wards")}
             className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
-              activeTab === "wards" ? "border-navy-700 text-navy-700" : "border-transparent text-slate-400 hover:text-slate-600"
+              activeTab === "wards" ? "border-emerald-700 text-emerald-700" : "border-transparent text-slate-400 hover:text-slate-600"
             }`}
           >
             <span>🏥</span> Wards ({totalWardsCount})
@@ -511,7 +511,7 @@ export function BedsPage() {
           <button
             onClick={() => setActiveTab("rooms")}
             className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
-              activeTab === "rooms" ? "border-navy-700 text-navy-700" : "border-transparent text-slate-400 hover:text-slate-600"
+              activeTab === "rooms" ? "border-emerald-700 text-emerald-700" : "border-transparent text-slate-400 hover:text-slate-600"
             }`}
           >
             <span>🏨</span> Rooms ({totalRoomsCount})
@@ -519,7 +519,7 @@ export function BedsPage() {
           <button
             onClick={() => setActiveTab("beds")}
             className={`pb-3 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
-              activeTab === "beds" ? "border-navy-700 text-navy-700" : "border-transparent text-slate-400 hover:text-slate-600"
+              activeTab === "beds" ? "border-emerald-700 text-emerald-700" : "border-transparent text-slate-400 hover:text-slate-600"
             }`}
           >
             <span>🛏</span> Beds ({statsTotalBeds})
@@ -568,7 +568,7 @@ export function BedsPage() {
             {(wardSearch || wardTypeFilter || wardStatusFilter) && (
               <button
                 onClick={() => { setWardSearch(""); setWardTypeFilter(""); setWardStatusFilter(""); setWardPage(1); }}
-                className="text-xs text-navy-700 font-bold hover:underline flex items-center gap-1"
+                className="text-xs text-emerald-700 font-bold hover:underline flex items-center gap-1"
               >
                 <RotateCcw className="h-3.5 w-3.5" /> Clear Filters
               </button>
@@ -632,7 +632,7 @@ export function BedsPage() {
             {(roomSearch || roomWardFilter || roomCategoryFilter) && (
               <button
                 onClick={() => { setRoomSearch(""); setRoomWardFilter(""); setRoomCategoryFilter(""); setRoomPage(1); }}
-                className="text-xs text-navy-700 font-bold hover:underline flex items-center gap-1"
+                className="text-xs text-emerald-700 font-bold hover:underline flex items-center gap-1"
               >
                 <RotateCcw className="h-3.5 w-3.5" /> Clear Filters
               </button>
@@ -697,7 +697,7 @@ export function BedsPage() {
             {(bedSearch || bedWardFilter || bedRoomFilter || bedStatusFilter) && (
               <button
                 onClick={() => { setBedSearch(""); setBedWardFilter(""); setBedRoomFilter(""); setBedStatusFilter(""); setBedPage(1); }}
-                className="text-xs text-navy-700 font-bold hover:underline flex items-center gap-1"
+                className="text-xs text-emerald-700 font-bold hover:underline flex items-center gap-1"
               >
                 <RotateCcw className="h-3.5 w-3.5" /> Clear Filters
               </button>

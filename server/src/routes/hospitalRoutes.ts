@@ -20,6 +20,7 @@ import {
   createPublicEnquiry,
   listHospitalEnquiries,
   updateEnquiryStatus,
+  getNextHospitalId,
 } from "../controllers/hospitalController";
 
 const router = Router();
@@ -33,16 +34,17 @@ router.get("/public/appointments/booked-slots", getPublicBookedSlots);
 router.post("/public/appointments", createPublicAppointment);
 router.post("/public/enquiries", createPublicEnquiry);
 
-// Hospital Admin Enquiries endpoints
-router.get("/enquiries", protect, restrictTo("hospital_admin"), scopeToHospital, listHospitalEnquiries);
-router.patch("/enquiries/:id", protect, restrictTo("hospital_admin"), scopeToHospital, updateEnquiryStatus);
+// Super Admin Website Enquiries endpoints (transferred from hospital_admin)
+router.get("/enquiries", protect, restrictTo("super_admin"), listHospitalEnquiries);
+router.patch("/enquiries/:id", protect, restrictTo("super_admin"), updateEnquiryStatus);
 
 router.get("/me", protect, getMyHospital);
-router.patch("/me", protect, restrictTo("hospital_admin", "laboratory"), updateMyHospital);
+router.patch("/me", protect, restrictTo("super_admin"), updateMyHospital);
 
 router.use(protect, restrictTo("super_admin"));
 
 router.get("/generate-code", getHospitalCode);
+router.get("/next-id", getNextHospitalId);
 router.get("/unassigned-admins", listUnassignedHospitalAdmins);
 router.route("/").get(listHospitals).post(createHospital);
 router.route("/:id").get(getHospital).patch(updateHospital).delete(deleteHospital);

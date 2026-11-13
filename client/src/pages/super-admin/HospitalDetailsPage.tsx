@@ -55,7 +55,7 @@ export function HospitalDetailsPage() {
           <Card>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-base font-semibold text-slate-800">Connected Branches</h3>
-              <Link to={`/super-admin/branches?hospitalId=${id}`} className="text-sm font-medium text-navy-700 hover:underline">
+              <Link to={`/super-admin/branches?hospitalId=${id}`} className="text-sm font-medium text-emerald-700 hover:underline">
                 Manage Branches
               </Link>
             </div>
@@ -65,7 +65,7 @@ export function HospitalDetailsPage() {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {(branches as { _id: string; name: string; city: string; state: string }[]).map((b) => (
                   <div key={b._id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
-                    <span className="rounded-lg bg-navy-50 p-2 text-navy-700">
+                    <span className="rounded-lg bg-emerald-50 p-2 text-emerald-700">
                       <Network className="h-4 w-4" />
                     </span>
                     <div>
@@ -85,7 +85,7 @@ export function HospitalDetailsPage() {
         <div className="space-y-6">
           <Card>
             <div className="mb-3 flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-navy-700" />
+              <MapPin className="h-4 w-4 text-emerald-700" />
               <h3 className="text-base font-semibold text-slate-800">Location</h3>
             </div>
             <p className="text-sm text-slate-600">{hospital.address || "No address on file."}</p>
@@ -100,11 +100,6 @@ export function HospitalDetailsPage() {
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-slate-400" /> {hospital.contactEmail || "—"}
               </div>
-              {stats.primaryAdmin && (
-                <div className="pt-2 text-xs text-slate-400">
-                  Primary Admin: {stats.primaryAdmin.name} ({stats.primaryAdmin.email})
-                </div>
-              )}
             </div>
           </Card>
         </div>

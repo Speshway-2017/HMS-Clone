@@ -51,14 +51,14 @@ export const TrustNotificationCard: React.FC<AnimatedListItemProps & { className
         </div>
 
         {badge && (
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-navy-800 bg-navy-50/90 px-2.5 py-1 rounded-full border border-navy-100 shadow-2xs">
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 bg-emerald-50/90 px-2.5 py-1 rounded-full border border-navy-100 shadow-2xs">
             {badge}
           </span>
         )}
       </div>
 
       <div className="mt-4 space-y-2 flex-1 flex flex-col justify-start">
-        <h3 className="text-base font-bold text-slate-900 transition-colors duration-200 group-hover:text-navy-900">
+        <h3 className="text-base font-bold text-slate-900 transition-colors duration-200 group-hover:text-slate-900">
           {title}
         </h3>
         <p className="text-xs text-slate-600 leading-relaxed font-medium">

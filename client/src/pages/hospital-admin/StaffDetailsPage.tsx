@@ -43,7 +43,7 @@ export function StaffDetailsPage() {
       {/* Header Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <Link to="/admin/staff" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-navy-700 mb-2">
+          <Link to="/admin/staff" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-emerald-700 mb-2">
             <ArrowLeft className="h-3.5 w-3.5" /> Back to Staff Directory
           </Link>
           <h1 className="text-2xl font-bold text-slate-900">Staff Member Profile</h1>
@@ -54,7 +54,7 @@ export function StaffDetailsPage() {
             Close
           </Button>
           <Link to={`/admin/staff/${staff._id}/edit`}>
-            <Button variant="primary" className="bg-navy-700 hover:bg-navy-800">
+            <Button variant="primary" className="bg-emerald-700 hover:bg-emerald-800">
               <Pencil className="h-4 w-4 mr-2" /> Edit Profile
             </Button>
           </Link>
@@ -67,7 +67,7 @@ export function StaffDetailsPage() {
           {staff.photoUrl ? (
             <img src={staff.photoUrl} alt={staff.name} className="h-24 w-24 rounded-2xl object-cover border border-slate-200 shadow-md shrink-0" />
           ) : (
-            <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-navy-100 text-2xl font-bold text-navy-700 shadow-sm shrink-0">
+            <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-emerald-100 text-2xl font-bold text-emerald-700 shadow-sm shrink-0">
               {staff.name.slice(0, 2).toUpperCase()}
             </div>
           )}
@@ -77,7 +77,7 @@ export function StaffDetailsPage() {
               <div>
                 <h2 className="text-2xl font-extrabold text-slate-900">{staff.name}</h2>
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-1">
-                  <span className="inline-block rounded-full bg-navy-50 px-3 py-0.5 text-xs font-bold text-navy-700 uppercase">
+                  <span className="inline-block rounded-full bg-emerald-50 px-3 py-0.5 text-xs font-bold text-emerald-700 uppercase">
                     {staff.role || "Staff Member"}
                   </span>
                   <Badge tone={DUTY_TONE[staff.dutyStatus]}>{staff.dutyStatus.replace("_", " ")}</Badge>
@@ -86,7 +86,7 @@ export function StaffDetailsPage() {
               {staff.employeeId && (
                 <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-center sm:text-right">
                   <span className="text-[10px] font-bold text-slate-400 uppercase block">Employee ID</span>
-                  <span className="font-mono font-bold text-navy-700 text-sm">{staff.employeeId}</span>
+                  <span className="font-mono font-bold text-emerald-700 text-sm">{staff.employeeId}</span>
                 </div>
               )}
             </div>
@@ -115,7 +115,7 @@ export function StaffDetailsPage() {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Professional Details */}
         <Card className="p-6 space-y-4">
-          <div className="flex items-center gap-2 text-navy-700 font-bold border-b pb-3">
+          <div className="flex items-center gap-2 text-emerald-700 font-bold border-b pb-3">
             <Briefcase className="h-5 w-5" />
             <h3>Professional Details</h3>
           </div>
@@ -130,7 +130,7 @@ export function StaffDetailsPage() {
             </div>
             <div className="flex justify-between border-b pb-2">
               <span className="text-slate-500 font-medium">Employee Reference ID:</span>
-              <span className="font-mono font-bold text-navy-700">{staff.employeeId || "—"}</span>
+              <span className="font-mono font-bold text-emerald-700">{staff.employeeId || "—"}</span>
             </div>
             <div>
               <span className="text-slate-500 font-medium block mb-1">Qualifications & Certifications:</span>
@@ -143,7 +143,7 @@ export function StaffDetailsPage() {
 
         {/* Operational Attendance & Performance */}
         <Card className="p-6 space-y-4">
-          <div className="flex items-center gap-2 text-navy-700 font-bold border-b pb-3">
+          <div className="flex items-center gap-2 text-emerald-700 font-bold border-b pb-3">
             <Activity className="h-5 w-5" />
             <h3>Operational Status & Performance</h3>
           </div>
@@ -162,7 +162,7 @@ export function StaffDetailsPage() {
                 <span className="font-bold text-slate-800">{staff.taskLoad ?? 0}%</span>
               </div>
               <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                <div className="h-2 bg-navy-700 rounded-full" style={{ width: `${staff.taskLoad ?? 0}%` }} />
+                <div className="h-2 bg-emerald-700 rounded-full" style={{ width: `${staff.taskLoad ?? 0}%` }} />
               </div>
             </div>
             <div className="flex justify-between border-b pb-2">
@@ -177,7 +177,7 @@ export function StaffDetailsPage() {
       {(isNurse || assignedPatients.length > 0) && (
         <Card className="p-6 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-4">
-            <div className="flex items-center gap-2 text-navy-800 font-extrabold">
+            <div className="flex items-center gap-2 text-emerald-800 font-extrabold">
               <BedDouble className="h-5 w-5 text-indigo-600" />
               <h3 className="text-base">Allotted Inpatients & Ward Care Assignments</h3>
             </div>
@@ -245,7 +245,7 @@ export function StaffDetailsPage() {
                         <div className="flex items-center justify-between">
                           <span className="text-slate-400">Attending Doctor:</span>
                           <span className="font-bold text-slate-800 flex items-center gap-1">
-                            <Stethoscope className="h-3.5 w-3.5 text-navy-700" /> {doctorName}
+                            <Stethoscope className="h-3.5 w-3.5 text-emerald-700" /> {doctorName}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
@@ -269,7 +269,7 @@ export function StaffDetailsPage() {
                       {pat._id && (
                         <Link
                           to={`/admin/patients/${pat._id}`}
-                          className="inline-flex items-center gap-1.5 text-xs font-extrabold text-navy-700 hover:text-navy-900 hover:underline"
+                          className="inline-flex items-center gap-1.5 text-xs font-extrabold text-emerald-700 hover:text-slate-900 hover:underline"
                         >
                           <Eye className="h-3.5 w-3.5" /> View Patient Record
                         </Link>

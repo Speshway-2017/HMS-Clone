@@ -190,7 +190,7 @@ export function NursingNotesPage() {
       header: "Attending Doctor",
       render: (row) => (
         <div>
-          <p className="text-xs font-bold text-navy-800">{row.doctorName || "Dr. Assigned"}</p>
+          <p className="text-xs font-bold text-emerald-800">{row.doctorName || "Dr. Assigned"}</p>
           <span className="text-[10px] text-slate-400 font-medium">Primary Consultant</span>
         </div>
       ),
@@ -231,7 +231,7 @@ export function NursingNotesPage() {
               <button
                 disabled={isSending || isReadOnly}
                 onClick={() => handleSendToDoctor(row)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-navy-600 hover:bg-navy-700 text-white font-bold text-xs px-3 py-1.5 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-navy-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
                 title={`Send note directly to ${docName}`}
               >
                 {isSending ? (
@@ -281,7 +281,7 @@ export function NursingNotesPage() {
         <button
           disabled={isReadOnly}
           onClick={() => setIsAddModalOpen(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-navy-700 hover:bg-navy-800 text-white font-extrabold text-xs px-4 py-2.5 shadow-sm transition-all disabled:opacity-50 cursor-pointer shrink-0"
+          className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs px-4 py-2.5 shadow-sm transition-all disabled:opacity-50 cursor-pointer shrink-0"
         >
           <Plus className="h-4 w-4" />
           Log & Send Note to Doctor
@@ -317,7 +317,7 @@ export function NursingNotesPage() {
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-5 border border-slate-100">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-navy-50 text-navy-700">
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
                   <FileText className="h-5 w-5" />
                 </div>
                 <div>
@@ -357,7 +357,7 @@ export function NursingNotesPage() {
                   className={`w-full rounded-xl border px-3 py-2.5 text-xs font-semibold bg-white outline-none cursor-pointer transition-colors ${
                     fieldErrors.patientId
                       ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                      : "border-slate-200 focus:border-navy-500"
+                      : "border-slate-200 focus:border-emerald-500"
                   }`}
                 >
                   <option value="">Select Inpatient Patient...</option>
@@ -387,7 +387,7 @@ export function NursingNotesPage() {
                 <select
                   value={noteForm.observationType}
                   onChange={(e) => setNoteForm({ ...noteForm, observationType: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold focus:border-navy-500 bg-white outline-none cursor-pointer"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold focus:border-emerald-500 bg-white outline-none cursor-pointer"
                 >
                   <option value="Shift Assessment">Shift Assessment</option>
                   <option value="Routine Check">Routine Check</option>
@@ -427,7 +427,7 @@ export function NursingNotesPage() {
                   className={`w-full rounded-xl border p-3 text-xs font-medium outline-none resize-none transition-colors ${
                     fieldErrors.additionalNotes
                       ? "border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                      : "border-slate-200 focus:border-navy-500"
+                      : "border-slate-200 focus:border-emerald-500"
                   }`}
                 />
                 {fieldErrors.additionalNotes && (
@@ -448,7 +448,7 @@ export function NursingNotesPage() {
                 <button
                   type="submit"
                   disabled={saveNoteMutation.isPending || sendNoteToDoctorMutation.isPending}
-                  className="px-5 py-2.5 bg-navy-700 hover:bg-navy-800 text-white font-extrabold text-xs rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   <Send className="h-4 w-4" />
                   {saveNoteMutation.isPending || sendNoteToDoctorMutation.isPending ? "Sending..." : "Save & Send to Doctor"}

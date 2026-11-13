@@ -179,7 +179,7 @@ export function PharmacySalesAnalytics() {
           <Button variant="secondary" onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-1.5 text-xs py-1.5 bg-white border border-slate-200 hover:bg-slate-50">
             <Upload className="h-3.5 w-3.5 text-emerald-600" /> Import Excel
           </Button>
-          <Button onClick={handleExportPDF} className="flex items-center gap-1.5 text-xs py-1.5 bg-navy-700 hover:bg-navy-800 text-white">
+          <Button onClick={handleExportPDF} className="flex items-center gap-1.5 text-xs py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white">
             <Download className="h-3.5 w-3.5" /> Export PDF
           </Button>
         </div>
@@ -383,7 +383,7 @@ export function PharmacySalesAnalytics() {
         {/* Top Selling Medicines */}
         <Card>
           <h3 className="mb-4 text-base font-semibold text-slate-800 flex items-center gap-1.5">
-            <Award className="h-5 w-5 text-navy-700" /> Top Selling Formulations
+            <Award className="h-5 w-5 text-emerald-700" /> Top Selling Formulations
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -412,7 +412,7 @@ export function PharmacySalesAnalytics() {
         {/* Stock Movement Reports */}
         <Card>
           <h3 className="mb-4 text-base font-semibold text-slate-800 flex items-center gap-1.5">
-            <BarChart3 className="h-5 w-5 text-navy-700" /> Stock Movement Log (Real-time)
+            <BarChart3 className="h-5 w-5 text-emerald-700" /> Stock Movement Log (Real-time)
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -430,7 +430,7 @@ export function PharmacySalesAnalytics() {
                   const isIn = mov.movementType.startsWith("IN");
                   return (
                     <tr key={mov._id} className="hover:bg-slate-50 text-slate-800">
-                      <td className="p-3 font-mono font-bold text-navy-700">{mov._id}</td>
+                      <td className="p-3 font-mono font-bold text-emerald-700">{mov._id}</td>
                       <td className="p-3 font-semibold">{mov.medName}</td>
                       <td className="p-3">
                         <span className={`inline-flex rounded px-2 py-0.5 text-[9px] font-bold ${isIn ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>

@@ -197,7 +197,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({ isOpen, 
         <div className="bg-slate-900 text-white p-6 flex items-start justify-between relative shrink-0">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-navy-500 text-white">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500 text-white">
                 Official Clinical Signoff
               </span>
               <span className="text-xs text-slate-400 font-mono font-bold">
@@ -226,7 +226,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({ isOpen, 
             <div>
               <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block font-sans">Outgoing Shift Nurse</span>
               <p className="text-sm font-extrabold text-slate-800 font-sans mt-0.5 flex items-center gap-1.5">
-                <User className="h-4 w-4 text-navy-600" /> {currentNurse?.name || "Current Nurse"}
+                <User className="h-4 w-4 text-emerald-600" /> {currentNurse?.name || "Current Nurse"}
               </p>
               <span className="text-[11px] text-slate-500 font-medium block">
                 Shift: <strong className="text-slate-700">{currentShift}</strong> ({currentShift === "Morning" ? "06:00-14:00" : currentShift === "Evening" ? "14:00-22:00" : "22:00-06:00"})
@@ -244,7 +244,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({ isOpen, 
                   const selectedText = e.target.options[e.target.selectedIndex]?.text || "";
                   setIncomingNurseName(selectedText);
                 }}
-                className="w-full text-xs font-bold bg-white border border-slate-300 text-slate-800 py-2 px-3 rounded-xl outline-none focus:border-navy-600 cursor-pointer"
+                className="w-full text-xs font-bold bg-white border border-slate-300 text-slate-800 py-2 px-3 rounded-xl outline-none focus:border-emerald-600 cursor-pointer"
               >
                 <option value="">-- Choose Incoming Nurse --</option>
                 <option value="64d1f2e809ab123456789012">Nurse Sarah Jenkins (Evening Duty)</option>
@@ -256,7 +256,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({ isOpen, 
             <div>
               <div className="flex justify-between text-xs font-extrabold text-slate-700 font-sans mb-1">
                 <span>Patients Handed Over</span>
-                <span className="font-mono text-navy-700">{handedOverCount} / {totalPatientsCount} ({progressPercentage}%)</span>
+                <span className="font-mono text-emerald-700">{handedOverCount} / {totalPatientsCount} ({progressPercentage}%)</span>
               </div>
               <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden mt-2 border border-slate-300">
                 <div
@@ -282,7 +282,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({ isOpen, 
                     onClick={() => toggleNoteChip(chip)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
                       isSelected
-                        ? "bg-navy-700 text-white border-navy-700 shadow-sm"
+                        ? "bg-emerald-700 text-white border-emerald-700 shadow-sm"
                         : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
                     }`}
                   >
@@ -329,12 +329,12 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({ isOpen, 
                             type="checkbox"
                             checked={isChecked}
                             onChange={() => handleHandoverCheckToggle(patient._id)}
-                            className="h-4.5 w-4.5 rounded border-slate-300 text-navy-600 focus:ring-navy-500 cursor-pointer"
+                            className="h-4.5 w-4.5 rounded border-slate-300 text-emerald-600 focus:ring-navy-500 cursor-pointer"
                           />
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
                               <h4 className="text-sm font-bold text-slate-900 font-sans">{pName}</h4>
-                              <span className="font-mono text-[10px] font-bold text-navy-700 bg-navy-50 border border-navy-100 px-2 py-0.5 rounded">
+                              <span className="font-mono text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-navy-100 px-2 py-0.5 rounded">
                                 {pUhid}
                               </span>
                               <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-md border ${
@@ -413,7 +413,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({ isOpen, 
               className={`w-full text-xs border rounded-xl p-3 outline-none transition-all font-sans ${
                 remarksError
                   ? "border-rose-400 bg-rose-50/20 focus:border-rose-500"
-                  : "bg-slate-50 border-slate-200 focus:border-navy-600 focus:bg-white"
+                  : "bg-slate-50 border-slate-200 focus:border-emerald-600 focus:bg-white"
               }`}
             />
             {remarksError && (
@@ -430,7 +430,7 @@ export const ShiftHandoverModal: React.FC<ShiftHandoverModalProps> = ({ isOpen, 
               id="confirmHandover"
               checked={isConfirmed}
               onChange={(e) => setIsConfirmed(e.target.checked)}
-              className="h-5 w-5 rounded border-amber-300 text-navy-600 focus:ring-navy-500 shrink-0 mt-0.5 cursor-pointer"
+              className="h-5 w-5 rounded border-amber-300 text-emerald-600 focus:ring-navy-500 shrink-0 mt-0.5 cursor-pointer"
             />
             <label htmlFor="confirmHandover" className="text-xs text-amber-950 font-bold leading-relaxed cursor-pointer font-sans">
               I confirm all patient information, active prescriptions, bedside vitals, and clinical care instructions have been handed over correctly to the next shift nurse.

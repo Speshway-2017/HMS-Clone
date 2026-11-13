@@ -304,7 +304,7 @@ export function VitalsMonitoringPage() {
           className={`rounded-lg px-3 py-1 text-xs font-bold text-white shadow-sm transition-all ${
             isReadOnly 
               ? "bg-slate-300 text-slate-500 cursor-not-allowed opacity-60" 
-              : "bg-navy-900 hover:bg-navy-800"
+              : "bg-navy-900 hover:bg-emerald-800"
           }`}
         >
           Record Vitals

@@ -70,13 +70,13 @@ export async function scopeToHospital(req: Request, _res: Response, next: NextFu
       }
     }
 
-    // STRICT MULTI-BRANCH READ-ONLY ENFORCEMENT:
-    // Block all mutation operations (POST, PUT, PATCH, DELETE) when "All Branches" view mode is selected!
+    // Multi-branch read-only enforcement:
+    // Super Admin and Hospital Admins have full operational authority over their facilities and are never restricted.
     if (req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS") {
       const isGlobalHospitalRoute = req.originalUrl.includes("/branches") || req.originalUrl.includes("/hospitals") || req.originalUrl.includes("/auth/");
       if (!isGlobalHospitalRoute) {
-        if (req.user.role === "hospital_admin" && (branchHeader === "all" || (tenantScope.branchId === null && !tenantScope.isBranchScoped))) {
-          throw new AppError("Action forbidden in 'All Branches' mode. Please select a specific branch context to add, edit, or delete records.", 403);
+        if (branchHeader === "all" && req.user.role !== "super_admin" && req.user.role !== "hospital_admin" && req.user.role !== "admin") {
+          throw new AppError("Action forbidden in aggregated view mode. Please select a specific branch context to perform changes.", 403);
         }
       }
     }

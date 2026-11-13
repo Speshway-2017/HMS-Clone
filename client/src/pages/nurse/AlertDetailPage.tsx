@@ -166,7 +166,7 @@ export function AlertDetailPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
           <div className="rounded-lg border border-slate-200 p-3.5 space-y-1">
             <div className="flex items-center gap-2 text-slate-400">
-              <User className="h-4 w-4 text-navy-800" />
+              <User className="h-4 w-4 text-emerald-800" />
               <span className="text-xs font-semibold">Patient Name / UHID</span>
             </div>
             <p className="text-sm font-bold text-slate-900">{alertItem.data?.patientName || "Assigned Patient"}</p>
@@ -175,7 +175,7 @@ export function AlertDetailPage() {
 
           <div className="rounded-lg border border-slate-200 p-3.5 space-y-1">
             <div className="flex items-center gap-2 text-slate-400">
-              <BedDouble className="h-4 w-4 text-navy-800" />
+              <BedDouble className="h-4 w-4 text-emerald-800" />
               <span className="text-xs font-semibold">Ward & Location</span>
             </div>
             <p className="text-sm font-bold text-slate-900">{alertItem.data?.ward || "General Ward"}</p>
@@ -184,7 +184,7 @@ export function AlertDetailPage() {
 
           <div className="rounded-lg border border-slate-200 p-3.5 space-y-1">
             <div className="flex items-center gap-2 text-slate-400">
-              <Clock className="h-4 w-4 text-navy-800" />
+              <Clock className="h-4 w-4 text-emerald-800" />
               <span className="text-xs font-semibold">Triggered Timestamp</span>
             </div>
             <p className="text-sm font-bold text-slate-900">{date}</p>
@@ -193,7 +193,7 @@ export function AlertDetailPage() {
 
           <div className="rounded-lg border border-slate-200 p-3.5 space-y-1">
             <div className="flex items-center gap-2 text-slate-400">
-              <Activity className="h-4 w-4 text-navy-800" />
+              <Activity className="h-4 w-4 text-emerald-800" />
               <span className="text-xs font-semibold">Attending Doctor</span>
             </div>
             <p className="text-sm font-bold text-slate-900">{alertItem.data?.assignedDoctor || "Dr. Primary Consultant"}</p>

@@ -184,7 +184,7 @@ function PatientSidePanel({ item, onClose }: { item: PendingOverdueItem; onClose
         <div className="p-4 border-t bg-slate-50 grid grid-cols-2 gap-2">
           <Link
             to={`/admin/finance/invoices/${item._id}`}
-            className="flex items-center justify-center gap-1.5 bg-navy-700 text-white text-xs font-bold py-2.5 rounded-xl hover:bg-navy-800 transition col-span-2"
+            className="flex items-center justify-center gap-1.5 bg-emerald-700 text-white text-xs font-bold py-2.5 rounded-xl hover:bg-emerald-800 transition col-span-2"
           >
             <Eye className="h-4 w-4" /> View Full Invoice
           </Link>
@@ -450,7 +450,7 @@ export function PendingOverduePage() {
           <button
             onClick={exportCSV}
             aria-label="Export CSV"
-            className="flex items-center gap-1.5 text-xs font-bold text-white bg-navy-700 hover:bg-navy-800 px-3 py-2 rounded-lg transition shadow"
+            className="flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 px-3 py-2 rounded-lg transition shadow"
           >
             <Download className="h-3.5 w-3.5" /> Export CSV
           </button>
@@ -507,7 +507,7 @@ export function PendingOverduePage() {
               placeholder="Search patient name or mobile..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none bg-slate-50"
+              className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-navy-500 outline-none bg-slate-50"
             />
           </div>
           {/* UHID Search */}
@@ -518,14 +518,14 @@ export function PendingOverduePage() {
               placeholder="UHID..."
               value={uhid}
               onChange={e => setUhid(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none bg-slate-50"
+              className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-navy-500 outline-none bg-slate-50"
             />
           </div>
           {/* Status filter */}
           <select
             value={status}
             onChange={e => { setStatus(e.target.value); setPage(1); }}
-            className="py-2 px-3 text-sm rounded-xl border border-slate-200 bg-slate-50 focus:border-navy-500 outline-none"
+            className="py-2 px-3 text-sm rounded-xl border border-slate-200 bg-slate-50 focus:border-emerald-500 outline-none"
           >
             <option value="">All Status</option>
             <option value="pending">Pending</option>
@@ -536,7 +536,7 @@ export function PendingOverduePage() {
           <select
             value={billingType}
             onChange={e => { setBillingType(e.target.value); setPage(1); }}
-            className="py-2 px-3 text-sm rounded-xl border border-slate-200 bg-slate-50 focus:border-navy-500 outline-none"
+            className="py-2 px-3 text-sm rounded-xl border border-slate-200 bg-slate-50 focus:border-emerald-500 outline-none"
           >
             <option value="">All Types</option>
             {Object.entries(BILLING_TYPE_LABELS).map(([k, v]) => (
@@ -546,7 +546,7 @@ export function PendingOverduePage() {
           {/* Advanced Filters Toggle */}
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-1.5 py-2 px-3 text-sm font-semibold rounded-xl border transition ${showFilters ? "bg-navy-50 border-navy-300 text-navy-700" : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"}`}
+            className={`flex items-center gap-1.5 py-2 px-3 text-sm font-semibold rounded-xl border transition ${showFilters ? "bg-emerald-50 border-navy-300 text-emerald-700" : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"}`}
           >
             <Filter className="h-4 w-4" /> Filters
             <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showFilters ? "rotate-180" : ""}`} />
@@ -564,17 +564,17 @@ export function PendingOverduePage() {
             <div>
               <label className="text-xs font-semibold text-slate-500 block mb-1">Date From</label>
               <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }}
-                className="w-full py-2 px-3 text-sm rounded-xl border border-slate-200 focus:border-navy-500 outline-none bg-white" />
+                className="w-full py-2 px-3 text-sm rounded-xl border border-slate-200 focus:border-emerald-500 outline-none bg-white" />
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-500 block mb-1">Date To</label>
               <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }}
-                className="w-full py-2 px-3 text-sm rounded-xl border border-slate-200 focus:border-navy-500 outline-none bg-white" />
+                className="w-full py-2 px-3 text-sm rounded-xl border border-slate-200 focus:border-emerald-500 outline-none bg-white" />
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-500 block mb-1">Department</label>
               <select value={department} onChange={e => { setDepartment(e.target.value); setPage(1); }}
-                className="w-full py-2 px-3 text-sm rounded-xl border border-slate-200 bg-white focus:border-navy-500 outline-none">
+                className="w-full py-2 px-3 text-sm rounded-xl border border-slate-200 bg-white focus:border-emerald-500 outline-none">
                 <option value="">All Departments</option>
                 {(deptsData || []).map((d: any) => (
                   <option key={d._id} value={d._id}>{d.name}</option>
@@ -584,7 +584,7 @@ export function PendingOverduePage() {
             <div>
               <label className="text-xs font-semibold text-slate-500 block mb-1">Doctor</label>
               <select value={doctor} onChange={e => { setDoctor(e.target.value); setPage(1); }}
-                className="w-full py-2 px-3 text-sm rounded-xl border border-slate-200 bg-white focus:border-navy-500 outline-none">
+                className="w-full py-2 px-3 text-sm rounded-xl border border-slate-200 bg-white focus:border-emerald-500 outline-none">
                 <option value="">All Doctors</option>
                 {(doctorsData?.data || []).map((d: any) => (
                   <option key={d._id} value={d._id}>{d.name}</option>
@@ -594,7 +594,7 @@ export function PendingOverduePage() {
             <div>
               <label className="text-xs font-semibold text-slate-500 block mb-1">Branch</label>
               <select value={branch} onChange={e => { setBranch(e.target.value); setPage(1); }}
-                className="w-full py-2 px-3 text-sm rounded-xl border border-slate-200 bg-white focus:border-navy-500 outline-none">
+                className="w-full py-2 px-3 text-sm rounded-xl border border-slate-200 bg-white focus:border-emerald-500 outline-none">
                 <option value="">All Branches</option>
                 {(branchesData?.data || []).map((b: any) => (
                   <option key={b._id} value={b._id}>{b.name}</option>
@@ -619,7 +619,7 @@ export function PendingOverduePage() {
             <p className="text-xs text-slate-400 mt-1 mb-4">An error occurred while fetching invoice records.</p>
             <button
               onClick={() => refetch()}
-              className="px-4 py-2 text-xs font-bold text-white bg-navy-700 hover:bg-navy-800 rounded-xl transition"
+              className="px-4 py-2 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-xl transition"
             >
               Try Again
             </button>
@@ -663,7 +663,7 @@ export function PendingOverduePage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <div className="h-7 w-7 rounded-full bg-navy-100 text-navy-700 flex items-center justify-center text-xs font-black flex-shrink-0">
+                          <div className="h-7 w-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-black flex-shrink-0">
                             {item.patient?.name?.charAt(0)?.toUpperCase()}
                           </div>
                           <div>
@@ -702,7 +702,7 @@ export function PendingOverduePage() {
                           <button
                             title="View Details"
                             onClick={() => setSelectedItem(item)}
-                            className="p-1.5 rounded-lg bg-navy-50 text-navy-700 hover:bg-navy-100 transition"
+                            className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition"
                           >
                             <Eye className="h-3.5 w-3.5" />
                           </button>
@@ -759,7 +759,7 @@ export function PendingOverduePage() {
                   <button
                     key={pg}
                     onClick={() => setPage(pg)}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition ${pg === pagination.page ? "bg-navy-700 text-white border-navy-700" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition ${pg === pagination.page ? "bg-emerald-700 text-white border-emerald-700" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"}`}
                   >
                     {pg}
                   </button>

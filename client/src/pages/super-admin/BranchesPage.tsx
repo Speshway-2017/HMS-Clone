@@ -63,7 +63,7 @@ export function BranchesPage() {
       header: "Actions",
       render: (b) => (
         <div className="flex items-center gap-2 text-slate-400">
-          <Link to={`/super-admin/branches/${b._id}/edit`} className="hover:text-navy-700">
+          <Link to={`/super-admin/branches/${b._id}/edit`} className="hover:text-emerald-700">
             <Pencil className="h-4 w-4" />
           </Link>
           <button

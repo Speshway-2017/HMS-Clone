@@ -737,7 +737,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
       render: (p: any) => (
         <button
           onClick={() => navigate(`/receptionist/patients/${p._id}`)}
-          className="font-mono text-xs font-bold text-navy-700 hover:underline"
+          className="font-mono text-xs font-bold text-emerald-700 hover:underline"
         >
           {p.uhid || "N/A"}
         </button>
@@ -832,7 +832,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
             
             {/* 1. Admission Slip Card */}
             <Card className="space-y-4 border border-slate-200 shadow-md p-6 bg-white relative">
-              <div className="absolute top-4 right-4 bg-navy-50 text-navy-700 font-bold font-mono text-xs px-2 py-0.5 rounded border border-navy-100">
+              <div className="absolute top-4 right-4 bg-emerald-50 text-emerald-700 font-bold font-mono text-xs px-2 py-0.5 rounded border border-navy-100">
                 ADMISSION SLIP
               </div>
               
@@ -1083,7 +1083,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                 )}
                 <div>
                   <h2 className="text-lg font-bold text-slate-800">{patient.name}</h2>
-                  <span className="text-[10px] font-mono font-bold bg-navy-50 text-navy-700 px-2 py-0.5 rounded-full mt-1 inline-block">
+                  <span className="text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full mt-1 inline-block">
                     {patient.patientCode}
                   </span>
                 </div>
@@ -1198,7 +1198,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                     type="button"
                     onClick={() => setProfileTab(t.key)}
                     className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold whitespace-nowrap transition-colors ${
-                      profileTab === t.key ? "bg-navy-700 text-white shadow-sm" : "text-slate-650 hover:bg-slate-50"
+                      profileTab === t.key ? "bg-emerald-700 text-white shadow-sm" : "text-slate-650 hover:bg-slate-50"
                     }`}
                   >
                     {t.icon}
@@ -1220,7 +1220,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                       <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                        <History className="h-4.5 w-4.5 text-navy-700" /> Medical History Ledger
+                        <History className="h-4.5 w-4.5 text-emerald-700" /> Medical History Ledger
                       </h3>
                       <span className="text-xs text-slate-400">
                         {historyGroups.length} consultations recorded
@@ -1313,7 +1313,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                               {/* Consultation Clinical Summary */}
                               {group.consultation && (
                                 <div className="bg-white rounded-lg border border-slate-100 p-2.5 space-y-1 text-xs">
-                                  <div className="flex items-center gap-1.5 text-navy-700 font-bold border-b border-slate-50 pb-1 mb-1">
+                                  <div className="flex items-center gap-1.5 text-emerald-700 font-bold border-b border-slate-50 pb-1 mb-1">
                                     <FileText className="h-3.5 w-3.5" /> Clinical Examination Details
                                   </div>
                                   {group.consultation.diagnosis && (
@@ -1437,7 +1437,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                       <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                        <Pill className="h-4.5 w-4.5 text-navy-700" /> Prescription History
+                        <Pill className="h-4.5 w-4.5 text-emerald-700" /> Prescription History
                       </h3>
                       <span className="text-xs text-slate-400">
                         {(prescriptions || []).length} rx across {rxGroups.length} consultations
@@ -1522,7 +1522,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
               {profileTab === "billing" && (
                 <div className="space-y-4">
                   <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 pb-2 border-b border-slate-100">
-                    <Receipt className="h-4.5 w-4.5 text-navy-700" /> Billing ledger
+                    <Receipt className="h-4.5 w-4.5 text-emerald-700" /> Billing ledger
                   </h3>
                   {billsData && billsData.data && billsData.data.length > 0 ? (
                     <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
@@ -1566,7 +1566,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                   <div className="space-y-6">
                     <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                       <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                        <Activity className="h-4.5 w-4.5 text-navy-700" /> Diagnostic Reports
+                        <Activity className="h-4.5 w-4.5 text-emerald-700" /> Diagnostic Reports
                       </h3>
                       <span className="text-xs text-slate-400">
                         {reports.length} total report(s)
@@ -1582,7 +1582,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                         {/* Section 1: Laboratory Reports */}
                         <div className="space-y-3">
                           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5 border-b pb-1">
-                            <FlaskConical className="h-4 w-4 text-navy-700" /> Laboratory Reports ({labReports.length})
+                            <FlaskConical className="h-4 w-4 text-emerald-700" /> Laboratory Reports ({labReports.length})
                           </h4>
                           {labGroups.length === 0 ? (
                             <p className="text-xs text-slate-400 italic py-2">No laboratory reports on file.</p>
@@ -1623,7 +1623,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                                       {group.doctorName && (
                                         <span>Doctor: <strong className="text-slate-700">Dr. {group.doctorName}</strong></span>
                                       )}
-                                      <span className="rounded-full bg-navy-100 px-2 py-0.5 text-[10px] font-semibold text-navy-800">
+                                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
                                         {group.reports.length} {group.reports.length === 1 ? "Report" : "Reports"}
                                       </span>
                                     </div>
@@ -1641,7 +1641,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                                       <div key={r._id} className="rounded-xl border border-slate-200/80 bg-white p-3 space-y-1.5 text-xs">
                                         <div className="flex justify-between items-center border-b border-slate-100 pb-1 mb-1">
                                           <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                                            <FlaskConical className="h-3.5 w-3.5 text-navy-600" /> {r.testName}
+                                            <FlaskConical className="h-3.5 w-3.5 text-emerald-600" /> {r.testName}
                                           </span>
                                           <span className="text-[10px] text-slate-400">{new Date(r.uploadedAt || r.createdAt).toLocaleDateString("en-IN")}</span>
                                         </div>
@@ -1673,7 +1673,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                                           </button>
                                           <button
                                             onClick={() => setSelectedReportId(r._id)}
-                                            className="inline-flex items-center gap-1 text-navy-700 hover:underline font-bold ml-auto bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded px-2 py-0.5 text-[10px]"
+                                            className="inline-flex items-center gap-1 text-emerald-700 hover:underline font-bold ml-auto bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded px-2 py-0.5 text-[10px]"
                                           >
                                             Details
                                           </button>
@@ -1690,7 +1690,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                         {/* Section 2: Radiology Reports */}
                         <div className="space-y-3 pt-2">
                           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5 border-b pb-1">
-                            <Scan className="h-4 w-4 text-navy-700" /> Radiology Studies ({radReports.length})
+                            <Scan className="h-4 w-4 text-emerald-700" /> Radiology Studies ({radReports.length})
                           </h4>
                           {radGroups.length === 0 ? (
                             <p className="text-xs text-slate-400 italic py-2">No radiology reports on file.</p>
@@ -1749,7 +1749,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                                       <div key={r._id} className="rounded-xl border border-slate-200/80 bg-white p-3 space-y-1.5 text-xs">
                                         <div className="flex justify-between items-center border-b border-slate-100 pb-1 mb-1">
                                           <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-                                            <Scan className="h-3.5 w-3.5 text-navy-600" /> {r.testName}
+                                            <Scan className="h-3.5 w-3.5 text-emerald-600" /> {r.testName}
                                           </span>
                                           <span className="text-[10px] text-slate-400">{new Date(r.uploadedAt || r.createdAt).toLocaleDateString("en-IN")}</span>
                                         </div>
@@ -1781,7 +1781,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                                           </button>
                                           <button
                                             onClick={() => setSelectedReportId(r._id)}
-                                            className="inline-flex items-center gap-1 text-navy-700 hover:underline font-bold ml-auto bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded px-2 py-0.5 text-[10px]"
+                                            className="inline-flex items-center gap-1 text-emerald-700 hover:underline font-bold ml-auto bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded px-2 py-0.5 text-[10px]"
                                           >
                                             Details
                                           </button>
@@ -2089,13 +2089,13 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                 placeholder="Search by UHID, phone, name, or code..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-slate-50 pl-9 pr-4 py-2 text-xs outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500 transition-colors"
+                className="w-full rounded-lg border border-slate-300 bg-slate-50 pl-9 pr-4 py-2 text-xs outline-none focus:border-emerald-500 focus:ring-1 focus:ring-navy-500 transition-colors"
               />
             </div>
 
             <div className="flex items-center gap-2">
               {todayFilter && !todayLoading && (
-                <span className="rounded-full bg-navy-50 text-navy-700 border border-navy-200 text-xs font-semibold px-2.5 py-0.5">
+                <span className="rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold px-2.5 py-0.5">
                   {todayData?.total ?? 0} registered today
                 </span>
               )}
@@ -2150,7 +2150,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                 </div>
               </div>
               <div className="text-right">
-                <h2 className="text-sm font-black uppercase text-navy-900 tracking-wider">
+                <h2 className="text-sm font-black uppercase text-slate-900 tracking-wider">
                   {todayFilter ? "Today's Registration Registry" : "Master Patient Registry"}
                 </h2>
                 <p className="text-[11px] text-slate-600 font-mono mt-0.5">
@@ -2167,7 +2167,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
               </div>
               <div>
                 <span>Total Records Printed: </span>
-                <span className="text-navy-900 font-extrabold">{((todayFilter ? todayData?.patients : listData?.data) || []).length} Patients</span>
+                <span className="text-slate-900 font-extrabold">{((todayFilter ? todayData?.patients : listData?.data) || []).length} Patients</span>
               </div>
             </div>
 
@@ -2387,7 +2387,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                   <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4 border border-slate-100 flex flex-col items-center">
                     <div className="w-full flex items-center justify-between border-b border-slate-100 pb-3">
                       <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-                        <Camera className="h-4 w-4 text-navy-700" /> Device Webcam Capture
+                        <Camera className="h-4 w-4 text-emerald-700" /> Device Webcam Capture
                       </h3>
                       <button type="button" onClick={stopCamera} className="text-slate-400 hover:text-slate-700 text-lg font-semibold">
                         &times;
@@ -2634,7 +2634,7 @@ export function PatientManagementPage({ activeTab = "list" }: Props) {
                 <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 flex justify-between items-center">
                   <div className="space-y-0.5">
                     <span className="text-[9px] font-bold tracking-wider text-slate-400 uppercase">Universal Health ID (UHID)</span>
-                    <div className="text-lg font-black text-navy-800 tracking-wide font-mono">
+                    <div className="text-lg font-black text-emerald-800 tracking-wide font-mono">
                       {registeredPatient.uhid}
                     </div>
                   </div>

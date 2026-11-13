@@ -135,7 +135,7 @@ export function ForgotPasswordPage() {
         <div className="flex flex-1 flex-col justify-center px-6 py-12 lg:col-span-7 xl:col-span-8 bg-slate-50">
           <div className="mx-auto w-full max-w-[420px] space-y-8">
             <div className="text-center space-y-2 lg:text-left">
-              <Link to="/" className="inline-flex lg:hidden items-center gap-2.5 text-xl font-extrabold text-navy-900 justify-center">
+              <Link to="/" className="inline-flex lg:hidden items-center gap-2.5 text-xl font-extrabold text-emerald-900 justify-center">
                 {logoUrl && (
                   <img src={logoUrl} alt={hospitalName} className="h-8 w-8 rounded-lg object-cover" />
                 )}
@@ -164,7 +164,7 @@ export function ForgotPasswordPage() {
                   <div className="pt-2 border-t border-slate-100">
                     <Link
                       to="/login"
-                      className="inline-flex items-center gap-1.5 text-xs text-navy-600 hover:text-navy-800 font-bold hover:underline"
+                      className="inline-flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-800 font-bold hover:underline"
                     >
                       <ArrowLeft className="h-4 w-4" /> Back to Sign In
                     </Link>
@@ -191,7 +191,7 @@ export function ForgotPasswordPage() {
                       className={`w-full rounded-lg border px-3.5 py-2.5 outline-none font-medium transition-all text-sm ${
                         emailTouched && emailError
                           ? "border-rose-400 bg-rose-50/20 text-slate-900 focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
-                          : "border-slate-300 focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+                          : "border-slate-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                       }`}
                       placeholder="name@hospital.com"
                     />
@@ -217,7 +217,7 @@ export function ForgotPasswordPage() {
                   <div className="text-center pt-2 border-t border-slate-100">
                     <Link
                       to="/login"
-                      className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-navy-700 font-bold hover:underline transition-colors"
+                      className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-emerald-700 font-bold hover:underline transition-colors"
                     >
                       <ArrowLeft className="h-4 w-4" /> Back to Sign In
                     </Link>

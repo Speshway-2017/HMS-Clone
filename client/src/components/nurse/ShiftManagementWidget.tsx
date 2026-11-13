@@ -216,7 +216,7 @@ export const ShiftManagementWidget: React.FC<ShiftManagementWidgetProps> = ({
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-navy-50 text-navy-700 border border-navy-100 flex items-center justify-center shrink-0">
+          <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-700 border border-navy-100 flex items-center justify-center shrink-0">
             <Clock className="h-5 w-5" />
           </div>
           <div>
@@ -237,7 +237,7 @@ export const ShiftManagementWidget: React.FC<ShiftManagementWidgetProps> = ({
           </button>
           <button
             onClick={onStartHandover}
-            className="px-4 py-2 bg-navy-700 hover:bg-navy-800 text-white text-xs font-extrabold rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer font-sans"
+            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer font-sans"
           >
             <UserCheck className="h-4 w-4" /> Start Shift Handover
           </button>

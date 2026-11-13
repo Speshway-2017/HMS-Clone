@@ -73,7 +73,7 @@ export function PatientFormPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <div className="text-sm text-slate-400">
-          <Link to="/admin/patients" className="hover:text-navy-700">
+          <Link to="/admin/patients" className="hover:text-emerald-700">
             Patients
           </Link>{" "}
           &gt; {isEdit ? "Edit Patient" : "Add New Patient"}

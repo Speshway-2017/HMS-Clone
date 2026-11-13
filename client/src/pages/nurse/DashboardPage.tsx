@@ -425,7 +425,7 @@ export function NurseDashboardPage() {
       header: "Patient",
       render: (row) => (
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-navy-100 text-navy-800 font-extrabold text-xs">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-xs">
             {(row.patientName || row.patient?.name || "P").charAt(0).toUpperCase()}
           </div>
           <div>
@@ -446,7 +446,7 @@ export function NurseDashboardPage() {
     {
       header: "Bed",
       render: (row) => (
-        <span className="rounded bg-navy-50 px-2.5 py-1 text-xs font-extrabold text-navy-800">
+        <span className="rounded bg-emerald-50 px-2.5 py-1 text-xs font-extrabold text-emerald-800">
           {row.bedNumber || row.bed?.bedNumber || "Bed 01"}
         </span>
       ),
@@ -463,7 +463,7 @@ export function NurseDashboardPage() {
       header: "Latest Vitals",
       render: (row) => {
         const v = row.latestVitals;
-        if (!v) return <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">Check Pending</span>;
+        if (!v) return <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">Check Pending</span>;
 
         const isAlert = Number(v.oxygenSaturation) < 94 || Number(v.temperature) > 100.4;
         return (
@@ -496,7 +496,7 @@ export function NurseDashboardPage() {
         } else if (isMedPending) {
           return <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-[11px] font-extrabold uppercase text-amber-800">Med Due</span>;
         } else if (isVitPending) {
-          return <span className="inline-flex items-center gap-1 rounded bg-blue-100 px-2 py-0.5 text-[11px] font-extrabold uppercase text-blue-800">Vitals Due</span>;
+          return <span className="inline-flex items-center gap-1 rounded bg-rose-100 px-2 py-0.5 text-[11px] font-extrabold uppercase text-rose-800">Vitals Due</span>;
         }
         return <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-[11px] font-extrabold uppercase text-emerald-800">Stable</span>;
       },
@@ -514,14 +514,14 @@ export function NurseDashboardPage() {
           </button>
           <button
             onClick={() => navigate(`/nurse/vitals?patientId=${row._id}`)}
-            className="rounded bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100"
+            className="rounded bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
             title="Record Vitals"
           >
             Vitals
           </button>
           <button
             onClick={() => navigate(`/nurse/medications?patientId=${row._id}`)}
-            className="rounded bg-purple-50 px-2 py-1 text-xs font-bold text-purple-700 hover:bg-purple-100"
+            className="rounded bg-rose-50 px-2 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100"
             title="Medications"
           >
             Meds
@@ -572,8 +572,8 @@ export function NurseDashboardPage() {
       {/* 1. Header Banner styled like Admin Dashboard */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-white p-6 rounded-2xl border border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
         <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-navy-50 border border-navy-100 text-navy-800 shadow-sm shrink-0">
-            <Activity className="h-6 w-6 text-navy-700" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 border border-navy-100 text-emerald-800 shadow-sm shrink-0">
+            <Activity className="h-6 w-6 text-emerald-700" />
           </div>
           <div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">Enterprise Clinical Nurse Dashboard</h1>
@@ -614,24 +614,24 @@ export function NurseDashboardPage() {
         {/* Card 1: Assigned Patients */}
         <div
           onClick={() => handleCardFilterClick("all")}
-          className={`cursor-pointer rounded-2xl p-4 border transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between h-full ${
+          className={`cursor-pointer rounded-xl p-3.5 border transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between h-full ${
             priorityFilter === "all"
-              ? "bg-navy-800 border-navy-800 text-white shadow-lg"
-              : "bg-white border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-md"
+              ? "bg-emerald-700 border-emerald-700 text-white shadow-md"
+              : "bg-white border-slate-200 shadow-xs hover:border-emerald-300"
           }`}
         >
           <div className="flex items-center justify-between gap-2">
-            <p className={`text-[10px] font-extrabold uppercase tracking-wider ${priorityFilter === "all" ? "text-navy-100" : "text-slate-400"}`}>
+            <p className={`text-[10px] font-extrabold uppercase tracking-wider ${priorityFilter === "all" ? "text-emerald-100" : "text-slate-500"}`}>
               TOTAL ASSIGNED
             </p>
-            <div className={`p-2 rounded-xl flex items-center justify-center shrink-0 ${priorityFilter === "all" ? "bg-navy-700 text-white" : "bg-navy-50 text-navy-700"}`}>
+            <div className={`p-1.5 rounded-lg flex items-center justify-center shrink-0 ${priorityFilter === "all" ? "bg-white/15 text-white" : "bg-emerald-50 text-emerald-700 border border-emerald-100"}`}>
               <Users className="h-4 w-4" />
             </div>
           </div>
-          <p className={`mt-3 text-3xl font-black ${priorityFilter === "all" ? "text-white" : "text-slate-900"}`}>
+          <p className={`mt-2 text-2xl font-bold ${priorityFilter === "all" ? "text-white" : "text-slate-900"}`}>
             {metrics.totalAssigned}
           </p>
-          <span className={`mt-2 text-[10px] font-bold ${priorityFilter === "all" ? "text-navy-200" : "text-slate-400"}`}>
+          <span className={`mt-1 text-[10px] font-semibold ${priorityFilter === "all" ? "text-emerald-200" : "text-slate-400"}`}>
             Shift Roster
           </span>
         </div>
@@ -639,24 +639,24 @@ export function NurseDashboardPage() {
         {/* Card 2: Pending Medications */}
         <div
           onClick={() => handleCardFilterClick("pending_meds")}
-          className={`cursor-pointer rounded-2xl p-4 border transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between h-full ${
+          className={`cursor-pointer rounded-xl p-3.5 border transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between h-full ${
             priorityFilter === "pending_meds"
-              ? "bg-navy-800 border-navy-800 text-white shadow-lg"
-              : "bg-white border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-md"
+              ? "bg-emerald-700 border-emerald-700 text-white shadow-md"
+              : "bg-white border-slate-200 shadow-xs hover:border-emerald-300"
           }`}
         >
           <div className="flex items-center justify-between gap-2">
-            <p className={`text-[10px] font-extrabold uppercase tracking-wider ${priorityFilter === "pending_meds" ? "text-navy-100" : "text-slate-400"}`}>
+            <p className={`text-[10px] font-extrabold uppercase tracking-wider ${priorityFilter === "pending_meds" ? "text-emerald-100" : "text-slate-500"}`}>
               PENDING MEDS
             </p>
-            <div className={`p-2 rounded-xl flex items-center justify-center shrink-0 ${priorityFilter === "pending_meds" ? "bg-navy-700 text-white" : "bg-amber-50 text-amber-600"}`}>
+            <div className={`p-1.5 rounded-lg flex items-center justify-center shrink-0 ${priorityFilter === "pending_meds" ? "bg-white/15 text-white" : "bg-amber-50 text-amber-700 border border-amber-100"}`}>
               <Pill className="h-4 w-4" />
             </div>
           </div>
-          <p className={`mt-3 text-3xl font-black ${priorityFilter === "pending_meds" ? "text-white" : "text-amber-600"}`}>
+          <p className={`mt-2 text-2xl font-bold ${priorityFilter === "pending_meds" ? "text-white" : "text-amber-700"}`}>
             {metrics.medDueCount}
           </p>
-          <span className={`mt-2 text-[10px] font-bold ${priorityFilter === "pending_meds" ? "text-navy-200" : "text-slate-400"}`}>
+          <span className={`mt-1 text-[10px] font-semibold ${priorityFilter === "pending_meds" ? "text-emerald-200" : "text-slate-400"}`}>
             Doses Pending
           </span>
         </div>
@@ -664,24 +664,24 @@ export function NurseDashboardPage() {
         {/* Card 3: Pending Vitals */}
         <div
           onClick={() => handleCardFilterClick("pending_vitals")}
-          className={`cursor-pointer rounded-2xl p-4 border transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between h-full ${
+          className={`cursor-pointer rounded-xl p-3.5 border transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between h-full ${
             priorityFilter === "pending_vitals"
-              ? "bg-navy-800 border-navy-800 text-white shadow-lg"
-              : "bg-white border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-md"
+              ? "bg-emerald-700 border-emerald-700 text-white shadow-md"
+              : "bg-white border-slate-200 shadow-xs hover:border-emerald-300"
           }`}
         >
           <div className="flex items-center justify-between gap-2">
-            <p className={`text-[10px] font-extrabold uppercase tracking-wider ${priorityFilter === "pending_vitals" ? "text-navy-100" : "text-slate-400"}`}>
+            <p className={`text-[10px] font-extrabold uppercase tracking-wider ${priorityFilter === "pending_vitals" ? "text-emerald-100" : "text-slate-500"}`}>
               PENDING VITALS
             </p>
-            <div className={`p-2 rounded-xl flex items-center justify-center shrink-0 ${priorityFilter === "pending_vitals" ? "bg-navy-700 text-white" : "bg-blue-50 text-blue-600"}`}>
+            <div className={`p-1.5 rounded-lg flex items-center justify-center shrink-0 ${priorityFilter === "pending_vitals" ? "bg-white/15 text-white" : "bg-emerald-50 text-emerald-700 border border-emerald-100"}`}>
               <Activity className="h-4 w-4" />
             </div>
           </div>
-          <p className={`mt-3 text-3xl font-black ${priorityFilter === "pending_vitals" ? "text-white" : "text-blue-600"}`}>
+          <p className={`mt-2 text-2xl font-bold ${priorityFilter === "pending_vitals" ? "text-white" : "text-emerald-700"}`}>
             {metrics.pendingVitalsCount}
           </p>
-          <span className={`mt-2 text-[10px] font-bold ${priorityFilter === "pending_vitals" ? "text-navy-200" : "text-slate-400"}`}>
+          <span className={`mt-1 text-[10px] font-semibold ${priorityFilter === "pending_vitals" ? "text-emerald-200" : "text-slate-400"}`}>
             Check Scheduled
           </span>
         </div>
@@ -689,24 +689,24 @@ export function NurseDashboardPage() {
         {/* Card 4: Critical Patients */}
         <div
           onClick={() => handleCardFilterClick("critical")}
-          className={`cursor-pointer rounded-2xl p-4 border transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between h-full ${
+          className={`cursor-pointer rounded-xl p-3.5 border transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between h-full ${
             priorityFilter === "critical"
-              ? "bg-navy-800 border-navy-800 text-white shadow-lg"
-              : "bg-white border-slate-100 shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-md"
+              ? "bg-emerald-700 border-emerald-700 text-white shadow-md"
+              : "bg-white border-slate-200 shadow-xs hover:border-emerald-300"
           }`}
         >
           <div className="flex items-center justify-between gap-2">
-            <p className={`text-[10px] font-extrabold uppercase tracking-wider ${priorityFilter === "critical" ? "text-navy-100" : "text-slate-400"}`}>
+            <p className={`text-[10px] font-extrabold uppercase tracking-wider ${priorityFilter === "critical" ? "text-emerald-100" : "text-slate-500"}`}>
               CRITICAL PATIENTS
             </p>
-            <div className={`p-2 rounded-xl flex items-center justify-center shrink-0 ${priorityFilter === "critical" ? "bg-navy-700 text-white" : "bg-red-50 text-red-600"}`}>
+            <div className={`p-1.5 rounded-lg flex items-center justify-center shrink-0 ${priorityFilter === "critical" ? "bg-white/15 text-white" : "bg-rose-50 text-rose-600 border border-rose-100"}`}>
               <ShieldAlert className="h-4 w-4" />
             </div>
           </div>
           <p className={`mt-3 text-3xl font-black ${priorityFilter === "critical" ? "text-white" : "text-red-600"}`}>
             {metrics.criticalCount}
           </p>
-          <span className={`mt-2 text-[10px] font-bold ${priorityFilter === "critical" ? "text-navy-200" : "text-slate-400"}`}>
+          <span className={`mt-2 text-[10px] font-bold ${priorityFilter === "critical" ? "text-emerald-200" : "text-slate-400"}`}>
             ICU / Vitals Alert
           </span>
         </div>
@@ -778,7 +778,7 @@ export function NurseDashboardPage() {
                 </div>
                 <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-blue-600 transition-all duration-500 ease-in-out" 
+                    className="h-full bg-emerald-600 transition-all duration-500 ease-in-out" 
                     style={{ width: `${completionAnalytics.vitalsRate}%` }}
                   />
                 </div>
@@ -892,7 +892,7 @@ export function NurseDashboardPage() {
             <button
               type="button"
               onClick={() => setTaskTab("medium")}
-              className={`rounded-lg px-3.5 py-1.5 text-xs font-extrabold transition-all cursor-pointer ${taskTab === "medium" ? "bg-navy-900 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+              className={`rounded-lg px-3.5 py-1.5 text-xs font-extrabold transition-all cursor-pointer ${taskTab === "medium" ? "bg-emerald-700 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
             >
               Medium Priority ({tasks.medium.length})
             </button>
@@ -916,12 +916,12 @@ export function NurseDashboardPage() {
             (taskTab === "high" ? tasks.high : taskTab === "medium" ? tasks.medium : tasks.completed).map((t) => (
               <div
                 key={t.id}
-                className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 space-y-2 hover:bg-white hover:shadow-md transition-all border-l-4 border-l-indigo-500"
+                className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 space-y-2 hover:bg-white hover:shadow-md transition-all border-l-4 border-l-emerald-600"
               >
                 <div className="flex items-center justify-between">
                   <h4 className="font-bold text-slate-800 text-xs">{t.title}</h4>
                   <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wider ${
-                    t.type === 'critical' ? 'bg-red-100 text-red-700' : t.type === 'medication' ? 'bg-amber-100 text-amber-800' : t.type === 'vitals' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-800'
+                    t.type === 'critical' ? 'bg-red-100 text-red-700' : t.type === 'medication' ? 'bg-amber-100 text-amber-800' : t.type === 'vitals' ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-100 text-emerald-800'
                   }`}>
                     {t.type}
                   </span>
@@ -935,7 +935,7 @@ export function NurseDashboardPage() {
                       else if (t.type === 'vitals' || t.type === 'critical') navigate(`/nurse/vitals?patientId=${t.patientId}`);
                       else navigate(`/nurse/notes?patientId=${t.patientId}`);
                     }}
-                    className="inline-flex items-center gap-1 text-xs font-extrabold text-navy-900 hover:text-navy-950 hover:underline cursor-pointer"
+                    className="inline-flex items-center gap-1 text-xs font-extrabold text-slate-900 hover:text-emerald-700 hover:underline cursor-pointer"
                   >
                     <span>Take Action</span>
                     <ChevronRight className="h-3.5 w-3.5" />
@@ -959,7 +959,7 @@ export function NurseDashboardPage() {
               <button
                 type="button"
                 onClick={() => setPriorityFilter("all")}
-                className="rounded-full bg-navy-50 border border-navy-100 px-3 py-1 text-xs font-extrabold text-navy-800 hover:bg-navy-100 flex items-center gap-1 transition cursor-pointer"
+                className="rounded-full bg-emerald-50 border border-navy-100 px-3 py-1 text-xs font-extrabold text-emerald-800 hover:bg-emerald-100 flex items-center gap-1 transition cursor-pointer"
               >
                 <span>Reset Filter</span>
                 <span>✕</span>
@@ -1078,7 +1078,7 @@ export function NurseDashboardPage() {
                               key={nurse._id}
                               onClick={() => setSelectedIncomingNurseId(nurse._id)}
                               className={`hover:bg-slate-50/80 cursor-pointer transition ${
-                                isSelected ? "bg-navy-50/60" : ""
+                                isSelected ? "bg-emerald-50/60" : ""
                               }`}
                             >
                               <td className="p-3 text-center">
@@ -1087,7 +1087,7 @@ export function NurseDashboardPage() {
                                   name="incomingNurse"
                                   checked={isSelected}
                                   onChange={() => setSelectedIncomingNurseId(nurse._id)}
-                                  className="h-3.5 w-3.5 text-navy-900 border-slate-300 focus:ring-navy-950"
+                                  className="h-3.5 w-3.5 text-slate-900 border-slate-300 focus:ring-navy-950"
                                 />
                               </td>
                               <td className="p-3 font-bold text-slate-800 flex items-center gap-2">

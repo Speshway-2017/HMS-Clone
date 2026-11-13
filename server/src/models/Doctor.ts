@@ -15,6 +15,7 @@ const doctorSchema = new Schema(
     specialization: { type: String, default: "", maxlength: 100 },
     qualification: { type: String, default: "", maxlength: 200 },
     licenseNo: { type: String, default: "", maxlength: 50 },
+    employeeId: { type: String, default: "", maxlength: 50 },
     bio: { type: String, default: "", maxlength: 500 },
     workingHours: {
       type: [

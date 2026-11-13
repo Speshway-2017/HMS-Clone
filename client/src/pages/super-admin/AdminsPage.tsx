@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { UserPlus, ShieldCheck, Users2, Building2, Pencil, Trash2 } from "lucide-react";
+import { UserPlus, ShieldCheck, Users2, Pencil, Trash2 } from "lucide-react";
 import { useAdmins, useDeleteAdmin } from "../../features/admins";
-import { useHospitals } from "../../features/hospitals";
 import { useGlobalAnalytics } from "../../features/analytics";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -16,10 +15,8 @@ import { Admin } from "../../types/domain";
 
 export function AdminsPage() {
   const [page, setPage] = useState(1);
-  const [hospitalId, setHospitalId] = useState("");
   const [role, setRole] = useState("");
-  const { data, isLoading } = useAdmins({ page, hospitalId: hospitalId || undefined, role: role || undefined });
-  const { data: hospitalsData } = useHospitals({ page: 1 });
+  const { data, isLoading } = useAdmins({ page, role: role || undefined });
   const { data: analytics } = useGlobalAnalytics();
   const deleteAdmin = useDeleteAdmin();
   const [deleteTargetAdmin, setDeleteTargetAdmin] = useState<{ id: string; name: string } | null>(null);
@@ -40,18 +37,39 @@ export function AdminsPage() {
     {
       header: "Administrator Name",
       render: (a) => (
-        <div>
-          <div className="font-semibold text-slate-800">{a.name}</div>
-          {a.employeeId && <div className="text-xs text-slate-400">ID: {a.employeeId}</div>}
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200">
+            {a.avatarUrl ? (
+              <img src={a.avatarUrl} alt={a.name} className="h-8 w-8 rounded-full object-cover" />
+            ) : (
+              <span>{a.name.slice(0, 2).toUpperCase()}</span>
+            )}
+          </div>
+          <div>
+            <div className="font-semibold text-slate-800 text-xs sm:text-sm">{a.name}</div>
+            <div className="text-[11px] text-slate-400">{a.title || "System Administrator"}</div>
+          </div>
         </div>
       ),
     },
     {
-      header: "Primary Role",
-      render: (a) => <Badge tone="info">{a.title || (a.role === "hospital_admin" ? "Hospital Admin" : "Accountant")}</Badge>,
+      header: "Admin Unique ID",
+      render: (a) => (
+        <span className="inline-flex items-center px-2 py-0.5 rounded font-mono text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">
+          {a.employeeId || "—"}
+        </span>
+      ),
     },
-    { header: "Assigned Hospital", render: (a) => <span className="text-slate-600">{typeof a.hospital === "object" && a.hospital ? a.hospital.name : "Unassigned"}</span> },
-    { header: "Email Address", render: (a) => <span className="text-slate-600">{a.email}</span> },
+    {
+      header: "Role / Authority",
+      render: (a) => (
+        <Badge tone="info">
+          {a.role === "admin" || a.role === "hospital_admin" ? "Administrator" : a.role}
+        </Badge>
+      ),
+    },
+    { header: "Email Address", render: (a) => <span className="text-slate-600 text-xs sm:text-sm">{a.email}</span> },
+    { header: "Contact Number", render: (a) => <span className="text-slate-600 text-xs sm:text-sm font-mono">{a.phone || "—"}</span> },
     {
       header: "Status",
       render: (a) => <Badge tone={a.status === "active" ? "success" : "neutral"}>{a.status === "active" ? "Active" : "Inactive"}</Badge>,
@@ -60,7 +78,7 @@ export function AdminsPage() {
       header: "Actions",
       render: (a) => (
         <div className="flex items-center gap-2 text-slate-400">
-          <Link to={`/super-admin/admins/${a._id}/edit`} className="hover:text-navy-700">
+          <Link to={`/super-admin/admins/${a._id}/edit`} className="hover:text-emerald-700" title="Edit Profile">
             <Pencil className="h-4 w-4" />
           </Link>
           <button
@@ -97,41 +115,27 @@ export function AdminsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <KpiCard label="Total Admins" value={data?.pagination.total ?? 0} icon={<Users2 className="h-5 w-5" />} />
-        <KpiCard label="Active Hospitals" value={analytics?.counts.activeHospitals ?? 0} icon={<Building2 className="h-5 w-5" />} />
+        <KpiCard label="Total Administrators" value={data?.pagination.total ?? 0} icon={<Users2 className="h-5 w-5" />} />
+        <KpiCard label="Active Status" value={data?.data.filter((a) => a.status === "active").length ?? 0} icon={<ShieldCheck className="h-5 w-5" />} />
       </div>
 
       <Card>
-        <div className="mb-4 flex flex-wrap gap-3">
-          <select
-            value={hospitalId}
-            onChange={(e) => {
-              setHospitalId(e.target.value);
-              setPage(1);
-            }}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-          >
-            <option value="">Filter by Hospital</option>
-            {hospitalsData?.data.map((h) => (
-              <option key={h._id} value={h._id}>
-                {h.name}
-              </option>
-            ))}
-          </select>
+        <div className="mb-4 flex flex-wrap items-center gap-3">
           <select
             value={role}
             onChange={(e) => {
               setRole(e.target.value);
               setPage(1);
             }}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white"
           >
-            <option value="">Filter by Role</option>
+            <option value="">All Roles</option>
+            <option value="admin">Administrator</option>
             <option value="hospital_admin">Hospital Admin</option>
             <option value="accountant">Accountant</option>
           </select>
-          <span className="ml-auto self-center text-sm text-slate-500">
-            Showing {data?.data.length ?? 0} of {data?.pagination.total ?? 0} admins
+          <span className="ml-auto self-center text-xs text-slate-500">
+            Showing {data?.data.length ?? 0} of {data?.pagination.total ?? 0} administrators
           </span>
         </div>
 

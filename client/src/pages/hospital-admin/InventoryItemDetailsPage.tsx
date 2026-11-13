@@ -24,7 +24,7 @@ export function InventoryItemDetailsPage() {
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm text-slate-400">
-            <Link to="/admin/inventory" className="hover:text-navy-700">
+            <Link to="/admin/inventory" className="hover:text-emerald-700">
               Inventory
             </Link>{" "}
             / {item.category} / {item.name}
@@ -53,7 +53,7 @@ export function InventoryItemDetailsPage() {
             <span>{percentToMax}% to Max</span>
           </div>
           <div className="mt-1 h-2 rounded-full bg-slate-100">
-            <div className="h-2 rounded-full bg-navy-700" style={{ width: `${percentToMax}%` }} />
+            <div className="h-2 rounded-full bg-emerald-700" style={{ width: `${percentToMax}%` }} />
           </div>
         </Card>
 
@@ -78,8 +78,8 @@ export function InventoryItemDetailsPage() {
           </div>
         </Card>
 
-        <Card className="bg-navy-700 text-white">
-          <p className="text-xs font-semibold uppercase tracking-wide text-navy-100">Supplier</p>
+        <Card className="bg-emerald-700 text-white">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-100">Supplier</p>
           <h3 className="mt-1 text-lg font-semibold">{item.supplier || "Not specified"}</h3>
         </Card>
       </div>

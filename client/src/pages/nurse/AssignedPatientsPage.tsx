@@ -95,7 +95,7 @@ export function AssignedPatientsPage() {
       header: "Ward / Room / Bed",
       render: (row) => (
         <div>
-          <span className="rounded bg-navy-50 px-2 py-0.5 text-xs font-bold text-navy-800">
+          <span className="rounded bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-800">
             {row.bedNumber || row.bed?.bedNumber || "Bed N/A"}
           </span>
           <p className="mt-1 text-xs text-slate-500">{row.wardName || row.ward?.name || "General Ward"} (Room: {row.roomNumber || row.room?.roomNumber || "101"})</p>

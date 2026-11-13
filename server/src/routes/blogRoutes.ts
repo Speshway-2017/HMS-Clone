@@ -10,7 +10,7 @@ router.get("/:id", getBlog);
 
 router.use(protect);
 router.use(scopeToHospital);
-router.use(restrictTo("super_admin", "hospital_admin"));
+router.use(restrictTo("super_admin"));
 
 router.post("/", createBlog);
 router.patch("/:id", updateBlog);

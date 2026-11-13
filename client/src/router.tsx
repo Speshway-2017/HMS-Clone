@@ -57,17 +57,6 @@ import { StaffPage } from "./pages/hospital-admin/StaffPage";
 import { StaffFormPage } from "./pages/hospital-admin/StaffFormPage";
 import { StaffDetailsPage } from "./pages/hospital-admin/StaffDetailsPage";
 
-// Accountant module
-import { AccountantDashboard } from "./pages/accountant/Dashboard";
-import { AccountantBillingPage } from "./pages/accountant/BillingPage";
-import { AccountantPaymentsPage } from "./pages/accountant/PaymentsPage";
-import { AccountantClaimsPage } from "./pages/accountant/ClaimsPage";
-import { AccountantPayrollPage } from "./pages/accountant/PayrollPage";
-import { AccountantExpensesPage } from "./pages/accountant/ExpensesPage";
-import { AccountantAnalyticsPage } from "./pages/accountant/AnalyticsPage";
-import { AccountantAuditLogsPage } from "./pages/accountant/AuditLogsPage";
-import { AccountantSettingsPage } from "./pages/accountant/SettingsPage";
-
 // Shared/Profile settings
 import { SettingsPage } from "./pages/shared/SettingsPage";
 
@@ -81,7 +70,6 @@ import { BillingPage as ReceptionBillingPage } from "./pages/receptionist/Billin
 import { QueuePage } from "./pages/receptionist/Queue";
 import { DisplayQueuePage } from "./pages/receptionist/DisplayQueue";
 import { DoctorsPage as ReceptionDoctorsPage } from "./pages/receptionist/Doctors";
-import { NotificationsPage as ReceptionNotificationsPage } from "./pages/receptionist/Notifications";
 import { ReportsPage as ReceptionReportsPage } from "./pages/receptionist/Reports";
 
 // Doctor module
@@ -105,7 +93,6 @@ import { PendingLabOrdersPage } from "./pages/doctor/PendingLabOrdersPage";
 import { NewLabOrderPage } from "./pages/doctor/NewLabOrderPage";
 import { FollowupsPage } from "./pages/doctor/FollowupsPage";
 import { SurgeriesPage } from "./pages/doctor/SurgeriesPage";
-import { NotificationsPage as DoctorNotificationsPage } from "./pages/doctor/NotificationsPage";
 import { CalendarPage as DoctorCalendarPage } from "./pages/doctor/CalendarPage";
 import { PatientsPage as DoctorPatientsPage } from "./pages/doctor/PatientsPage";
 import { NewCertificatePage } from "./pages/doctor/NewCertificatePage";
@@ -121,37 +108,22 @@ import { PharmacyBilling } from "./pages/pharmacy/Billing";
 import { PharmacySalesAnalytics } from "./pages/pharmacy/SalesAnalytics";
 import { PharmacySettings } from "./pages/pharmacy/Settings";
 
-// Laboratory module
-import { LaboratoryDashboard } from "./pages/laboratory/Dashboard";
-import { LaboratoryTestRequestManagement } from "./pages/laboratory/TestRequestManagement";
-import { LaboratorySampleCollection } from "./pages/laboratory/SampleCollection";
-import { LaboratoryTestProcessing } from "./pages/laboratory/TestProcessing";
-import { LaboratoryInventory } from "./pages/laboratory/LabInventory";
-import { LaboratorySettings } from "./pages/laboratory/Settings";
-import { LaboratoryBilling } from "./pages/laboratory/Billing";
-import { NewLabBillPage } from "./pages/laboratory/NewLabBill";
-import { UploadReportPage } from "./pages/laboratory/UploadReportPage";
-import { TestRequestDetailsPage } from "./pages/laboratory/TestRequestDetailsPage";
-import { LaboratoryQualityControl } from "./pages/laboratory/QualityControl";
-import { LaboratoryCompletedReports } from "./pages/laboratory/CompletedReports";
-
-// Nurse & Patient modules
-import { NurseDashboardPage } from "./pages/nurse/DashboardPage";
-import { AssignedPatientsPage } from "./pages/nurse/AssignedPatientsPage";
-import { MedicationAdminPage } from "./pages/nurse/MedicationAdminPage";
-import { VitalsMonitoringPage } from "./pages/nurse/VitalsMonitoringPage";
-import { NursingNotesPage } from "./pages/nurse/NursingNotesPage";
-import { CarePlansPage } from "./pages/nurse/CarePlansPage";
+// Clinical Staff module
+import { NurseDashboardPage as StaffDashboardPage } from "./pages/nurse/DashboardPage";
+import { AssignedPatientsPage as StaffAssignedPatientsPage } from "./pages/nurse/AssignedPatientsPage";
+import { MedicationAdminPage as StaffMedicationAdminPage } from "./pages/nurse/MedicationAdminPage";
+import { VitalsMonitoringPage as StaffVitalsMonitoringPage } from "./pages/nurse/VitalsMonitoringPage";
+import { NursingNotesPage as StaffNotesPage } from "./pages/nurse/NursingNotesPage";
+import { CarePlansPage as StaffCarePlansPage } from "./pages/nurse/CarePlansPage";
 import ShiftHandover from "./pages/nurse/ShiftHandover";
-import { WardManagementPage } from "./pages/nurse/WardManagementPage";
-import { EmergencyAlertsPage } from "./pages/nurse/EmergencyAlertsPage";
-import { AlertDetailPage } from "./pages/nurse/AlertDetailPage";
-import NurseNotificationsPage from "./pages/nurse/NotificationsPage";
+import { WardManagementPage as StaffWardManagementPage } from "./pages/nurse/WardManagementPage";
+import { EmergencyAlertsPage as StaffEmergencyAlertsPage } from "./pages/nurse/EmergencyAlertsPage";
+import { AlertDetailPage as StaffAlertDetailPage } from "./pages/nurse/AlertDetailPage";
+import { AssignTaskPage as StaffAssignTaskPage } from "./pages/nurse/AssignTaskPage";
+
+// Patient module
 import { PatientDashboard } from "./pages/patient/Dashboard";
 
-// Nurse module
-import { NurseDashboard } from "./pages/nurse/Dashboard";
-import { AssignTaskPage } from "./pages/nurse/AssignTaskPage";
 export const router = createBrowserRouter([
   {
     element: <PublicLayout />,
@@ -163,13 +135,17 @@ export const router = createBrowserRouter([
       { path: "/reset-password/:token", element: <ResetPasswordPage /> },
       { path: "/verify-prescription/:id", element: <VerifyPrescriptionPage /> },
       { path: "/doctors/:id", element: <PublicDoctorProfilePage /> },
-      { path: "/reception/ip-management", element: <Navigate to="/admin/ip?tab=transfer" replace /> },
-      { path: "/receptionist/ip-management", element: <Navigate to="/admin/ip?tab=transfer" replace /> },
+      { path: "/reception/ip-management", element: <Navigate to="/admin/beds" replace /> },
+      { path: "/receptionist/ip-management", element: <Navigate to="/admin/beds" replace /> },
       { path: "/privacy-policy", element: <PrivacyPolicyPage /> },
       { path: "/terms-and-conditions", element: <TermsConditionsPage /> },
       { path: "/delete-account", element: <DeleteAccountPage /> },
+      { path: "/nurse", element: <Navigate to="/staff" replace /> },
+      { path: "/nurse/*", element: <Navigate to="/staff" replace /> },
     ],
   },
+
+  // 1. Super Admin Dashboard (Network oversight + Website CMS & Public Enquiries)
   {
     element: <ProtectedRoute allow={["super_admin"]} />,
     children: [
@@ -193,17 +169,26 @@ export const router = createBrowserRouter([
           { path: "admins/new", element: <AdminFormPage /> },
           { path: "admins/:id/edit", element: <AdminFormPage /> },
           { path: "roles", element: <ManageRolesPage /> },
-          { path: "roles/new", element: <RoleFormPage /> },
-          { path: "roles/:id/edit", element: <RoleFormPage /> },
+          { path: "roles/new", element: <Navigate to="/super-admin/roles" replace /> },
+          { path: "roles/:id/edit", element: <Navigate to="/super-admin/roles" replace /> },
           { path: "analytics", element: <AnalyticsPage /> },
           { path: "reports", element: <ReportsPage /> },
+          // Website CMS & Public Pages Control (transferred from Admin)
+          { path: "cms", element: <HospitalInfoPage /> },
+          { path: "hospital-info", element: <HospitalInfoPage /> },
+          { path: "enquiries", element: <EnquiriesPage /> },
+          { path: "blogs", element: <BlogsPage /> },
+          { path: "blogs/new", element: <BlogFormPage /> },
+          { path: "blogs/edit/:id", element: <BlogFormPage /> },
           { path: "settings", element: <SettingsPage /> },
         ],
       },
     ],
   },
+
+  // 2. Hospital Admin Dashboard
   {
-    element: <ProtectedRoute allow={["hospital_admin"]} />,
+    element: <ProtectedRoute allow={["hospital_admin", "admin"]} />,
     children: [
       {
         path: "/admin",
@@ -236,9 +221,9 @@ export const router = createBrowserRouter([
           { path: "inventory/new", element: <InventoryFormPage /> },
           { path: "inventory/:id", element: <InventoryItemDetailsPage /> },
           { path: "inventory/:id/edit", element: <InventoryFormPage /> },
-          { path: "roles", element: <ManageRolesPage /> },
-          { path: "roles/new", element: <RoleFormPage /> },
-          { path: "roles/:id/edit", element: <RoleFormPage /> },
+          { path: "roles", element: <Navigate to="/admin" replace /> },
+          { path: "roles/new", element: <Navigate to="/admin" replace /> },
+          { path: "roles/:id/edit", element: <Navigate to="/admin" replace /> },
           { path: "beds", element: <BedsPage /> },
           { path: "beds/create-ward", element: <WardFormPage /> },
           { path: "beds/edit-ward/:id", element: <WardFormPage /> },
@@ -248,38 +233,15 @@ export const router = createBrowserRouter([
           { path: "beds/edit-bed/:id", element: <BedFormPage /> },
           { path: "beds/transfer", element: <Navigate to="/admin/beds" replace /> },
           { path: "ip", element: <Navigate to="/admin/beds" replace /> },
-          { path: "hospital-info", element: <HospitalInfoPage /> },
-          { path: "enquiries", element: <EnquiriesPage /> },
-          { path: "blogs", element: <BlogsPage /> },
-          { path: "blogs/new", element: <BlogFormPage /> },
-          { path: "blogs/edit/:id", element: <BlogFormPage /> },
           { path: "settings", element: <SettingsPage /> },
         ],
       },
     ],
   },
+
+  // 3. Receptionist Dashboard
   {
-    element: <ProtectedRoute allow={["accountant"]} />,
-    children: [
-      {
-        path: "/accountant",
-        element: <DashboardLayout />,
-        children: [
-          { index: true, element: <AccountantDashboard /> },
-          { path: "billing", element: <AccountantBillingPage /> },
-          { path: "payments", element: <AccountantPaymentsPage /> },
-          { path: "claims", element: <AccountantClaimsPage /> },
-          { path: "payroll", element: <AccountantPayrollPage /> },
-          { path: "expenses", element: <AccountantExpensesPage /> },
-          { path: "analytics", element: <AccountantAnalyticsPage /> },
-          { path: "audit-logs", element: <AccountantAuditLogsPage /> },
-          { path: "settings", element: <AccountantSettingsPage /> },
-        ],
-      },
-    ],
-  },
-  {
-    element: <ProtectedRoute allow={["receptionist", "hospital_admin", "super_admin"]} />,
+    element: <ProtectedRoute allow={["receptionist", "hospital_admin", "admin", "super_admin"]} />,
     children: [
       {
         path: "/receptionist",
@@ -319,7 +281,6 @@ export const router = createBrowserRouter([
           { path: "doctors", element: <ReceptionDoctorsPage /> },
           { path: "doctors/availability", element: <ReceptionDoctorsPage activeTab="availability" /> },
           { path: "doctors/timings", element: <ReceptionDoctorsPage activeTab="timings" /> },
-          { path: "notifications", element: <ReceptionNotificationsPage /> },
           { path: "reports", element: <ReceptionReportsPage /> },
           { path: "settings", element: <SettingsPage /> },
         ],
@@ -334,6 +295,8 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
+  // 4. Doctor Dashboard
   {
     element: <ProtectedRoute allow={["doctor"]} />,
     children: [
@@ -361,7 +324,6 @@ export const router = createBrowserRouter([
           { path: "laboratory/new", element: <NewLabOrderPage /> },
           { path: "followups", element: <FollowupsPage /> },
           { path: "surgeries", element: <SurgeriesPage /> },
-          { path: "notifications", element: <DoctorNotificationsPage /> },
           { path: "calendar", element: <DoctorCalendarPage /> },
           { path: "patients", element: <DoctorPatientsPage /> },
           { path: "certificates/new", element: <NewCertificatePage /> },
@@ -370,6 +332,8 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
+  // 5. Pharmacist Dashboard
   {
     element: <ProtectedRoute allow={["pharmacist"]} />,
     children: [
@@ -389,57 +353,36 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  {
-    element: <ProtectedRoute allow={["laboratory"]} />,
-    children: [
-      {
-        path: "/laboratory",
-        element: <DashboardLayout />,
-        children: [
-          { index: true, element: <LaboratoryDashboard /> },
-          { path: "requests", element: <LaboratoryTestRequestManagement /> },
-          { path: "requests/:requestId", element: <TestRequestDetailsPage /> },
-          { path: "samples", element: <LaboratorySampleCollection /> },
-          { path: "processing", element: <LaboratoryTestProcessing /> },
-          { path: "processing/upload", element: <UploadReportPage /> },
-          { path: "qc", element: <LaboratoryQualityControl /> },
-          { path: "inventory", element: <LaboratoryInventory /> },
-          { path: "billing", element: <LaboratoryBilling /> },
-          { path: "billing/new", element: <NewLabBillPage /> },
-          { path: "completed-reports", element: <LaboratoryCompletedReports /> },
-          { path: "settings", element: <LaboratorySettings /> },
-        ],
-      },
-    ],
-  },
-  {
-    element: <ProtectedRoute allow={["nurse"]} />,
-    children: [
-      {
-        path: "/nurse",
-        element: <DashboardLayout />,
-        children: [
-          { index: true, element: <NurseDashboardPage /> },
 
-          { path: "dashboard", element: <NurseDashboardPage /> },
-          { path: "assign-task", element: <AssignTaskPage /> },
-          { path: "patients", element: <AssignedPatientsPage /> },
-          { path: "inpatients", element: <AssignedPatientsPage /> },
-          { path: "medications", element: <MedicationAdminPage /> },
-          { path: "vitals", element: <VitalsMonitoringPage /> },
-          { path: "notes", element: <NursingNotesPage /> },
-          { path: "care-plans", element: <CarePlansPage /> },
+  // 6. Clinical Staff Dashboard (Ward, Inpatient, Vitals, Shift Handover)
+  {
+    element: <ProtectedRoute allow={["staff", "nurse"]} />,
+    children: [
+      {
+        path: "/staff",
+        element: <DashboardLayout />,
+        children: [
+          { index: true, element: <StaffDashboardPage /> },
+          { path: "dashboard", element: <StaffDashboardPage /> },
+          { path: "assign-task", element: <StaffAssignTaskPage /> },
+          { path: "patients", element: <StaffAssignedPatientsPage /> },
+          { path: "inpatients", element: <StaffAssignedPatientsPage /> },
+          { path: "medications", element: <StaffMedicationAdminPage /> },
+          { path: "vitals", element: <StaffVitalsMonitoringPage /> },
+          { path: "notes", element: <StaffNotesPage /> },
+          { path: "care-plans", element: <StaffCarePlansPage /> },
           { path: "shift-handover", element: <ShiftHandover /> },
           { path: "handover", element: <ShiftHandover /> },
-          { path: "wards", element: <WardManagementPage /> },
-          { path: "alerts", element: <EmergencyAlertsPage /> },
-          { path: "alerts/:id", element: <AlertDetailPage /> },
-          { path: "notifications", element: <NurseNotificationsPage /> },
+          { path: "wards", element: <StaffWardManagementPage /> },
+          { path: "alerts", element: <StaffEmergencyAlertsPage /> },
+          { path: "alerts/:id", element: <StaffAlertDetailPage /> },
           { path: "settings", element: <SettingsPage /> },
         ],
       },
     ],
   },
+
+  // 7. Patient Portal
   {
     element: <ProtectedRoute allow={["patient"]} />,
     children: [
@@ -460,10 +403,15 @@ export const router = createBrowserRouter([
           { path: "video-consult", element: <PatientDashboard activeTab="telehealth" /> },
           { path: "video-conference", element: <PatientDashboard activeTab="conference" /> },
           { path: "conference", element: <PatientDashboard activeTab="conference" /> },
-          { path: "notifications", element: <PatientDashboard activeTab="notifications" /> },
           { path: "settings", element: <SettingsPage /> },
         ],
       },
     ],
+  },
+
+  // Catch-all redirect
+  {
+    path: "*",
+    element: <Navigate to="/" replace />,
   },
 ]);

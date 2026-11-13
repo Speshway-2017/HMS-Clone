@@ -655,7 +655,7 @@ export function PharmacyInventoryManagement() {
           <Button variant="secondary" onClick={handleExportExcel} className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50">
             <Download className="h-4 w-4 text-slate-600" /> Export Excel
           </Button>
-          <Button onClick={handleOpenAdd} className="flex items-center gap-2 bg-navy-700 hover:bg-navy-800 text-white">
+          <Button onClick={handleOpenAdd} className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white">
             <Plus className="h-4 w-4" /> Add New Medicine
           </Button>
         </div>
@@ -709,7 +709,7 @@ export function PharmacyInventoryManagement() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setFilterCategory("All")}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${filterCategory === "All" ? "bg-navy-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${filterCategory === "All" ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
           >
             All Categories
@@ -718,7 +718,7 @@ export function PharmacyInventoryManagement() {
             <button
               key={cat}
               onClick={() => setFilterCategory(cat)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${filterCategory === cat ? "bg-navy-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${filterCategory === cat ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
             >
               {cat}
@@ -733,7 +733,7 @@ export function PharmacyInventoryManagement() {
             placeholder="Search SKU, medicine, batch..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-slate-350 bg-slate-50 pl-9 pr-4 py-2 text-xs outline-none focus:border-navy-500 focus:bg-white"
+            className="w-full rounded-lg border border-slate-350 bg-slate-50 pl-9 pr-4 py-2 text-xs outline-none focus:border-emerald-500 focus:bg-white"
           />
         </div>
       </div>
@@ -824,7 +824,7 @@ export function PharmacyInventoryManagement() {
               header: "Actions",
               render: (r) => (
                 <div className="flex gap-2">
-                  <Button variant="ghost" onClick={() => handleOpenEdit(r)} className="p-1 hover:text-navy-700">
+                  <Button variant="ghost" onClick={() => handleOpenEdit(r)} className="p-1 hover:text-emerald-700">
                     <Edit3 className="h-4 w-4" />
                   </Button>
                   <Button variant="ghost" onClick={() => handleDelete(r._id)} className="p-1 hover:text-red-700">
@@ -889,7 +889,7 @@ export function PharmacyInventoryManagement() {
                 <button
                   type="button"
                   onClick={() => setSku(generateAutoSku(name, category))}
-                  className="text-[10px] font-extrabold text-navy-700 hover:underline flex items-center gap-1 cursor-pointer"
+                  className="text-[10px] font-extrabold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
                   title="Generate new unique SKU"
                 >
                   <Sparkles className="h-3 w-3 text-indigo-600" /> Auto Generate
@@ -908,7 +908,7 @@ export function PharmacyInventoryManagement() {
                 onBlur={() => handleBlur("sku")}
                 placeholder="e.g. ANA-PAR-402"
                 className={`w-full rounded-xl border bg-white px-3 py-2 text-xs font-mono font-bold text-slate-800 outline-none transition-colors ${
-                  fieldErrors.sku ? "border-red-500 focus:border-red-600 focus:ring-red-100" : "border-slate-200 focus:border-navy-600 focus:ring-navy-100"
+                  fieldErrors.sku ? "border-red-500 focus:border-red-600 focus:ring-red-100" : "border-slate-200 focus:border-emerald-600 focus:ring-navy-100"
                 } focus:ring-2`}
               />
               {fieldErrors.sku && (
@@ -924,7 +924,7 @@ export function PharmacyInventoryManagement() {
                 <button
                   type="button"
                   onClick={() => setBatchNo(generateAutoBatchNo())}
-                  className="text-[10px] font-extrabold text-navy-700 hover:underline flex items-center gap-1 cursor-pointer"
+                  className="text-[10px] font-extrabold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
                   title="Generate new unique Batch Number"
                 >
                   <Sparkles className="h-3 w-3 text-indigo-600" /> Auto Generate
@@ -943,7 +943,7 @@ export function PharmacyInventoryManagement() {
                 onBlur={() => handleBlur("batchNo")}
                 placeholder="e.g. B202608-4910"
                 className={`w-full rounded-xl border bg-white px-3 py-2 text-xs font-mono font-bold text-slate-800 outline-none transition-colors ${
-                  fieldErrors.batchNo ? "border-red-500 focus:border-red-600 focus:ring-red-100" : "border-slate-200 focus:border-navy-600 focus:ring-navy-100"
+                  fieldErrors.batchNo ? "border-red-500 focus:border-red-600 focus:ring-red-100" : "border-slate-200 focus:border-emerald-600 focus:ring-navy-100"
                 } focus:ring-2`}
               />
               {fieldErrors.batchNo && (

@@ -93,7 +93,7 @@ export function SpeechToTextButton({
       onClick={handleToggle}
       disabled={disabled}
       title="Click to start Speech-to-Text"
-      className={`inline-flex items-center gap-1 p-1 rounded-md text-slate-500 hover:text-navy-700 hover:bg-slate-100 transition-colors text-xs font-medium cursor-pointer ${
+      className={`inline-flex items-center gap-1 p-1 rounded-md text-slate-500 hover:text-emerald-700 hover:bg-slate-100 transition-colors text-xs font-medium cursor-pointer ${
         disabled ? "opacity-50 cursor-not-allowed" : ""
       } ${className}`}
     >

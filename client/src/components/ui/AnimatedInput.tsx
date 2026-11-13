@@ -69,11 +69,11 @@ export default function AnimatedInput({
           aria-label={label}
           aria-invalid={Boolean(activeError)}
           aria-describedby={activeError ? `${inputId}-error` : undefined}
-          className={`peer w-full rounded-xl border ${
+          className={`peer w-full rounded-lg border ${
             activeError
               ? "border-red-500 text-red-900 focus:border-red-500"
-              : "border-slate-200 text-slate-900"
-          } bg-white px-3.5 py-3 text-sm outline-none transition-all duration-200 focus:ring-4 focus:ring-blue-500/10 ${
+              : "border-slate-300 text-slate-900 focus:border-emerald-600"
+          } bg-white px-3.5 py-2.5 text-sm outline-none transition-all duration-150 focus:ring-2 focus:ring-emerald-500/20 ${
             icon ? "pl-10" : ""
           } ${endIcon ? "pr-10" : ""} ${inputClassName}`}
           disabled={disabled}
@@ -103,7 +103,7 @@ export default function AnimatedInput({
             icon ? "left-10" : "left-3.5"
           } ${
             isFloating
-              ? "-top-2 text-xs text-blue-600"
+              ? "-top-2 text-xs text-emerald-700 font-semibold"
               : "top-1/2 -translate-y-1/2 text-sm text-slate-500"
           } ${labelClassName}`}
         >

@@ -108,7 +108,7 @@ export function PatientDetailsPage() {
 
           <Card>
             <div className="mb-3 flex items-center gap-2">
-              <Receipt className="h-4 w-4 text-navy-700" />
+              <Receipt className="h-4 w-4 text-emerald-700" />
               <h3 className="text-base font-semibold text-slate-800">Invoices</h3>
             </div>
             {invoices?.data.length === 0 && <p className="text-sm text-slate-400">No invoices yet.</p>}

@@ -58,7 +58,7 @@ export const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ onBack }) =>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="px-3 py-1.5 rounded-xl bg-navy-50 text-navy-700 font-extrabold text-xs border border-navy-100 font-sans">
+          <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 font-extrabold text-xs border border-navy-100 font-sans">
             Total Handover Records: {handovers.length}
           </span>
         </div>
@@ -75,7 +75,7 @@ export const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ onBack }) =>
               placeholder="Search by Nurse name, Patient, Ward, or Shift..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 text-xs outline-none transition focus:border-navy-600 focus:ring-2 focus:ring-navy-100 font-sans"
+              className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 text-xs outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-navy-100 font-sans"
             />
             {searchQuery && (
               <button
@@ -88,7 +88,7 @@ export const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ onBack }) =>
           </div>
 
           <div className="flex items-center gap-1.5 text-xs text-slate-400 font-extrabold uppercase tracking-wider shrink-0 font-sans">
-            <SlidersHorizontal className="h-4 w-4 text-navy-600" /> Audit Filters
+            <SlidersHorizontal className="h-4 w-4 text-emerald-600" /> Audit Filters
           </div>
         </div>
 
@@ -100,7 +100,7 @@ export const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ onBack }) =>
             <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value)}
-              className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 text-slate-700 py-2 px-2.5 rounded-xl outline-none focus:border-navy-600 cursor-pointer font-sans"
+              className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 text-slate-700 py-2 px-2.5 rounded-xl outline-none focus:border-emerald-600 cursor-pointer font-sans"
             >
               <option value="today">Today</option>
               <option value="yesterday">Yesterday</option>
@@ -116,7 +116,7 @@ export const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ onBack }) =>
             <select
               value={shiftFilter}
               onChange={(e) => setShiftFilter(e.target.value)}
-              className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 text-slate-700 py-2 px-2.5 rounded-xl outline-none focus:border-navy-600 cursor-pointer font-sans"
+              className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 text-slate-700 py-2 px-2.5 rounded-xl outline-none focus:border-emerald-600 cursor-pointer font-sans"
             >
               <option value="All">All Shifts</option>
               <option value="Morning">Morning Shift</option>
@@ -131,7 +131,7 @@ export const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ onBack }) =>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 text-slate-700 py-2 px-2.5 rounded-xl outline-none focus:border-navy-600 cursor-pointer font-sans"
+              className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 text-slate-700 py-2 px-2.5 rounded-xl outline-none focus:border-emerald-600 cursor-pointer font-sans"
             >
               <option value="All">All Statuses</option>
               <option value="Submitted">Submitted</option>
@@ -221,7 +221,7 @@ export const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ onBack }) =>
                       {item.incomingNurseName || "Incoming Duty Nurse"}
                     </td>
                     <td className="py-3.5 px-5">
-                      <span className="px-2 py-0.5 rounded-md font-bold text-[10px] uppercase bg-navy-50 text-navy-700 border border-navy-100">
+                      <span className="px-2 py-0.5 rounded-md font-bold text-[10px] uppercase bg-emerald-50 text-emerald-700 border border-navy-100">
                         {item.currentShift} → {item.nextShift}
                       </span>
                     </td>
@@ -238,7 +238,7 @@ export const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ onBack }) =>
                     <td className="py-3.5 px-5 text-right">
                       <button
                         onClick={() => setSelectedAuditReport(item)}
-                        className="px-3 py-1.5 bg-slate-100 hover:bg-navy-50 text-slate-700 hover:text-navy-700 rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer font-sans"
+                        className="px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer font-sans"
                       >
                         <Eye className="h-3.5 w-3.5" /> View Audit Report
                       </button>
@@ -282,7 +282,7 @@ export const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ onBack }) =>
               </div>
               <div>
                 <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px] block">Shift Transfer</span>
-                <p className="font-bold text-navy-700 mt-0.5">{selectedAuditReport.currentShift} Shift → {selectedAuditReport.nextShift} Shift</p>
+                <p className="font-bold text-emerald-700 mt-0.5">{selectedAuditReport.currentShift} Shift → {selectedAuditReport.nextShift} Shift</p>
               </div>
               <div>
                 <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px] block">Handed Over Patients</span>
@@ -293,7 +293,7 @@ export const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ onBack }) =>
             {/* IP Address & Device Audit Info */}
             <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2 text-xs">
               <h4 className="font-extrabold text-slate-700 uppercase tracking-wider text-[10px] font-sans flex items-center gap-1.5">
-                <Globe className="h-3.5 w-3.5 text-navy-600" /> Digital Security & IP Audit Stamp
+                <Globe className="h-3.5 w-3.5 text-emerald-600" /> Digital Security & IP Audit Stamp
               </h4>
               <div className="grid grid-cols-2 gap-2 text-slate-600 font-medium">
                 <div>IP Address: <strong className="font-mono text-slate-800">{selectedAuditReport._id ? "192.168.1.45" : "Local Host"}</strong></div>
@@ -313,7 +313,7 @@ export const ShiftHistoryView: React.FC<ShiftHistoryViewProps> = ({ onBack }) =>
             <div className="flex justify-end pt-2">
               <button
                 onClick={() => setSelectedAuditReport(null)}
-                className="px-5 py-2 bg-navy-700 text-white font-extrabold text-xs rounded-xl shadow-sm cursor-pointer font-sans"
+                className="px-5 py-2 bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-sm cursor-pointer font-sans"
               >
                 Close Audit Report
               </button>

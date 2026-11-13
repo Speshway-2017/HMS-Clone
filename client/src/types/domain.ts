@@ -103,8 +103,8 @@ export interface Admin {
   _id: string;
   name: string;
   email: string;
-  role: "hospital_admin" | "accountant";
-  hospital: { _id: string; name: string } | string | null;
+  role: "admin" | "hospital_admin" | "accountant" | string;
+  hospital?: { _id: string; name: string; code?: string } | string | null;
   title: string;
   phone: string;
   employeeId: string;
