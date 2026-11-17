@@ -1,4 +1,6 @@
 import express from "express";
+import path from "path";
+import fs from "fs";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -109,6 +111,13 @@ app.use(
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Local Uploads static serving (fallback when Cloudinary is unavailable or local storage is used)
+const uploadsDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use("/uploads", express.static(uploadsDir));
 
 // NoSQL & XSS Sanitization
 app.use(sanitizeNoSql);

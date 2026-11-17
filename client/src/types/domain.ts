@@ -146,6 +146,7 @@ export interface Doctor {
   monthlyAvailability?: Array<{ date: string; from: string; to: string; active: boolean }>;
   languages?: string;
   consultationFee?: string;
+  dateOfJoining?: string | null;
   opExpiryLimit?: number;
 }
 
@@ -164,6 +165,7 @@ export interface Staff {
   checkInTime: string;
   taskLoad: number;
   rating: number;
+  shift?: string;
   assignedPatients?: any[];
 }
 

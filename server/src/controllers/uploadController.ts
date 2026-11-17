@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { cloudinary } from "../config/cloudinary";
+import { cloudinary, CLOUDINARY_ROOT_FOLDER } from "../config/cloudinary";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { emitToHospital, broadcastGlobal } from "../config/socket";
@@ -77,30 +77,50 @@ export const uploadFile = catchAsync(async (req: Request, res: Response) => {
       ? req.body.image
       : null;
 
+  const targetFolder = `${CLOUDINARY_ROOT_FOLDER}/${folder}`;
+
   if (rawFileStr && rawFileStr.startsWith("data:image")) {
-    const uploadRes = await cloudinary.uploader.upload(rawFileStr, {
-      folder: `hms/${folder}`,
-      resource_type: "auto",
-    });
-    result = {
-      secure_url: uploadRes.secure_url,
-      public_id: uploadRes.public_id,
-      resource_type: uploadRes.resource_type || "image",
-    };
+    try {
+      const uploadRes = await cloudinary.uploader.upload(rawFileStr, {
+        folder: targetFolder,
+        resource_type: "auto",
+      });
+      result = {
+        secure_url: uploadRes.secure_url,
+        public_id: uploadRes.public_id,
+        resource_type: uploadRes.resource_type || "image",
+      };
+    } catch (cErr: any) {
+      console.error("Cloudinary data URL upload error:", cErr);
+      const isAuthError = cErr?.http_code === 401 || (cErr?.message && cErr.message.includes("Invalid Signature"));
+      const hint = isAuthError
+        ? " (Invalid Cloudinary Signature: please ensure your CLOUDINARY_URL in server/.env contains your actual API Secret, not duplicate API Key)"
+        : "";
+      throw new AppError(`Cloudinary upload failed: ${cErr?.message || "Unknown error"}${hint}`, 500);
+    }
   } else if (req.file && req.file.buffer) {
-    result = await new Promise<{ secure_url: string; public_id: string; resource_type: string }>((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        { folder: `hms/${folder}`, resource_type: "auto" },
-        (error, uploadResult) => {
-          if (error || !uploadResult) {
-            reject(error ?? new Error("Cloudinary upload failed."));
-            return;
-          }
-          resolve(uploadResult);
-        },
-      );
-      stream.end(req.file!.buffer);
-    });
+    try {
+      result = await new Promise<{ secure_url: string; public_id: string; resource_type: string }>((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: targetFolder, resource_type: "auto" },
+          (error, uploadResult) => {
+            if (error || !uploadResult) {
+              reject(error ?? new Error("Cloudinary upload failed."));
+              return;
+            }
+            resolve(uploadResult);
+          },
+        );
+        stream.end(req.file!.buffer);
+      });
+    } catch (cErr: any) {
+      console.error("Cloudinary stream upload error:", cErr);
+      const isAuthError = cErr?.http_code === 401 || (cErr?.message && cErr.message.includes("Invalid Signature"));
+      const hint = isAuthError
+        ? " (Invalid Cloudinary Signature: please ensure your CLOUDINARY_URL in server/.env contains your actual API Secret, not duplicate API Key)"
+        : "";
+      throw new AppError(`Cloudinary upload failed: ${cErr?.message || "Unknown error"}${hint}`, 500);
+    }
   } else {
     throw new AppError("No file or image data provided.", 400);
   }

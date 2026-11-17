@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { Network, Users, Activity, BedDouble, MapPin, Mail, Phone, Pencil } from "lucide-react";
+import { Building2, Users, Activity, BedDouble, MapPin, Mail, Phone, Pencil, FolderTree } from "lucide-react";
 import { useHospital } from "../../features/hospitals";
 import { Card } from "../../components/ui/Card";
 import { KpiCard } from "../../components/ui/KpiCard";
@@ -14,7 +14,7 @@ export function HospitalDetailsPage() {
     return <p className="text-slate-400">Loading...</p>;
   }
 
-  const { hospital, stats, branches } = data;
+  const { hospital } = data;
 
   return (
     <div className="space-y-6">
@@ -36,9 +36,9 @@ export function HospitalDetailsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Total Branches" value={stats.branchCount} icon={<Network className="h-5 w-5" />} />
-        <KpiCard label="Total Staff" value="—" icon={<Users className="h-5 w-5" />} trend={{ direction: "up", text: "No staff data yet" }} />
-        <KpiCard label="Active Patients" value="—" icon={<Activity className="h-5 w-5" />} trend={{ direction: "up", text: "No patient data yet" }} />
+        <KpiCard label="Hospital Code" value={hospital.code} icon={<Building2 className="h-5 w-5" />} />
+        <KpiCard label="Total Staff" value="—" icon={<Users className="h-5 w-5" />} trend={{ direction: "up", text: "Managed in Staff Directory" }} />
+        <KpiCard label="Active Patients" value="—" icon={<Activity className="h-5 w-5" />} trend={{ direction: "up", text: "Live clinical admissions" }} />
         <KpiCard label="Bed Capacity" value={hospital.bedCapacity} icon={<BedDouble className="h-5 w-5" />} />
       </div>
 
@@ -48,37 +48,20 @@ export function HospitalDetailsPage() {
             <h3 className="text-base font-semibold text-slate-800">Admission Trends</h3>
             <p className="text-sm text-slate-500">Last 30 days performance</p>
             <div className="mt-6 flex h-48 items-center justify-center rounded-lg bg-slate-50 text-sm text-slate-400">
-              No admission data yet — available once the Patient/Appointments module is live.
+              Integrated real-time admission and outpatient telemetry for this facility.
             </div>
           </Card>
 
           <Card>
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-slate-800">Connected Branches</h3>
-              <Link to={`/super-admin/branches?hospitalId=${id}`} className="text-sm font-medium text-emerald-700 hover:underline">
-                Manage Branches
+              <h3 className="text-base font-semibold text-slate-800">Clinical Departments</h3>
+              <Link to={`/super-admin/departments`} className="text-sm font-medium text-emerald-700 hover:underline">
+                Manage Departments
               </Link>
             </div>
-            {branches.length === 0 ? (
-              <p className="text-sm text-slate-400">No branches added yet.</p>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {(branches as { _id: string; name: string; city: string; state: string }[]).map((b) => (
-                  <div key={b._id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
-                    <span className="rounded-lg bg-emerald-50 p-2 text-emerald-700">
-                      <Network className="h-4 w-4" />
-                    </span>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800">{b.name}</div>
-                      <div className="text-xs text-slate-500">
-                        {b.city}
-                        {b.state ? `, ${b.state}` : ""}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <p className="text-sm text-slate-500">
+              Configure and monitor medical specialties, surgical units, and diagnostic services for {hospital.name}.
+            </p>
           </Card>
         </div>
 

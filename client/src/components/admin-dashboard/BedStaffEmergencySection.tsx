@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { BedDouble, Users, AlertTriangle, Activity, CheckCircle2, Clock } from "lucide-react";
-import { ChartCard } from "../ui/ChartCard";
+import { BedDouble, Users, AlertTriangle, CheckCircle2, ShieldCheck, Ambulance, Clock, Activity } from "lucide-react";
+import { formatINR } from "../../lib/currency";
 
 interface BedStaffEmergencySectionProps {
   beds: any[];
@@ -46,7 +46,6 @@ export function BedStaffEmergencySection({ beds, staff, hospitalCounts }: BedSta
 
     let present = 58;
     let onLeave = 4;
-    let absent = 2;
 
     if (staff && staff.length > 0) {
       nurses = staff.filter((s) => (s.role || "").toLowerCase().includes("nurse")).length || 28;
@@ -86,7 +85,6 @@ export function BedStaffEmergencySection({ beds, staff, hospitalCounts }: BedSta
       pharmacists,
       present,
       onLeave,
-      absent,
       attendancePct,
       emergencyAdmissions,
       criticalPatients,
@@ -96,164 +94,183 @@ export function BedStaffEmergencySection({ beds, staff, hospitalCounts }: BedSta
   }, [beds, staff, hospitalCounts]);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-        <div className="flex items-center gap-2">
-          <div className="rounded-lg bg-rose-50 p-2 text-rose-700">
+    <div className="space-y-4">
+      {/* Header with Telemetry Summary Chips */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+        <div className="flex items-center gap-2.5">
+          <div className="rounded-lg bg-emerald-50 p-2 text-emerald-800 border border-emerald-100">
             <BedDouble className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-slate-900">Beds, Staff & Emergency Analytics</h3>
-            <p className="text-xs text-slate-500">Bed capacity & utilization, staff attendance & emergency response metrics</p>
+            <h3 className="text-base font-bold text-slate-900 leading-tight">Bed Capacity & Clinical Workforce Matrix</h3>
+            <p className="text-xs text-slate-500">Ward census, workforce deployment & emergency readiness</p>
           </div>
+        </div>
+
+        {/* Inline Summary */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/70 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+            <span>Staff Attendance: <strong>{metrics.attendancePct}%</strong></span>
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-2xs">
+            <span>Bed Census: <strong>{metrics.occupiedBeds}/{metrics.totalBeds} ({metrics.utilizationPct}%)</strong></span>
+          </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* 1. Bed Occupancy & Wards */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2 text-indigo-700 font-bold">
-              <BedDouble className="h-5 w-5" /> Bed Capacity & Wards
-            </div>
-            <span className="rounded bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700">
-              {metrics.utilizationPct}% Utilized
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-              <p className="text-[11px] font-semibold text-slate-500">Occupied Beds</p>
-              <p className="text-xl font-black text-indigo-700">{metrics.occupiedBeds} / {metrics.totalBeds}</p>
-            </div>
-
-            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-              <p className="text-[11px] font-semibold text-slate-500">Available Beds</p>
-              <p className="text-xl font-black text-emerald-600">{metrics.availableBeds} Beds</p>
-            </div>
-          </div>
-
-          {/* Utilization Progress Bars */}
-          <div className="space-y-3 pt-2">
-            <div>
-              <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
-                <span>ICU Occupancy ({metrics.icuOccupied}/{metrics.icuTotal})</span>
-                <span className="text-red-600">{Math.round((metrics.icuOccupied / metrics.icuTotal) * 100)}%</span>
+      {/* 2-Column Responsive Matrix (eliminates cramped nested 3-column squish) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Card 1: Bed Capacity & Ward Census */}
+        <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-2xs space-y-4 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+                <BedDouble className="h-4 w-4 text-emerald-700" />
+                <span>Bed Capacity & Ward Census</span>
               </div>
-              <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                <div className="h-full bg-red-500 rounded-full" style={{ width: `${(metrics.icuOccupied / metrics.icuTotal) * 100}%` }} />
+              <span className="rounded-md bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 text-xs font-bold text-emerald-800">
+                {metrics.availableBeds} Beds Available
+              </span>
+            </div>
+
+            {/* Overall Hospital Census Bar */}
+            <div className="mt-3 p-3 rounded-lg bg-slate-50 border border-slate-100">
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1.5">
+                <span>Overall Hospital Occupancy</span>
+                <span className="text-emerald-700 font-bold">{metrics.utilizationPct}% Occupied</span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
+                <div
+                  className="h-full bg-emerald-600 rounded-full transition-all duration-300"
+                  style={{ width: `${metrics.utilizationPct}%` }}
+                />
               </div>
             </div>
 
-            <div>
-              <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
-                <span>General Wards ({metrics.wardOccupied}/{metrics.wardTotal})</span>
-                <span className="text-indigo-600">{Math.round((metrics.wardOccupied / metrics.wardTotal) * 100)}%</span>
+            {/* Ward-level Detailed Breakdown */}
+            <div className="mt-4 space-y-3">
+              <div>
+                <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                  <span>ICU Critical Care Ward ({metrics.icuOccupied} / {metrics.icuTotal} beds)</span>
+                  <span className="text-rose-600 font-bold">{Math.round((metrics.icuOccupied / metrics.icuTotal) * 100)}%</span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className="h-full bg-rose-500 rounded-full"
+                    style={{ width: `${(metrics.icuOccupied / metrics.icuTotal) * 100}%` }}
+                  />
+                </div>
               </div>
-              <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${(metrics.wardOccupied / metrics.wardTotal) * 100}%` }} />
-              </div>
-            </div>
 
-            <div>
-              <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
-                <span>Emergency Beds ({metrics.emergencyOccupied}/{metrics.emergencyBeds})</span>
-                <span className="text-amber-600">{Math.round((metrics.emergencyOccupied / metrics.emergencyBeds) * 100)}%</span>
+              <div>
+                <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                  <span>General Inpatient Wards ({metrics.wardOccupied} / {metrics.wardTotal} beds)</span>
+                  <span className="text-emerald-700 font-bold">{Math.round((metrics.wardOccupied / metrics.wardTotal) * 100)}%</span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-600 rounded-full"
+                    style={{ width: `${(metrics.wardOccupied / metrics.wardTotal) * 100}%` }}
+                  />
+                </div>
               </div>
-              <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(metrics.emergencyOccupied / metrics.emergencyBeds) * 100}%` }} />
+
+              <div>
+                <div className="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                  <span>Emergency Observation Units ({metrics.emergencyOccupied} / {metrics.emergencyBeds} beds)</span>
+                  <span className="text-amber-600 font-bold">{Math.round((metrics.emergencyOccupied / metrics.emergencyBeds) * 100)}%</span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className="h-full bg-amber-500 rounded-full"
+                    style={{ width: `${(metrics.emergencyOccupied / metrics.emergencyBeds) * 100}%` }}
+                  />
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 2. Staff Roster & Attendance */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2 text-slate-800 font-bold">
-              <Users className="h-5 w-5" /> Staff Roster & Attendance
-            </div>
-            <span className="rounded bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">
-              {metrics.attendancePct}% Present
-            </span>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-lg bg-emerald-50 p-2.5">
-              <p className="text-[10px] font-bold text-emerald-800 uppercase">Present</p>
-              <p className="text-lg font-black text-emerald-700">{metrics.present}</p>
-            </div>
-            <div className="rounded-lg bg-amber-50 p-2.5">
-              <p className="text-[10px] font-bold text-amber-800 uppercase">On Leave</p>
-              <p className="text-lg font-black text-amber-700">{metrics.onLeave}</p>
-            </div>
-            <div className="rounded-lg bg-red-50 p-2.5">
-              <p className="text-[10px] font-bold text-red-800 uppercase">Absent</p>
-              <p className="text-lg font-black text-red-700">{metrics.absent}</p>
             </div>
           </div>
 
-          <div className="space-y-2 pt-1">
-            <p className="text-xs font-bold text-slate-700">Role Breakdown</p>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="flex justify-between border-b border-slate-50 py-1">
-                <span className="text-slate-600">Doctors</span>
-                <span className="font-bold text-slate-800">{metrics.doctors}</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-50 py-1">
-                <span className="text-slate-600">Nurses</span>
-                <span className="font-bold text-slate-800">{metrics.nurses}</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-50 py-1">
-                <span className="text-slate-600">Receptionists</span>
-                <span className="font-bold text-slate-800">{metrics.receptionists}</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-50 py-1">
-                <span className="text-slate-600">Lab Staff</span>
-                <span className="font-bold text-slate-800">{metrics.labStaff}</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-50 py-1">
-                <span className="text-slate-600">Radiology Staff</span>
-                <span className="font-bold text-slate-800">{metrics.radStaff}</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-50 py-1">
-                <span className="text-slate-600">Pharmacists</span>
-                <span className="font-bold text-slate-800">{metrics.pharmacists}</span>
-              </div>
-            </div>
+          <div className="flex items-center justify-between text-xs text-slate-500 border-t border-slate-100 pt-3">
+            <span>Total Operational Capacity: <strong>{metrics.totalBeds} Beds</strong></span>
+            <span className="text-emerald-700 font-semibold">Triage Status: Active</span>
           </div>
         </div>
 
-        {/* 3. Emergency Unit Analytics */}
-        <div className="rounded-xl border border-rose-200 bg-rose-50/40 p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-rose-200/60 pb-3">
-            <div className="flex items-center gap-2 text-rose-800 font-bold">
-              <AlertTriangle className="h-5 w-5 text-rose-600 animate-pulse" /> Emergency Unit
+        {/* Card 2: Clinical Workforce & Emergency Readiness */}
+        <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-2xs space-y-4 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+                <Users className="h-4 w-4 text-emerald-700" />
+                <span>Clinical Workforce & Emergency Readiness</span>
+              </div>
+              <span className="rounded-md bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 text-xs font-bold text-emerald-800">
+                {metrics.present} On-Duty
+              </span>
             </div>
-            <span className="rounded bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-800">
-              Response: {metrics.responseTimeMins}
+
+            {/* Department Roster Distribution (3 cols, clean spacing, no text collision) */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs pt-2">
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                <span className="text-slate-600 font-medium">Doctors</span>
+                <span className="font-bold text-slate-900">{metrics.doctors}</span>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                <span className="text-slate-600 font-medium">Nurses</span>
+                <span className="font-bold text-slate-900">{metrics.nurses}</span>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                <span className="text-slate-600 font-medium">Frontdesk</span>
+                <span className="font-bold text-slate-900">{metrics.receptionists}</span>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                <span className="text-slate-600 font-medium">Diagnostics</span>
+                <span className="font-bold text-slate-900">{metrics.labStaff + metrics.radStaff}</span>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                <span className="text-slate-600 font-medium">Pharmacy</span>
+                <span className="font-bold text-slate-900">{metrics.pharmacists}</span>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-amber-50/70 border border-amber-200/70">
+                <span className="text-amber-800 font-medium">On Leave</span>
+                <span className="font-bold text-amber-900">{metrics.onLeave}</span>
+              </div>
+            </div>
+
+            {/* Emergency & Fleet Telemetry Strip */}
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+              <div className="p-2.5 rounded-lg bg-rose-50/60 border border-rose-100 flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] text-rose-600 font-semibold uppercase">Critical Triage</div>
+                  <div className="text-sm font-bold text-rose-900 mt-0.5">{metrics.criticalPatients} Active</div>
+                </div>
+                <Activity className="h-4 w-4 text-rose-500" />
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] text-slate-500 font-semibold uppercase">Avg Response</div>
+                  <div className="text-sm font-bold text-slate-900 mt-0.5">{metrics.responseTimeMins}</div>
+                </div>
+                <Clock className="h-4 w-4 text-slate-400" />
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-emerald-50/60 border border-emerald-100 flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] text-emerald-700 font-semibold uppercase">Ambulance Fleet</div>
+                  <div className="text-sm font-bold text-emerald-900 mt-0.5">{metrics.ambulanceRequests} Ready</div>
+                </div>
+                <Ambulance className="h-4 w-4 text-emerald-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-xs text-slate-500 border-t border-slate-100 pt-3">
+            <span>Emergency Dept: <strong>24/7 Readiness</strong></span>
+            <span className="text-emerald-700 font-semibold flex items-center gap-1">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> System Operational
             </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg bg-white p-3 border border-rose-100">
-              <p className="text-[11px] font-semibold text-slate-500">Emergency Admissions</p>
-              <p className="text-2xl font-black text-rose-700">+{metrics.emergencyAdmissions}</p>
-            </div>
-
-            <div className="rounded-lg bg-white p-3 border border-rose-100">
-              <p className="text-[11px] font-semibold text-slate-500">Critical Patients</p>
-              <p className="text-2xl font-black text-red-600">{metrics.criticalPatients}</p>
-            </div>
-          </div>
-
-          <div className="rounded-lg bg-white p-3 border border-rose-100 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-slate-800">Ambulance Requests</p>
-              <p className="text-[11px] text-slate-500">Dispatched & active today</p>
-            </div>
-            <span className="text-xl font-black text-rose-700">{metrics.ambulanceRequests} Units</span>
           </div>
         </div>
       </div>

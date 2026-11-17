@@ -61,6 +61,7 @@ const doctorSchema = new Schema(
     },
     languages: { type: String, default: "English, Hindi", maxlength: 200 },
     consultationFee: { type: String, default: "₹500" },
+    dateOfJoining: { type: Date, default: null },
     opExpiryLimit: { type: Number, default: 10 },
     status: { type: String, enum: DOCTOR_STATUSES, default: "ACTIVE" },
     rating: { type: Number, default: 0, min: 0, max: 100 },

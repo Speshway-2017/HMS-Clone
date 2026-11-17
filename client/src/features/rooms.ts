@@ -22,7 +22,7 @@ export interface RoomInfo {
   ward: string | WardInfo;
   wardName: string;
   floor: number;
-  roomType: "General" | "Semi Private" | "Semi-Private" | "Private" | "Deluxe" | "Suite" | "ICU" | "NICU" | "PICU" | "Emergency" | "Isolation";
+  roomType: string;
   acType: "AC" | "Non AC";
   acSubTypes?: string[];
   capacity: number;
@@ -54,6 +54,18 @@ export function useRooms(params: { search?: string; ward?: string; status?: stri
       const res = await api.get<{ data: ListRoomsResponse }>("/rooms", { params });
       return res.data.data;
     }
+  });
+}
+
+export function useRoom(id?: string) {
+  return useQuery({
+    queryKey: ["rooms", id],
+    queryFn: async () => {
+      if (!id) return null;
+      const res = await api.get<{ data: { room: RoomInfo } }>(`/rooms/${id}`);
+      return res.data.data.room;
+    },
+    enabled: Boolean(id)
   });
 }
 

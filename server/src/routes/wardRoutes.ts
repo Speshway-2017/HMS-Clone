@@ -6,13 +6,16 @@ import {
   getWard,
   createWard,
   updateWard,
-  deleteWard
+  deleteWard,
+  getWardTypes
 } from "../controllers/wardController";
 
 const router = Router();
 
 // Secure all routes
 router.use(protect, restrictTo("hospital_admin", "receptionist", "nurse", "doctor"), scopeToHospital);
+
+router.get("/types", getWardTypes);
 
 router.route("/")
   .get(listWards)

@@ -11,8 +11,9 @@ const roomSchema = new Schema(
     floor: { type: Number, required: true },
     roomType: {
       type: String,
-      enum: ["General", "Semi Private", "Semi-Private", "Private", "Deluxe", "Suite", "ICU", "NICU", "PICU", "Emergency", "Isolation"],
-      required: true
+      required: true,
+      trim: true,
+      maxlength: 100
     },
     acType: {
       type: String,

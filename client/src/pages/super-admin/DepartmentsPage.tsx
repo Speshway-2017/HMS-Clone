@@ -1,16 +1,14 @@
-import { useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { Plus, ArrowRight, MoreVertical, Pencil, PowerOff, Power, Trash2, AlertTriangle } from "lucide-react";
+import { useRef, useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Plus, ArrowRight, MoreVertical, Pencil, PowerOff, Power, Trash2, AlertTriangle, Building2, MapPin } from "lucide-react";
 import { useDepartments, useToggleDepartmentStatus, useDeleteDepartment } from "../../features/departments";
+import { useHospitals } from "../../features/hospitals";
 import { useAuth } from "../../context/AuthContext";
-import { useBranchContext } from "../../context/BranchContext";
-import { AllBranchesNoticeBanner } from "../../components/common/AllBranchesNoticeBanner";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { getDepartmentTheme } from "../../config/departmentTheme";
 import { ROLE_HOME_PATH } from "../../types/auth";
 import { Department } from "../../types/domain";
-import { EditDepartmentModal } from "./EditDepartmentModal";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Status label map
@@ -35,9 +33,10 @@ interface ThreeDotMenuProps {
   onToggleStatus: () => void;
   onDelete: () => void;
   isToggling: boolean;
+  isSuperAdmin?: boolean;
 }
 
-function ThreeDotMenu({ department, onEdit, onToggleStatus, onDelete, isToggling }: ThreeDotMenuProps) {
+function ThreeDotMenu({ department, onEdit, onToggleStatus, onDelete, isToggling, isSuperAdmin }: ThreeDotMenuProps) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -66,17 +65,19 @@ function ThreeDotMenu({ department, onEdit, onToggleStatus, onDelete, isToggling
 
       {open && (
         <div className="absolute right-0 z-30 mt-1 w-48 origin-top-right rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
-          {/* Edit */}
-          <button
-            type="button"
-            onClick={handleEdit}
-            className="flex w-full items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-          >
-            <Pencil className="h-3.5 w-3.5 text-emerald-600" />
-            Edit Department
-          </button>
+          {/* Edit - Super Admin only */}
+          {isSuperAdmin && (
+            <button
+              type="button"
+              onClick={handleEdit}
+              className="flex w-full items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              <Pencil className="h-3.5 w-3.5 text-emerald-600" />
+              Edit Department
+            </button>
+          )}
 
-          {/* Disable / Enable */}
+          {/* Disable / Enable - Available to both Super Admin and Hospital Admin */}
           <button
             type="button"
             onClick={handleToggle}
@@ -96,17 +97,20 @@ function ThreeDotMenu({ department, onEdit, onToggleStatus, onDelete, isToggling
             )}
           </button>
 
-          <div className="my-1 border-t border-slate-100" />
-
-          {/* Delete */}
-          <button
-            type="button"
-            onClick={handleDelete}
-            className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Delete Department
-          </button>
+          {/* Delete - Super Admin only */}
+          {isSuperAdmin && (
+            <>
+              <div className="my-1 border-t border-slate-100" />
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete Department
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -170,14 +174,28 @@ function DeleteConfirmModal({ department, onConfirm, onCancel, isDeleting, error
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function DepartmentsPage() {
-  const { isAllBranches } = useBranchContext();
-  const { data: departments, isLoading } = useDepartments();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const basePath = ROLE_HOME_PATH[user!.role];
   const isSuperAdmin = user?.role === "super_admin";
 
-  // Edit modal state
-  const [editTarget, setEditTarget] = useState<Department | null>(null);
+  const [selectedHospitalId, setSelectedHospitalId] = useState<string>(() => {
+    return (typeof window !== "undefined" && localStorage.getItem("hms_super_admin_active_hospital_id")) || "all";
+  });
+
+  useEffect(() => {
+    const handleContextChange = () => {
+      const stored = localStorage.getItem("hms_super_admin_active_hospital_id") || "all";
+      setSelectedHospitalId(stored);
+    };
+    window.addEventListener("hospital_context_change", handleContextChange);
+    return () => window.removeEventListener("hospital_context_change", handleContextChange);
+  }, []);
+
+  const { data: hospitalsData } = useHospitals({ page: 1, limit: 100 }, { enabled: isSuperAdmin });
+
+  const effectiveHospitalId = isSuperAdmin ? (selectedHospitalId !== "all" ? selectedHospitalId : undefined) : undefined;
+  const { data: departments, isLoading } = useDepartments(effectiveHospitalId);
 
   // Delete state
   const deleteDept = useDeleteDepartment();
@@ -215,8 +233,6 @@ export function DepartmentsPage() {
 
   return (
     <div className="space-y-6">
-      {!isSuperAdmin && <AllBranchesNoticeBanner />}
-
       {/* Header */}
       <div className="flex flex-col justify-between gap-4 rounded-xl bg-emerald-700 p-6 text-white sm:flex-row sm:items-center">
         <div>
@@ -227,81 +243,73 @@ export function DepartmentsPage() {
               : "Manage medical infrastructure and monitor departments for your hospital."}
           </p>
         </div>
-        {(!isAllBranches || isSuperAdmin) ? (
+        {isSuperAdmin && (
           <Link to={`${basePath}/departments/new`}>
             <Button variant="secondary" className="bg-white">
               <Plus className="h-4 w-4" /> Add Department
             </Button>
           </Link>
-        ) : (
-          <Button
-            variant="secondary"
-            disabled
-            className="bg-white/60 text-white/50 opacity-60 cursor-not-allowed border-none shadow-none"
-            title="Switch to a specific branch to add departments"
-          >
-            <Plus className="h-4 w-4" /> Add Department (Read Only)
-          </Button>
         )}
       </div>
+
+      {/* Parent Hospital Filter for Super Admin */}
+      {isSuperAdmin && hospitalsData?.data && hospitalsData.data.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+          <div className="flex items-center gap-3">
+            <Building2 className="h-4 w-4 text-emerald-700" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Filter By Parent Hospital:
+            </span>
+            <select
+              value={selectedHospitalId}
+              onChange={(e) => {
+                const newId = e.target.value;
+                setSelectedHospitalId(newId);
+                localStorage.setItem("hms_super_admin_active_hospital_id", newId);
+                const hosp = hospitalsData.data.find((h) => h._id === newId);
+                if (hosp) {
+                  localStorage.setItem("hms_hospital_name", hosp.name);
+                  if (hosp.logoUrl) localStorage.setItem("hms_hospital_logo", hosp.logoUrl);
+                }
+                window.dispatchEvent(new Event("hospital_context_change"));
+              }}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-800 shadow-xs focus:border-emerald-600 focus:outline-none cursor-pointer"
+            >
+              <option value="all">All Hospitals (Consolidated Network)</option>
+              {hospitalsData.data.map((h) => (
+                <option key={h._id} value={h._id}>
+                  {h.name} {h.code ? `(${h.code})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          {selectedHospitalId !== "all" && (
+            <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+              Displaying departments for selected hospital only
+            </span>
+          )}
+        </div>
+      )}
 
       {isLoading && <p className="text-slate-400">Loading...</p>}
       {!isLoading && departments?.length === 0 && (
         <p className="text-slate-400">No departments yet — add the first one.</p>
       )}
 
-      {!isLoading && departments && departments.length > 0 && (() => {
-        // Group departments by branch name
-        const groupedDepts: Record<string, Department[]> = {};
-        departments.forEach((dept) => {
-          let branchName = "Main Hospital";
-          if (dept.branch && typeof dept.branch === "object") {
-            branchName = dept.branch.name;
-          }
-          if (!groupedDepts[branchName]) {
-            groupedDepts[branchName] = [];
-          }
-          groupedDepts[branchName].push(dept);
-        });
-
-        const branchNames = Object.keys(groupedDepts).sort((a, b) => {
-          if (a === "Main Hospital") return -1;
-          if (b === "Main Hospital") return 1;
-          return a.localeCompare(b);
-        });
-
-        return (
-          <div className="space-y-8">
-            {branchNames.map((branchName) => (
-              <div key={branchName} className="space-y-4">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-200 pb-2">
-                  {branchName} ({groupedDepts[branchName].length})
-                </h2>
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                  {groupedDepts[branchName].map((dept) => (
-                    <DepartmentCard
-                      key={dept._id}
-                      dept={dept}
-                      basePath={basePath}
-                      onEdit={() => setEditTarget(dept)}
-                      onDeleteClick={() => handleDeleteClick(dept)}
-                      isAllBranches={isAllBranches}
-                      isSuperAdmin={isSuperAdmin}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-      })()}
-
-      {/* Edit modal */}
-      <EditDepartmentModal
-        department={editTarget}
-        isOpen={editTarget !== null}
-        onClose={() => setEditTarget(null)}
-      />
+      {!isLoading && departments && departments.length > 0 && (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {departments.map((dept) => (
+            <DepartmentCard
+              key={dept._id}
+              dept={dept}
+              basePath={basePath}
+              onEdit={() => navigate(`${basePath}/departments/${dept._id}/edit`)}
+              onDeleteClick={() => handleDeleteClick(dept)}
+              isSuperAdmin={isSuperAdmin}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Delete confirmation modal */}
       <DeleteConfirmModal
@@ -324,20 +332,18 @@ interface DepartmentCardProps {
   basePath: string;
   onEdit: () => void;
   onDeleteClick: () => void;
-  isAllBranches: boolean;
   isSuperAdmin?: boolean;
 }
 
-function DepartmentCard({ dept, basePath, onEdit, onDeleteClick, isAllBranches, isSuperAdmin }: DepartmentCardProps) {
+function DepartmentCard({ dept, basePath, onEdit, onDeleteClick, isSuperAdmin }: DepartmentCardProps) {
   const theme = getDepartmentTheme(dept.category);
   const status = STATUS_LABEL[dept.status] ?? STATUS_LABEL.operational;
   const toggleStatus = useToggleDepartmentStatus(dept._id);
 
   return (
     <div
-      className={`relative rounded-xl border bg-slate-50 p-5 transition ${
-        dept.isDisabled ? "border-slate-200 opacity-70" : "border-slate-200"
-      }`}
+      className={`relative rounded-xl border bg-slate-50 p-5 transition ${dept.isDisabled ? "border-slate-200 opacity-70" : "border-slate-200"
+        }`}
       style={dept.colorTheme ? { borderLeftColor: dept.colorTheme, borderLeftWidth: 3 } : {}}
     >
       {/* Top row: icon + status + menu */}
@@ -352,62 +358,94 @@ function DepartmentCard({ dept, basePath, onEdit, onDeleteClick, isAllBranches, 
         </div>
         <div className="flex items-center gap-2">
           {!dept.isDisabled && <Badge tone={status.tone}>{status.text}</Badge>}
-          {(!isAllBranches || isSuperAdmin) && (
-            <ThreeDotMenu
-              department={dept}
-              onEdit={onEdit}
-              onToggleStatus={() => toggleStatus.mutate()}
-              onDelete={onDeleteClick}
-              isToggling={toggleStatus.isPending}
-            />
-          )}
+          <ThreeDotMenu
+            department={dept}
+            onEdit={onEdit}
+            onToggleStatus={() => toggleStatus.mutate()}
+            onDelete={onDeleteClick}
+            isToggling={toggleStatus.isPending}
+            isSuperAdmin={isSuperAdmin}
+          />
         </div>
       </div>
 
-      {/* Name + description */}
-      <h3 className="text-lg font-semibold text-emerald-700">{dept.name}</h3>
+      {/* Name + Code */}
+      <h3 className="text-lg font-semibold text-emerald-800">{dept.name}</h3>
       <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
-        {dept.code && <span className="font-mono">{dept.code}</span>}
-        {dept.branch && typeof dept.branch === "object" && (
-          <>
-            {dept.code && <span>•</span>}
-            <span className="font-semibold text-slate-500">{dept.branch.name}</span>
-          </>
+        {dept.code && (
+          <span className="font-mono font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+            {dept.code}
+          </span>
         )}
       </div>
-      <p className="mt-1.5 text-sm text-slate-500">{dept.description || "No description provided."}</p>
+
+      {/* Facility Location */}
+      {dept.location && (
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-600">
+          <MapPin className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+          <span className="truncate">{dept.location}</span>
+        </div>
+      )}
+
+      {/* Description */}
+      {dept.description ? (
+        <p className="mt-1.5 text-sm text-slate-500 line-clamp-2">{dept.description}</p>
+      ) : !dept.location && (!dept.services || dept.services.length === 0) ? (
+        <p className="mt-1.5 text-xs text-slate-400 italic">Integrated clinical care department</p>
+      ) : null}
 
       {/* Extra badges */}
       {(dept.isEmergency || dept.specialization) && (
         <div className="mt-2 flex flex-wrap gap-1">
           {dept.isEmergency && (
-            <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600">
-              Emergency
+            <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600 border border-red-100">
+              24/7 Emergency
             </span>
           )}
           {dept.specialization && (
-            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-100">
               {dept.specialization}
             </span>
           )}
         </div>
       )}
 
-      {/* Stats grid */}
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <div className="rounded-lg border border-slate-200 bg-white py-2 text-center">
-          <div className="text-xs text-slate-400">Doctors</div>
-          <div className="text-sm font-semibold text-slate-800">{dept.doctors}</div>
+      {/* Services pills preview */}
+      {dept.services && dept.services.length > 0 && (
+        <div className="mt-2.5 flex flex-wrap gap-1">
+          {dept.services.slice(0, 3).map((s) => (
+            <span
+              key={s}
+              className="rounded-md bg-emerald-50/80 px-2 py-0.5 text-[11px] font-medium text-emerald-700 border border-emerald-100/80"
+            >
+              {s}
+            </span>
+          ))}
+          {dept.services.length > 3 && (
+            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">
+              +{dept.services.length - 3} more
+            </span>
+          )}
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white py-2 text-center">
-          <div className="text-xs text-slate-400">Beds</div>
-          <div className="text-sm font-semibold text-slate-800">
-            {dept.occupiedBeds}/{dept.totalBeds}
+      )}
+
+      {/* Relevant Clinical Outcomes & Parameters Grid (Replaced irrelevant Beds & Rating) */}
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <div className="rounded-lg border border-slate-200 bg-white py-2 text-center shadow-2xs">
+          <div className="text-[11px] font-medium text-slate-400">Specialists</div>
+          <div className="text-sm font-bold text-slate-800">{dept.doctors || 0}</div>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white py-2 text-center shadow-2xs">
+          <div className="text-[11px] font-medium text-slate-400">Services</div>
+          <div className="text-sm font-bold text-emerald-700">
+            {dept.services?.length ? `${dept.services.length} Active` : "General"}
           </div>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white py-2 text-center">
-          <div className="text-xs text-slate-400">Rating</div>
-          <div className="text-sm font-semibold text-slate-800">{dept.rating}%</div>
+        <div className="rounded-lg border border-slate-200 bg-white py-2 text-center shadow-2xs">
+          <div className="text-[11px] font-medium text-slate-400">Care Unit</div>
+          <div className="text-xs font-bold text-slate-700 truncate px-1">
+            {dept.isEmergency ? "Emergency" : "Standard"}
+          </div>
         </div>
       </div>
 

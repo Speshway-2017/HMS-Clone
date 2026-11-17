@@ -1,21 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 
-export type WardType = 
-  | "General Ward" 
-  | "Semi-Private Ward" 
-  | "Private Ward" 
-  | "ICU" 
-  | "NICU" 
-  | "PICU" 
-  | "Emergency" 
-  | "Emergency Ward" 
-  | "Operation Theatre" 
-  | "Labour Ward" 
-  | "Semi Private" 
-  | "Private" 
-  | "Deluxe" 
-  | "VIP";
+export type WardType = string;
 
 export interface WardInfo {
   _id: string;

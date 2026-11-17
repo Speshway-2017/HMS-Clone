@@ -14,6 +14,7 @@ import { Patient } from "../models/Patient";
 import { Staff } from "../models/Staff";
 import { sendEmail } from "../services/emailService";
 import { handleAutoAttendanceOnLogin, handleAutoCheckoutOnLogout } from "../services/attendanceAutoService";
+import { generateNextAdminId } from "../utils/idGenerator";
 import {
   requiredTrimmedString,
   optionalTrimmedString,
@@ -68,20 +69,45 @@ const registerSchema = z
 
 async function sanitizeUser(user: UserDocument) {
   let name = user.name;
+  let employeeId = user.employeeId || "";
 
   if (user.role === "doctor") {
     const doc = await Doctor.findOne({ email: user.email.toLowerCase() });
-    if (doc?.name) name = doc.name;
+    if (doc) {
+      if (doc.name) name = doc.name;
+      if (doc.licenseNo || (doc as any).employeeId) {
+        employeeId = doc.licenseNo || (doc as any).employeeId;
+      }
+    }
   } else if (user.role === "patient") {
     const pat = await Patient.findOne({ user: user._id });
-    if (pat?.name) name = pat.name;
+    if (pat) {
+      if (pat.name) name = pat.name;
+      if ((pat as any).patientId) {
+        employeeId = (pat as any).patientId;
+      }
+    }
+  } else if (user.role === "hospital_admin" || user.role === "admin") {
+    if (!employeeId || !employeeId.trim()) {
+      employeeId = await generateNextAdminId();
+      await User.updateOne({ _id: user._id }, { employeeId }).catch(() => {});
+    }
   } else if (user.role !== "super_admin") {
     const st = await Staff.findOne({ email: user.email.toLowerCase() });
-    if (st?.name) name = st.name;
+    if (st) {
+      if (st.name) name = st.name;
+      if ((st as any).employeeId) {
+        employeeId = (st as any).employeeId;
+      }
+    }
   }
 
   if (name && name !== user.name) {
-    await User.updateOne({ _id: user._id }, { name });
+    await User.updateOne({ _id: user._id }, { name }).catch(() => {});
+  }
+
+  if (employeeId && employeeId !== user.employeeId) {
+    await User.updateOne({ _id: user._id }, { employeeId }).catch(() => {});
   }
 
   return {
@@ -91,6 +117,7 @@ async function sanitizeUser(user: UserDocument) {
     role: user.role,
     hospital: user.hospital,
     branch: user.branch,
+    employeeId: employeeId || user.employeeId || "",
     avatarUrl: user.avatarUrl,
     status: user.status,
     lastLogin: user.lastLogin,
@@ -320,32 +347,98 @@ export const login = catchAsync(async (req: Request, res: Response) => {
   const password = body.password;
 
   if (!input) {
-    throw new AppError("Please enter your email address or phone number.", 400);
+    throw new AppError("Please enter your email, mobile number, or Unique ID.", 400);
   }
 
   const cleanPhone = input.replace(/\D/g, "").slice(-10);
   const isEmail = input.includes("@");
+  const escapedInput = input.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
 
-  let query: any = {};
-  if (isEmail) {
-    query = { email: { $regex: `^${input.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } };
-  } else if (cleanPhone && cleanPhone.length >= 7) {
-    query = {
-      $or: [
-        { phone: { $regex: `${cleanPhone}$` } },
-        { email: input.toLowerCase() }
-      ]
-    };
+  const orConditions: any[] = [
+    { email: { $regex: `^${escapedInput}$`, $options: "i" } },
+    { employeeId: { $regex: `^${escapedInput}$`, $options: "i" } },
+  ];
+
+  if (cleanPhone && cleanPhone.length >= 7) {
+    orConditions.push({ phone: { $regex: `${cleanPhone}$` } });
   } else {
-    query = {
-      $or: [
-        { email: { $regex: `^${input.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, $options: "i" } },
-        { phone: input }
-      ]
-    };
+    orConditions.push({ phone: input });
   }
 
-  const user = await User.findOne(query).select("+passwordHash");
+  // 1. Search directly in User collection by email, employeeId, or phone
+  let user: any = await User.findOne({ $or: orConditions }).select("+passwordHash");
+
+  // 2. If not found, look up in Doctor collection (licenseNo or employeeId)
+  if (!user) {
+    const doctor = await Doctor.findOne({
+      $or: [
+        { licenseNo: { $regex: `^${escapedInput}$`, $options: "i" } },
+        { employeeId: { $regex: `^${escapedInput}$`, $options: "i" } },
+      ],
+    });
+
+    if (doctor) {
+      if (doctor.user) {
+        user = await User.findById(doctor.user).select("+passwordHash");
+      }
+      if (!user && doctor.email) {
+        const docEmailEscaped = doctor.email.trim().replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
+        user = await User.findOne({
+          email: { $regex: `^${docEmailEscaped}$`, $options: "i" },
+        }).select("+passwordHash");
+      }
+      if (user) {
+        const uniqueId = doctor.licenseNo || doctor.employeeId;
+        if (uniqueId && user.employeeId !== uniqueId) {
+          await User.updateOne({ _id: user._id }, { employeeId: uniqueId }).catch(() => {});
+        }
+        if (!doctor.user) {
+          await Doctor.updateOne({ _id: doctor._id }, { user: user._id }).catch(() => {});
+        }
+      }
+    }
+  }
+
+  // 3. If not found, look up in Staff collection (employeeId)
+  if (!user) {
+    const staffMember = await Staff.findOne({
+      employeeId: { $regex: `^${escapedInput}$`, $options: "i" },
+    });
+
+    if (staffMember && staffMember.email) {
+      const staffEmailEscaped = staffMember.email.trim().replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
+      user = await User.findOne({
+        email: { $regex: `^${staffEmailEscaped}$`, $options: "i" },
+      }).select("+passwordHash");
+
+      if (user && user.employeeId !== staffMember.employeeId) {
+        await User.updateOne({ _id: user._id }, { employeeId: staffMember.employeeId }).catch(() => {});
+      }
+    }
+  }
+
+  // 4. If not found, look up in Patient collection (uhid or patientCode)
+  if (!user) {
+    const patient = await Patient.findOne({
+      $or: [
+        { uhid: { $regex: `^${escapedInput}$`, $options: "i" } },
+        { patientCode: { $regex: `^${escapedInput}$`, $options: "i" } },
+      ],
+    });
+
+    if (patient) {
+      if (patient.user) {
+        user = await User.findById(patient.user).select("+passwordHash");
+      }
+      if (!user && patient.email) {
+        const patEmailEscaped = patient.email.trim().replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
+        user = await User.findOne({
+          email: { $regex: `^${patEmailEscaped}$`, $options: "i" },
+        }).select("+passwordHash");
+      }
+    }
+  }
+
   if (!user || !(await user.comparePassword(password))) {
     await logAudit({
       req,
@@ -354,7 +447,7 @@ export const login = catchAsync(async (req: Request, res: Response) => {
       entity: "User",
       details: { reason: "Invalid credentials" },
     });
-    throw new AppError("Incorrect email/phone number or password.", 401);
+    throw new AppError("Incorrect email/phone number, Unique ID, or password.", 401);
   }
   if (user.status !== "active") {
     await logAudit({
@@ -756,7 +849,7 @@ const updateProfileSchema = z.object({
     .optional(),
   phone: phoneValidator("Phone", false).optional(),
   email: emailValidator("Email", false, 254).optional(),
-  avatarUrl: optionalTrimmedString("Avatar URL", 500).optional(),
+  avatarUrl: z.string().max(2000000, "Avatar URL is too large").optional(),
 });
 
 export const updateProfile = catchAsync(async (req: Request, res: Response) => {
@@ -771,12 +864,19 @@ export const updateProfile = catchAsync(async (req: Request, res: Response) => {
 
   await user.save();
 
-  // If this user is staff, sync the avatar to their staff photoUrl / name
+  // If this user is staff or doctor, sync the avatar to their photoUrl / name
   const staff = await Staff.findOne({ email: user.email });
   if (staff) {
     if (data.name) staff.name = data.name;
     if (data.avatarUrl !== undefined) staff.photoUrl = data.avatarUrl;
     await staff.save();
+  }
+
+  const doctor = await Doctor.findOne({ email: user.email });
+  if (doctor) {
+    if (data.name) doctor.name = data.name;
+    if (data.avatarUrl !== undefined) doctor.photoUrl = data.avatarUrl;
+    await doctor.save();
   }
 
   await logAudit({
@@ -791,6 +891,6 @@ export const updateProfile = catchAsync(async (req: Request, res: Response) => {
 
   res.status(200).json({
     status: "success",
-    data: { user: sanitizeUser(user) }
+    data: { user: await sanitizeUser(user) }
   });
 });

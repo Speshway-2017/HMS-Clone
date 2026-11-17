@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import mongoose, { Types } from "mongoose";
-import { cloudinary } from "../config/cloudinary";
+import { cloudinary, CLOUDINARY_ROOT_FOLDER } from "../config/cloudinary";
 import { Doctor } from "../models/Doctor";
 import { LabOrder } from "../models/LabOrder";
 import { RadiologyOrder } from "../models/RadiologyOrder";
@@ -384,7 +384,7 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
         for (const file of testFiles) {
           const uploadResult = await new Promise<{ secure_url: string; public_id: string; resource_type: string }>((resolve, reject) => {
             const stream = cloudinary.uploader.upload_stream(
-              { folder: `hms/diagnostic-reports`, resource_type: "auto" },
+              { folder: `${CLOUDINARY_ROOT_FOLDER}/diagnostic-reports`, resource_type: "auto" },
               (error, uploadResult) => {
                 if (error || !uploadResult) {
                   reject(error ?? new Error("Cloudinary upload failed."));
@@ -529,7 +529,7 @@ export const uploadReport = catchAsync(async (req: Request, res: Response) => {
       for (const file of files) {
         const uploadResult = await new Promise<{ secure_url: string; public_id: string; resource_type: string }>((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
-            { folder: `hms/diagnostic-reports`, resource_type: "auto" },
+            { folder: `${CLOUDINARY_ROOT_FOLDER}/diagnostic-reports`, resource_type: "auto" },
             (error, uploadResult) => {
               if (error || !uploadResult) {
                 reject(error ?? new Error("Cloudinary upload failed."));
@@ -1181,7 +1181,7 @@ export const editReport = catchAsync(async (req: Request, res: Response) => {
     for (const file of files) {
       const uploadResult = await new Promise<{ secure_url: string; public_id: string; resource_type: string }>((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
-          { folder: `hms/diagnostic-reports`, resource_type: "auto" },
+          { folder: `${CLOUDINARY_ROOT_FOLDER}/diagnostic-reports`, resource_type: "auto" },
           (error, uploadResult) => {
             if (error || !uploadResult) {
               reject(error ?? new Error("Cloudinary upload failed."));

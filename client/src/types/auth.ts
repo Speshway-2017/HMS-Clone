@@ -15,6 +15,7 @@ export interface AuthUser {
   email: string;
   role: Role;
   hospital: string | null;
+  employeeId?: string;
   avatarUrl?: string;
   status: "active" | "inactive";
   lastLogin: string | null;

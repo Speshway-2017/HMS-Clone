@@ -18,8 +18,6 @@ import { SuperAdminDashboard } from "./pages/super-admin/Dashboard";
 import { HospitalsPage } from "./pages/super-admin/HospitalsPage";
 import { HospitalFormPage } from "./pages/super-admin/HospitalFormPage";
 import { HospitalDetailsPage } from "./pages/super-admin/HospitalDetailsPage";
-import { BranchesPage } from "./pages/super-admin/BranchesPage";
-import { BranchFormPage } from "./pages/super-admin/BranchFormPage";
 import { DepartmentsPage } from "./pages/super-admin/DepartmentsPage";
 import { DepartmentFormPage } from "./pages/super-admin/DepartmentFormPage";
 import { DepartmentMetricsPage } from "./pages/super-admin/DepartmentMetricsPage";
@@ -48,6 +46,7 @@ import { InventoryItemDetailsPage } from "./pages/hospital-admin/InventoryItemDe
 import { BedsPage } from "./pages/hospital-admin/BedsPage";
 import { WardFormPage } from "./pages/hospital-admin/WardFormPage";
 import { RoomFormPage } from "./pages/hospital-admin/RoomFormPage";
+import { RoomDetailsPage } from "./pages/hospital-admin/RoomDetailsPage";
 import { BedFormPage } from "./pages/hospital-admin/BedFormPage";
 import { HospitalInfoPage } from "./pages/hospital-admin/HospitalInfoPage";
 import { EnquiriesPage } from "./pages/hospital-admin/EnquiriesPage";
@@ -158,9 +157,6 @@ export const router = createBrowserRouter([
           { path: "hospitals/new", element: <HospitalFormPage /> },
           { path: "hospitals/:id", element: <HospitalDetailsPage /> },
           { path: "hospitals/:id/edit", element: <HospitalFormPage /> },
-          { path: "branches", element: <BranchesPage /> },
-          { path: "branches/new", element: <BranchFormPage /> },
-          { path: "branches/:id/edit", element: <BranchFormPage /> },
           { path: "departments", element: <DepartmentsPage /> },
           { path: "departments/new", element: <DepartmentFormPage /> },
           { path: "departments/:id/edit", element: <DepartmentFormPage /> },
@@ -212,15 +208,15 @@ export const router = createBrowserRouter([
           { path: "appointments", element: <AppointmentsPage /> },
           { path: "appointments/:id", element: <AppointmentDetailsPage /> },
           { path: "departments", element: <DepartmentsPage /> },
-          { path: "departments/new", element: <DepartmentFormPage /> },
-          { path: "departments/:id/edit", element: <DepartmentFormPage /> },
+          { path: "departments/new", element: <Navigate to="/admin/departments" replace /> },
+          { path: "departments/:id/edit", element: <Navigate to="/admin/departments" replace /> },
           { path: "departments/:id/metrics", element: <DepartmentMetricsPage /> },
           { path: "finance", element: <FinancePage /> },
           { path: "finance/invoices/:id", element: <PatientInvoicePage /> },
           { path: "inventory", element: <InventoryPage /> },
-          { path: "inventory/new", element: <InventoryFormPage /> },
+          { path: "inventory/new", element: <Navigate to="/admin/inventory" replace /> },
           { path: "inventory/:id", element: <InventoryItemDetailsPage /> },
-          { path: "inventory/:id/edit", element: <InventoryFormPage /> },
+          { path: "inventory/:id/edit", element: <Navigate to="/admin/inventory" replace /> },
           { path: "roles", element: <Navigate to="/admin" replace /> },
           { path: "roles/new", element: <Navigate to="/admin" replace /> },
           { path: "roles/:id/edit", element: <Navigate to="/admin" replace /> },
@@ -229,6 +225,7 @@ export const router = createBrowserRouter([
           { path: "beds/edit-ward/:id", element: <WardFormPage /> },
           { path: "beds/create-room", element: <RoomFormPage /> },
           { path: "beds/edit-room/:id", element: <RoomFormPage /> },
+          { path: "beds/rooms/:id", element: <RoomDetailsPage /> },
           { path: "beds/create-beds", element: <BedFormPage /> },
           { path: "beds/edit-bed/:id", element: <BedFormPage /> },
           { path: "beds/transfer", element: <Navigate to="/admin/beds" replace /> },

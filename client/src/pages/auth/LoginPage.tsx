@@ -96,11 +96,11 @@ export function LoginPage() {
     const cleanId = identifier.trim();
 
     if (!cleanId) {
-      setError("Email address or phone number is required.");
+      setError("Email address, mobile number, or Unique ID is required.");
       return;
     }
     if (cleanId.length > 100) {
-      setError("Email address or phone number cannot exceed 100 characters.");
+      setError("Email address, mobile number, or Unique ID cannot exceed 100 characters.");
       return;
     }
     if (!password) {
@@ -302,7 +302,7 @@ export function LoginPage() {
                   htmlFor="login-identifier"
                   className="block text-xs font-semibold text-slate-700"
                 >
-                  Email Address or Mobile Number
+                  Email Address, Mobile Number, or Unique ID
                 </label>
                 <div className="relative rounded-xl border border-slate-300 bg-white shadow-2xs focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all">
                   <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
@@ -319,7 +319,7 @@ export function LoginPage() {
                       setIdentifier(e.target.value);
                       if (error) setError(null);
                     }}
-                    placeholder="Enter email or mobile number"
+                    placeholder="Enter email, mobile number, or Unique ID (e.g. HOSP-001-DOC-JC01)"
                     className="w-full bg-transparent pl-10 pr-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none rounded-xl"
                   />
                 </div>

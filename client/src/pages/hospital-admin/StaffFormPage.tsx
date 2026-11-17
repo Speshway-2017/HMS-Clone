@@ -1,9 +1,19 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { UserCircle, Briefcase, ShieldCheck, Copy, AlertCircle } from "lucide-react";
+import { 
+  UserCircle, 
+  Briefcase, 
+  ShieldCheck, 
+  Copy, 
+  AlertCircle, 
+  RefreshCw, 
+  Building2, 
+  UserCheck, 
+  CheckCircle2,
+  Users
+} from "lucide-react";
 import toast from "react-hot-toast";
 import { useStaffMember, useCreateStaff, useUpdateStaff } from "../../features/staff";
-import { useDepartments } from "../../features/departments";
 import { useRoles } from "../../features/roles";
 import { FormSection } from "../../components/ui/FormSection";
 import { InputField, SelectField } from "../../components/ui/Field";
@@ -27,17 +37,48 @@ const NAME_REGEX = /^[a-zA-Z\s\.\-']+$/;
 const QUALIFICATIONS_REGEX = /^[a-zA-Z0-9\s\.\-/'&,()]+$/;
 const EMPLOYEE_ID_REGEX = /^[A-Za-z0-9\-_]+$/;
 
-function getRolePrefix(role: string): string {
+function getRoleDisplay(role: string, customRoles?: { role: string; label: string }[]): { label: string; code: string } {
+  const matched = customRoles?.find((r) => r.role.toLowerCase() === (role || "").toLowerCase());
   const clean = (role || "").toLowerCase().trim();
-  if (clean.includes("doc")) return "DOC";
-  if (clean.includes("nur")) return "NUR";
-  if (clean.includes("recep")) return "REC";
-  if (clean.includes("lab")) return "LAB";
-  if (clean.includes("radio")) return "RAD";
-  if (clean.includes("account")) return "ACC";
-  if (clean.includes("pharm")) return "PHA";
-  if (clean.includes("admin")) return "ADM";
-  return clean.substring(0, 3).toUpperCase() || "EMP";
+  let label = matched?.label || "";
+  let code = "STF";
+
+  if (clean.includes("doc")) {
+    label = label || "Doctor";
+    code = "DOC";
+  } else if (clean.includes("staf") || clean === "staff" || clean.includes("clinical")) {
+    label = label || "Clinical Staff";
+    code = "STF";
+  } else if (clean.includes("nur")) {
+    label = label || "Nurse";
+    code = "NUR";
+  } else if (clean.includes("recep") || clean.includes("front")) {
+    label = label || "Receptionist";
+    code = "REC";
+  } else if (clean.includes("pharm")) {
+    label = label || "Pharmacist";
+    code = "PHM";
+  } else if (clean.includes("lab")) {
+    label = label || "Lab Technician";
+    code = "LAB";
+  } else if (clean.includes("radio") || clean.includes("scan")) {
+    label = label || "Radiologist";
+    code = "RAD";
+  } else if (clean.includes("account") || clean.includes("bill")) {
+    label = label || "Accountant";
+    code = "ACC";
+  } else if (clean.includes("admin")) {
+    label = label || "Hospital Admin";
+    code = "ADM";
+  } else if (clean.includes("super")) {
+    label = label || "Super Admin";
+    code = "SUP";
+  } else {
+    label = label || role || "Staff";
+    code = clean.substring(0, 3).toUpperCase() || "STF";
+  }
+
+  return { label, code };
 }
 
 export function StaffFormPage() {
@@ -45,13 +86,16 @@ export function StaffFormPage() {
   const isEdit = !!id;
   const navigate = useNavigate();
   const { data: staff } = useStaffMember(id);
-  const { data: departments } = useDepartments();
   const { data: roles } = useRoles();
   const createStaff = useCreateStaff();
   const updateStaff = useUpdateStaff(id ?? "");
   const { isAllBranches, branches } = useBranchContext();
 
-  // When admin is in "All Branches" mode, they must choose a branch for the new staff member
+  // Hospital Admins are strictly disallowed from creating/assigning Super Admin, Hospital Admin, or Patient roles
+  const assignableRoles = (roles || []).filter(
+    (r) => !["super_admin", "admin", "hospital_admin", "patient"].includes(r.role.toLowerCase())
+  );
+
   const [selectedBranchId, setSelectedBranchId] = useState("");
 
   const [form, setForm] = useState({
@@ -60,9 +104,9 @@ export function StaffFormPage() {
     email: "",
     phone: "",
     photoUrl: "",
-    role: "",
+    role: "staff",
     employeeId: "",
-    department: "",
+    dateOfJoining: new Date().toISOString().split("T")[0],
     qualifications: "",
     dutyStatus: "on_duty" as "on_duty" | "late" | "off_duty" | "on_leave",
   });
@@ -71,6 +115,66 @@ export function StaffFormPage() {
   const [, setTouched] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ name: string; email: string; tempPassword: string; role: string } | null>(null);
+  const [isGeneratingId, setIsGeneratingId] = useState(false);
+
+  // Fetch or regenerate composite Unique Staff ID based on Hospital ID, Role, and Person Name
+  const fetchNextId = useCallback((roleVal?: string, nameVal?: string) => {
+    if (isEdit) return;
+    const activeRole = roleVal || form.role || "staff";
+    const activeName = nameVal !== undefined ? nameVal : form.name;
+    setIsGeneratingId(true);
+
+    api.get("/staff/next-employee-id", {
+      params: {
+        role: activeRole,
+        name: activeName || undefined,
+      },
+    })
+      .then((res) => {
+        const nextId = res.data.data?.employeeId;
+        if (nextId) {
+          setForm((prev) => ({ ...prev, employeeId: nextId }));
+          setFieldErrors((prev) => ({ ...prev, employeeId: undefined }));
+        }
+      })
+      .catch(() => {
+        const roleInfo = getRoleDisplay(activeRole, roles);
+        const fallbackId = `HOSP-001-${roleInfo.code}-001`;
+        setForm((prev) => ({ ...prev, employeeId: fallbackId }));
+      })
+      .finally(() => setIsGeneratingId(false));
+  }, [isEdit, form.role, form.name, roles]);
+
+  // Synchronize form role with available assignable roles from superadmin matrix
+  useEffect(() => {
+    if (!isEdit && assignableRoles && assignableRoles.length > 0) {
+      const currentRoleExists = assignableRoles.some((r) => r.role === form.role);
+      if (!currentRoleExists) {
+        const preferredRole = assignableRoles.find((r) => r.role === "staff")?.role || assignableRoles[0]?.role;
+        if (preferredRole) {
+          setForm((prev) => ({ ...prev, role: preferredRole }));
+          fetchNextId(preferredRole, form.name);
+        }
+      }
+    }
+  }, [assignableRoles, isEdit]);
+
+  useEffect(() => {
+    if (!isEdit && !form.employeeId) {
+      fetchNextId();
+    }
+  }, [isEdit]);
+
+  // Debounced ID re-generation when staff name changes
+  useEffect(() => {
+    if (isEdit || !form.name.trim()) return;
+    const timer = setTimeout(() => {
+      if (form.name.trim().length >= 2) {
+        fetchNextId(form.role, form.name);
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [form.name, form.role, isEdit]);
 
   useEffect(() => {
     if (staff) {
@@ -80,9 +184,11 @@ export function StaffFormPage() {
         email: staff.email || "",
         phone: staff.phone || "",
         photoUrl: staff.photoUrl || "",
-        role: staff.role || "",
+        role: staff.role || "nurse",
         employeeId: staff.employeeId || "",
-        department: typeof staff.department === "object" && staff.department ? staff.department._id : "",
+        dateOfJoining: staff.dateOfJoining
+          ? new Date(staff.dateOfJoining).toISOString().split("T")[0]
+          : new Date().toISOString().split("T")[0],
         qualifications: staff.qualifications || "",
         dutyStatus: staff.dutyStatus || "on_duty",
       });
@@ -162,6 +268,9 @@ export function StaffFormPage() {
       if (!trimmed) {
         return "Role / Designation is required. Please fill out this field";
       }
+      if (["super_admin", "admin", "hospital_admin", "patient"].includes(trimmed.toLowerCase())) {
+        return "Hospital administrators are not permitted to assign this role. Please select a valid clinical or support staff role.";
+      }
       return undefined;
     }
 
@@ -238,10 +347,6 @@ export function StaffFormPage() {
 
     if (isPhone && !/^[0-9]$/.test(e.key)) {
       e.preventDefault();
-      const msg = "Invalid phone number. Phone Number should accept 10 digits only. Please enter valid data";
-      setError("Please enter valid data");
-      setFieldErrors((prev) => ({ ...prev, [field]: msg }));
-      toast.error(msg, { id: `${label}-digit-only` });
       return;
     }
 
@@ -249,85 +354,42 @@ export function StaffFormPage() {
     const hasSelection = (input.selectionEnd ?? 0) - (input.selectionStart ?? 0) > 0;
     if (!hasSelection && currentLen >= limit) {
       e.preventDefault();
-      const msg = isPhone
-        ? `${label} cannot exceed ${limit} digits. Please enter valid data`
-        : `${label} cannot exceed ${limit} characters. Please enter valid data`;
       setError("Please enter valid data");
-      setFieldErrors((prev) => ({ ...prev, [field]: msg }));
-      toast.error(msg, { id: `${label}-limit` });
     }
   };
 
-  const handleBlur = (
-    field:
-      | "name"
-      | "gender"
-      | "email"
-      | "phone"
-      | "role"
-      | "employeeId"
-      | "qualifications"
-  ) => {
+  const handleBlur = (field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
-    const err = validateField(field, form[field]);
+    const err = validateField(field as any, (form as any)[field]);
     setFieldErrors((prev) => ({ ...prev, [field]: err }));
-    if (err) {
-      setError("Please enter valid data");
-      toast.error(err, { id: `staff-${field}-error` });
-    }
+    if (err) setError("Please enter valid data");
   };
 
   const handleRoleChange = async (selectedRole: string) => {
     setForm((prev) => ({ ...prev, role: selectedRole }));
     const roleErr = validateField("role", selectedRole);
     setFieldErrors((prev) => ({ ...prev, role: roleErr }));
-
-    if (selectedRole) {
-      try {
-        const res = await api.get("/staff/next-employee-id", { params: { role: selectedRole } });
-        const nextId = res.data.data?.employeeId;
-        if (nextId) {
-          setForm((prev) => ({ ...prev, role: selectedRole, employeeId: nextId }));
-          setFieldErrors((prev) => ({ ...prev, employeeId: undefined }));
-        }
-      } catch {
-        const prefix = getRolePrefix(selectedRole);
-        const year = new Date().getFullYear();
-        const fallbackId = `${prefix}-${year}-0001`;
-        setForm((prev) => ({ ...prev, role: selectedRole, employeeId: fallbackId }));
-        setFieldErrors((prev) => ({ ...prev, employeeId: undefined }));
-      }
-    }
+    fetchNextId(selectedRole, form.name);
   };
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
 
-    // Validate: when admin is in All Branches mode, a branch must be selected
     if (!isEdit && isAllBranches && !selectedBranchId) {
       setError("Please select the branch this staff member belongs to.");
       return;
     }
 
-    const nameErr = validateField("name", form.name);
-    const genderErr = validateField("gender", form.gender);
-    const emailErr = validateField("email", form.email);
-    const phoneErr = validateField("phone", form.phone);
-    const roleErr = validateField("role", form.role);
-    const employeeIdErr = validateField("employeeId", form.employeeId);
-    const qualErr = validateField("qualifications", form.qualifications);
-    const photoErr = validateField("photoUrl", form.photoUrl);
-
     const errors: Record<string, string | undefined> = {
-      name: nameErr,
-      gender: genderErr,
-      email: emailErr,
-      phone: phoneErr,
-      role: roleErr,
-      employeeId: employeeIdErr,
-      qualifications: qualErr,
-      photoUrl: photoErr,
+      name: validateField("name", form.name),
+      gender: validateField("gender", form.gender),
+      email: validateField("email", form.email),
+      phone: validateField("phone", form.phone),
+      role: validateField("role", form.role),
+      employeeId: validateField("employeeId", form.employeeId),
+      qualifications: validateField("qualifications", form.qualifications),
+      photoUrl: validateField("photoUrl", form.photoUrl),
     };
 
     setFieldErrors(errors);
@@ -350,33 +412,37 @@ export function StaffFormPage() {
       return;
     }
 
-    const payload = {
+    const payload: any = {
       ...form,
       name: form.name.trim(),
       email: form.email.trim(),
       phone: form.phone.trim(),
-      role: form.role.trim(),
       employeeId: form.employeeId.trim(),
       qualifications: form.qualifications.trim(),
-      department: form.department || null,
+      shift: "General",
+      dateOfJoining: form.dateOfJoining || undefined,
+      dutyStatus: form.dutyStatus || "on_duty",
     };
+
+    if (!isEdit && isAllBranches && selectedBranchId) {
+      payload.branch = selectedBranchId;
+    }
 
     try {
       if (isEdit) {
         await updateStaff.mutateAsync(payload);
-        toast.success("Staff member updated successfully!");
+        toast.success("Staff profile updated successfully!");
         navigate("/admin/staff");
       } else {
-        // When admin is in All Branches view, explicitly override X-Branch-ID for this POST
-        const headers: Record<string, string> = {};
-        if (isAllBranches && selectedBranchId) {
-          headers["X-Branch-ID"] = selectedBranchId;
-        }
-        const res = await api.post("/staff", payload, { headers });
-        const result = res.data.data as { staff: any; tempPassword: string | null };
-        toast.success("Staff member created successfully!");
+        const result = await createStaff.mutateAsync(payload);
+        toast.success("Staff member onboarded successfully!");
         if (result.tempPassword) {
-          setCreated({ name: form.name, email: form.email, tempPassword: result.tempPassword, role: form.role });
+          setCreated({
+            name: form.name,
+            email: form.email,
+            tempPassword: result.tempPassword,
+            role: form.role,
+          });
         } else {
           navigate("/admin/staff");
         }
@@ -391,87 +457,100 @@ export function StaffFormPage() {
 
   const isSaving = createStaff.isPending || updateStaff.isPending;
 
-  // ── Credential reveal screen ──────────────────────────────────────────────────
+  // Credential reveal modal
   if (created) {
     return (
-      <div className="mx-auto max-w-lg">
-        <Card>
+      <div className="mx-auto max-w-lg pt-8">
+        <Card className="p-6 border border-emerald-200 bg-white shadow-md">
           <div className="mb-4 flex justify-center">
-            <span className="rounded-full bg-emerald-100 p-3 text-emerald-600">
-              <ShieldCheck className="h-6 w-6" />
+            <span className="rounded-full bg-emerald-100 p-3 text-emerald-700">
+              <ShieldCheck className="h-8 w-8" />
             </span>
           </div>
-          <h2 className="text-center text-lg font-semibold text-slate-800">
-            Staff Account Created
-          </h2>
-          <p className="mt-1 text-center text-sm text-slate-500">
-            Share these temporary credentials with <strong>{created.name}</strong> securely — the password is shown only once.
+          <h2 className="text-center text-xl font-bold text-slate-900">Staff Account Created</h2>
+          <p className="mt-1.5 text-center text-xs text-slate-500">
+            Login credentials have been securely generated and emailed to <strong>{created.email}</strong>. Share these temporary login credentials with <strong>{created.name}</strong> securely if needed. Password is shown only once.
           </p>
-          <div className="mt-4 space-y-2 rounded-lg bg-slate-50 p-4 text-sm">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Email</span>
-              <span className="font-medium text-slate-800">{created.email}</span>
+          <div className="mt-5 space-y-3 rounded-xl bg-slate-50 border border-slate-200/80 p-4 text-xs">
+            <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
+              <span className="text-slate-500 font-semibold">Employee ID (Unique ID)</span>
+              <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                {form.employeeId}
+              </span>
+            </div>
+            <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
+              <span className="text-slate-500 font-semibold">Assigned Role</span>
+              <span className="font-bold text-slate-800 capitalize">{created.role?.replace("_", " ")}</span>
+            </div>
+            <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
+              <span className="text-slate-500 font-semibold">Login Username / Email</span>
+              <span className="font-bold text-slate-800">{created.email}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-slate-500">Temporary Password</span>
-              <span className="flex items-center gap-2 font-mono font-medium text-slate-800">
+              <span className="text-slate-500 font-semibold">Temporary Password</span>
+              <span className="flex items-center gap-2 font-mono font-bold text-slate-900 bg-white px-2.5 py-1 rounded border border-slate-200">
                 {created.tempPassword}
                 <button
+                  type="button"
                   onClick={() => {
                     navigator.clipboard.writeText(created.tempPassword);
                     toast.success("Password copied to clipboard!");
                   }}
-                  className="text-slate-400 hover:text-emerald-700"
+                  className="text-slate-400 hover:text-emerald-700 cursor-pointer"
                   title="Copy password"
                 >
                   <Copy className="h-4 w-4" />
                 </button>
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Role</span>
-              <span className="font-medium text-slate-800 capitalize">
-                {roles?.find((r) => r.role === created.role)?.label || created.role || "Receptionist"}
-              </span>
-            </div>
           </div>
-          <p className="mt-3 text-center text-xs text-amber-600">
-            ⚠️ Staff should change this password after first login via the Settings page.
+          <p className="mt-4 text-center text-[11px] text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200/60">
+            ⚠️ The employee must change their temporary password upon first login in Account Settings.
           </p>
           <Button
             variant="primary"
-            className="mt-6 w-full justify-center"
+            className="mt-6 w-full justify-center font-bold"
             onClick={() => navigate("/admin/staff")}
           >
-            Done
+            Done & Return to Staff Directory
           </Button>
         </Card>
       </div>
     );
   }
 
-  // ── Main form ─────────────────────────────────────────────────────────────────
   return (
-    <div className="w-full space-y-6">
-      <div>
-        <div className="text-sm text-slate-400">
-          <Link to="/admin/staff" className="hover:text-emerald-700">
-            Staff
-          </Link>{" "}
-          &gt; {isEdit ? "Edit Staff" : "Add New Staff"}
+    <div className="w-full space-y-6 pb-12">
+      {/* Breadcrumb & Header */}
+      <div className="border-b border-slate-200 pb-4">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-1">
+          <Link to="/admin/staff" className="hover:text-emerald-700 transition-colors">
+            Staff Directory
+          </Link>
+          <span>&gt;</span>
+          <span className="text-emerald-800">{isEdit ? "Edit Profile" : "Onboard Healthcare Personnel"}</span>
         </div>
-        <h1 className="text-2xl font-bold text-slate-900">
-          {isEdit ? "Edit Staff Member" : "Staff Onboarding"}
-        </h1>
-        <p className="text-sm text-slate-500">
-          {isEdit
-            ? "Update the staff member's profile and operational details."
-            : `Fill in the details below. A login account for the selected role (${form.role ? (roles?.find(r => r.role === form.role)?.label || form.role) : "staff"}) will be automatically created with a temporary password.`}
-        </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              {isEdit ? "Edit Staff Member" : "Staff Onboarding Portal"}
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {isEdit
+                ? "Update staff member profile, role designations, and operational department assignment."
+                : "Register clinical, administrative, and operations personnel with an auto-generated composite Unique ID."}
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 border border-emerald-200 w-fit">
+            <Users className="h-3.5 w-3.5 text-emerald-700" />
+            <span>Personnel Management</span>
+          </span>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} noValidate className="space-y-6">
-        <FormSection icon={UserCircle} title="Personal Information">
+        {/* Section 1: Personal & Contact Details (Full Width) */}
+        <FormSection icon={UserCircle} title="Personnel Personal Information">
           <InputField
             label="Full Name"
             required
@@ -488,8 +567,10 @@ export function StaffFormPage() {
             }}
             onKeyDown={(e) => handleKeyGuard(e, "name", form.name.length, STAFF_LIMITS.NAME, "Full Name")}
             onBlur={() => handleBlur("name")}
-            placeholder="e.g. Sarah Jenkins"
+            placeholder="e.g. Ananya Rao"
+            hint="Initials will be embedded into the Unique ID (e.g. AR01)"
           />
+
           <SelectField
             label="Gender *"
             required
@@ -508,8 +589,9 @@ export function StaffFormPage() {
             <option value="Female">Female</option>
             <option value="Other">Other</option>
           </SelectField>
+
           <InputField
-            label="Email Address (used for login)"
+            label="Work Email Address"
             type="email"
             required={!isEdit}
             disabled={isEdit}
@@ -526,10 +608,12 @@ export function StaffFormPage() {
             }}
             onKeyDown={(e) => handleKeyGuard(e, "email", form.email.length, STAFF_LIMITS.EMAIL, "Email Address")}
             onBlur={() => handleBlur("email")}
-            placeholder="sarah.j@medipro.com"
+            placeholder="e.g. ananya.rao@preethifertility.com"
+            hint="Staff portal login username"
           />
+
           <InputField
-            label="Phone Number"
+            label="Mobile Phone Number"
             type="tel"
             required
             maxLength={STAFF_LIMITS.PHONE}
@@ -546,10 +630,12 @@ export function StaffFormPage() {
             onKeyDown={(e) => handleKeyGuard(e, "phone", form.phone.length, STAFF_LIMITS.PHONE, "Phone Number", true)}
             onBlur={() => handleBlur("phone")}
             placeholder="e.g. 9876543210"
+            hint="10-digit primary mobile contact"
           />
+
           <div className="sm:col-span-2">
             <FileUpload
-              label="Photo"
+              label="Staff Identification Photo"
               folder="staff-photos"
               value={form.photoUrl}
               onChange={(url) => {
@@ -557,52 +643,55 @@ export function StaffFormPage() {
                 setFieldErrors((prev) => ({ ...prev, photoUrl: undefined }));
               }}
               maxSizeMB={2}
-              hint="PNG, JPEG, WEBP, SVG up to 2MB"
+              hint="PNG, JPEG, WEBP up to 2MB"
               error={fieldErrors.photoUrl}
               onError={(err) => setFieldErrors((prev) => ({ ...prev, photoUrl: err || undefined }))}
             />
           </div>
         </FormSection>
 
-        <FormSection icon={Briefcase} title="Professional Details">
-          {/* Branch selector — only shown to admins in "All Branches" mode */}
-          {!isEdit && isAllBranches && (
-            <SelectField
-              label="Assign to Branch *"
-              required
-              value={selectedBranchId}
-              onChange={(e) => setSelectedBranchId(e.target.value)}
-            >
-              <option value="">Select Branch</option>
-              {branches.map((b) => (
-                <option key={b._id} value={b._id}>
-                  {b.name}
-                </option>
-              ))}
-            </SelectField>
-          )}
+        {/* Section 2: Role & Employment Details (Full Width) */}
+        <FormSection icon={Briefcase} title="Role & Employment Details">
           <SelectField
-            label="Role / Designation *"
+            label="Staff Role / Designation *"
             required
             value={form.role}
             error={fieldErrors.role}
             onChange={(e) => handleRoleChange(e.target.value)}
             onBlur={() => handleBlur("role")}
           >
-            <option value="">Select Role</option>
-            {roles?.map((r) => (
-              <option key={r.role} value={r.role}>
-                {r.label}
-              </option>
-            ))}
+            {assignableRoles && assignableRoles.length > 0 ? (
+              assignableRoles.map((r) => (
+                <option key={r._id || r.role} value={r.role}>
+                  {r.label}
+                </option>
+              ))
+            ) : (
+              <option value="staff">Clinical Staff</option>
+            )}
           </SelectField>
+
           <InputField
-            label="Employee ID (Auto-Generated)"
+            label="Unique Employee ID"
             required
             maxLength={STAFF_LIMITS.EMPLOYEE_ID}
             showCharCount
             value={form.employeeId}
             error={fieldErrors.employeeId}
+            rightElement={
+              !isEdit ? (
+                <button
+                  type="button"
+                  onClick={() => fetchNextId(form.role, form.name)}
+                  disabled={isGeneratingId}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 transition-colors cursor-pointer"
+                  title="Re-generate unique staff ID"
+                >
+                  <RefreshCw className={`h-3 w-3 ${isGeneratingId ? "animate-spin" : ""}`} />
+                  <span>Re-generate</span>
+                </button>
+              ) : undefined
+            }
             onChange={(e) => {
               const val = e.target.value;
               setForm({ ...form, employeeId: val });
@@ -612,34 +701,37 @@ export function StaffFormPage() {
             }}
             onKeyDown={(e) => handleKeyGuard(e, "employeeId", form.employeeId.length, STAFF_LIMITS.EMPLOYEE_ID, "Employee ID")}
             onBlur={() => handleBlur("employeeId")}
-            placeholder={form.role ? "Auto-generating unique Employee ID..." : "Select a role to auto-generate ID"}
-            hint={form.role ? `Unique auto-generated ID formatted for hospital & branch` : "Selecting a role above automatically generates a unique role-prefixed Employee ID"}
+            placeholder="Auto-generating Staff ID..."
+            hint="Format: <Hospital>-<Role>-<Initials><Seq>"
           />
-          <SelectField
-            label="Department"
-            value={form.department}
-            onChange={(e) => setForm({ ...form, department: e.target.value })}
-          >
-            <option value="">Select Department</option>
-            {departments?.map((d) => (
-              <option key={d._id} value={d._id}>
-                {d.name}
-              </option>
-            ))}
-          </SelectField>
-          <SelectField
-            label="Duty Status"
-            value={form.dutyStatus}
-            onChange={(e) => setForm({ ...form, dutyStatus: e.target.value as typeof form.dutyStatus })}
-          >
-            <option value="on_duty">On Duty</option>
-            <option value="late">Late</option>
-            <option value="off_duty">Off Duty</option>
-            <option value="on_leave">On Leave</option>
-          </SelectField>
-          <div className="sm:col-span-2">
+
+          <InputField
+            label="Date of Joining"
+            type="date"
+            value={form.dateOfJoining}
+            onChange={(e) => setForm({ ...form, dateOfJoining: e.target.value })}
+            hint="Official hospital employment commencement date"
+          />
+
+          {!isEdit && isAllBranches && (
+            <SelectField
+              label="Assigned Facility Branch *"
+              required
+              value={selectedBranchId}
+              onChange={(e) => setSelectedBranchId(e.target.value)}
+            >
+              <option value="">Select Branch...</option>
+              {branches?.map((b) => (
+                <option key={b._id} value={b._id}>
+                  {b.name}
+                </option>
+              ))}
+            </SelectField>
+          )}
+
+          <div className={!isEdit && isAllBranches ? "sm:col-span-2" : ""}>
             <InputField
-              label="Qualifications / Certifications"
+              label="Qualifications & Certifications"
               maxLength={STAFF_LIMITS.QUALIFICATIONS}
               showCharCount
               value={form.qualifications}
@@ -651,32 +743,38 @@ export function StaffFormPage() {
                 setFieldErrors((prev) => ({ ...prev, qualifications: err }));
                 if (!err && error === "Please enter valid data") setError(null);
               }}
-              onKeyDown={(e) => handleKeyGuard(e, "qualifications", form.qualifications.length, STAFF_LIMITS.QUALIFICATIONS, "Qualifications / Certifications")}
+              onKeyDown={(e) => handleKeyGuard(e, "qualifications", form.qualifications.length, STAFF_LIMITS.QUALIFICATIONS, "Qualifications")}
               onBlur={() => handleBlur("qualifications")}
-              placeholder="e.g. Registered Nurse (RN), BLS Certified"
+              placeholder="e.g. B.Sc Nursing, Certified Phlebotomist"
+              hint="Medical degrees, certifications"
             />
           </div>
         </FormSection>
 
         {!isEdit && (
-          <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-            <strong>Note:</strong> A login account for the selected role ({form.role ? (roles?.find(r => r.role === form.role)?.label || form.role) : "staff"}) will be automatically created using the email address above. A temporary password will be shown after submission.
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-xs text-emerald-950 flex items-start gap-3 shadow-2xs">
+            <ShieldCheck className="h-5 w-5 text-emerald-700 shrink-0 mt-0.5" />
+            <div>
+              <strong className="font-bold text-emerald-900 block">Automated Security & Access Provisioning:</strong>
+              A staff portal login account will be generated automatically for this personnel using the provided email address. Temporary credentials will be emailed to them directly and revealed upon saving.
+            </div>
           </div>
         )}
 
         {error && (
-          <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-700 flex items-center gap-2 animate-in fade-in duration-150">
+          <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-700 flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
             <span>{error}</span>
           </div>
         )}
 
-        <div className="flex justify-end gap-3">
+        {/* Action Controls */}
+        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
           <Button type="button" variant="secondary" onClick={() => navigate("/admin/staff")}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" disabled={isSaving}>
-            {isSaving ? "Saving..." : isEdit ? "Save Changes" : "Create Staff & Account"}
+          <Button type="submit" variant="primary" disabled={isSaving} className="font-bold shadow-sm">
+            {isSaving ? "Saving..." : isEdit ? "Save Personnel Profile" : "Onboard Staff & Issue ID"}
           </Button>
         </div>
       </form>

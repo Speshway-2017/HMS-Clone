@@ -30,7 +30,7 @@ const wardSchema = z.object({
     .string({ invalid_type_error: "Please enter valid data" })
     .trim()
     .min(1, "Ward Type is required. Field is required. Please fill out this field")
-    .max(50, "Ward Type cannot exceed 50 characters. Too long text is not accepted. Please enter valid data"),
+    .max(100, "Ward Type cannot exceed 100 characters. Too long text is not accepted. Please enter valid data"),
   floorNumber: z.coerce
     .number({ invalid_type_error: "Floor Number must be a valid number. Invalid data is not accepted. Please enter valid data" })
     .min(-5, "Floor Number cannot be less than -5. Invalid data is not accepted. Please enter valid data")
@@ -195,4 +195,26 @@ export const deleteWard = catchAsync(async (req: Request, res: Response) => {
   }
 
   res.json({ status: "success", message: "Ward deleted successfully." });
+});
+
+export const getWardTypes = catchAsync(async (req: Request, res: Response) => {
+  const distinct = await Ward.distinct("wardType", req.hospitalFilter);
+  const defaults = [
+    "General Ward",
+    "Semi-Private Ward",
+    "Private Ward",
+    "Deluxe Wing",
+    "VIP Suite Ward",
+    "ICU",
+    "NICU",
+    "PICU",
+    "Emergency Ward",
+    "Labour & Delivery",
+    "Maternity Ward",
+    "Isolation Ward",
+    "Post-Operative Ward",
+    "Day Care Unit"
+  ];
+  const combined = Array.from(new Set([...distinct.filter(Boolean), ...defaults]));
+  res.json({ status: "success", data: { wardTypes: combined } });
 });

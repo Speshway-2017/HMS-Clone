@@ -43,11 +43,11 @@ export function FieldWrapper({
   return (
     <div>
       <div className="mb-1 flex items-center justify-between gap-2">
-        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">
           {cleanLabel}
           {required && <span className="text-red-500"> *</span>}
         </label>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {maxLength !== undefined && (
             <span
               className={`text-[11px] font-mono transition-colors ${

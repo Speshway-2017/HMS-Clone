@@ -800,119 +800,98 @@ export function LandingPage() {
         {activeTab === "home" && (
           <div className="transition-all duration-300 ease-in-out">
 
-            {/* Hero Section */}
-            <section className="relative px-6 pb-16 pt-8 lg:px-12 lg:pb-24 lg:pt-12 bg-gradient-to-b from-white via-slate-50 to-slate-50 overflow-hidden">
-              <div aria-hidden className="pointer-events-none absolute -right-[15%] -top-[10%] h-[500px] w-[500px] rounded-full bg-navy-100/40 blur-3xl opacity-60" />
-              <div aria-hidden className="pointer-events-none absolute -left-[10%] top-[40%] h-[400px] w-[400px] rounded-full bg-emerald-50/40 blur-3xl opacity-50" />
+            {/* Hero Section - Fixed to Screen Size on Desktop & Fully Responsive */}
+            <section className="relative px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#fbfdfc] via-white to-slate-50/60 overflow-hidden lg:h-[calc(100vh-65px)] lg:min-h-[580px] lg:max-h-[820px] flex items-center">
+              <div aria-hidden className="pointer-events-none absolute -right-[10%] -top-[10%] h-[500px] w-[500px] rounded-full bg-emerald-100/40 blur-3xl opacity-60" />
+              <div aria-hidden className="pointer-events-none absolute -left-[10%] top-[30%] h-[400px] w-[400px] rounded-full bg-teal-50/40 blur-3xl opacity-50" />
 
-              <div className="mx-auto grid max-w-[1600px] grid-cols-1 items-center gap-12 lg:grid-cols-12">
-                <div className="text-center lg:col-span-6 lg:text-left space-y-6">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-emerald-800 border border-emerald-200 shadow-xs">
-                    <Heart className="h-3.5 w-3.5 text-rose-600 fill-rose-600" />
-                    Dedicated Clinical Excellence
+              <div className="mx-auto w-full max-w-7xl h-full grid grid-cols-1 lg:grid-cols-12 items-center gap-8 lg:gap-12 py-8 lg:py-0">
+                <div className="text-center lg:col-span-6 lg:text-left space-y-4 sm:space-y-5 lg:space-y-6 flex flex-col justify-center">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50/90 border border-emerald-200/80 px-3.5 py-1.5 text-xs font-semibold text-emerald-900 shadow-2xs w-fit mx-auto lg:mx-0">
+                    <span className="flex h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
+                    <Heart className="h-3.5 w-3.5 text-rose-500 fill-rose-500" />
+                    <span>Dedicated Clinical Excellence</span>
                   </div>
-                  <h1 className="text-3xl font-extrabold leading-[1.15] tracking-tight text-slate-900 sm:text-4xl lg:text-5xl">
+
+                  <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[44px] xl:text-[52px] font-extrabold leading-[1.12] tracking-tight text-slate-900">
                     {heroTitle}
                   </h1>
-                  <p className="mx-auto mt-3 max-w-xl text-sm lg:text-base leading-relaxed text-slate-600 lg:mx-0">
+
+                  <p className="mx-auto max-w-xl text-sm sm:text-base lg:text-base xl:text-lg leading-relaxed text-slate-600 lg:mx-0">
                     {heroSub}
                   </p>
-                  <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
+
+                  <div className="pt-1 flex flex-col items-stretch sm:items-center justify-center gap-3.5 sm:flex-row lg:justify-start">
                     <button
                       onClick={() => changeTab("doctors")}
-                      className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold text-sm shadow-xs transition-colors cursor-pointer w-full sm:w-auto"
+                      className="inline-flex items-center justify-center gap-2.5 px-6 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-semibold text-sm shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
                     >
                       <span>Book Appointment Online</span>
                       <ArrowRight className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => changeTab("departments")}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold text-sm shadow-xs transition-colors cursor-pointer w-full sm:w-auto"
+                      className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-sm shadow-2xs transition-all hover:border-slate-300 cursor-pointer"
                     >
                       <span>Explore Specialties</span>
                     </button>
                   </div>
 
-                  <div className="pt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-xs lg:text-sm font-semibold text-slate-500 lg:justify-start">
+                  <div className="pt-2 flex flex-wrap items-center justify-center gap-x-6 gap-y-2.5 text-xs sm:text-sm font-medium text-slate-600 lg:justify-start">
                     <div className="flex items-center gap-1.5">
-                      <CheckCircle2 className="h-5 w-5 text-emerald-500" /> 24/7 Trauma Care
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span>24/7 Clinical Care</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <CheckCircle2 className="h-5 w-5 text-emerald-500" /> Verified Medical Staff
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span>Verified Medical Specialists</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span>State-of-the-Art Labs</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Hero Banner / 3D Animated Clinical Illustration */}
-                <div className="lg:col-span-6">
-                  <div className="relative group perspective-1000">
-                    {/* Ambient Glow Halo matching emerald & rose clinical color palette */}
-                    <div className="absolute -inset-2 rounded-3xl bg-gradient-to-r from-emerald-500/20 via-teal-500/10 to-rose-400/20 blur-xl opacity-75 group-hover:opacity-100 transition-opacity animate-pulse-glow pointer-events-none" />
+                {/* Hero Photo - Proprietor Showcase (Dr. Preethi Dayal Transparent Cutout) */}
+                <div className="lg:col-span-6 h-full flex items-end justify-center lg:justify-end relative pt-4 lg:pt-0">
+                  <div className="relative h-full flex items-end justify-center w-full max-w-[460px] sm:max-w-[520px] lg:max-w-[580px] xl:max-w-[640px]">
+                    {/* Soft Backdrop Orbs */}
+                    <div
+                      aria-hidden
+                      className="absolute bottom-12 left-1/2 -translate-x-1/2 w-72 sm:w-80 lg:w-96 h-72 sm:h-80 lg:h-96 rounded-full bg-gradient-to-tr from-emerald-100/60 via-teal-50/40 to-transparent blur-3xl -z-10 pointer-events-none"
+                    />
 
-                    {/* Main 3D Card Shell */}
-                    <div className="relative rounded-3xl border border-slate-200/90 bg-white p-2.5 sm:p-3 shadow-2xl transition-all duration-500 group-hover:shadow-emerald-900/10 group-hover:-translate-y-1">
-                      <div className="relative rounded-2xl overflow-hidden aspect-[4/3] bg-gradient-to-br from-[#062417] via-[#093522] to-[#041a10]">
-                        {/* 3D Medical Illustration Image with Floating Animation */}
-                        <img
-                          src={heroBannerUrl || "/hero_3d_medical.jpg"}
-                          alt={`${hospitalName} 3D Clinical Environment`}
-                          className="w-full h-full object-cover object-center animate-float-slow scale-102 group-hover:scale-105 transition-transform duration-700"
-                          onError={(e) => {
-                            e.currentTarget.onerror = null;
-                            e.currentTarget.src = "/hero_3d_medical.jpg";
-                          }}
-                        />
+                    {/* Transparent Cutout Image of Dr. Preethi Dayal - Sized with respect to Hero Section */}
+                    <img
+                      src={heroBannerUrl && heroBannerUrl !== "/hero_3d_medical.jpg" ? heroBannerUrl : "/dr_preethi_dayal.png"}
+                      alt={`${hospitalName} - Dr. Preethi Dayal`}
+                      className="w-auto h-auto max-h-[440px] sm:max-h-[520px] lg:max-h-[calc(100vh-120px)] lg:h-[88%] xl:max-h-[720px] max-w-full object-contain object-bottom block drop-shadow-2xl relative z-10 select-none pointer-events-none transition-all duration-300"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = "/dr_preethi_dayal.png";
+                      }}
+                    />
 
-                        {/* Top Floating Glass Badge */}
-                        <div className="absolute top-3.5 left-3.5 right-3.5 z-20 flex items-center justify-between pointer-events-none">
-                          <div className="flex items-center gap-2.5 rounded-2xl bg-slate-900/75 backdrop-blur-md border border-white/20 px-3 py-1.5 shadow-lg animate-float-reverse">
-                            <img
-                              src={logoUrl}
-                              alt="Logo"
-                              className="h-7 w-7 rounded-full border border-emerald-400/50 bg-white p-0.5 object-contain"
-                              onError={(e) => {
-                                e.currentTarget.onerror = null;
-                                e.currentTarget.src = "/preethi_logo.jpg";
-                              }}
-                            />
-                            <div className="flex flex-col">
-                              <span className="text-xs font-bold text-white leading-tight">
-                                {hospitalName}
-                              </span>
-                              <span className="text-[10px] text-emerald-300 font-medium leading-none mt-0.5">
-                                Reproductive Medicine & Clinical Care
-                              </span>
-                            </div>
-                          </div>
+                    {/* Floating Badge 1 - Top Left: Identity & Leadership */}
+                    <div className="absolute top-6 sm:top-10 -left-2 sm:-left-4 lg:-left-6 z-20 flex items-center gap-2.5 rounded-2xl bg-white/95 backdrop-blur-md px-3.5 py-2 sm:px-4 sm:py-2.5 border border-slate-200/90 shadow-md">
+                      <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200/60 shrink-0">
+                        <Stethoscope className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-emerald-700" />
+                      </div>
+                      <div className="text-left">
+                        <div className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">Dr. Preethi Dayal</div>
+                        <div className="text-[10px] sm:text-xs text-emerald-700 font-semibold leading-tight mt-0.5">Founder & Clinical Director</div>
+                      </div>
+                    </div>
 
-                          <div className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-emerald-950/80 backdrop-blur-md px-3 py-1 text-[11px] font-bold text-emerald-300 border border-emerald-400/40 shadow-sm">
-                            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                            <span>CARE ACTIVE</span>
-                          </div>
-                        </div>
-
-                        {/* Bottom Floating Stats Strip */}
-                        <div className="absolute bottom-3.5 left-3.5 right-3.5 z-20 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pointer-events-auto">
-                          {/* Left Badge: Trust KPI */}
-                          <div className="rounded-xl bg-slate-900/80 backdrop-blur-md px-3.5 py-2 border border-white/15 shadow-lg flex items-center gap-3">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-bold text-xs">
-                              98%
-                            </div>
-                            <div>
-                              <div className="text-xs font-bold text-white leading-tight">Patient Care Trust</div>
-                              <div className="text-[10px] text-emerald-300 font-medium">Verified Clinical Outcomes</div>
-                            </div>
-                          </div>
-
-                          {/* Right Badge: Specialists Link */}
-                          <button
-                            onClick={() => changeTab("doctors")}
-                            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-700/90 hover:bg-emerald-600 backdrop-blur-md px-4 py-2 text-xs font-bold text-white border border-emerald-400/40 shadow-lg transition-all active:scale-95 cursor-pointer"
-                          >
-                            <span>Consult Specialists</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                    {/* Floating Badge 2 - Bottom Right: Patient Trust & Outcomes */}
+                    <div className="absolute bottom-6 sm:bottom-10 -right-2 sm:-right-4 lg:-right-6 z-20 flex items-center gap-2.5 rounded-2xl bg-white/95 backdrop-blur-md px-3.5 py-2 sm:px-4 sm:py-2.5 border border-slate-200/90 shadow-md">
+                      <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-xs shrink-0">
+                        <Award className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
+                      </div>
+                      <div className="text-left">
+                        <div className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">Patient Care Trust</div>
+                        <div className="text-[10px] sm:text-xs text-slate-500 font-medium leading-tight mt-0.5">98% Verified Clinical Outcomes</div>
                       </div>
                     </div>
                   </div>
@@ -2005,12 +1984,12 @@ export function LandingPage() {
               className="flex cursor-pointer items-center gap-2.5 text-lg font-extrabold text-navy-900"
             >
               <img
-                src={logoUrl || "/hospital-logo.svg"}
+                src={logoUrl || "/preethi_logo.jpg"}
                 alt=""
                 className="h-7 w-7 rounded object-cover"
                 onError={(e) => {
                   e.currentTarget.onerror = null;
-                  e.currentTarget.src = "/hospital-logo.svg";
+                  e.currentTarget.src = "/preethi_logo.jpg";
                 }}
               />
               <span>{hospitalName}</span>

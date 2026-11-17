@@ -75,7 +75,6 @@ export const NAV_GROUPS_BY_ROLE: Record<Role, NavGroupItem[]> = {
       icon: Building2,
       items: [
         { label: "Hospitals", path: "/super-admin/hospitals", icon: Building2, description: "Hospital directory & institutions" },
-        { label: "Branches", path: "/super-admin/branches", icon: Network, description: "Branch clinic locations" },
         { label: "Departments", path: "/super-admin/departments", icon: FolderTree, description: "Clinical & medical divisions" },
       ],
     },

@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { Doctor, DOCTOR_STATUSES } from "../models/Doctor";
 import { User } from "../models/User";
+import { Hospital } from "../models/Hospital";
 import { Appointment } from "../models/Appointment";
 import { Prescription } from "../models/Prescription";
 import { DiagnosticReport } from "../models/DiagnosticReport";
@@ -12,6 +13,7 @@ import { generateTempPassword, generateUniqueEmployeeId } from "../utils/idGener
 import { getPagination, paginatedResponse } from "../utils/pagination";
 import { getDoctorDynamicStatus, getBusyDoctorIds } from "../utils/doctorStatus";
 import { syncDoctorStaffRecords } from "./staffController";
+import { sendOnboardingCredentialsEmail } from "../services/emailService";
 
 import { Department } from "../models/Department";
 import { Feedback } from "../models/Feedback";
@@ -74,6 +76,8 @@ const doctorSchema = z.object({
   bio: z.string().max(500, "Bio cannot exceed 500 characters").optional().default(""),
   status: z.enum(DOCTOR_STATUSES).optional(),
   rating: z.coerce.number().min(0, "Rating must be at least 0").max(100, "Rating cannot exceed 100").optional(),
+  consultationFee: z.string().max(50).optional().default("₹500"),
+  dateOfJoining: z.coerce.date().optional().nullable(),
   opExpiryLimit: z.coerce.number().min(0, "Expiry limit must be at least 0").optional(),
 });
 
@@ -131,18 +135,18 @@ export const createDoctor = catchAsync(async (req: Request, res: Response) => {
   const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
 
   if (body.department) {
-    const dept = await Department.findOne({ _id: body.department, ...req.hospitalFilter });
+    const dept = await Department.findOne({ _id: body.department, hospital: hospitalId });
     if (!dept) {
-      throw new AppError("Selected department does not exist in this branch.", 400);
+      throw new AppError("Selected department does not exist in this hospital.", 400);
     }
     if (dept.isDisabled) {
-      throw new AppError(`Department "${dept.name}" is disabled in this branch and cannot be assigned to doctors.`, 400);
+      throw new AppError(`Department "${dept.name}" is disabled and cannot be assigned to doctors.`, 400);
     }
   }
 
   let licenseNo = body.licenseNo?.trim();
   if (!licenseNo) {
-    licenseNo = await generateUniqueEmployeeId("doctor", hospitalId, branchId);
+    licenseNo = await generateUniqueEmployeeId("doctor", hospitalId, branchId, body.name);
   }
 
   // Create the Doctor profile record
@@ -160,8 +164,9 @@ export const createDoctor = catchAsync(async (req: Request, res: Response) => {
     tempPassword = generateTempPassword();
     const passwordHash = await bcrypt.hash(tempPassword, 10);
     const existingUser = await User.findOne({ email: body.email.toLowerCase() });
+    let docUser: any = existingUser;
     if (!existingUser) {
-      await User.create({
+      docUser = await User.create({
         name: body.name,
         email: body.email,
         passwordHash,
@@ -171,10 +176,52 @@ export const createDoctor = catchAsync(async (req: Request, res: Response) => {
         branch: branchId,
       });
     } else {
-      await User.findOneAndUpdate(
+      docUser = await User.findOneAndUpdate(
         { email: body.email.toLowerCase() },
-        { employeeId: licenseNo, hospital: hospitalId, branch: branchId, role: "doctor" }
+        { employeeId: licenseNo, hospital: hospitalId, branch: branchId, role: "doctor", passwordHash },
+        { new: true }
       );
+    }
+    if (docUser && doctor && !doctor.user) {
+      await Doctor.updateOne({ _id: doctor._id }, { user: docUser._id }).catch(() => {});
+    }
+  }
+
+  // Dispatch onboarding credentials email to newly registered doctor
+  if (body.email && tempPassword) {
+    const hospital = await Hospital.findById(hospitalId);
+    const hospitalName = hospital?.name || "Preethi Fertility, Hyderabad";
+    const logoUrl = hospital?.logoUrl || "";
+
+    const reqOrigin = req.get("origin");
+    const reqReferer = req.get("referer");
+    let clientUrl = process.env.CLIENT_URL;
+    if (!clientUrl || clientUrl.includes("localhost")) {
+      if (reqOrigin) {
+        clientUrl = reqOrigin;
+      } else if (reqReferer) {
+        try {
+          clientUrl = new URL(reqReferer).origin;
+        } catch {}
+      }
+    }
+    if (!clientUrl) clientUrl = "http://localhost:5173";
+    clientUrl = clientUrl.replace(/\/+$/, "");
+    const loginUrl = `${clientUrl}/login`;
+
+    try {
+      await sendOnboardingCredentialsEmail({
+        to: body.email.trim(),
+        name: body.name,
+        role: "Doctor",
+        employeeId: licenseNo,
+        tempPassword,
+        hospitalName,
+        logoUrl,
+        loginUrl,
+      });
+    } catch (err: any) {
+      console.error("[Doctor] Failed to dispatch onboarding credentials email:", err?.message || err);
     }
   }
 
@@ -254,14 +301,15 @@ export const getDoctor = catchAsync(async (req: Request, res: Response) => {
 
 export const updateDoctor = catchAsync(async (req: Request, res: Response) => {
   const body = doctorSchema.partial().parse(req.body);
+  const hospitalId = req.hospitalFilter?.hospital || (req.user as any)?.hospital;
 
   if (body.department) {
-    const dept = await Department.findOne({ _id: body.department, ...req.hospitalFilter });
+    const dept = await Department.findOne({ _id: body.department, hospital: hospitalId });
     if (!dept) {
-      throw new AppError("Selected department does not exist in this branch.", 400);
+      throw new AppError("Selected department does not exist in this hospital.", 400);
     }
     if (dept.isDisabled) {
-      throw new AppError(`Department "${dept.name}" is disabled in this branch and cannot be assigned to doctors.`, 400);
+      throw new AppError(`Department "${dept.name}" is disabled and cannot be assigned to doctors.`, 400);
     }
   }
 

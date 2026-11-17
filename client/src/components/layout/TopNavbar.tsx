@@ -95,6 +95,29 @@ export function TopNavbar() {
   const userInitials = getAvatarInitials(displayName);
   const roleName = ROLE_LABEL[user.role] || "Portal";
 
+  const getDashboardHomePath = () => {
+    switch (user.role) {
+      case "super_admin":
+        return "/super-admin";
+      case "hospital_admin":
+      case "admin":
+        return "/admin";
+      case "receptionist":
+        return "/receptionist";
+      case "doctor":
+        return "/doctor";
+      case "pharmacist":
+        return "/pharmacy";
+      case "staff":
+      case "nurse":
+        return "/staff";
+      case "patient":
+        return "/patient";
+      default:
+        return "/admin";
+    }
+  };
+
   const getSettingsPath = () => {
     switch (user.role) {
       case "super_admin":
@@ -170,7 +193,7 @@ export function TopNavbar() {
                 {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
 
-              <Link to="/" className="flex items-center gap-3 group shrink-0">
+              <Link to={getDashboardHomePath()} className="flex items-center gap-3 group shrink-0" title="Go to Dashboard">
                 <div className="relative">
                   <img
                     src={hospital?.logoUrl || persistedHospital.logoUrl || "/preethi_logo.jpg"}
@@ -230,9 +253,16 @@ export function TopNavbar() {
                   <span className="text-xs sm:text-sm font-semibold text-white leading-tight max-w-[140px] truncate">
                     {displayName}
                   </span>
-                  <span className="text-[11px] text-emerald-300 font-medium leading-none mt-0.5">
-                    {roleName}
-                  </span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-[11px] text-emerald-300 font-medium leading-none">
+                      {roleName}
+                    </span>
+                    {user?.employeeId && (
+                      <span className="text-[10px] font-mono bg-emerald-950/70 text-emerald-200 border border-emerald-500/30 px-1 py-0.2 rounded font-semibold leading-none">
+                        {user.employeeId}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 

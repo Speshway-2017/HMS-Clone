@@ -3,8 +3,9 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import { UserPlus, ShieldCheck, Copy, AlertCircle, Sparkles, CheckCircle2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAdmin, useCreateAdmin, useUpdateAdmin } from "../../features/admins";
+import { useHospitals } from "../../features/hospitals";
 import { FormSection } from "../../components/ui/FormSection";
-import { InputField } from "../../components/ui/Field";
+import { InputField, SelectField } from "../../components/ui/Field";
 import { FileUpload } from "../../components/ui/FileUpload";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -28,6 +29,7 @@ export function AdminFormPage() {
   const isEdit = !!id;
   const navigate = useNavigate();
   const { data: admin } = useAdmin(id);
+  const { data: hospitalsData } = useHospitals({ page: 1, limit: 100 });
   const createAdmin = useCreateAdmin();
   const updateAdmin = useUpdateAdmin(id ?? "");
 
@@ -35,6 +37,7 @@ export function AdminFormPage() {
     name: "",
     email: "",
     role: "admin",
+    hospital: "",
     title: "System Administrator",
     phone: "",
     employeeId: "",
@@ -68,6 +71,7 @@ export function AdminFormPage() {
         name: admin.name || "",
         email: admin.email || "",
         role: admin.role || "admin",
+        hospital: typeof admin.hospital === "object" && admin.hospital ? (admin.hospital as any)._id : (admin.hospital || ""),
         title: admin.title || "System Administrator",
         phone: admin.phone || "",
         employeeId: admin.employeeId || "",
@@ -215,16 +219,23 @@ export function AdminFormPage() {
     }
 
     try {
+      const assignedHospital = form.hospital ? form.hospital : null;
+      const adminRole = assignedHospital ? "hospital_admin" : "admin";
+
       if (isEdit) {
-        await updateAdmin.mutateAsync(form);
+        await updateAdmin.mutateAsync({
+          ...form,
+          role: adminRole,
+          hospital: assignedHospital,
+        });
         toast.success("Administrator updated successfully");
         navigate("/super-admin/admins");
       } else {
         const result = await createAdmin.mutateAsync({
           name: form.name.trim(),
           email: form.email.trim().toLowerCase(),
-          role: "admin",
-          hospital: null,
+          role: adminRole,
+          hospital: assignedHospital,
           title: form.title.trim(),
           phone: form.phone.trim(),
           employeeId: form.employeeId.trim().toUpperCase(),
@@ -431,17 +442,35 @@ export function AdminFormPage() {
             placeholder="e.g. Operations Director / Administrator"
           />
 
+          <SelectField
+            label="Assigned Hospital (Facility Governance)"
+            value={form.hospital}
+            onChange={(e) => setForm({ ...form, hospital: e.target.value })}
+            hint="Assign this administrator to lead a specific hospital facility, or leave as Independent Admin."
+          >
+            <option value="">Independent System Administrator (System-Wide)</option>
+            {hospitalsData?.data.map((h) => (
+              <option key={h._id} value={h._id}>
+                {h.name} {h.code ? `(${h.code})` : ""}
+              </option>
+            ))}
+          </SelectField>
+
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-slate-700">System Role & Authority</label>
             <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3.5 py-2.5">
               <ShieldCheck className="h-4 w-4 text-emerald-700" />
-              <span className="text-xs font-bold text-emerald-950">System Administrator</span>
+              <span className="text-xs font-bold text-emerald-950">
+                {form.hospital ? "Hospital Administrator" : "System Administrator"}
+              </span>
               <span className="ml-auto rounded-full bg-emerald-200 px-2 py-0.5 text-[10px] font-semibold text-emerald-900">
-                Independent Admin
+                {form.hospital ? "Facility Head" : "Independent Admin"}
               </span>
             </div>
             <p className="text-[11px] text-slate-400">
-              Administrators hold operational permissions without being restricted to a single hospital entity.
+              {form.hospital
+                ? "This administrator holds full governance authority over the assigned hospital facility."
+                : "Administrators hold operational permissions across all unassigned network operations."}
             </p>
           </div>
 

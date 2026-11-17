@@ -10,7 +10,7 @@ interface DepartmentAnalyticsSectionProps {
   appointments: any[];
 }
 
-const DEPT_COLORS = ["#0f172a", "#2563eb", "#059669", "#d97706", "#7c3aed", "#0284c7", "#e11d48", "#475569"];
+const DEPT_COLORS = ["#047857", "#059669", "#0d9488", "#10b981", "#0f766e", "#334155", "#64748b"];
 
 export function DepartmentAnalyticsSection({ departments, invoices, appointments }: DepartmentAnalyticsSectionProps) {
   const metrics = useMemo(() => {
@@ -109,24 +109,40 @@ export function DepartmentAnalyticsSection({ departments, invoices, appointments
       value: d.revenue,
     }));
 
+    const totalDeptRevenue = data.reduce((sum, d) => sum + (d.revenue || 0), 0);
+
     return {
       deptData: data,
       pieData,
+      totalDeptRevenue,
     };
   }, [departments, invoices, appointments]);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-        <div className="flex items-center gap-2">
-          <div className="rounded-lg bg-teal-50 p-2 text-teal-700">
+    <div className="space-y-4">
+      {/* Header with Inline Metrics */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+        <div className="flex items-center gap-2.5">
+          <div className="rounded-lg bg-emerald-50 p-2 text-emerald-800 border border-emerald-100">
             <FolderTree className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-slate-900">Department Analytics</h3>
-            <p className="text-xs text-slate-500">Live departmental patient load, revenue generation & completion %</p>
+            <h3 className="text-base font-bold text-slate-900 leading-tight">Clinical Specialty & Department Analytics</h3>
+            <p className="text-xs text-slate-500">Live departmental patient load, revenue generation & completion rate</p>
           </div>
+        </div>
+
+        {/* Compact Integrated Telemetry Summary Chips */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-2xs">
+            <span>Specialties: <strong>{metrics.deptData.length} Active</strong></span>
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/70 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+            <span>Top Specialty: <strong>{metrics.deptData[0]?.name || "Reproductive Medicine"}</strong></span>
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50/70 px-2.5 py-1 text-xs font-semibold text-teal-800">
+            <span>Contribution: <strong>{formatINR(metrics.totalDeptRevenue)}</strong></span>
+          </span>
         </div>
       </div>
 
@@ -148,7 +164,7 @@ export function DepartmentAnalyticsSection({ departments, invoices, appointments
                       <XAxis type="number" tick={{ fontSize: 10, fill: "#64748b" }} tickFormatter={(val) => `₹${val}`} />
                       <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#334155", fontWeight: 600 }} width={110} />
                       <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderRadius: "8px", border: "1px solid #1e293b", color: "#fff", fontSize: "12px" }} itemStyle={{ color: "#fff" }} labelStyle={{ color: "#fff", fontWeight: 600 }} formatter={(value: any) => [formatINR(value), "Revenue"]} />
-                      <Bar dataKey="revenue" fill="#0f172a" radius={[0, 6, 6, 0]} />
+                      <Bar dataKey="revenue" fill="#059669" radius={[0, 6, 6, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

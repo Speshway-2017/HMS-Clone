@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useBranchContext } from "../../context/BranchContext";
+import { useAuth } from "../../context/AuthContext";
 import { 
   CalendarClock, 
   BedDouble, 
@@ -56,6 +57,7 @@ import { LiveActivityPanel } from "../../components/admin-dashboard/LiveActivity
 type ActiveTabOption = "overview" | "patient_flow" | "dept_doctors" | "revenue" | "diagnostics";
 
 export function HospitalAdminDashboard() {
+  const { user } = useAuth();
   const { isAllBranches } = useBranchContext();
   const queryClient = useQueryClient();
 
@@ -363,39 +365,70 @@ export function HospitalAdminDashboard() {
     : (counts?.totalRevenue && counts.totalRevenue > 0 ? counts.totalRevenue : (calculatedFilteredRevenue || appointmentOpdRevenue));
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-5 pb-12 font-sans">
       {/* 1. Header with Hospital Identity & Status */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          {hospital?.logoUrl ? (
-            <img src={hospital.logoUrl} alt={hospital.name} className="h-12 w-12 rounded-xl object-contain ring-2 ring-slate-100 bg-white p-1" />
-          ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 font-bold text-xl ring-2 ring-slate-100 shadow-sm">
-              {hospital?.name ? hospital.name.charAt(0).toUpperCase() : "H"}
-            </div>
-          )}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4">
+        <div className="flex items-center gap-3.5">
+          <div className="relative shrink-0">
+            <img
+              src={hospital?.logoUrl || "/preethi_logo.jpg"}
+              alt={hospital?.name || "Preethi Fertility Centre"}
+              className="h-11 w-11 rounded-xl object-contain bg-white p-1 border border-emerald-400/40 shadow-xs"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = "/preethi_logo.jpg";
+              }}
+            />
+            <span className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-emerald-400 border-2 border-white" />
+          </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-black tracking-tight text-slate-900">{hospital?.name || "Hospital Dashboard"}</h1>
-              <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-navy-100 flex items-center gap-1">
-                <Sparkles className="h-3 w-3 text-emerald-700" /> Executive Analytics ERP
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                {hospital?.name || "Preethi Fertility Centre & Women's Clinic"}
+              </h1>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800 border border-emerald-200">
+                <ShieldCheck className="h-3 w-3 text-emerald-600" />
+                Hospital Admin Console
               </span>
+              {user?.employeeId && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-800 border border-sky-200">
+                  <span className="text-slate-500 font-normal">Admin ID:</span>
+                  <span className="font-mono font-bold text-sky-900">{user.employeeId}</span>
+                </span>
+              )}
             </div>
-            <p className="text-sm text-slate-500">Real-time enterprise analytics center for hospital operations & finance.</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Clinical operations, patient volume, and billing telemetry.
+              {user?.name && (
+                <span className="ml-1 text-slate-400 hidden sm:inline">
+                  • Logged in as <strong className="text-slate-700 font-medium">{user.name}</strong>
+                </span>
+              )}
+            </p>
           </div>
         </div>
 
         {/* Header Action Shortcuts */}
-        {!isAllBranches && (
-          <div className="flex items-center gap-2">
-            <Link
-              to="/admin/doctors/new"
-              className="flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-800"
-            >
-              <Plus className="h-3.5 w-3.5" /> Add Doctor
-            </Link>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            to="/admin/appointments"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition-colors"
+          >
+            <CalendarClock className="h-3.5 w-3.5 text-emerald-700" /> Appointments
+          </Link>
+          <Link
+            to="/admin/staff/new"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition-colors"
+          >
+            <UserPlus className="h-3.5 w-3.5 text-slate-500" /> Add Staff
+          </Link>
+          <Link
+            to="/admin/doctors/new"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add Doctor
+          </Link>
+        </div>
       </div>
 
       {/* 2. Global Filter & Socket Controls Bar */}
@@ -413,149 +446,159 @@ export function HospitalAdminDashboard() {
         lastUpdated={lastUpdated}
       />
 
-      {/* 3. Dynamic KPI Summary Cards Grid with Filter Synchronization */}
-      <div key={`kpi-${dateRange}-${selectedDepartment}-${selectedDoctor}`} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 transition-all duration-300 ease-in-out">
-        <KpiCard
-          label={dateRange === "today" ? "Today's Appointments" : "Appointments"}
-          value={filteredAppointments.length}
-          icon={<CalendarClock className="h-5 w-5" />}
-          emphasis
-          to="/admin/appointments"
-        />
-        <KpiCard
-          label="Bed Occupancy"
-          value={`${counts?.bedOccupancyPercent ?? 0}%`}
-          icon={<BedDouble className="h-5 w-5" />}
-          trend={{ direction: "up", text: `${counts?.occupiedBeds ?? 0}/${counts?.totalBeds ?? 0} beds` }}
-          to="/admin/departments"
-        />
-        <KpiCard
-          label="Total Revenue (Paid)"
-          value={`₹${displayRevenue.toFixed(2)}`}
-          icon={<Wallet className="h-5 w-5" />}
-          to="/admin/finance"
-        />
-        <KpiCard
-          label="Critical Stock Alerts"
-          value={counts?.criticalStockCount ?? 0}
-          icon={<AlertTriangle className="h-5 w-5" />}
-          to="/admin/inventory"
-        />
-      </div>
+      {/* 3. Sleek Executive Pulse Summary Strip (Replaces massive KPI card clutter with clean analytics focus) */}
+      <div
+        key={`kpi-${dateRange}-${selectedDepartment}-${selectedDoctor}`}
+        className="flex items-center gap-3 overflow-x-auto rounded-xl border border-slate-200/80 bg-white px-4 py-2.5 shadow-2xs text-xs"
+      >
+        <span className="font-bold text-slate-500 uppercase tracking-wider text-[11px] shrink-0 flex items-center gap-1.5 border-r border-slate-200 pr-3">
+          <Activity className="h-3.5 w-3.5 text-emerald-700" />
+          <span>Hospital Pulse</span>
+        </span>
 
-      {/* Preserved Secondary KPI Grid & Quick Actions */}
-      <div key={`sec-kpi-${dateRange}-${selectedDepartment}-${selectedDoctor}`} className="grid grid-cols-1 gap-4 sm:grid-cols-3 transition-all duration-300 ease-in-out">
-        <KpiCard label="Doctors" value={filteredDoctorsListArray.length} icon={<Stethoscope className="h-5 w-5" />} to="/admin/doctors" />
-        <KpiCard label="Patients" value={filteredPatientsList.length} icon={<Users2 className="h-5 w-5" />} to="/admin/patients" />
-
-        <Card className="flex items-center justify-between p-4">
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Quick Actions</h4>
-            <p className="text-xs font-semibold text-slate-700 mt-1">Management Shortcuts</p>
-          </div>
-          {!isAllBranches ? (
-            <Link to="/admin/doctors/new" className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
-              <Plus className="h-3.5 w-3.5" /> Doctor
-            </Link>
-          ) : (
-            <span className="text-xs font-semibold text-slate-400 italic">Read-Only View</span>
-          )}
-        </Card>
+        <div className="flex items-center gap-4 shrink-0 text-slate-600">
+          <Link to="/admin/appointments" className="hover:text-emerald-700 transition-colors flex items-center gap-1.5">
+            <span className="text-slate-400">Appointments:</span>
+            <strong className="text-slate-900 font-bold">{filteredAppointments.length}</strong>
+          </Link>
+          <span className="text-slate-200">•</span>
+          <Link to="/admin/beds" className="hover:text-emerald-700 transition-colors flex items-center gap-1.5">
+            <span className="text-slate-400">Bed Occupancy:</span>
+            <strong className="text-slate-900 font-bold">{counts?.bedOccupancyPercent ?? 0}%</strong>
+            <span className="text-[10px] text-slate-400 font-normal">({counts?.occupiedBeds ?? 0}/{counts?.totalBeds ?? 0})</span>
+          </Link>
+          <span className="text-slate-200">•</span>
+          <Link to="/admin/finance" className="hover:text-emerald-700 transition-colors flex items-center gap-1.5">
+            <span className="text-slate-400">Collections:</span>
+            <strong className="text-emerald-700 font-bold">₹{displayRevenue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</strong>
+          </Link>
+          <span className="text-slate-200">•</span>
+          <Link to="/admin/doctors" className="hover:text-emerald-700 transition-colors flex items-center gap-1.5">
+            <span className="text-slate-400">Doctors:</span>
+            <strong className="text-slate-900 font-bold">{filteredDoctorsListArray.length} Active</strong>
+          </Link>
+          <span className="text-slate-200">•</span>
+          <Link to="/admin/patients" className="hover:text-emerald-700 transition-colors flex items-center gap-1.5">
+            <span className="text-slate-400">Registered Patients:</span>
+            <strong className="text-slate-900 font-bold">{filteredPatientsList.length}</strong>
+          </Link>
+          <span className="text-slate-200">•</span>
+          <Link to="/admin/inventory" className="hover:text-emerald-700 transition-colors flex items-center gap-1.5">
+            <span className="text-slate-400">Stock Alerts:</span>
+            <strong className={`${(counts?.criticalStockCount ?? 0) > 0 ? "text-amber-600" : "text-emerald-700"} font-bold`}>
+              {counts?.criticalStockCount ?? 0}
+            </strong>
+          </Link>
+        </div>
       </div>
 
       {/* 4. Analytics Section Tabs Navigation */}
-      <div className="flex border-b border-slate-200 overflow-x-auto gap-2 pt-2">
+      <div className="flex border-b border-slate-200 overflow-x-auto gap-1 pt-1">
         <button
           onClick={() => setActiveTab("overview")}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold transition-all whitespace-nowrap ${
+          className={`flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-xs transition-all whitespace-nowrap cursor-pointer ${
             activeTab === "overview"
-              ? "border-emerald-700 text-emerald-700 font-extrabold"
-              : "border-transparent text-slate-500 hover:text-slate-700"
+              ? "border-emerald-600 text-emerald-800 font-bold bg-emerald-50/40"
+              : "border-transparent text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-50"
           }`}
         >
-          <BarChart3 className="h-4 w-4" /> All Analytics Overview
+          <BarChart3 className="h-3.5 w-3.5 text-emerald-600" />
+          <span>Operational Overview</span>
         </button>
 
         <button
           onClick={() => setActiveTab("patient_flow")}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold transition-all whitespace-nowrap ${
+          className={`flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-xs transition-all whitespace-nowrap cursor-pointer ${
             activeTab === "patient_flow"
-              ? "border-emerald-700 text-emerald-700 font-extrabold"
-              : "border-transparent text-slate-500 hover:text-slate-700"
+              ? "border-emerald-600 text-emerald-800 font-bold bg-emerald-50/40"
+              : "border-transparent text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-50"
           }`}
         >
-          <Users className="h-4 w-4" /> Patient & Flow Analytics
+          <Users className="h-3.5 w-3.5 text-emerald-600" />
+          <span>Patient & Clinical Flow</span>
         </button>
 
         <button
           onClick={() => setActiveTab("dept_doctors")}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold transition-all whitespace-nowrap ${
+          className={`flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-xs transition-all whitespace-nowrap cursor-pointer ${
             activeTab === "dept_doctors"
-              ? "border-emerald-700 text-emerald-700 font-extrabold"
-              : "border-transparent text-slate-500 hover:text-slate-700"
+              ? "border-emerald-600 text-emerald-800 font-bold bg-emerald-50/40"
+              : "border-transparent text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-50"
           }`}
         >
-          <FolderTree className="h-4 w-4" /> Department & Doctor Analytics
+          <FolderTree className="h-3.5 w-3.5 text-emerald-600" />
+          <span>Departments & Doctors</span>
         </button>
 
         <button
           onClick={() => setActiveTab("revenue")}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold transition-all whitespace-nowrap ${
+          className={`flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-xs transition-all whitespace-nowrap cursor-pointer ${
             activeTab === "revenue"
-              ? "border-emerald-700 text-emerald-700 font-extrabold"
-              : "border-transparent text-slate-500 hover:text-slate-700"
+              ? "border-emerald-600 text-emerald-800 font-bold bg-emerald-50/40"
+              : "border-transparent text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-50"
           }`}
         >
-          <Wallet className="h-4 w-4" /> Revenue & Financial Analytics
+          <Wallet className="h-3.5 w-3.5 text-emerald-600" />
+          <span>Revenue & Billing</span>
         </button>
 
         <button
           onClick={() => setActiveTab("diagnostics")}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold transition-all whitespace-nowrap ${
+          className={`flex items-center gap-1.5 border-b-2 px-3.5 py-2 text-xs transition-all whitespace-nowrap cursor-pointer ${
             activeTab === "diagnostics"
-              ? "border-emerald-700 text-emerald-700 font-extrabold"
-              : "border-transparent text-slate-500 hover:text-slate-700"
+              ? "border-emerald-600 text-emerald-800 font-bold bg-emerald-50/40"
+              : "border-transparent text-slate-600 font-medium hover:text-slate-900 hover:bg-slate-50"
           }`}
         >
-          <FlaskConical className="h-4 w-4" /> Diagnostics, Pharmacy & Beds
+          <FlaskConical className="h-3.5 w-3.5 text-emerald-600" />
+          <span>Diagnostics & Facilities</span>
         </button>
       </div>
 
-      {/* 5. TAB 1: OVERVIEW (Unified Multi-Section ERP View with Smooth Transitions) */}
-      <div key={`sections-${dateRange}-${selectedDepartment}-${selectedDoctor}`} className="transition-all duration-300 ease-in-out">
-        {(activeTab === "overview" || activeTab === "patient_flow") && (
-          <div className="space-y-8">
+      {/* 5. TAB VIEWS: Restructured Domain Sections */}
+      <div key={`sections-${dateRange}-${selectedDepartment}-${selectedDoctor}`} className="transition-all duration-200">
+        {/* OVERVIEW TAB: Core Hospital Pulse */}
+        {activeTab === "overview" && (
+          <div className="space-y-6">
+            <AppointmentAnalyticsSection appointments={filteredAppointments} />
+            <PatientFlowSection appointments={filteredAppointments} labRequests={labRequestsList} admissions={filteredAdmissions} patients={filteredPatientsList} />
+            <RevenueAnalyticsSection invoices={filteredInvoices} hospitalCounts={{ ...counts, totalRevenue: displayRevenue }} />
+            <BedStaffEmergencySection beds={bedsList} staff={staffList} admissions={filteredAdmissions} hospitalCounts={counts} />
+            <LiveActivityPanel />
+          </div>
+        )}
+
+        {/* PATIENT & FLOW TAB */}
+        {activeTab === "patient_flow" && (
+          <div className="space-y-6">
             <PatientAnalyticsSection patients={filteredPatientsList} admissions={filteredAdmissions} appointments={filteredAppointments} isLoading={loadingPatients} />
             <OpIpAnalyticsSection patients={filteredPatientsList} appointments={filteredAppointments} admissions={filteredAdmissions} />
             <PatientFlowSection appointments={filteredAppointments} labRequests={labRequestsList} admissions={filteredAdmissions} patients={filteredPatientsList} />
           </div>
         )}
 
-        {(activeTab === "overview" || activeTab === "dept_doctors") && (
-          <div className="space-y-8 pt-4">
+        {/* DEPARTMENTS & DOCTORS TAB */}
+        {activeTab === "dept_doctors" && (
+          <div className="space-y-6">
             <DoctorAnalyticsSection doctors={filteredDoctorsListArray} appointments={filteredAppointments} />
             <DepartmentAnalyticsSection departments={departmentsListArray} invoices={filteredInvoices} appointments={filteredAppointments} />
-            <AppointmentAnalyticsSection appointments={filteredAppointments} />
           </div>
         )}
 
-        {(activeTab === "overview" || activeTab === "revenue") && (
-          <div className="space-y-8 pt-4">
+        {/* REVENUE & BILLING TAB */}
+        {activeTab === "revenue" && (
+          <div className="space-y-6">
             <RevenueAnalyticsSection invoices={filteredInvoices} hospitalCounts={{ ...counts, totalRevenue: displayRevenue }} />
           </div>
         )}
 
-        {(activeTab === "overview" || activeTab === "diagnostics") && (
-          <div className="space-y-8 pt-4">
+        {/* DIAGNOSTICS & FACILITIES TAB */}
+        {activeTab === "diagnostics" && (
+          <div className="space-y-6">
             <LabRadiologyPharmacySection labRequests={labRequestsList} inventory={inventoryList} />
             <BedStaffEmergencySection beds={bedsList} staff={staffList} admissions={filteredAdmissions} hospitalCounts={counts} />
           </div>
         )}
-      </div>
-
-      {/* 6. Live Activity Stream */}
-      <div className="pt-4">
-        <LiveActivityPanel />
       </div>
     </div>
   );

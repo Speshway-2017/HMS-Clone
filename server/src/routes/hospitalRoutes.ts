@@ -39,7 +39,7 @@ router.get("/enquiries", protect, restrictTo("super_admin"), listHospitalEnquiri
 router.patch("/enquiries/:id", protect, restrictTo("super_admin"), updateEnquiryStatus);
 
 router.get("/me", protect, getMyHospital);
-router.patch("/me", protect, restrictTo("super_admin"), updateMyHospital);
+router.patch("/me", protect, restrictTo("super_admin", "hospital_admin", "admin"), updateMyHospital);
 
 router.use(protect, restrictTo("super_admin"));
 

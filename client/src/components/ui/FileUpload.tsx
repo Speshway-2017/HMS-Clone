@@ -105,6 +105,7 @@ export function FileUpload({
           const formData = new FormData();
           formData.append("file", file);
           formData.append("folder", folder);
+
           const res = await api.post("/uploads", formData, {
             headers: { "Content-Type": "multipart/form-data" },
           });
@@ -112,6 +113,7 @@ export function FileUpload({
           setLocalError(null);
           onError?.(null);
           stopCamera();
+          toast.success("Photo captured and stored in Cloudinary successfully!");
         } else {
           const errMsg = "Failed to capture image blob.";
           setLocalError(errMsg);
@@ -119,9 +121,10 @@ export function FileUpload({
         }
       }
     } catch (err) {
-      const errMsg = "Failed to upload captured image.";
+      const errMsg = getApiErrorMessage(err);
       setLocalError(errMsg);
       onError?.(errMsg);
+      toast.error(errMsg, { id: "camera-upload-error" });
     } finally {
       setIsUploading(false);
     }
@@ -196,10 +199,12 @@ export function FileUpload({
       const formData = new FormData();
       formData.append("file", file);
       formData.append("folder", folder);
+
       const res = await api.post("/uploads", formData, { headers: { "Content-Type": "multipart/form-data" } });
       onChange(res.data.data.url);
       setLocalError(null);
       onError?.(null);
+      toast.success("File uploaded to Cloudinary successfully!");
     } catch (err) {
       const errMsg = getApiErrorMessage(err);
       setLocalError(errMsg);
@@ -269,11 +274,11 @@ export function FileUpload({
           </div>
         </div>
       ) : value ? (
-        <div className="flex items-center gap-3 rounded-lg border border-slate-300 p-3">
+        <div className="flex items-center gap-3 rounded-lg border border-slate-300 p-3 bg-white">
           {isPdf ? (
-            <FileText className="h-8 w-8 text-emerald-600" />
+            <FileText className="h-8 w-8 text-emerald-600 shrink-0" />
           ) : (
-            <img src={value} alt={label} className="h-12 w-12 rounded-md object-cover" />
+            <img src={value} alt={label} className="h-12 w-12 rounded-md object-cover border border-slate-200 shrink-0" />
           )}
           <a href={value} target="_blank" rel="noreferrer" className="flex-1 truncate text-xs text-emerald-700 hover:underline">
             {value}
@@ -281,14 +286,18 @@ export function FileUpload({
           <button
             type="button"
             onClick={() => {
+              if (inputRef.current) inputRef.current.value = "";
               onChange("");
               setLocalError(null);
               onError?.(null);
             }}
-            className="text-slate-400 hover:text-red-600"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-xs font-semibold text-red-650 hover:text-red-800 transition-colors cursor-pointer shrink-0"
             aria-label="Remove file"
+            data-testid="remove-file-button"
+            title="Remove profile photo"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5 text-red-500" />
+            <span>Remove</span>
           </button>
         </div>
       ) : (

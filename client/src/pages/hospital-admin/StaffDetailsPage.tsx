@@ -1,5 +1,5 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Pencil, Briefcase, Mail, Phone, Building2, Activity, BedDouble, Users, Stethoscope, Eye, Calendar } from "lucide-react";
+import { ArrowLeft, Pencil, Briefcase, Mail, Phone, Building2, Activity, BedDouble, Users, Stethoscope, Eye, Calendar, Clock } from "lucide-react";
 import { useStaffMember } from "../../features/staff";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
@@ -35,7 +35,7 @@ export function StaffDetailsPage() {
   }
 
   const deptName = typeof staff.department === "object" && staff.department ? (staff.department as any).name : "Unassigned";
-  const isNurse = staff.role && (staff.role.toLowerCase() === "nurse" || staff.role.toLowerCase().includes("nurse"));
+  const isNurse = staff.role && (staff.role.toLowerCase() === "nurse" || staff.role.toLowerCase().includes("nurse") || staff.role.toLowerCase() === "staff");
   const assignedPatients = staff.assignedPatients || [];
 
   return (
@@ -103,8 +103,8 @@ export function StaffDetailsPage() {
                 <span>{staff.phone || "No phone number"}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
-                <span>Department: <strong className="text-slate-800">{deptName}</strong></span>
+                <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
+                <span>Joined: <strong className="text-slate-800">{staff.dateOfJoining ? new Date(staff.dateOfJoining).toLocaleDateString() : "—"}</strong></span>
               </div>
             </div>
           </div>
@@ -125,8 +125,10 @@ export function StaffDetailsPage() {
               <span className="font-bold text-slate-800 capitalize">{staff.role || "Staff Member"}</span>
             </div>
             <div className="flex justify-between border-b pb-2">
-              <span className="text-slate-500 font-medium">Assigned Department:</span>
-              <span className="font-bold text-slate-800">{deptName}</span>
+              <span className="text-slate-500 font-medium">Date of Joining:</span>
+              <span className="font-bold text-slate-800">
+                {staff.dateOfJoining ? new Date(staff.dateOfJoining).toLocaleDateString() : "—"}
+              </span>
             </div>
             <div className="flex justify-between border-b pb-2">
               <span className="text-slate-500 font-medium">Employee Reference ID:</span>

@@ -67,12 +67,6 @@ export function SuperAdminDashboard() {
             <Plus className="h-3.5 w-3.5" /> Add Hospital
           </Link>
           <Link
-            to="/super-admin/branches"
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-          >
-            <Network className="h-3.5 w-3.5 text-slate-500" /> Branches
-          </Link>
-          <Link
             to="/super-admin/cms"
             className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
           >
@@ -240,7 +234,6 @@ export function SuperAdminDashboard() {
                 <th className="py-2.5 px-3">Code</th>
                 <th className="py-2.5 px-3">Location</th>
                 <th className="py-2.5 px-3">Status</th>
-                <th className="py-2.5 px-3 text-center">Branches</th>
                 <th className="py-2.5 px-3 text-center">Paid Invoices</th>
                 <th className="py-2.5 px-3 text-right">Total Sales</th>
                 <th className="py-2.5 px-3 text-right">Actions</th>
@@ -249,7 +242,7 @@ export function SuperAdminDashboard() {
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {hospitals.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400">
+                  <td colSpan={7} className="py-8 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Building2 className="h-8 w-8 text-slate-300" />
                       <p className="font-medium text-slate-600">No hospitals registered yet</p>
@@ -294,10 +287,6 @@ export function SuperAdminDashboard() {
                           <XCircle className="h-3 w-3" /> Inactive
                         </span>
                       )}
-                    </td>
-
-                    <td className="py-3 px-3 text-center font-semibold text-slate-800">
-                      {h.totalBranches}
                     </td>
 
                     <td className="py-3 px-3 text-center font-semibold text-slate-800">

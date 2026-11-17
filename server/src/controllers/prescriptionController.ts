@@ -17,7 +17,7 @@ import { emitToHospital } from "../config/socket";
 import { catchAsync } from "../utils/catchAsync";
 import { AppError } from "../utils/AppError";
 import { env } from "../config/env";
-import { cloudinary } from "../config/cloudinary";
+import { cloudinary, CLOUDINARY_ROOT_FOLDER } from "../config/cloudinary";
 import { InventoryItem } from "../models/InventoryItem";
 import { Invoice } from "../models/Invoice";
 import { AuditLog } from "../models/AuditLog";
@@ -250,7 +250,7 @@ export async function createOrUpdatePrescriptionCore(
 
   // Upload to Cloudinary
   const uploadResult = await cloudinary.uploader.upload(pdfPath, {
-    folder: "hms/prescriptions",
+    folder: `${CLOUDINARY_ROOT_FOLDER}/prescriptions`,
     resource_type: "auto"
   });
 
@@ -604,7 +604,7 @@ export const downloadPrescription = catchAsync(async (req: Request, res: Respons
   if (fs.existsSync(pdfPath)) {
     // Lazy migration: Upload existing local prescription to Cloudinary on first view
     const uploadResult = await cloudinary.uploader.upload(pdfPath, {
-      folder: "hms/prescriptions",
+      folder: `${CLOUDINARY_ROOT_FOLDER}/prescriptions`,
       resource_type: "auto"
     });
 

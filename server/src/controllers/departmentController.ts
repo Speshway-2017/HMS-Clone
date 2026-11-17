@@ -14,6 +14,7 @@ import {
   codeValidator,
   numberValidator,
 } from "../utils/validators";
+import { generateUniqueDepartmentCode } from "../utils/idGenerator";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Validation schemas
@@ -111,9 +112,19 @@ import { Branch } from "../models/Branch";
 export const listDepartments = catchAsync(async (req: Request, res: Response) => {
   const filter: Record<string, unknown> = { ...req.hospitalFilter };
 
-  if (req.user?.role === "patient" || !filter.hospital) {
+  // If a specific hospital is requested in query params (e.g. from super-admin or parent hospital dropdown)
+  const targetHospital = (req.query.hospitalId as string) || (req.query.hospital as string);
+  if (targetHospital && targetHospital !== "all") {
+    filter.hospital = targetHospital;
+  } else if (req.user?.role === "patient" || !filter.hospital) {
     delete filter.hospital;
     delete filter.branch;
+  }
+
+  // If a specific branch is requested
+  const targetBranch = (req.query.branchId as string) || (req.query.branch as string);
+  if (targetBranch && targetBranch !== "all") {
+    filter.branch = targetBranch;
   }
 
   if (req.query.activeOnly === "true" || req.query.active === "true") {
@@ -121,12 +132,24 @@ export const listDepartments = catchAsync(async (req: Request, res: Response) =>
   }
 
   const departments = await Department.find(filter)
-    .populate("hospital", "name")
-    .populate("branch", "name")
+    .populate("hospital", "name code")
+    .populate("branch", "name code")
     .populate("departmentHead", "name specialization")
     .sort({ displayOrder: 1, createdAt: -1 });
 
   res.json({ status: "success", data: { departments } });
+});
+
+export const getNextDepartmentCode = catchAsync(async (req: Request, res: Response) => {
+  const hospitalRaw = (req.query.hospital as string) || (req.query.hospitalId as string) || req.hospitalFilter?.hospital || req.user?.hospital;
+  const targetBranch = (req.query.branch as string) || (req.query.branchId as string) || req.hospitalFilter?.branch || null;
+  const deptName = req.query.name as string | undefined;
+
+  const code = await generateUniqueDepartmentCode(hospitalRaw, targetBranch, deptName);
+  res.json({
+    status: "success",
+    data: { code },
+  });
 });
 
 export const createDepartment = catchAsync(async (req: Request, res: Response) => {
@@ -149,18 +172,10 @@ export const createDepartment = catchAsync(async (req: Request, res: Response) =
     throw new AppError(`A department named "${trimmedName}" already exists for this hospital/branch.`, 409);
   }
 
-  // Auto-generate code if empty, or enforce uniqueness
+  // Auto-generate composite Unique Department Code if empty, or enforce uniqueness
   let code = body.code?.trim() ?? "";
   if (!code) {
-    const cleanWords = trimmedName.replace(/[^a-zA-Z0-9\s]/g, "").split(/\s+/).filter(Boolean);
-    const baseCode = (cleanWords[0]?.slice(0, 6) || "DEPT").toUpperCase();
-    let num = 1;
-    let candidate = `${baseCode}-${String(num).padStart(2, "0")}`;
-    while (await Department.exists({ hospital, branch: targetBranch, code: candidate })) {
-      num++;
-      candidate = `${baseCode}-${String(num).padStart(2, "0")}`;
-    }
-    code = candidate;
+    code = await generateUniqueDepartmentCode(hospital, targetBranch, trimmedName);
   } else {
     const existingCode = await Department.findOne({ hospital, branch: targetBranch, code: code.toUpperCase() });
     if (existingCode) {

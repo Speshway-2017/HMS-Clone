@@ -34,9 +34,14 @@ export function RegisterPage() {
     return <Navigate to="/login" replace />;
   }
 
+  const [persistedHospital] = useState<{ name: string; logoUrl: string }>(() => ({
+    name: typeof window !== "undefined" ? localStorage.getItem("hms_hospital_name") || "" : "",
+    logoUrl: typeof window !== "undefined" ? localStorage.getItem("hms_hospital_logo") || "" : "",
+  }));
+
   const { data: hospital } = usePublicHospital();
-  const hospitalName = hospital?.name || "HMS Enterprise";
-  const logoUrl = hospital?.logoUrl;
+  const hospitalName = hospital?.name || persistedHospital.name || "Preethi Fertility Centre & Women's Clinic";
+  const logoUrl = hospital?.logoUrl || persistedHospital.logoUrl || "/preethi_logo.jpg";
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
   const registerMutation = useRegisterPatientUser();
@@ -217,66 +222,85 @@ export function RegisterPage() {
   return (
     <div className="h-screen w-full flex overflow-hidden bg-slate-50 font-sans">
       {/* --- LEFT PANEL: Branding & Info (Hidden on mobile) --- */}
-      <div className="relative hidden lg:flex flex-col justify-between bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 p-8 lg:w-[360px] xl:w-[420px] shrink-0 h-full overflow-hidden text-white">
-        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
-        <div className="absolute -left-10 bottom-10 h-48 w-48 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none" />
+      <div className="relative hidden lg:flex flex-col justify-between bg-gradient-to-br from-[#041a10] via-[#093522] to-[#041910] p-8 lg:w-[360px] xl:w-[420px] shrink-0 h-full overflow-hidden text-white border-r border-emerald-900/40 shadow-2xl">
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-emerald-500/15 blur-3xl pointer-events-none" />
+        <div className="absolute -left-10 bottom-10 h-48 w-48 rounded-full bg-emerald-400/10 blur-2xl pointer-events-none" />
+        <div className="absolute right-10 bottom-10 h-48 w-48 rounded-full bg-rose-500/10 blur-2xl pointer-events-none" />
+
+        {/* Ambient Subtle Grid Pattern Overlay */}
+        <div
+          className="absolute inset-0 opacity-[0.03] pointer-events-none"
+          style={{
+            backgroundImage: "radial-gradient(#ffffff 1px, transparent 1px)",
+            backgroundSize: "24px 24px",
+          }}
+        />
 
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-3 text-lg font-extrabold tracking-tight relative z-10">
-          <img
-            src={logoUrl || "/hospital-logo.svg"}
-            alt=""
-            className="h-8 w-8 rounded-lg object-cover shadow-sm bg-white/10"
-            onError={(e) => {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = "/hospital-logo.svg";
-            }}
-          />
-          <span className="bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">
-            {hospitalName}
-          </span>
+        <Link to="/" className="flex items-center gap-3.5 text-lg font-extrabold tracking-tight relative z-10 group">
+          <div className="relative">
+            <img
+              src={logoUrl}
+              alt={hospitalName}
+              className="h-10 w-10 rounded-xl object-contain bg-white p-1 border border-emerald-400/40 shadow-lg group-hover:scale-105 transition-transform"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = "/preethi_logo.jpg";
+              }}
+            />
+            <span className="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full bg-emerald-400 border-2 border-[#093522]" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-white font-extrabold text-base tracking-tight leading-snug group-hover:text-emerald-200 transition-colors">
+              {hospitalName}
+            </span>
+            <span className="text-[11px] font-semibold text-emerald-300/90 tracking-wide flex items-center gap-1.5 mt-0.5">
+              <Activity className="h-3 w-3 text-emerald-400 animate-pulse" />
+              Hospital Management System
+            </span>
+          </div>
         </Link>
 
         {/* Info */}
         <div className="my-auto space-y-6 relative z-10 py-6">
           <div className="space-y-3">
-            <span className="inline-block rounded-full bg-indigo-500/10 border border-indigo-400/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-300">
+            <span className="inline-block rounded-full bg-emerald-500/15 border border-emerald-400/30 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
               Direct Clinical Network
             </span>
             <h2 className="text-2xl xl:text-3xl font-extrabold leading-tight tracking-tight text-white">
               Instant Patient Registration
             </h2>
-            <p className="text-xs leading-relaxed text-slate-300">
+            <p className="text-xs leading-relaxed text-emerald-100/80">
               Create your verified patient profile to schedule OPD appointments, track medical histories, view diagnostic laboratory test reports, and connect with clinical specialists.
             </p>
           </div>
 
-          <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-md text-xs">
+          <div className="space-y-3 rounded-2xl border border-emerald-500/25 bg-emerald-950/40 p-4 backdrop-blur-md text-xs shadow-inner">
             <div className="flex items-start gap-2.5">
               <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
               <div>
                 <h4 className="font-bold text-white">Instant UHID Generation</h4>
-                <p className="text-[11px] text-slate-300 mt-0.5">Automated unique health identification code linked directly to our reception desk matrix.</p>
+                <p className="text-[11px] text-emerald-200/80 mt-0.5">Automated unique health identification code linked directly to our reception desk matrix.</p>
               </div>
             </div>
             <div className="flex items-start gap-2.5">
               <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
               <div>
                 <h4 className="font-bold text-white">Real-Time Reception Sync</h4>
-                <p className="text-[11px] text-slate-300 mt-0.5">Your registration is fetched in real-time by receptionists for instant check-in & OPD token issuance.</p>
+                <p className="text-[11px] text-emerald-200/80 mt-0.5">Your registration is fetched in real-time by receptionists for instant check-in & OPD token issuance.</p>
               </div>
             </div>
             <div className="flex items-start gap-2.5">
               <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
               <div>
                 <h4 className="font-bold text-white">Encrypted & HIPAA Compliant</h4>
-                <p className="text-[11px] text-slate-300 mt-0.5">Your personal information and medical records are isolated and protected using AES-256 encryption.</p>
+                <p className="text-[11px] text-emerald-200/80 mt-0.5">Your personal information and medical records are isolated and protected using AES-256 encryption.</p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="text-[10px] text-slate-400 relative z-10">
+        <div className="text-[10px] text-emerald-300/70 border-t border-emerald-800/40 pt-3 relative z-10">
           © {new Date().getFullYear()} {hospitalName}. Managed Healthcare Platform.
         </div>
       </div>
@@ -287,7 +311,7 @@ export function RegisterPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-                <UserPlus className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-650 shrink-0" />
+                <UserPlus className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-700 shrink-0" />
                 Patient Self-Registration
               </h2>
               <p className="text-xs text-slate-500 font-medium mt-1">
@@ -296,7 +320,7 @@ export function RegisterPage() {
             </div>
             <Link
               to="/login"
-              className="text-xs font-bold text-indigo-650 hover:text-indigo-800 hover:underline flex items-center gap-1 shrink-0"
+              className="text-xs font-bold text-emerald-700 hover:text-emerald-900 hover:underline flex items-center gap-1 shrink-0"
             >
               Already registered? Sign In →
             </Link>
@@ -331,8 +355,8 @@ export function RegisterPage() {
           <form onSubmit={handleSubmit(onValidSubmit, onInvalidSubmit)} noValidate className="space-y-6">
             {/* SECTION 1: Personal & Account Security */}
             <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-card space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-950 flex items-center gap-2 border-b border-slate-100 pb-2">
-                <User className="h-4 w-4 text-indigo-650" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-2 border-b border-slate-100 pb-2">
+                <User className="h-4 w-4 text-emerald-700" />
                 1. Account & Security Details
               </h3>
 
@@ -352,7 +376,7 @@ export function RegisterPage() {
                       className={`w-full rounded-lg border pl-9 pr-3 py-2 text-xs font-medium outline-none transition-colors ${
                         errors.name
                           ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                          : "border-slate-300 text-slate-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                          : "border-slate-300 text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                       }`}
                     />
                     <User className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
@@ -379,7 +403,7 @@ export function RegisterPage() {
                       className={`w-full rounded-lg border pl-9 pr-3 py-2 text-xs font-medium outline-none transition-colors ${
                         errors.email
                           ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                          : "border-slate-300 text-slate-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                          : "border-slate-300 text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                       }`}
                     />
                     <Mail className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
@@ -406,7 +430,7 @@ export function RegisterPage() {
                       className={`w-full rounded-lg border pl-9 pr-9 py-2 text-xs font-medium outline-none transition-colors ${
                         errors.password
                           ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                          : "border-slate-300 text-slate-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                          : "border-slate-300 text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                       }`}
                     />
                     <Lock className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
@@ -441,7 +465,7 @@ export function RegisterPage() {
                       className={`w-full rounded-lg border pl-9 pr-9 py-2 text-xs font-medium outline-none transition-colors ${
                         errors.confirmPassword
                           ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                          : "border-slate-300 text-slate-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                          : "border-slate-300 text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                       }`}
                     />
                     <Lock className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
@@ -465,8 +489,8 @@ export function RegisterPage() {
 
             {/* SECTION 2: Demographics & Address */}
             <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-card space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-950 flex items-center gap-2 border-b border-slate-100 pb-2">
-                <Activity className="h-4 w-4 text-emerald-600" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-2 border-b border-slate-100 pb-2">
+                <Activity className="h-4 w-4 text-emerald-700" />
                 2. Patient Demographics & Contact
               </h3>
 
@@ -486,12 +510,12 @@ export function RegisterPage() {
                       className={`w-full rounded-lg border pl-9 pr-9 py-2 text-xs font-medium outline-none transition-colors ${
                         errors.phone
                           ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                          : "border-slate-300 text-slate-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                          : "border-slate-300 text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                       }`}
                     />
                     <Phone className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
                     {searchingPhone && (
-                      <Loader2 className="absolute right-3 top-2.5 h-3.5 w-3.5 animate-spin text-indigo-600" />
+                      <Loader2 className="absolute right-3 top-2.5 h-3.5 w-3.5 animate-spin text-emerald-600" />
                     )}
                   </div>
                   {errors.phone && (
@@ -513,7 +537,7 @@ export function RegisterPage() {
                     className={`w-full rounded-lg border px-3 py-2 text-xs font-medium outline-none transition-colors ${
                       errors.age
                         ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                        : "border-slate-300 text-slate-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                        : "border-slate-300 text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                     }`}
                   />
                   {errors.age && (
@@ -531,7 +555,7 @@ export function RegisterPage() {
                     className={`w-full rounded-lg border px-3 py-2 text-xs font-medium outline-none transition-colors bg-white ${
                       errors.gender
                         ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                        : "border-slate-300 text-slate-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                        : "border-slate-300 text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                     }`}
                   >
                     <option value="Male">Male</option>
@@ -555,7 +579,7 @@ export function RegisterPage() {
                     className={`w-full rounded-lg border px-3 py-2 text-xs font-medium outline-none transition-colors bg-white ${
                       errors.bloodGroup
                         ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                        : "border-slate-300 text-slate-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                        : "border-slate-300 text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                     }`}
                   >
                     {["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"].map((bg) => (
@@ -586,7 +610,7 @@ export function RegisterPage() {
                       className={`w-full rounded-lg border pl-9 pr-3 py-2 text-xs font-medium outline-none transition-colors ${
                         errors.address
                           ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                          : "border-slate-300 text-slate-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                          : "border-slate-300 text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                       }`}
                     />
                     <MapPin className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
@@ -602,8 +626,8 @@ export function RegisterPage() {
 
             {/* SECTION 3: Emergency Contact */}
             <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-card space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-950 flex items-center gap-2 border-b border-slate-100 pb-2">
-                <ShieldAlert className="h-4 w-4 text-amber-600" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-2 border-b border-slate-100 pb-2">
+                <ShieldAlert className="h-4 w-4 text-emerald-700" />
                 3. Emergency Contact Person
               </h3>
 
@@ -622,7 +646,7 @@ export function RegisterPage() {
                     className={`w-full rounded-lg border px-3 py-2 text-xs font-medium outline-none transition-colors ${
                       errors.emergencyName
                         ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                        : "border-slate-300 text-slate-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                        : "border-slate-300 text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                     }`}
                   />
                   {errors.emergencyName && (
@@ -646,7 +670,7 @@ export function RegisterPage() {
                     className={`w-full rounded-lg border px-3 py-2 text-xs font-medium outline-none transition-colors ${
                       errors.emergencyPhone
                         ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                        : "border-slate-300 text-slate-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                        : "border-slate-300 text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                     }`}
                   />
                   {errors.emergencyPhone && (
@@ -670,7 +694,7 @@ export function RegisterPage() {
                     className={`w-full rounded-lg border px-3 py-2 text-xs font-medium outline-none transition-colors ${
                       errors.emergencyRelation
                         ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                        : "border-slate-300 text-slate-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                        : "border-slate-300 text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                     }`}
                   />
                   {errors.emergencyRelation && (
@@ -684,8 +708,8 @@ export function RegisterPage() {
 
             {/* SECTION 4: Medical History & Insurance */}
             <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-card space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-950 flex items-center gap-2 border-b border-slate-100 pb-2">
-                <FileText className="h-4 w-4 text-teal-600" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-2 border-b border-slate-100 pb-2">
+                <FileText className="h-4 w-4 text-emerald-700" />
                 4. Allergies & Insurance Details (Optional)
               </h3>
 
@@ -700,7 +724,7 @@ export function RegisterPage() {
                     className={`w-full rounded-lg border px-3 py-2 text-xs font-medium outline-none transition-colors ${
                       errors.allergies
                         ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                        : "border-slate-300 text-slate-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                        : "border-slate-300 text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                     }`}
                   />
                   {errors.allergies && (
@@ -720,7 +744,7 @@ export function RegisterPage() {
                     className={`w-full rounded-lg border px-3 py-2 text-xs font-medium outline-none transition-colors ${
                       errors.insuranceProvider
                         ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                        : "border-slate-300 text-slate-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                        : "border-slate-300 text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                     }`}
                   />
                   {errors.insuranceProvider && (
@@ -740,7 +764,7 @@ export function RegisterPage() {
                     className={`w-full rounded-lg border px-3 py-2 text-xs font-medium outline-none transition-colors ${
                       errors.insurancePolicyNumber
                         ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                        : "border-slate-300 text-slate-800 focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
+                        : "border-slate-300 text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                     }`}
                   />
                   {errors.insurancePolicyNumber && (
@@ -764,7 +788,7 @@ export function RegisterPage() {
               <Button
                 type="submit"
                 disabled={isPending}
-                className="bg-indigo-650 hover:bg-indigo-700 px-8 py-3 text-sm font-bold text-white shadow-lg transition-all disabled:opacity-50"
+                className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 px-8 py-3 text-sm font-bold text-white shadow-md hover:shadow-lg transition-all disabled:opacity-50"
               >
                 {isPending ? "Registering Patient..." : "Complete Registration"}
               </Button>

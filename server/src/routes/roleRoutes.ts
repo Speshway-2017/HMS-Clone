@@ -4,7 +4,7 @@ import { listRoles, createRole, updateRole, deleteRole } from "../controllers/ro
 
 const router = Router();
 
-router.use(protect, restrictTo("super_admin", "hospital_admin"));
+router.use(protect, restrictTo("super_admin", "hospital_admin", "admin" as any));
 router.get("/", listRoles);
 router.post("/", createRole);
 router.patch("/:id", updateRole);

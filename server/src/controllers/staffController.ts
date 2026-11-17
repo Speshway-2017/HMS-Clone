@@ -3,7 +3,9 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { Staff, STAFF_DUTY_STATUSES } from "../models/Staff";
 import { User } from "../models/User";
+import { Hospital } from "../models/Hospital";
 import { Admission } from "../models/Admission";
+import { sendOnboardingCredentialsEmail } from "../services/emailService";
 import { AppError } from "../utils/AppError";
 import { catchAsync } from "../utils/catchAsync";
 import { generateTempPassword, generateUniqueEmployeeId } from "../utils/idGenerator";
@@ -50,6 +52,7 @@ const staffSchema = z.object({
       }
     )
     .default(""),
+  shift: z.string().max(50).optional().default("General"),
   dateOfJoining: z.coerce.date().optional().nullable(),
   dutyStatus: z.enum(STAFF_DUTY_STATUSES).optional(),
   checkInTime: z.string().optional().default(""),
@@ -181,9 +184,10 @@ export const getTopStaff = catchAsync(async (req: Request, res: Response) => {
 
 export const getNextEmployeeId = catchAsync(async (req: Request, res: Response) => {
   const role = (req.query.role as string) || "staff";
+  const name = (req.query.name as string) || "";
   const hospitalId = req.hospitalFilter?.hospital || (req.query.hospital as string);
   const branchId = req.hospitalFilter?.branch || (req.query.branch as string) || null;
-  const employeeId = await generateUniqueEmployeeId(role, hospitalId, branchId);
+  const employeeId = await generateUniqueEmployeeId(role, hospitalId, branchId, name);
   res.json({ status: "success", data: { employeeId } });
 });
 
@@ -194,11 +198,17 @@ export const createStaff = catchAsync(async (req: Request, res: Response) => {
   const hospitalId = req.hospitalFilter!.hospital;
   const branchId = req.hospitalFilter?.branch || (req.body as any).branch || null;
 
+  const normalizedRole = (body.role || "").toLowerCase().trim();
+  const prohibitedRoles = ["super_admin", "admin", "hospital_admin", "patient"];
+  if (prohibitedRoles.includes(normalizedRole) && req.user?.role !== "super_admin") {
+    throw new AppError("Hospital administrators are not permitted to add Super Admin, Hospital Admin, or Patient accounts.", 403);
+  }
+
   const isDoctorRole = (body.role || "").toLowerCase().includes("doctor");
 
   let employeeId = body.employeeId?.trim();
   if (!employeeId) {
-    employeeId = await generateUniqueEmployeeId(body.role || "staff", hospitalId, branchId);
+    employeeId = await generateUniqueEmployeeId(body.role || "staff", hospitalId, branchId, body.name);
   }
 
   let createdRecord: any;
@@ -246,6 +256,11 @@ export const createStaff = catchAsync(async (req: Request, res: Response) => {
           hospital: hospitalId,
           branch: branchId,
         });
+      } else {
+        await User.findOneAndUpdate(
+          { email: body.email.toLowerCase() },
+          { employeeId, hospital: hospitalId, branch: branchId, role: "doctor", passwordHash }
+        );
       }
     }
   } else {
@@ -266,7 +281,50 @@ export const createStaff = catchAsync(async (req: Request, res: Response) => {
           hospital: hospitalId,
           branch: branchId,
         });
+      } else {
+        await User.findOneAndUpdate(
+          { email: body.email.toLowerCase() },
+          { employeeId, hospital: hospitalId, branch: branchId, role: body.role || "receptionist", passwordHash }
+        );
       }
+    }
+  }
+
+  // Dispatch onboarding credentials email to newly registered personnel
+  if (body.email && tempPassword) {
+    const hospital = await Hospital.findById(hospitalId);
+    const hospitalName = hospital?.name || "Preethi Fertility, Hyderabad";
+    const logoUrl = hospital?.logoUrl || "";
+
+    const reqOrigin = req.get("origin");
+    const reqReferer = req.get("referer");
+    let clientUrl = process.env.CLIENT_URL;
+    if (!clientUrl || clientUrl.includes("localhost")) {
+      if (reqOrigin) {
+        clientUrl = reqOrigin;
+      } else if (reqReferer) {
+        try {
+          clientUrl = new URL(reqReferer).origin;
+        } catch {}
+      }
+    }
+    if (!clientUrl) clientUrl = "http://localhost:5173";
+    clientUrl = clientUrl.replace(/\/+$/, "");
+    const loginUrl = `${clientUrl}/login`;
+
+    try {
+      await sendOnboardingCredentialsEmail({
+        to: body.email.trim(),
+        name: body.name,
+        role: isDoctorRole ? "Doctor" : body.role || "staff",
+        employeeId,
+        tempPassword,
+        hospitalName,
+        logoUrl,
+        loginUrl,
+      });
+    } catch (err: any) {
+      console.error("[Staff] Failed to dispatch onboarding credentials email:", err?.message || err);
     }
   }
 
@@ -310,6 +368,13 @@ export const updateStaff = catchAsync(async (req: Request, res: Response) => {
     throw new AppError("Employee ID is required. Please enter valid data", 400);
   }
   const body = staffSchema.partial().parse(req.body);
+  if (body.role) {
+    const normalizedRole = body.role.toLowerCase().trim();
+    const prohibitedRoles = ["super_admin", "admin", "hospital_admin", "patient"];
+    if (prohibitedRoles.includes(normalizedRole) && req.user?.role !== "super_admin") {
+      throw new AppError("Hospital administrators are not permitted to assign Super Admin, Hospital Admin, or Patient roles.", 403);
+    }
+  }
   const staff = await Staff.findOneAndUpdate({ _id: req.params.id, ...req.hospitalFilter }, body, {
     new: true,
     runValidators: true,
